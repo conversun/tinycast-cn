@@ -3,6 +3,8 @@
 import Foundation
 
 enum FuzzyMatch {
+    static let romanizedPenalty = 5_000
+
     static func score(query: String, candidate: String) -> Int? {
         let q = normalized(query)
         let c = normalized(candidate)
@@ -63,19 +65,26 @@ enum FuzzyMatch {
 let apps = [
     "Google Chrome", "Chess", "Time Machine", "Safari", "Bluetooth File Exchange",
     "Screenshot", "Screen Sharing", "Visual Studio Code", "Photos", "App Store",
-    "System Settings", "Calendar", "Terminal", "WhatsApp", "Wick",
+    "System Settings", "Calendar", "Terminal", "WhatsApp", "Wick", "微信", "钉钉",
+    "网易云音乐", "高德地图",
 ]
 
 func rank(_ query: String, boosts: [String: Int] = [:]) -> [String] {
     apps.compactMap { name -> (String, Int)? in
-        guard let s = FuzzyMatch.score(query: query, candidate: name) else { return nil }
-        return (name, s + boosts[name, default: 0])
+        let literal = FuzzyMatch.score(query: query, candidate: name)
+        let romanized = Pinyin.aliases(for: name)
+            .compactMap { FuzzyMatch.score(query: query, candidate: $0) }
+            .map { $0 - FuzzyMatch.romanizedPenalty }
+            .max()
+        guard let score = [literal, romanized].compactMap({ $0 }).max() else { return nil }
+        return (name, score + boosts[name, default: 0])
     }
     .sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.count < $1.0.count }
     .map(\.0)
 }
 
 var failures = 0
+@MainActor
 func check(_ desc: String, _ cond: Bool, _ detail: String = "") {
     if cond {
         print("PASS  \(desc)")
@@ -123,6 +132,12 @@ check(
     "learned marked WhatsApp can outrank Wick",
     FuzzyMatch.score(query: "w", candidate: markedWhatsApp)! + 2_100
         > FuzzyMatch.score(query: "w", candidate: "Wick")!)
+
+check("full pinyin", Pinyin.aliases(for: "微信").first == "weixin")
+check("pinyin initials", Pinyin.aliases(for: "微信").last == "wx")
+check("polyphone context", Pinyin.aliases(for: "高德地图").first == "gaodeditu")
+check("full pinyin ranks app", rank("weixin").first == "微信", "got \(rank("weixin"))")
+check("initials rank app", rank("wyyyy").first == "网易云音乐", "got \(rank("wyyyy"))")
 
 print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

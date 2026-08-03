@@ -75,7 +75,9 @@ app; changes always apply (fixed build path — no need to delete `build/`).
 There's no XCTest target. Standalone harnesses:
 
 ```sh
-swift Tools/fuzz-test.swift                                        # launcher fuzzy matcher
+cp Tools/fuzz-test.swift /tmp/main.swift
+swiftc -swift-version 6 Tinycast/Core/Pinyin.swift /tmp/main.swift \
+    -o /tmp/fuzz-test && /tmp/fuzz-test                            # launcher fuzzy matcher + pinyin
 swiftc -swift-version 6 Tinycast/Core/LauncherRankingStore.swift Tools/ranking-test.swift \
     -o /tmp/ranking-test && /tmp/ranking-test                      # learned launcher ranking
 swiftc Tinycast/Core/Calculator/*.swift Tools/calc-test.swift \
@@ -118,8 +120,9 @@ swiftc -swift-version 6 Tinycast/Core/Uninstall/UninstallTarget.swift \
 ```
 
 `Tools/fuzz-test.swift` holds a **copy** of `FuzzyMatch` from `Tinycast/Core/AppIndex.swift` —
-change the scoring in one and mirror it in the other. The calc harness compiles the real engine
-sources, which is why `Tinycast/Core/Calculator/` must stay Foundation-only. The system-action harness
+change the scoring in one and mirror it in the other. It compiles the real `Core/Pinyin.swift`, which
+must stay Foundation-only. The calc harness compiles the real engine sources, which is why
+ `Tinycast/Core/Calculator/` must stay Foundation-only. The system-action harness
 similarly keeps `SystemAction.swift` independent from AppKit and all command side effects. The
 uninstall harness is the same idea taken furthest: it touches no filesystem at all, because
 `UninstallScanner` hands the rules directory *names* and the protection classifier takes its

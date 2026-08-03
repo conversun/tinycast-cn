@@ -18,7 +18,23 @@ struct AppEntry: Identifiable, Hashable, Sendable {
     let bundleID: String?
     let kind: Kind
     /// Extra strings this entry also matches on in search — a snippet's keyword. Empty for every other kind.
-    var matchAliases: [String] = []
+    var matchAliases: [String]
+    /// Latin readings of a Han-script name, scored half a tier below the literal ladder.
+    let romanizedAliases: [String]
+
+    /// Readings are derived here rather than at the call sites, so no entry kind can be added without them.
+    init(
+        id: String, name: String, url: URL, bundleID: String?, kind: Kind,
+        matchAliases: [String] = []
+    ) {
+        self.id = id
+        self.name = name
+        self.url = url
+        self.bundleID = bundleID
+        self.kind = kind
+        self.matchAliases = matchAliases
+        self.romanizedAliases = Pinyin.aliases(for: name)
+    }
 
     /// Stable identity for learned ranking, favorites, and other per-entry preferences.
     var preferenceKey: String { bundleID ?? id }
@@ -452,6 +468,12 @@ final class AppIndex: ObservableObject {
                 guard let aliasScore = FuzzyMatch.score(query: q, candidate: candidate) else { continue }
                 bestScore = max(bestScore ?? aliasScore, aliasScore)
             }
+            // A reading is a weaker claim on the query than the name itself, so it lands below the literal match of the same kind but still above the next kind down: typing "safari" can never lose Safari to something whose pinyin spells it.
+            for candidate in app.romanizedAliases {
+                guard let aliasScore = FuzzyMatch.score(query: q, candidate: candidate) else { continue }
+                let penalized = aliasScore - FuzzyMatch.romanizedPenalty
+                bestScore = max(bestScore ?? penalized, penalized)
+            }
             guard let score = bestScore else { return nil }
             return (app, score + (learned[app.preferenceKey] ?? 0))
         }
@@ -468,6 +490,9 @@ final class AppIndex: ObservableObject {
 }
 
 enum FuzzyMatch {
+    /// Half the gap between two tiers, subtracted from a transliterated match so it ranks under the literal match of the same kind without falling past the kind below it. It also has to stay above `LauncherRankingStore.maximumBoost`, or learned ranking could lift a reading back over the literal match it sits under.
+    static let romanizedPenalty = 5_000
+
     /// Tiered relevance score (higher is better), or nil when the query doesn't match; tiers are spaced so a better kind always wins.
     static func score(query: String, candidate: String) -> Int? {
         let q = normalized(query)

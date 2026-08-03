@@ -35,6 +35,12 @@ frecency boost (frequency plus decaying recency). The boost can reorder results 
 tier but cannot make a weaker match kind beat a stronger one. Matching strips invisible Unicode
 format scalars first, since app metadata can contain bidi/zero-width markers before the visible name.
 
+## Pinyin
+
+Chinese names also match their full reading and initials: 微信 answers to `weixin` and `wx`.
+`Core/Pinyin.swift` uses word-aware system transcription for polyphones and keeps its aliases below
+literal matches in ranking. Aliases are computed once when entries are indexed, off the main actor.
+
 Selecting a launcher result records every prefix of the submitted query, so choosing WhatsApp for
 `wha` also teaches `w` and `wh`. Direct hotkeys and empty-query favorites do not affect learned
 ranking. Learned data stays on device in `launcher-ranking.json`; a result that has learned ranking
@@ -125,7 +131,7 @@ execution semantics.
 
 > **Invariant:** `Tools/fuzz-test.swift` contains a **copy** of `FuzzyMatch` from
 > `Tinycast/Core/AppIndex.swift`. If you change the scoring in one, mirror it in the other or the test
-> is meaningless.
+> is meaningless. It compiles the real `Core/Pinyin.swift`, which must therefore stay Foundation-only.
 
 The ranking harness covers prefix learning, frequency/recency scoring, persistence, and both reset
 paths; see the command in `development.md`.
