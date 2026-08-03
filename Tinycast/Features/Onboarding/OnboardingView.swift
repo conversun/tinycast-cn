@@ -13,8 +13,8 @@ struct OnboardingView: View {
     private let refreshTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private static let lastStep = 3
-    /// Fixed content size; also the window size in `AppCore.showOnboarding()`. A hard frame keeps `NSHostingView` from sizing the window to the content's unbounded ideal height.
-    static let windowSize = CGSize(width: 520, height: 400)
+    /// Fixed AppKit-owned size, chosen to fit the tallest onboarding step.
+    static let windowSize = CGSize(width: 520, height: 458)
 
     var body: some View {
         VStack(spacing: Theme.Spacing.lg) {
@@ -49,9 +49,9 @@ struct OnboardingView: View {
         VStack(spacing: Theme.Spacing.md) {
             heroMark
             VStack(spacing: Theme.Spacing.xs) {
-                Text(title)
+                Text(title.localizedUI)
                     .font(.title2.weight(.bold))
-                Text(subtitle)
+                Text(subtitle.localizedUI)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -111,9 +111,9 @@ struct OnboardingView: View {
 
     private var readyMessage: String {
         if let caps = hotKeys.binding(for: .togglePalette)?.keycaps {
-            return "Press \(caps.joined()) anytime to start using Tinycast."
+            return String(localized: "Press \(caps.joined()) anytime to start using Tinycast.")
         }
-        return "Tinycast is ready. Set a shortcut in Settings to summon it."
+        return String(localized: "Tinycast is ready. Set a shortcut in Settings to summon it.")
     }
 
     // MARK: - Step content
@@ -243,7 +243,7 @@ struct OnboardingView: View {
                     .controlSize(.large)
                     .disabled(true)
                 } else {
-                    Button(primaryTitle, action: primaryAction)
+                    Button(primaryTitle.localizedUI, action: primaryAction)
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
                         .disabled(primaryDisabled)
@@ -297,7 +297,7 @@ struct OnboardingView: View {
     // MARK: - Shared bits
 
     private func caption(_ text: String) -> some View {
-        Text(text)
+        Text(text.localizedUI)
             .font(.caption)
             .foregroundStyle(.tertiary)
             .padding(.horizontal, Theme.Spacing.xs)
@@ -327,7 +327,7 @@ struct OnboardingView: View {
             Image(
                 systemName: accessibilityTrusted
                     ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-            Text(accessibilityTrusted ? "Granted" : "Not granted")
+            Text((accessibilityTrusted ? "Granted" : "Not granted").localizedUI)
         }
         .font(.caption.weight(.semibold))
         .foregroundStyle(accessibilityTrusted ? Color.green : Color.orange)
@@ -373,7 +373,7 @@ final class OnboardingModel: ObservableObject {
         guard let name = file?.lastPathComponent else {
             return "Choose a .rayconfig file exported from Raycast."
         }
-        return "\(name) — \(format?.title ?? "not a Raycast export")"
+        return "\(name) — \(format?.title ?? String(localized: "not a Raycast export"))"
     }
 
     func chooseFile() {
@@ -392,14 +392,7 @@ final class OnboardingModel: ObservableObject {
             do {
                 let outcome = try await BackupActions.importRaycast(
                     file: file, passphrase: passphrase, options: selection)
-                var message = BackupActions.summaryText(outcome.summary)
-                if outcome.clipboardImported > 0 {
-                    message += " Imported \(outcome.clipboardImported) clipboard entries."
-                }
-                if outcome.missingImages > 0 {
-                    message += " \(outcome.missingImages) images were unavailable and skipped."
-                }
-                status = .success(message)
+                status = .success(BackupActions.raycastSummaryText(outcome))
                 passphrase = ""
             } catch {
                 status = .failure(error.localizedDescription)
