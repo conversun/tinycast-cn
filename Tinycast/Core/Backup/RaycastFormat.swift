@@ -7,9 +7,12 @@ enum RaycastImportError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notRaycastFile: return "This doesn't look like a Raycast export (.rayconfig)."
-        case .incorrectPassphrase: return "Incorrect passphrase, or the file is corrupted."
-        case .corrupt: return "The Raycast export could not be read."
+        case .notRaycastFile:
+            return String(localized: "This doesn't look like a Raycast export (.rayconfig).")
+        case .incorrectPassphrase:
+            return String(localized: "Incorrect passphrase, or the file is corrupted.")
+        case .corrupt:
+            return String(localized: "The Raycast export could not be read.")
         }
     }
 }
@@ -50,8 +53,8 @@ enum RaycastFormat: Sendable, Equatable {
 
     var title: String {
         switch self {
-        case .v1: return "Raycast 1.x export"
-        case .v2: return "Raycast X export"
+        case .v1: return String(localized: "Raycast 1.x export")
+        case .v2: return String(localized: "Raycast X export")
         }
     }
 

@@ -124,33 +124,68 @@ enum BackupActions {
         appliedText(s) ?? nothingImportedText
     }
 
-    static let nothingImportedText = "Nothing to import from this file."
+    static let nothingImportedText = String(localized: "Nothing to import from this file.")
 
     /// `nil` when the backup applied no settings, so callers that also import clipboard or snippets can compose one combined sentence instead of contradicting the empty-import wording.
     static func appliedText(_ s: SettingsBackup.ApplySummary) -> String? {
         var parts: [String] = []
-        if s.settingsFields > 0 { parts.append("\(s.settingsFields) settings") }
-        if s.hotkeys > 0 { parts.append("\(s.hotkeys) shortcuts") }
-        if s.favorites > 0 { parts.append("\(s.favorites) favorites") }
-        if s.hiddenItems > 0 { parts.append("\(s.hiddenItems) hidden items") }
-        if s.customCommands > 0 { parts.append("\(s.customCommands) custom commands") }
+        if s.settingsFields > 0 {
+            parts.append(String(localized: "\(s.settingsFields) settings"))
+        }
+        if s.hotkeys > 0 { parts.append(String(localized: "\(s.hotkeys) shortcuts")) }
+        if s.favorites > 0 { parts.append(String(localized: "\(s.favorites) favorites")) }
+        if s.hiddenItems > 0 {
+            parts.append(String(localized: "\(s.hiddenItems) hidden items"))
+        }
+        if s.customCommands > 0 {
+            parts.append(String(localized: "\(s.customCommands) custom commands"))
+        }
         guard !parts.isEmpty else { return nil }
-        return "Applied " + parts.joined(separator: ", ") + "."
+        return String(format: "Applied %@.".localizedUI, parts.joined(separator: ", "))
+    }
+
+    static func raycastSummaryText(_ outcome: RaycastOutcome) -> String {
+        var parts: [String] = []
+        if let applied = appliedText(outcome.summary) { parts.append(applied) }
+        if outcome.clipboardImported > 0 {
+            parts.append(String(localized: "Imported \(outcome.clipboardImported) clipboard entries."))
+        }
+        if outcome.snippetsImported == 1 {
+            parts.append(String(localized: "Imported 1 snippet."))
+        } else if outcome.snippetsImported > 1 {
+            parts.append(String(localized: "Imported \(outcome.snippetsImported) snippets."))
+        }
+        if let snippetsError = outcome.snippetsError {
+            parts.append(String(localized: "Couldn’t import snippets: \(snippetsError)"))
+        }
+        var message = parts.isEmpty ? nothingImportedText : parts.joined(separator: " ")
+        if outcome.missingImages > 0 {
+            message += " "
+                + String(localized: "\(outcome.missingImages) images were unavailable and skipped.")
+        }
+        return message
     }
 
     private static func confirmExecutableImport(commands: Int, shortcuts: Int) async -> Bool {
         guard commands > 0 || shortcuts > 0 else { return true }
-        let commandText = commands == 1 ? "1 custom command" : "\(commands) custom commands"
+        let commandText = commands == 1
+            ? String(localized: "1 custom command")
+            : String(localized: "\(commands) custom commands")
         let shortcutText =
-            shortcuts == 1 ? "1 global shortcut" : "\(shortcuts) global shortcuts"
+            shortcuts == 1
+            ? String(localized: "1 global shortcut")
+            : String(localized: "\(shortcuts) global shortcuts")
         // Red glyph because this is a real security warning, but a plain button: importing a file
         // destroys nothing, so the confirm action isn't destructive.
         return await AppCore.shared.confirm(
-            title: "Import executable commands?",
-            message:
-                "This backup contains \(commandText) and \(shortcutText). Custom commands can run "
-                + "arbitrary shell code. Only import files you trust.",
-            symbol: importSymbol, confirmTitle: "Import", confirmRole: .standard)
+            title: String(localized: "Import executable commands?"),
+            message: String(
+                format:
+                    "This backup contains %@ and %@. Custom commands can run arbitrary shell code. Only import files you trust."
+                    .localizedUI,
+                commandText, shortcutText),
+            symbol: importSymbol, confirmTitle: String(localized: "Import"),
+            confirmRole: .standard)
     }
 
     private static func dateStamp() -> String {

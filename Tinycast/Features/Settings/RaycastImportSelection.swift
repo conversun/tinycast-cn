@@ -45,15 +45,19 @@ struct RaycastImportSelection: View {
                             Image(systemName: category.symbol)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 16)
-                            Text(category.label).lineLimit(1)
+                            Text(category.label.localizedUI).lineLimit(1)
                         }
                     }
                     .toggleStyle(.checkbox)
                     .disabled(!supported)
-                    .help(supported ? "" : "This Raycast export doesn't include \(category.label).")
+                    .help(
+                        supported ? ""
+                            : String(
+                                format: "This Raycast export doesn't include %@.".localizedUI,
+                                category.label.localizedUI))
                 }
             }
-            Button(selection == available ? "Deselect All" : "Select All") {
+            Button((selection == available ? "Deselect All" : "Select All").localizedUI) {
                 selection = selection == available ? [] : available
             }
             .buttonStyle(.link)
