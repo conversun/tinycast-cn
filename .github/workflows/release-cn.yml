@@ -3,6 +3,25 @@ name: Release CN
 run-name: "Tinycast CN ${{ inputs.version }} #${{ github.run_number }}"
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "CN version, e.g. 0.8.2-beta.37-cn.2"
+        type: string
+        required: true
+      prerelease:
+        description: "Mark the GitHub release as a prerelease"
+        type: boolean
+        default: true
+      upstream_tag:
+        description: "Upstream Tinycast release tag"
+        type: string
+        required: true
+      ref:
+        description: "Source branch, tag, or commit"
+        type: string
+        default: main
+        required: true
   workflow_call:
     inputs:
       version:
