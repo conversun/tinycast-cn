@@ -95,11 +95,10 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           STAGE="$(mktemp -d)"
-          cp -R "$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app" \
-            "$STAGE/Tinycast CN.app"
+          cp -R "$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app" "$STAGE/"
           ln -s /Applications "$STAGE/Applications"
           mkdir -p dist
-          diskutil image create from "$STAGE" --format UDZO --volumeName "Tinycast CN" \
+          diskutil image create from "$STAGE" --format UDZO --volumeName "Tinycast" \
             "dist/Tinycast-CN-${VERSION}.dmg"
 
       - uses: actions/upload-artifact@v7
