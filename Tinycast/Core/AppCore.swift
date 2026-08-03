@@ -12,11 +12,11 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .launcher: return "Apps"
-        case .clipboard: return "Clipboard"
-        case .calculatorHistory: return "Calculator History"
-        case .emoji: return "Emoji & Symbols"
-        case .uninstall: return "Uninstall Application"
+        case .launcher: return String(localized: "Apps")
+        case .clipboard: return String(localized: "Clipboard")
+        case .calculatorHistory: return String(localized: "Calculator History")
+        case .emoji: return String(localized: "Emoji & Symbols")
+        case .uninstall: return String(localized: "Uninstall Application")
         }
     }
     var systemImage: String {
@@ -30,11 +30,12 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     }
     var placeholder: String {
         switch self {
-        case .launcher: return "Search for apps and commands…"
-        case .clipboard: return "Type to filter entries…"
-        case .calculatorHistory: return "Do math, convert units, or search your past calculations…"
-        case .emoji: return "Search emoji and symbols…"
-        case .uninstall: return "Filter files and folders by name…"
+        case .launcher: return String(localized: "Search for apps and commands…")
+        case .clipboard: return String(localized: "Type to filter entries…")
+        case .calculatorHistory:
+            return String(localized: "Do math, convert units, or search your past calculations…")
+        case .emoji: return String(localized: "Search emoji and symbols…")
+        case .uninstall: return String(localized: "Filter files and folders by name…")
         }
     }
 }
@@ -51,7 +52,7 @@ struct PasteTarget: Equatable {
         iconPath = app.bundleURL?.path
     }
 
-    var pasteTitle: String { "Paste to \(name)" }
+    var pasteTitle: String { String(localized: "Paste to \(name)") }
 }
 
 /// View-model shared between the panel's SwiftUI tree and the coordinator.
@@ -337,7 +338,8 @@ final class AppCore: ObservableObject {
     /// Settings runs in its own window (the SwiftUI `Settings` scene is unreliable for accessory apps). A fresh window mounts directly on `tab` (no first-frame flicker); an already-open one is switched in place.
     func showSettings(tab: SettingsTab = .general) {
         let isNew = auxWindows.show(
-            id: "settings", title: "Settings", size: CGSize(width: 720, height: 550),
+            id: "settings", title: String(localized: "Settings"),
+            size: CGSize(width: 720, height: 550),
             seamlessTitleBar: true
         ) {
             SettingsRootView(initialTab: tab)
@@ -363,7 +365,7 @@ final class AppCore: ObservableObject {
     /// The first-run wizard: palette shortcut, Accessibility, Raycast import. Also re-runnable from Settings.
     func showOnboarding() {
         auxWindows.show(
-            id: "onboarding", title: "Welcome to Tinycast",
+            id: "onboarding", title: String(localized: "Welcome to Tinycast"),
             size: OnboardingView.windowSize, seamlessTitleBar: true
         ) {
             OnboardingView()
@@ -529,9 +531,9 @@ final class AppCore: ObservableObject {
     private func presentFailure(action: SystemAction, failure: SystemActionFailure) async {
         guard
             await dialogs.reportFailure(
-                title: "“\(action.name)” Failed", message: failure.message,
+                title: String(localized: "“\(action.name)” Failed"), message: failure.message,
                 symbol: action.sfSymbol,
-                recovery: failure.settings == nil ? nil : "Open System Settings…"),
+                recovery: failure.settings == nil ? nil : String(localized: "Open System Settings…")),
             let settings = failure.settings
         else { return }
         let pane: String
@@ -586,8 +588,9 @@ final class AppCore: ObservableObject {
                     // not a warning, it just wants a deliberate second tap.
                     await confirm(
                         title: command.name,
-                        message: "Are you sure you want to run this command?\n\n\(command.command)",
-                        symbol: CustomCommand.sfSymbol, confirmTitle: "Run",
+                        message: String(
+                            localized: "Are you sure you want to run this command?\n\n\(command.command)"),
+                        symbol: CustomCommand.sfSymbol, confirmTitle: String(localized: "Run"),
                         tone: .neutral, confirmRole: .standard)
                 else { return }
             }
@@ -596,7 +599,7 @@ final class AppCore: ObservableObject {
             guard outcome != .success else {
                 // Fires when the command finishes, not when it starts, so a slow one confirms late rather than lying early.
                 if command.showsConfirmation {
-                    self.messageHUD.show(message: "Ran \(command.name)")
+                    self.messageHUD.show(message: String(localized: "Ran \(command.name)"))
                 }
                 return
             }
@@ -627,21 +630,23 @@ final class AppCore: ObservableObject {
         case .success:
             return
         case .launchFailure(let detail):
-            message = "The shell could not be started.\n\n\(detail)"
+            message = String(localized: "The shell could not be started.\n\n\(detail)")
         case .nonZeroExit(let status, let stderr):
             suggestsShellEnvironment = status == 127 && !command.loadsShellEnvironment
             message =
-                "The command exited with status \(status)."
+                String(localized: "The command exited with status \(status).")
                 + (stderr.map { "\n\n" + $0 } ?? "")
                 + (suggestsShellEnvironment
-                    ? "\n\nIf this is a shell alias or function, turn on Load Shell Environment for "
-                        + "this command." : "")
+                    ? "\n\n" + String(
+                        localized:
+                            "If this is a shell alias or function, turn on Load Shell Environment for this command."
+                    ) : "")
         }
         guard
             await dialogs.reportFailure(
-                title: "“\(command.name)” Failed", message: message,
+                title: String(localized: "“\(command.name)” Failed"), message: message,
                 symbol: CustomCommand.sfSymbol,
-                recovery: suggestsShellEnvironment ? "Open Settings…" : nil)
+                recovery: suggestsShellEnvironment ? String(localized: "Open Settings…") : nil)
         else { return }
         showSettings(tab: .commands)
     }
@@ -676,13 +681,16 @@ final class AppCore: ObservableObject {
         Task {
             let running = plan.isTargetRunning || runningApps.isRunning(app)
             let size = MeasuredSize(bytes: items.reduce(0) { $0 + $1.size.bytes }).formatted
-            let count = items.count == 1 ? "1 item" : "\(items.count) items"
+            let count = items.count == 1
+                ? String(localized: "1 item") : String(localized: "\(items.count) items")
             guard
                 await confirm(
-                    title: "Uninstall “\(app.name)”?",
-                    message: "\(count) (\(size)) will be moved to the Trash, where you can put them "
-                        + "back." + (running ? " \(app.name) will quit first." : ""),
-                    symbol: "trash", confirmTitle: "Move to Trash")
+                    title: String(localized: "Uninstall “\(app.name)”?"),
+                    message: String(
+                        localized:
+                            "\(count) (\(size)) will be moved to the Trash, where you can put them back."
+                    ) + (running ? " " + String(localized: "\(app.name) will quit first.") : ""),
+                    symbol: "trash", confirmTitle: String(localized: "Move to Trash"))
             else { return }
 
             if running, let bundleID = app.bundleID { _ = AppLauncher.quit(bundleID: bundleID) }
@@ -702,7 +710,7 @@ final class AppCore: ObservableObject {
     /// Stays on the screen: losing a whole scan to copy one path is a poor trade.
     func copyUninstallPath(_ candidate: UninstallCandidate) {
         Paster.copyPlainText(candidate.path)
-        messageHUD.show(message: "Copied path")
+        messageHUD.show(message: String(localized: "Copied path"))
     }
 
     func showUninstallItemInFinder(_ candidate: UninstallCandidate) {
@@ -715,9 +723,11 @@ final class AppCore: ObservableObject {
         Task {
             guard !AppLauncher.showInfoInFinder(candidate.url) else { return }
             await showNotice(
-                title: "Couldn’t Open Get Info",
-                message: "Allow Tinycast to control Finder in System Settings › Privacy & Security "
-                    + "› Automation, then try again.",
+                title: String(localized: "Couldn’t Open Get Info"),
+                message: String(
+                    localized:
+                        "Allow Tinycast to control Finder in System Settings › Privacy & Security › Automation, then try again."
+                ),
                 symbol: "info.circle", tone: .danger)
         }
     }
@@ -735,17 +745,21 @@ final class AppCore: ObservableObject {
     private func presentUninstallReport(_ report: UninstallReport) async {
         guard report.hasFailures else {
             guard report.trashedCount > 0 else { return }
-            let count = report.trashedCount == 1 ? "1 item" : "\(report.trashedCount) items"
+            let count = report.trashedCount == 1
+                ? String(localized: "1 item")
+                : String(localized: "\(report.trashedCount) items")
             let freed = MeasuredSize(bytes: report.freedBytes).formatted
-            messageHUD.show(message: "Moved \(count) to the Trash · \(freed)")
+            messageHUD.show(message: String(localized: "Moved \(count) to the Trash · \(freed)"))
             return
         }
         let listed = report.failed.prefix(5).map { "\($0.name) — \($0.reason)" }
         let remaining = report.failed.count - listed.count
         await showNotice(
-            title: report.trashedCount > 0 ? "Some Items Weren’t Moved" : "Nothing Was Moved",
+            title: report.trashedCount > 0
+                ? String(localized: "Some Items Weren’t Moved")
+                : String(localized: "Nothing Was Moved"),
             message: listed.joined(separator: "\n")
-                + (remaining > 0 ? "\nand \(remaining) more." : ""),
+                + (remaining > 0 ? "\n" + String(localized: "and \(remaining) more.") : ""),
             symbol: "trash", tone: .danger)
     }
 
@@ -755,10 +769,11 @@ final class AppCore: ObservableObject {
         guard !targets.isEmpty,
             await confirm(
                 title: targets.count == 1
-                    ? "Quit 1 application?" : "Quit \(targets.count) applications?",
-                message: "Applications with unsaved changes will ask you to save.",
+                    ? String(localized: "Quit 1 application?")
+                    : String(localized: "Quit \(targets.count) applications?"),
+                message: String(localized: "Applications with unsaved changes will ask you to save."),
                 symbol: SystemActionCatalog.action(id: .quitAllApps).sfSymbol,
-                confirmTitle: "Quit All")
+                confirmTitle: String(localized: "Quit All"))
         else { return }
         for app in targets { app.terminate() }
     }
@@ -894,19 +909,21 @@ final class AppCore: ObservableObject {
             return
         }
 
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "Enable snippets?"
-        alert.informativeText =
-            "Keyword expansion requires the Accessibility permission. Keystrokes stay on this Mac."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "Continue")
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-
-        settings.snippetsEnabled = true
-        // The one prompt for this feature, raised from the gesture that asked for it.
-        Permissions.ensureAccessibility()
+        Task {
+            guard
+                await confirm(
+                    title: String(localized: "Enable snippets?"),
+                    message: String(
+                        localized:
+                            "Keyword expansion requires the Accessibility permission. Keystrokes stay on this Mac."
+                    ),
+                    symbol: "text.quote", confirmTitle: String(localized: "Continue"),
+                    tone: .neutral, confirmRole: .standard)
+            else { return }
+            settings.snippetsEnabled = true
+            // The one prompt for this feature, raised from the gesture that asked for it.
+            Permissions.ensureAccessibility()
+        }
     }
 
     private func startSnippetKeywordListener() {
@@ -956,7 +973,8 @@ final class AppCore: ObservableObject {
         if automaticGeneration == nil {
             guard snippetTextInjector.prepareInteractiveExpansion(targetApp: targetApp) else { return }
         }
-        let confirmation = record.snippet.showsConfirmation ? "Inserted \(record.snippet.name)" : nil
+        let confirmation = record.snippet.showsConfirmation
+            ? String(localized: "Inserted \(record.snippet.name)") : nil
         let context = snippetTextInjector.captureExpansionContext(
             targetApp: targetApp,
             clipboardHistory: clipboardHistoryForExpansion())
