@@ -78,6 +78,7 @@ jobs:
             ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Tinycast Self-Signed" \
             OTHER_CODE_SIGN_FLAGS="--timestamp=none" \
+            PRODUCT_BUNDLE_IDENTIFIER="com.conversun.tinycast-cn" \
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             build
           BIN="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast"
@@ -94,10 +95,11 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           STAGE="$(mktemp -d)"
-          cp -R "$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app" "$STAGE/"
+          cp -R "$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app" \
+            "$STAGE/Tinycast CN.app"
           ln -s /Applications "$STAGE/Applications"
           mkdir -p dist
-          diskutil image create from "$STAGE" --format UDZO --volumeName "Tinycast" \
+          diskutil image create from "$STAGE" --format UDZO --volumeName "Tinycast CN" \
             "dist/Tinycast-CN-${VERSION}.dmg"
 
       - uses: actions/upload-artifact@v7
