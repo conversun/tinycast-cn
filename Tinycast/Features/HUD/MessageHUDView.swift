@@ -8,7 +8,7 @@ struct MessageHUDView: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            Text(message)
+            Text(message.localizedUI)
                 .font(Theme.Typography.bar)
                 .foregroundStyle(Color.primary)
                 .lineLimit(1)

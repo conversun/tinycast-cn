@@ -24,7 +24,7 @@ struct VolumeHUDView: View {
                 }
                 .frame(height: Theme.Size.volumeTrackHeight)
                 // Muted prints the word, not 0%: the bar is already empty, and a number would contradict it or hide the level to come back to.
-                Text(state.muted ? "Muted" : VolumeLevel.percentage(state.level))
+                Text(state.muted ? "Muted".localizedUI : VolumeLevel.percentage(state.level))
                     .font(Theme.Typography.rowTrailing)
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .monospacedDigit()

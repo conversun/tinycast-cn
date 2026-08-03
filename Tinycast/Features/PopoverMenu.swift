@@ -58,7 +58,7 @@ struct PopoverMenu: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             if let header {
-                Text(header)
+                Text(header.localizedUI)
                     .font(Theme.Typography.sectionHeader)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -108,7 +108,7 @@ private struct PopoverMenuRow: View {
                 case .file(let path):
                     MenuFileIcon(path: path)
                 }
-                Text(item.title)
+                Text(item.title.localizedUI)
                     .font(Theme.Typography.menuRow)
                     .foregroundStyle(item.isDestructive ? Color.red : Color.primary)
                 Spacer(minLength: Theme.Spacing.sm)

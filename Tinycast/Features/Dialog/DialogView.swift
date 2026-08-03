@@ -23,10 +23,10 @@ struct DialogView: View {
                     .foregroundStyle(request.tone.tint)
                     .frame(width: Theme.Size.dialogIcon)
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    Text(request.title)
+                    Text(request.title.localizedUI)
                         .font(.headline)
                     if let message = request.message {
-                        Text(message)
+                        Text(message.localizedUI)
                             .font(Theme.Typography.rowTrailing)
                             .foregroundStyle(Theme.Colors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -83,7 +83,7 @@ private struct DialogButton: View {
 
     var body: some View {
         Button(action: onActivate) {
-            Text(action.title)
+            Text(action.title.localizedUI)
                 .font(Theme.Typography.bar)
                 .foregroundStyle(labelColor)
                 .padding(.horizontal, Theme.Spacing.xl)
