@@ -35,9 +35,9 @@ struct SettingsHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Text(title)
+            Text(title.localizedUI)
                 .font(.title2.weight(.bold))
-            Text(subtitle)
+            Text(subtitle.localizedUI)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -54,7 +54,7 @@ struct SettingsCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             if let header {
-                Text(header)
+                Text(header.localizedUI)
                     .font(Theme.Typography.sectionHeader)
                     .foregroundStyle(.secondary)
                     .padding(.leading, Theme.Spacing.xs)
@@ -90,10 +90,10 @@ struct FeatureSwitchCard: View {
                 systemImage: systemImage,
                 tint: .green
             ) {
-                Toggle(enableTitle, isOn: $isEnabled)
+                Toggle(enableTitle.localizedUI, isOn: $isEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .accessibilityLabel(enableTitle)
+                    .accessibilityLabel(enableTitle.localizedUI)
             }
             SettingsDivider()
             SettingsRow(
@@ -123,7 +123,7 @@ struct SettingsSearchField: View {
         HStack(spacing: Theme.Spacing.sm) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-            TextField(prompt, text: $query)
+            TextField(prompt.localizedUI, text: $query)
                 .textFieldStyle(.plain)
             if !query.isEmpty {
                 Button {
@@ -181,7 +181,7 @@ struct SettingsRow<Trailing: View>: View {
             }
             VStack(alignment: .leading, spacing: Theme.Spacing.xs / 2) {
                 HStack(spacing: Theme.Spacing.sm) {
-                    Text(title)
+                    Text(title.localizedUI)
                         .font(.body)
                     if let statusDot {
                         Circle()
@@ -190,7 +190,7 @@ struct SettingsRow<Trailing: View>: View {
                     }
                 }
                 if let subtitle {
-                    Text(subtitle)
+                    Text(subtitle.localizedUI)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -221,9 +221,9 @@ struct SettingsCallout<Trailing: View>: View {
                 .foregroundStyle(tint)
                 .frame(width: Theme.Size.settingsRowIcon)
             VStack(alignment: .leading, spacing: Theme.Spacing.xs / 2) {
-                Text(title).font(.body)
+                Text(title.localizedUI).font(.body)
                 if let message {
-                    Text(message)
+                    Text(message.localizedUI)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

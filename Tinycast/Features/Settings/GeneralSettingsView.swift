@@ -21,16 +21,20 @@ struct GeneralSettingsView: View {
 
     private var hyperSubtitle: String {
         guard settings.hyperKey != .none else {
-            return
-                "Select a physical key to remap to the \(hyperGlyphs) modifier keys simultaneously."
+            return String(
+                format:
+                    "Select a physical key to remap to the %@ modifier keys simultaneously."
+                    .localizedUI,
+                hyperGlyphs)
         }
-        var text =
-            "Pressing \(settings.hyperKey.title) will trigger the left \(hyperGlyphs) modifier keys."
+        var text = String(
+            format: "Pressing %@ will trigger the left %@ modifier keys.".localizedUI,
+            settings.hyperKey.title.localizedUI, hyperGlyphs)
         if settings.hyperKeyReplacesGlyph {
-            text += " Hyper Key shortcuts will be shown in Tinycast with ✦."
+            text += " " + "Hyper Key shortcuts will be shown in Tinycast with ✦.".localizedUI
         }
         if hyperTap.status == .needsAccessibility {
-            text += " Tinycast needs Accessibility access to remap keys."
+            text += " " + "Tinycast needs Accessibility access to remap keys.".localizedUI
         }
         return text
     }
@@ -81,7 +85,7 @@ struct GeneralSettingsView: View {
                     }
                     Picker("", selection: $settings.hyperKey) {
                         ForEach(HyperKeyPhysicalKey.allCases) { key in
-                            Text(key.title).tag(key)
+                            Text(key.title.localizedUI).tag(key)
                         }
                     }
                     .labelsHidden()
@@ -96,15 +100,18 @@ struct GeneralSettingsView: View {
                     SettingsDivider()
                     SettingsRow(
                         title: "Quick Press",
-                        subtitle:
-                            "Select an action to perform when \(settings.hyperKey.title) is pressed without any other keys.",
+                        subtitle: String(
+                            format:
+                                "Select an action to perform when %@ is pressed without any other keys."
+                                .localizedUI,
+                            settings.hyperKey.title.localizedUI),
                         systemImage: "hand.tap",
                         tint: .teal
                     ) {
                         Picker("", selection: $settings.hyperKeyQuickPress) {
                             Text("Does Nothing").tag(HyperKeyQuickPress.none)
                             if let original = settings.hyperKey.quickPressOriginalTitle {
-                                Text(original).tag(HyperKeyQuickPress.originalKey)
+                                Text(original.localizedUI).tag(HyperKeyQuickPress.originalKey)
                             }
                             Text("Trigger Escape").tag(HyperKeyQuickPress.escape)
                         }
@@ -115,7 +122,9 @@ struct GeneralSettingsView: View {
                 SettingsDivider()
                 SettingsRow(
                     title: "Include Shift (⇧)",
-                    subtitle: "Hyper Key will remap to the \(hyperGlyphs) modifier keys.",
+                    subtitle: String(
+                        format: "Hyper Key will remap to the %@ modifier keys.".localizedUI,
+                        hyperGlyphs),
                     systemImage: "shift",
                     tint: .indigo
                 ) {
@@ -126,7 +135,8 @@ struct GeneralSettingsView: View {
                 }
                 SettingsDivider()
                 SettingsRow(
-                    title: "Replace occurrences of \(hyperGlyphs) with ✦",
+                    title: String(
+                        format: "Replace occurrences of %@ with ✦".localizedUI, hyperGlyphs),
                     subtitle: "Shortcuts containing the Hyper Key modifiers are shown with ✦.",
                     systemImage: "keyboard",
                     tint: .gray
@@ -215,7 +225,7 @@ struct GeneralSettingsView: View {
                 ) {
                     Picker("", selection: $settings.popToRootTimeout) {
                         ForEach(PopToRootTimeout.allCases) { timeout in
-                            Text(timeout.title).tag(timeout)
+                            Text(timeout.title.localizedUI).tag(timeout)
                         }
                     }
                     .labelsHidden()

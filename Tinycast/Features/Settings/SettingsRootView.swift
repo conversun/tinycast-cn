@@ -165,7 +165,7 @@ private struct SidebarRow: View {
                             .foregroundStyle(.white)
                     )
                     .shadow(color: .black.opacity(0.2), radius: 0.5, y: 0.5)
-                Text(title)
+                Text(title.localizedUI)
                     .font(Theme.Typography.rowTitle)
                 Spacer(minLength: 0)
             }
