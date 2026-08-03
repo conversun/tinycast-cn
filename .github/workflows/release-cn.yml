@@ -1,0 +1,122 @@
+name: Release CN
+
+run-name: "Tinycast CN ${{ inputs.version }} #${{ github.run_number }}"
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      prerelease:
+        type: boolean
+        default: false
+      upstream_tag:
+        type: string
+        required: true
+      ref:
+        type: string
+        required: true
+    secrets:
+      SIGNING_P12_BASE64:
+        required: true
+      SIGNING_P12_PASSWORD:
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "tinycast-cn-release-${{ inputs.version }}"
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Select Xcode 26
+        run: |
+          XCODE_CANDIDATES=(/Applications/Xcode_26*.app)
+          if [ ! -e "${XCODE_CANDIDATES[0]}" ]; then
+            echo "::error::No Xcode 26.x found on this runner."
+            exit 1
+          fi
+          XCODE_PATH="$(printf '%s\n' "${XCODE_CANDIDATES[@]}" | sort -V | tail -n1)"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Import signing certificate
+        env:
+          P12_BASE64: ${{ secrets.SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$P12_PASSWORD" -A -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN"
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Build and verify Universal app
+        env:
+          VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          cp Tools/fuzz-test.swift "$RUNNER_TEMP/main.swift"
+          swiftc -swift-version 6 Tinycast/Core/Pinyin.swift "$RUNNER_TEMP/main.swift" \
+            -o "$RUNNER_TEMP/fuzz-test"
+          "$RUNNER_TEMP/fuzz-test"
+          xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Tinycast Self-Signed" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp=none" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            build
+          BIN="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast"
+          ARCHS_BUILT="$(lipo -archs "$BIN")"
+          for WANT in arm64 x86_64; do
+            case " $ARCHS_BUILT " in
+              *" $WANT "*) ;;
+              *) echo "::error::Missing $WANT slice; built: $ARCHS_BUILT"; exit 1 ;;
+            esac
+          done
+
+      - name: Package DMG
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          STAGE="$(mktemp -d)"
+          cp -R "$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app" "$STAGE/"
+          ln -s /Applications "$STAGE/Applications"
+          mkdir -p dist
+          diskutil image create from "$STAGE" --format UDZO --volumeName "Tinycast" \
+            "dist/Tinycast-CN-${VERSION}.dmg"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Tinycast-CN-${{ inputs.version }}
+          path: dist/Tinycast-CN-${{ inputs.version }}.dmg
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+          SOURCE_COMMIT: ${{ inputs.ref }}
+        run: |
+          PRERELEASE_FLAG=()
+          if [ "$PRERELEASE" = "true" ]; then PRERELEASE_FLAG=(--prerelease); fi
+          gh release create "v${VERSION}" "dist/Tinycast-CN-${VERSION}.dmg" \
+            --target "$SOURCE_COMMIT" \
+            --title "Tinycast CN ${VERSION}" \
+            --notes "Chinese-optimized build synced from [${UPSTREAM_TAG}](https://github.com/abue-ammar/tinycast/releases/tag/${UPSTREAM_TAG})." \
+            "${PRERELEASE_FLAG[@]}"

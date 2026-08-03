@@ -1,0 +1,106 @@
+name: Sync upstream release
+
+run-name: "Sync Tinycast release ${{ inputs.upstream_tag || 'latest' }}"
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: "Optional upstream release tag; empty selects the latest published release"
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-release
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: macos-26
+    outputs:
+      should_release: ${{ steps.meta.outputs.should_release }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      upstream_tag: ${{ steps.meta.outputs.upstream_tag }}
+      source_commit: ${{ steps.merge.outputs.source_commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Select Xcode 26
+        run: |
+          XCODE_CANDIDATES=(/Applications/Xcode_26*.app)
+          if [ ! -e "${XCODE_CANDIDATES[0]}" ]; then
+            echo "::error::No Xcode 26.x found on this runner."
+            exit 1
+          fi
+          XCODE_PATH="$(printf '%s\n' "${XCODE_CANDIDATES[@]}" | sort -V | tail -n1)"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Resolve upstream release
+        id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.upstream_tag }}
+          UPSTREAM_REPOSITORY: abue-ammar/tinycast
+        run: |
+          if [ -n "$REQUESTED_TAG" ]; then
+            RELEASE="$(gh api "repos/${UPSTREAM_REPOSITORY}/releases/tags/${REQUESTED_TAG}")"
+          else
+            RELEASE="$(gh api "repos/${UPSTREAM_REPOSITORY}/releases?per_page=1" --jq '.[0]')"
+          fi
+          UPSTREAM_TAG="$(jq -r '.tag_name' <<< "$RELEASE")"
+          PRERELEASE="$(jq -r '.prerelease' <<< "$RELEASE")"
+          if [[ ! "$UPSTREAM_TAG" =~ ^v[0-9]+(\.[0-9]+){1,2}([.-][0-9A-Za-z]+)*$ ]]; then
+            echo "::error::Unsupported upstream tag '$UPSTREAM_TAG'."
+            exit 1
+          fi
+          VERSION="${UPSTREAM_TAG#v}-cn.1"
+          RELEASE_TAG="v${VERSION}"
+          SHOULD_RELEASE=true
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            SHOULD_RELEASE=false
+            echo "Release $RELEASE_TAG already exists; nothing to do."
+          fi
+          {
+            echo "should_release=${SHOULD_RELEASE}"
+            echo "version=${VERSION}"
+            echo "prerelease=${PRERELEASE}"
+            echo "upstream_tag=${UPSTREAM_TAG}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Merge upstream release into main
+        id: merge
+        if: steps.meta.outputs.should_release == 'true'
+        env:
+          UPSTREAM_TAG: ${{ steps.meta.outputs.upstream_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/abue-ammar/tinycast.git
+          git fetch --no-tags upstream "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
+          git merge --no-edit "$UPSTREAM_TAG"
+          cp Tools/fuzz-test.swift "$RUNNER_TEMP/main.swift"
+          swiftc -swift-version 6 Tinycast/Core/Pinyin.swift "$RUNNER_TEMP/main.swift" \
+            -o "$RUNNER_TEMP/fuzz-test"
+          "$RUNNER_TEMP/fuzz-test"
+          git push origin HEAD:main
+          echo "source_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: sync
+    if: needs.sync.outputs.should_release == 'true'
+    uses: ./.github/workflows/release-cn.yml
+    with:
+      version: ${{ needs.sync.outputs.version }}
+      prerelease: ${{ needs.sync.outputs.prerelease == 'true' }}
+      upstream_tag: ${{ needs.sync.outputs.upstream_tag }}
+      ref: ${{ needs.sync.outputs.source_commit }}
+    secrets: inherit
