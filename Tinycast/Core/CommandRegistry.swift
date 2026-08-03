@@ -14,15 +14,15 @@ enum CommandID: String, CaseIterable, Sendable {
 
     var name: String {
         switch self {
-        case .calculatorHistory: return "Calculator History"
-        case .clipboardHistory: return "Clipboard History"
-        case .searchEmoji: return "Search Emoji & Symbols"
-        case .exportSettings: return "Export Settings"
-        case .importSettings: return "Import Settings"
-        case .importFromRaycast: return "Import from Raycast"
-        case .settings: return "Settings"
-        case .about: return "About Tinycast"
-        case .quit: return "Quit Tinycast"
+        case .calculatorHistory: return String(localized: "Calculator History")
+        case .clipboardHistory: return String(localized: "Clipboard History")
+        case .searchEmoji: return String(localized: "Search Emoji & Symbols")
+        case .exportSettings: return String(localized: "Export Settings")
+        case .importSettings: return String(localized: "Import Settings")
+        case .importFromRaycast: return String(localized: "Import from Raycast")
+        case .settings: return String(localized: "Settings")
+        case .about: return String(localized: "About Tinycast")
+        case .quit: return String(localized: "Quit Tinycast")
         }
     }
 

@@ -75,37 +75,37 @@ enum SystemActionCatalog {
 
     private static func name(for id: SystemAction.ID) -> String {
         switch id {
-        case .lockScreen: return "Lock Screen"
-        case .sleep: return "Sleep"
-        case .sleepDisplays: return "Sleep Displays"
-        case .restart: return "Restart"
-        case .shutDown: return "Shut Down"
-        case .logOut: return "Log Out"
-        case .showScreenSaver: return "Show Screen Saver"
-        case .playPause: return "Play / Pause"
-        case .nextTrack: return "Next Track"
-        case .previousTrack: return "Previous Track"
-        case .toggleMute: return "Toggle Mute"
-        case .volumeUp: return "Turn Volume Up"
-        case .volumeDown: return "Turn Volume Down"
-        case .setVolume: return "Set Volume…"
-        case .volume0: return "Set Volume to 0%"
-        case .volume25: return "Set Volume to 25%"
-        case .volume50: return "Set Volume to 50%"
-        case .volume75: return "Set Volume to 75%"
-        case .volume100: return "Set Volume to 100%"
-        case .showDesktop: return "Show Desktop"
-        case .toggleAppearance: return "Toggle System Appearance"
-        case .toggleStageManager: return "Toggle Stage Manager"
-        case .openTrash: return "Open Trash"
-        case .emptyTrash: return "Empty Trash"
-        case .ejectAllDisks: return "Eject All Disks"
-        case .toggleHiddenFiles: return "Toggle Hidden Files"
-        case .hideOtherApps: return "Hide All Apps Except Frontmost"
-        case .unhideAllApps: return "Unhide All Hidden Apps"
-        case .quitAllApps: return "Quit All Applications"
-        case .dismissNotifications: return "Dismiss Notifications"
-        case .toggleBluetooth: return "Toggle Bluetooth"
+        case .lockScreen: return String(localized: "Lock Screen")
+        case .sleep: return String(localized: "Sleep")
+        case .sleepDisplays: return String(localized: "Sleep Displays")
+        case .restart: return String(localized: "Restart")
+        case .shutDown: return String(localized: "Shut Down")
+        case .logOut: return String(localized: "Log Out")
+        case .showScreenSaver: return String(localized: "Show Screen Saver")
+        case .playPause: return String(localized: "Play / Pause")
+        case .nextTrack: return String(localized: "Next Track")
+        case .previousTrack: return String(localized: "Previous Track")
+        case .toggleMute: return String(localized: "Toggle Mute")
+        case .volumeUp: return String(localized: "Turn Volume Up")
+        case .volumeDown: return String(localized: "Turn Volume Down")
+        case .setVolume: return String(localized: "Set Volume…")
+        case .volume0: return String(localized: "Set Volume to 0%")
+        case .volume25: return String(localized: "Set Volume to 25%")
+        case .volume50: return String(localized: "Set Volume to 50%")
+        case .volume75: return String(localized: "Set Volume to 75%")
+        case .volume100: return String(localized: "Set Volume to 100%")
+        case .showDesktop: return String(localized: "Show Desktop")
+        case .toggleAppearance: return String(localized: "Toggle System Appearance")
+        case .toggleStageManager: return String(localized: "Toggle Stage Manager")
+        case .openTrash: return String(localized: "Open Trash")
+        case .emptyTrash: return String(localized: "Empty Trash")
+        case .ejectAllDisks: return String(localized: "Eject All Disks")
+        case .toggleHiddenFiles: return String(localized: "Toggle Hidden Files")
+        case .hideOtherApps: return String(localized: "Hide All Apps Except Frontmost")
+        case .unhideAllApps: return String(localized: "Unhide All Hidden Apps")
+        case .quitAllApps: return String(localized: "Quit All Applications")
+        case .dismissNotifications: return String(localized: "Dismiss Notifications")
+        case .toggleBluetooth: return String(localized: "Toggle Bluetooth")
         }
     }
 
@@ -142,21 +142,24 @@ enum SystemActionCatalog {
         }
     }
 
-    private static let sessionEndingMessage =
-        "Applications with unsaved changes may ask you to save."
+    private static let sessionEndingMessage = String(
+        localized: "Applications with unsaved changes may ask you to save.")
 
     private static func confirmation(for id: SystemAction.ID) -> SystemAction.Confirmation {
         switch id {
         case .restart:
-            return .required(title: "Restart your Mac?", message: sessionEndingMessage)
+            return .required(
+                title: String(localized: "Restart your Mac?"), message: sessionEndingMessage)
         case .shutDown:
-            return .required(title: "Shut down your Mac?", message: sessionEndingMessage)
+            return .required(
+                title: String(localized: "Shut down your Mac?"), message: sessionEndingMessage)
         case .logOut:
-            return .required(title: "Log out now?", message: sessionEndingMessage)
+            return .required(
+                title: String(localized: "Log out now?"), message: sessionEndingMessage)
         case .emptyTrash:
             return .required(
-                title: "Empty Trash?",
-                message: "The items in the Trash will be permanently deleted.")
+                title: String(localized: "Empty Trash?"),
+                message: String(localized: "The items in the Trash will be permanently deleted."))
         case .quitAllApps:
             return .computed
         default:
