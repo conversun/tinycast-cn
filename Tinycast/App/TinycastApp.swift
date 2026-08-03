@@ -13,13 +13,15 @@ struct TinycastApp: App {
         MenuBarExtra(
             appName, systemImage: "macwindow.on.rectangle", isInserted: $showInMenuBar
         ) {
-            Button("Open \(appName)") { AppCore.shared.showPalette(mode: .launcher) }
+            Button(String(localized: "Open \(appName)")) {
+                AppCore.shared.showPalette(mode: .launcher)
+            }
             Button("Clipboard History") { AppCore.shared.showPalette(mode: .clipboard) }
             Divider()
             Button("Settings...") { AppCore.shared.showSettings() }
                 .keyboardShortcut(",")
             Divider()
-            Button("Quit \(appName)") { NSApp.terminate(nil) }
+            Button(String(localized: "Quit \(appName)")) { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         }
     }
