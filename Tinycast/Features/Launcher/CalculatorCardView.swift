@@ -63,7 +63,7 @@ struct CalculatorCard: View {
                 HStack(spacing: Theme.Spacing.md) {
                     Image(systemName: "exclamationmark.triangle")
                         .symbolRenderingMode(.hierarchical)
-                    Text(message)
+                    Text(message.localizedUI)
                         .lineLimit(1)
                 }
                 .font(.body)
@@ -98,7 +98,7 @@ private struct CalcColumn: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             if let badge {
-                Text(badge)
+                Text(badge.localizedUI)
                     .font(Theme.Typography.keyCap)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)

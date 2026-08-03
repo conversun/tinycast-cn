@@ -503,7 +503,7 @@ struct RootPaletteView: View {
     private var searchField: some View {
         TextField(
             "", text: $vm.query,
-            prompt: Text(vm.mode.placeholder).foregroundStyle(Theme.Colors.textTertiary)
+            prompt: Text(vm.mode.placeholder.localizedUI).foregroundStyle(Theme.Colors.textTertiary)
         )
         .textFieldStyle(.plain)
         .font(Theme.Typography.searchField)
@@ -695,7 +695,7 @@ struct RootPaletteView: View {
         HStack(spacing: 2) {
             BarButton(action: activateSelection) {
                 HStack(spacing: Theme.Spacing.sm) {
-                    Text(pillLabel)
+                    Text(pillLabel.localizedUI)
                         .font(Theme.Typography.bar)
                         .foregroundStyle(pillTint)
                     KeyCapChip(text: "↵", style: .outline)
@@ -922,7 +922,7 @@ struct EmptyResults: View {
         VStack(spacing: 8) {
             Image(systemName: "magnifyingglass").font(.largeTitle)
                 .symbolRenderingMode(.hierarchical).foregroundStyle(.tertiary)
-            Text(text).foregroundStyle(.secondary)
+            Text(text.localizedUI).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

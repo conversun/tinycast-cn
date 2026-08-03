@@ -133,7 +133,7 @@ struct SectionHeader: View {
     /// The list's first header hugs the top; every later header gets `sectionSpacing` above it, which reads as bottom padding on the section that just ended.
     var isFirst = false
     var body: some View {
-        Text(title)
+        Text(title.localizedUI)
             .font(Theme.Typography.sectionHeader)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -189,7 +189,7 @@ private struct AppRow: View {
                 }
             }
             Spacer()
-            Text(app.kindLabel)
+            Text(app.kindLabel.localizedUI)
                 .font(Theme.Typography.rowTrailing)
                 .foregroundStyle(.secondary)
         }
