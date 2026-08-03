@@ -1,0 +1,2 @@
+"NSAppleEventsUsageDescription" = "Tinycast 仅在你明确运行系统操作时使用自动化权限。";
+"NSBluetoothAlwaysUsageDescription" = "Tinycast 仅在你运行“切换蓝牙”操作时访问蓝牙。";
