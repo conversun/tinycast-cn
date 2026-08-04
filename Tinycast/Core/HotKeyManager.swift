@@ -9,6 +9,7 @@ final class HotKeyManager: ObservableObject {
     var onRunCustomCommand: ((UUID) -> Void)?
     var onRunSystemAction: ((SystemAction.ID) -> Void)?
     var onRunWindowCommand: ((WindowCommand.ID) -> Void)?
+    var onOpenQuicklink: ((UUID) -> Void)?
 
     /// The recorder currently capturing keystrokes, or `nil`; keeping this as plain app state makes recorders glitch-free, and any active recorder pauses both engines so the shortcut being typed can't fire the binding it's replacing. Setting it also starts/stops `capture`.
     @Published var recordingAction: HotKeyAction? {
@@ -37,13 +38,11 @@ final class HotKeyManager: ObservableObject {
     private let boundKey = "boundAppBundleIDs"
     private let boundPaneKey = "boundPaneBundleIDs"
     private let boundCustomCommandKey = "boundCustomCommandIDs"
+    private let boundQuicklinkKey = "boundQuicklinkIDs"
 
-    func start(customCommandIDs: Set<UUID>) {
-        let stale = Set(boundCustomCommandIDs).subtracting(customCommandIDs)
-        for id in stale {
-            UserDefaults.standard.removeObject(forKey: HotKeyAction.customCommand(id: id).defaultsKey)
-        }
-        persistBoundCustomCommandIDs(Set(boundCustomCommandIDs).intersection(customCommandIDs))
+    func start(customCommandIDs: Set<UUID>, quicklinkIDs: Set<UUID>) {
+        prune(key: boundCustomCommandKey, live: customCommandIDs) { .customCommand(id: $0) }
+        prune(key: boundQuicklinkKey, live: quicklinkIDs) { .quicklink(id: $0) }
 
         // `register` no-ops on an unbound item, so the fixed catalogs need no index of their own.
         for action in candidateActions { register(action) }
@@ -67,10 +66,10 @@ final class HotKeyManager: ObservableObject {
     }
 
     /// Custom-command UUIDs with a binding, indexed separately so startup can re-register them.
-    var boundCustomCommandIDs: [UUID] {
-        (UserDefaults.standard.stringArray(forKey: boundCustomCommandKey) ?? [])
-            .compactMap(UUID.init(uuidString:))
-    }
+    var boundCustomCommandIDs: [UUID] { boundIDs(key: boundCustomCommandKey) }
+
+    /// Quicklink UUIDs with a binding — the same index, its own namespace.
+    var boundQuicklinkIDs: [UUID] { boundIDs(key: boundQuicklinkKey) }
 
     func binding(for action: HotKeyAction) -> HotKeyBinding? {
         // The stored value is a JSON *string* (a legacy package format); anything else reads as unbound.
@@ -106,9 +105,9 @@ final class HotKeyManager: ObservableObject {
             if binding == nil { set.remove(bundleID) } else { set.insert(bundleID) }
             UserDefaults.standard.set(Array(set), forKey: boundPaneKey)
         case .customCommand(let id):
-            var set = Set(boundCustomCommandIDs)
-            if binding == nil { set.remove(id) } else { set.insert(id) }
-            persistBoundCustomCommandIDs(set)
+            index(id, bound: binding != nil, key: boundCustomCommandKey)
+        case .quicklink(let id):
+            index(id, bound: binding != nil, key: boundQuicklinkKey)
         case .togglePalette, .toggleClipboard, .toggleEmoji, .systemAction, .windowCommand:
             break
         }
@@ -133,6 +132,7 @@ final class HotKeyManager: ObservableObject {
         actions += boundBundleIDs.map { .app(bundleID: $0) }
         actions += boundPaneBundleIDs.map { .settingsPane(bundleID: $0) }
         actions += boundCustomCommandIDs.map { .customCommand(id: $0) }
+        actions += boundQuicklinkIDs.map { .quicklink(id: $0) }
         actions += SystemAction.ID.allCases.map { .systemAction(id: $0) }
         actions += WindowCommand.ID.allCases.map { .windowCommand(id: $0) }
         return actions
@@ -160,6 +160,8 @@ final class HotKeyManager: ObservableObject {
             return SystemActionCatalog.action(id: id).name
         case .windowCommand(let id):
             return WindowCommandCatalog.command(id: id)?.name ?? "Window Command"
+        case .quicklink(let id):
+            return AppCore.shared.quicklinks.quicklink(id: id)?.name ?? "Quicklink"
         }
     }
 
@@ -191,11 +193,35 @@ final class HotKeyManager: ObservableObject {
         case .customCommand(let id): onRunCustomCommand?(id)
         case .systemAction(let id): onRunSystemAction?(id)
         case .windowCommand(let id): onRunWindowCommand?(id)
+        case .quicklink(let id): onOpenQuicklink?(id)
         }
     }
 
-    private func persistBoundCustomCommandIDs(_ ids: Set<UUID>) {
-        UserDefaults.standard.set(
-            ids.map { $0.uuidString.lowercased() }.sorted(), forKey: boundCustomCommandKey)
+    // MARK: - UUID-keyed indexes
+    //
+    // Custom commands and quicklinks are bound per item rather than per fixed catalog entry, so each
+    // needs an index of the UUIDs that currently hold a binding for `start()` to re-register.
+
+    private func boundIDs(key: String) -> [UUID] {
+        (UserDefaults.standard.stringArray(forKey: key) ?? []).compactMap(UUID.init(uuidString:))
+    }
+
+    private func index(_ id: UUID, bound: Bool, key: String) {
+        var set = Set(boundIDs(key: key))
+        if bound { set.insert(id) } else { set.remove(id) }
+        persist(set, key: key)
+    }
+
+    /// Drops bindings whose item no longer exists — a record deleted while Tinycast wasn't running.
+    private func prune(key: String, live: Set<UUID>, action: (UUID) -> HotKeyAction) {
+        let stored = Set(boundIDs(key: key))
+        for id in stored.subtracting(live) {
+            UserDefaults.standard.removeObject(forKey: action(id).defaultsKey)
+        }
+        persist(stored.intersection(live), key: key)
+    }
+
+    private func persist(_ ids: Set<UUID>, key: String) {
+        UserDefaults.standard.set(ids.map { $0.uuidString.lowercased() }.sorted(), forKey: key)
     }
 }

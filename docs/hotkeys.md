@@ -17,14 +17,19 @@ the keycap rendering — only the *engine* differs.
 Bindings persist as JSON strings under `KeyboardShortcuts_<name>` UserDefaults keys — a **legacy
 format** from the removed KeyboardShortcuts package, kept so old bindings survive. The set of bound
 bundle IDs lives in `boundAppBundleIDs` and is re-registered on launch. System Settings panes use
-`boundPaneBundleIDs`; custom commands use their stable UUIDs in `boundCustomCommandIDs`.
+`boundPaneBundleIDs`; custom commands and quicklinks use their stable UUIDs in
+`boundCustomCommandIDs` and `boundQuicklinkIDs`. Those two are the per-item case — unlike a fixed
+catalog, there is no `allCases` to walk — so each needs an index for `start()` to re-register from
+and to prune bindings whose record was deleted while Tinycast wasn't running. That prune is why
+`QuicklinkStore` loads at launch even when the feature is off
+(see [quicklinks.md](quicklinks.md#hotkeys)).
 
 A `.combo` writes the original `{"carbonKeyCode":N,"carbonModifiers":N}` record and
 `HotKeyBinding.init(from:)` tries that shape first, so nothing needs migrating. A `.doubleTap` writes
 `{"doubleTapModifier":"command"}` — a shape a pre-double-tap build fails to decode and therefore reads
 as *unbound*, which is the intended degradation. The same wrapper is what `SettingsBackup.HotkeyBackup`
 stores, so old backup files import unchanged; a backup containing a double-tap cannot be read by an
-older build, which is what the `version` 3 bump records.
+older build, which is what the `version` 3 bump records (`version` 4 adds the quicklinks array).
 
 System actions and window commands are the fixed-catalog case: they persist under
 `KeyboardShortcuts_systemActionHotkey.<raw-id>` and `KeyboardShortcuts_windowCommandHotkey.<raw-id>`

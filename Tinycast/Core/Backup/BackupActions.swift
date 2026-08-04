@@ -15,13 +15,29 @@ enum BackupActions {
 
     // MARK: - Tinycast native (own file panels; dialogs come from `AppCore`)
 
-    static func exportSettings() async {
+    /// The JSON save panel, shared with the quicklinks archive. Tinycast is an accessory app, so it
+    /// has to activate itself before a modal panel or the panel opens behind everything.
+    static func chooseSaveLocation(named base: String) -> URL? {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "Tinycast-Settings-\(dateStamp()).json"
+        panel.nameFieldStringValue = "\(base)-\(dateStamp()).json"
         panel.canCreateDirectories = true
         NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+
+    static func chooseJSONFile() -> URL? {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+
+    static func exportSettings() async {
+        guard let url = chooseSaveLocation(named: "Tinycast-Settings") else { return }
         do {
             try SettingsBackup.gather().encoded().write(to: url, options: .atomic)
         } catch {
@@ -32,11 +48,7 @@ enum BackupActions {
     }
 
     static func importSettings() async {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.allowsMultipleSelection = false
-        NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = chooseJSONFile() else { return }
         do {
             let backup = try SettingsBackup(json: try Data(contentsOf: url))
             let commandCount = backup.customCommands?.count ?? 0
@@ -140,6 +152,7 @@ enum BackupActions {
         if s.customCommands > 0 {
             parts.append(String(localized: "\(s.customCommands) custom commands"))
         }
+        if s.quicklinks > 0 { parts.append(String(localized: "\(s.quicklinks) quicklinks")) }
         guard !parts.isEmpty else { return nil }
         return String(format: "Applied %@.".localizedUI, parts.joined(separator: ", "))
     }

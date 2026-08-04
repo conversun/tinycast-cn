@@ -7,8 +7,8 @@ extension Notification.Name {
 
 enum SettingsTab: Int, CaseIterable, Identifiable {
     // Declaration order is sidebar order: general, then one pane per launcher category, then the rest.
-    case general, applications, systemSettings, systemActions, commands, snippets, windowManagement,
-        clipboard, emoji, permissions, backup, miscellaneous, about
+    case general, applications, systemSettings, systemActions, commands, quicklinks, snippets,
+        windowManagement, clipboard, emoji, permissions, backup, miscellaneous, about
     var id: Int { rawValue }
 
     var title: String {
@@ -18,6 +18,7 @@ enum SettingsTab: Int, CaseIterable, Identifiable {
         case .systemSettings: return "System Settings"
         case .systemActions: return "System Actions"
         case .commands: return "Commands"
+        case .quicklinks: return "Quicklinks"
         case .snippets: return "Snippets"
         case .windowManagement: return "Window Management"
         case .clipboard: return "Clipboard"
@@ -36,6 +37,7 @@ enum SettingsTab: Int, CaseIterable, Identifiable {
         case .systemSettings: return "gearshape"
         case .systemActions: return "bolt"
         case .commands: return "terminal"
+        case .quicklinks: return "link"
         case .snippets: return "curlybraces"
         case .windowManagement: return "macwindow"
         case .clipboard: return "doc.on.clipboard"
@@ -55,6 +57,7 @@ enum SettingsTab: Int, CaseIterable, Identifiable {
         case .systemSettings: return .indigo
         case .systemActions: return .orange
         case .commands: return .green
+        case .quicklinks: return .cyan
         case .snippets: return .green
         case .windowManagement: return .blue
         case .clipboard: return .orange
@@ -86,6 +89,7 @@ struct SettingsRootView: View {
                 case .systemSettings: SystemSettingsSettingsView()
                 case .systemActions: SystemActionsSettingsView()
                 case .commands: CommandsSettingsView()
+                case .quicklinks: QuicklinksSettingsView()
                 case .snippets: SnippetsSettingsView()
                 case .windowManagement: WindowManagementSettingsView()
                 case .clipboard: ClipboardSettingsView()

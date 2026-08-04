@@ -1,7 +1,7 @@
 # Window Management
 
 Rectangle-style window actions — halves, quarters, thirds, sizing, nudging, display moves and native
-fullscreen — searchable in the palette and bindable to global shortcuts. 29 commands, no new
+fullscreen — searchable in the palette and bindable to global shortcuts. 30 commands, no new
 dependencies and no new permission: they reuse the Accessibility grant clipboard paste already needs.
 
 Ships **off**. Settings › Window Management is the switch, and while it is off there are no launcher
@@ -23,7 +23,7 @@ lives in that overlay rather than in Foundation.
 
 Adding a command is four edits in `WindowCommand.swift` (a case in `ID`, plus `name`, `symbol` and
 `group` arms), an arm in `WindowLayout.placement` or `tileFractions`, and bumping
-`commands.count == 29` in the harness.
+`commands.count == 30` in the harness.
 
 ## Coordinate space
 
@@ -54,7 +54,8 @@ no per-family special cases. Rects are rounded on their four **edges**, not orig
 sharing a fractional boundary (480.333 for thirds of 1441) round it identically — no overlaps, no
 one-point seams.
 
-**Free-floating commands** (Maximize, Almost Maximize, Center, Make Larger/Smaller, the nudges) work in
+**Free-floating commands** (Maximize, Almost Maximize, Reasonable Size, Center, Make Larger/Smaller,
+the nudges) work in
 `canvas = visibleFrame.insetBy(gap)` instead: a centred window has no neighbour to gutter against.
 
 **Make Larger / Make Smaller** step by 5% of the *screen*, not of the window, and the step is forced
@@ -62,6 +63,10 @@ even so each edge moves a whole point. That makes the two commands exactly inver
 1.05 ≠ size`, so a size-relative step would shrink a little on every round trip — and it feels the same
 at any window size. Both directions saturate into exact no-ops: the ceiling is the canvas, the floor is
 `max(200×150, 15% of canvas)`.
+
+**Reasonable Size** is 60% of the canvas, centred, capped at 1025×900 points. The cap is what makes it
+display-independent — a laptop gets the fraction, a 4K or 5K display gets a moderate window instead of
+a 2304×1296 one. It ignores the window's current size entirely, so it is idempotent.
 
 **Center Half** is half the screen's *area*: half width, full height, horizontally centred — the family
 sibling of Center Third.
@@ -173,7 +178,7 @@ stock Electron app tiles correctly without it, delete the helper rather than kee
 
 ## Testing
 
-`Tools/window-command-test.swift` (310 assertions) covers the catalog, the AX-space convention lock,
+`Tools/window-command-test.swift` (319 assertions) covers the catalog, the AX-space convention lock,
 tiling on divisible and non-divisible screens, off-origin and negative-coordinate displays, gap
 arithmetic including degenerate values, sizing, the Make Larger/Smaller round trip, nudges, display
 moves and wrapping, restore recovery, every `WindowActionMemory` rule, and a fuzz sweep over every

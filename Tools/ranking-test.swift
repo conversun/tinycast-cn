@@ -104,6 +104,37 @@ struct RankingTest {
         reloaded.resetAll()
         check("global reset clears all learned ranking", reloaded.isEmpty)
 
+        // No amount of learning lets a weaker field outrank a stronger one.
+        let alias = SearchFields(names: ["ChatGPT"], alternateNames: ["Codex"])
+        let displayName = SearchFields(names: ["Codex Viewer"])
+        let identifier = SearchFields(names: ["Unrelated"], bundleID: "com.openai.codex")
+
+        store.resetAll()
+        for _ in 0..<500 { store.record(itemKey: alias.names[0], query: "codex") }
+        let maxBoost = boost(store, alias.names[0], "codex")
+        check("the learned table is saturated for this query", maxBoost == 4_500)
+
+        func relevance(_ fields: SearchFields, _ query: String) -> Int {
+            SearchRelevance.score(query: query, fields: fields)!
+        }
+        check(
+            "a saturated boost cannot lift an alias hit over a display-name hit",
+            relevance(alias, "codex") + maxBoost < relevance(displayName, "codex"))
+        check(
+            "a saturated boost cannot lift an identifier hit over an alias hit",
+            relevance(identifier, "codex") + maxBoost < relevance(alias, "codex"))
+        check(
+            "a saturated boost cannot cross a FuzzyMatch tier",
+            relevance(SearchFields(names: ["Codex Pro"]), "codex") + maxBoost
+                < relevance(SearchFields(names: ["Codex"]), "codex"))
+        check(
+            "a saturated boost still reorders within one tier",
+            relevance(SearchFields(names: ["Codexes"]), "codex") + maxBoost
+                > relevance(SearchFields(names: ["Codex Pro"]), "codex"))
+        check(
+            "the observed boost cap stays under a band stride",
+            maxBoost < SearchRelevance.bandStride - FuzzyMatch.maximumScore)
+
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }

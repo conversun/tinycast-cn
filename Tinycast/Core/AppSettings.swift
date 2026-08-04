@@ -48,6 +48,11 @@ final class AppSettings: ObservableObject {
         static let windowManagementShowInLauncher = "windowManagementShowInLauncher"
         static let windowGap = "windowManagementGap"
         static let windowCycleOnRepeat = "windowManagementCycleOnRepeat"
+        static let quicklinksEnabled = "quicklinksEnabled"
+        static let quicklinksShowInLauncher = "quicklinksShowInLauncher"
+        static let quicklinkOpensNewWindow = "quicklinkOpensNewWindow"
+        static let quicklinkSelectionFallback = "quicklinkSelectionFallback"
+        static let quicklinkConfirmsBeforeDelete = "quicklinkConfirmsBeforeDelete"
     }
 
     /// Folders (and individual `.app` bundles) `AppIndex` scans, in scan order. Editing this re-indexes — `AppIndex.start(settings:)` observes it.
@@ -154,6 +159,35 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(windowCycleOnRepeat, forKey: Key.windowCycleOnRepeat) }
     }
 
+    /// Off means fully off: no launcher entries, no Quicklinks commands, and a still-registered
+    /// shortcut opens nothing.
+    @Published var quicklinksEnabled: Bool {
+        didSet { defaults.set(quicklinksEnabled, forKey: Key.quicklinksEnabled) }
+    }
+
+    @Published var quicklinksShowInLauncher: Bool {
+        didSet { defaults.set(quicklinksShowInLauncher, forKey: Key.quicklinksShowInLauncher) }
+    }
+
+    /// Ask the handler for a new window rather than reusing its frontmost tab. Off is the macOS
+    /// default, which is what "prefer existing tabs" means.
+    @Published var quicklinkOpensNewWindow: Bool {
+        didSet { defaults.set(quicklinkOpensNewWindow, forKey: Key.quicklinkOpensNewWindow) }
+    }
+
+    /// What `{selection}` does when there is no readable selection to pass.
+    @Published var quicklinkSelectionFallback: QuicklinkSelectionFallback {
+        didSet {
+            defaults.set(quicklinkSelectionFallback.rawValue, forKey: Key.quicklinkSelectionFallback)
+        }
+    }
+
+    @Published var quicklinkConfirmsBeforeDelete: Bool {
+        didSet {
+            defaults.set(quicklinkConfirmsBeforeDelete, forKey: Key.quicklinkConfirmsBeforeDelete)
+        }
+    }
+
     init() {
         // integer(forKey:) returns 0 when unset, which no case matches — falls through to 3 Months.
         clipboardRetention =
@@ -207,5 +241,16 @@ final class AppSettings: ObservableObject {
         // Unset reads as 0, which is the intended default anyway — no gap.
         windowGap = defaults.integer(forKey: Key.windowGap)
         windowCycleOnRepeat = defaults.bool(forKey: Key.windowCycleOnRepeat)
+        quicklinksEnabled = defaults.bool(forKey: Key.quicklinksEnabled)
+        quicklinksShowInLauncher =
+            defaults.object(forKey: Key.quicklinksShowInLauncher) == nil
+            || defaults.bool(forKey: Key.quicklinksShowInLauncher)
+        quicklinkOpensNewWindow = defaults.bool(forKey: Key.quicklinkOpensNewWindow)
+        quicklinkSelectionFallback =
+            defaults.string(forKey: Key.quicklinkSelectionFallback)
+            .flatMap(QuicklinkSelectionFallback.init) ?? .ask
+        quicklinkConfirmsBeforeDelete =
+            defaults.object(forKey: Key.quicklinkConfirmsBeforeDelete) == nil
+            || defaults.bool(forKey: Key.quicklinkConfirmsBeforeDelete)
     }
 }

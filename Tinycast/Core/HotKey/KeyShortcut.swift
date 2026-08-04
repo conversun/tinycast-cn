@@ -155,6 +155,7 @@ enum HotKeyAction: Hashable, Sendable {
     case customCommand(id: UUID)
     case systemAction(id: SystemAction.ID)
     case windowCommand(id: WindowCommand.ID)
+    case quicklink(id: UUID)
 
     /// UserDefaults key holding the shortcut JSON; the `KeyboardShortcuts_` prefix is a fossil of the replaced package, kept verbatim so existing bindings need no migration.
     var defaultsKey: String {
@@ -168,6 +169,8 @@ enum HotKeyAction: Hashable, Sendable {
             "KeyboardShortcuts_customCommandHotkey." + id.uuidString.lowercased()
         case .systemAction(let id): "KeyboardShortcuts_systemActionHotkey." + id.rawValue
         case .windowCommand(let id): "KeyboardShortcuts_windowCommandHotkey." + id.rawValue
+        case .quicklink(let id):
+            "KeyboardShortcuts_quicklinkHotkey." + id.uuidString.lowercased()
         }
     }
 }

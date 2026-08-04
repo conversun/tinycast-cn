@@ -17,6 +17,7 @@ struct WindowCommand: Identifiable, Hashable, Sendable {
         case lastTwoThirds = "last-two-thirds"
         case maximize
         case almostMaximize = "almost-maximize"
+        case reasonableSize = "reasonable-size"
         case maximizeHeight = "maximize-height"
         case maximizeWidth = "maximize-width"
         case center
@@ -124,6 +125,7 @@ enum WindowCommandCatalog {
         case .lastTwoThirds: return String(localized: "Last Two Thirds")
         case .maximize: return String(localized: "Maximize")
         case .almostMaximize: return String(localized: "Almost Maximize")
+        case .reasonableSize: return String(localized: "Reasonable Size")
         case .maximizeHeight: return String(localized: "Maximize Height")
         case .maximizeWidth: return String(localized: "Maximize Width")
         case .center: return String(localized: "Center")
@@ -156,6 +158,7 @@ enum WindowCommandCatalog {
         case .lastThird, .lastTwoThirds: return "rectangle.trailingthird.inset.filled"
         case .maximize: return "arrow.up.left.and.arrow.down.right"
         case .almostMaximize: return "rectangle.inset.filled"
+        case .reasonableSize: return "macwindow"
         case .maximizeHeight: return "arrow.up.and.down"
         case .maximizeWidth: return "arrow.left.and.right"
         case .center: return "rectangle.center.inset.filled"
@@ -189,8 +192,8 @@ enum WindowCommandCatalog {
             return .quarters
         case .firstThird, .centerThird, .lastThird, .firstTwoThirds, .lastTwoThirds:
             return .thirds
-        case .maximize, .almostMaximize, .maximizeHeight, .maximizeWidth, .center, .centerHalf,
-            .makeLarger, .makeSmaller, .restore:
+        case .maximize, .almostMaximize, .reasonableSize, .maximizeHeight, .maximizeWidth, .center,
+            .centerHalf, .makeLarger, .makeSmaller, .restore:
             return .sizing
         case .moveLeft, .moveRight, .moveUp, .moveDown, .nextDisplay, .previousDisplay:
             return .moving

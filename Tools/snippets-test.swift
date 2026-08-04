@@ -19,6 +19,7 @@ struct SnippetsTests {
         try await testStoreWatcher()
         testTemplateExpansion()
         testDynamicPlaceholders()
+        testTemplateEncodingAndSelectionAlias()
         testKeywordPolicy()
         testKeywordLifecycle()
         testKeywordListenerLifecycle()
@@ -1020,6 +1021,85 @@ struct SnippetsTests {
                     locale: Locale(identifier: "en_US_POSIX"),
                     timeZone: timeZone)
             ).text == "[]")
+    }
+
+    /// The engine is shared with Quicklinks: it also expands a bare string, can percent-encode every
+    /// value it produces, and accepts Raycast's `{selectedText}` spelling of `{selection}`.
+    private static func testTemplateEncodingAndSelectionAlias() {
+        var calendar = Calendar(identifier: .gregorian)
+        let timeZone = TimeZone(secondsFromGMT: 0)!
+        calendar.timeZone = timeZone
+        let context = SnippetTemplateEngine.ExpansionContext(
+            clipboardHistory: ["a b&c"],
+            selection: "a b&c",
+            now: calendar.date(from: DateComponents(year: 2026, month: 7, day: 24))!,
+            calendar: calendar,
+            locale: Locale(identifier: "en_US_POSIX"),
+            timeZone: timeZone)
+
+        func expand(
+            _ text: String,
+            encoding: SnippetTemplateEngine.ValueEncoding = .none,
+            arguments: [String: String] = [:]
+        ) -> SnippetTemplateEngine.ExpansionResult {
+            SnippetTemplateEngine.expand(
+                text: text, context: context, userArguments: arguments, encoding: encoding)
+        }
+
+        // The text entry point.
+        check("a bare template expands without a snippet record",
+            expand("q={clipboard}").text == "q=a b&c")
+        check("a snippet reference has nothing to resolve against and stays literal",
+            expand("{snippet:Child}").text == "{snippet:Child}")
+        check("missing arguments are reported from the text entry point too",
+            expand("{argument name=\"Repository\"}").missingArguments
+                == [.init(name: "Repository", options: [])])
+
+        // Percent encoding of produced values.
+        check("percent encoding escapes a value substituted into a URL",
+            expand("https://x.com/?q={clipboard}", encoding: .percentEncoding).text
+                == "https://x.com/?q=a%20b%26c")
+        check("the literal parts of the template are never encoded",
+            expand("https://x.com/a b?q={selection}", encoding: .percentEncoding).text
+                == "https://x.com/a b?q=a%20b%26c")
+        check("encoding runs after the pipeline, so uppercase cannot rewrite the hex",
+            expand("{clipboard | uppercase}", encoding: .percentEncoding).text == "A%20B%26C")
+        check("raw opts a value out of automatic encoding",
+            expand("{clipboard | raw}", encoding: .percentEncoding).text == "a b&c")
+        check("an explicit percent-encode is not applied twice",
+            expand("{clipboard | percent-encode}", encoding: .percentEncoding).text
+                == "a%20b%26c")
+        check("encoding reaches every value-producing token",
+            expand("{argument name=\"A\"}", encoding: .percentEncoding, arguments: ["A": "x y"]).text
+                == "x%20y")
+        check("snippets ask for no encoding, so their expansion is unchanged",
+            expand("{clipboard}").text == "a b&c")
+
+        // {selectedText} is an accepted spelling of {selection}.
+        check("selectedText resolves to the selection",
+            expand("{selectedText}").text == expand("{selection}").text)
+        check("the alias is case-insensitive like every other token name",
+            expand("{SelectedText}").text == "a b&c")
+        check("the alias takes the same modifier pipeline",
+            expand("{selectedText | trim | uppercase}").text == "A B&C")
+        check("the alias is encoded like the canonical spelling",
+            expand("{selectedText}", encoding: .percentEncoding).text == "a%20b%26c")
+        check("the alias rejects parameters, exactly as selection does",
+            expand("{selectedText offset=1}").text == "{selectedText offset=1}")
+        let aliasSnippet = record(
+            "/tmp/alias.md", Snippet(name: "Alias", text: "[{selectedText}]"))
+        check("a snippet may use the alias too — it is not quicklink-only",
+            SnippetTemplateEngine.expand(aliasSnippet, snippets: [], context: context).text
+                == "[a b&c]")
+
+        // usesSelection drives the selection-fallback setting.
+        check("usesSelection sees both spellings",
+            SnippetTemplateEngine.usesSelection("a {selection} b")
+                && SnippetTemplateEngine.usesSelection("a {selectedText} b"))
+        check("usesSelection is false for a template that reads no selection",
+            !SnippetTemplateEngine.usesSelection("{clipboard} {date}"))
+        check("usesSelection parses rather than searches, so a malformed token does not count",
+            !SnippetTemplateEngine.usesSelection("{selection offset=1}"))
     }
 
     private static func testKeywordPolicy() {

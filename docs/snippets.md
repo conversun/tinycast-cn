@@ -79,7 +79,9 @@ lines, CR/LF choices, Unicode, and later lines containing `---` are preserved ex
 
 ## Template tokens
 
-The template engine is Foundation-only and receives one captured expansion context: clipboard
+The template engine is **shared with [Quicklinks](quicklinks.md#placeholders)**, which expands a bare
+string rather than a snippet record and asks for automatic percent-encoding. It is Foundation-only and
+receives one captured expansion context: clipboard
 history, selected text, clock, calendar, locale, time zone, and a UUID source. Everything the engine
 needs is injected, so the whole placeholder surface is covered by the standalone harness. If arguments
 require a prompt, the same context is reused afterward, so nothing can drift while the prompt is open.
@@ -91,7 +93,7 @@ so a migrated snippet keeps working.
 | --- | --- |
 | `{clipboard}` | Captured plain-text clipboard value |
 | `{clipboard offset=1}` | Nth most recent clipboard text; `offset=1` is the one before the current |
-| `{selection}` | Captured selected text from the target app, when Accessibility can read it |
+| `{selection}` · `{selectedText}` | Captured selected text from the target app, when Accessibility can read it. `{selectedText}` is Raycast's spelling, accepted on the way in; `{selection}` is the canonical one and the only one **Insert…** writes |
 | `{date}` · `{time}` · `{datetime}` | Captured date / time / both, in the context locale |
 | `{day}` | Weekday name |
 | `{uuid}` | A fresh UUID per token |
@@ -110,8 +112,9 @@ The editor's **Insert…** menu lists every token above; parameters and modifier
 Any value-producing token accepts a modifier pipeline, applied left to right:
 `{clipboard | trim | uppercase}`. The modifiers are `uppercase`, `lowercase`, `trim`,
 `percent-encode` (escapes everything outside RFC 3986's unreserved set), `json-stringify` (escapes for
-use *inside* a JSON string, without adding the quotes), and `raw` — accepted for Raycast
-compatibility and doing nothing, since Tinycast applies no automatic formatting to opt out of.
+use *inside* a JSON string, without adding the quotes), and `raw`, which opts a value out of any
+automatic formatting the *result* asks for. A snippet asks for none, so `raw` is a no-op there; a
+quicklink expanding into a URL percent-encodes every value, and `raw` is how a template opts one out.
 `{cursor}` and snippet references are structural, so they take no modifiers.
 
 A token Tinycast cannot parse — an unknown name, an unknown modifier, a duplicated or unsupported

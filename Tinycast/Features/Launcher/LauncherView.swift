@@ -49,20 +49,22 @@ struct LauncherList: View {
         var rows: [Row] = calcRows
         let favorites = results.prefix(favoriteCount)
         let rest = results.dropFirst(favoriteCount)
-        // `rest` is apps, panes, snippets, system actions, window commands, custom commands, then
-        // built-in commands by the AppIndex sort invariant, so filtering by kind keeps row order
-        // identical and the flat selection index valid.
-        for (title, group) in [
+        // `rest` is apps, panes, quicklinks, snippets, system actions, window commands, custom
+        // commands, then built-in commands by the AppIndex sort invariant, so filtering by kind
+        // keeps row order identical and the flat selection index valid.
+        // Annotated: with this many sections the inference pass times out.
+        let sections: [(String, [AppEntry])] = [
             ("Favorites", Array(favorites)),
             ("Applications", rest.filter { $0.kind == .application }),
             ("System Settings", rest.filter { $0.kind == .systemSettings }),
+            ("Quicklinks", rest.filter { $0.kind == .quicklink }),
             ("Snippets", rest.filter { $0.kind == .snippet }),
             ("System Actions", rest.filter { $0.kind == .systemAction }),
             ("Window Management", rest.filter { $0.kind == .windowCommand }),
             ("Custom Commands", rest.filter { $0.kind == .customCommand }),
             ("Commands", rest.filter { $0.kind == .command })
         ]
-        where !group.isEmpty {
+        for (title, group) in sections where !group.isEmpty {
             rows.append(.header(title))
             rows.append(contentsOf: group.map(Row.app))
         }
@@ -301,6 +303,7 @@ enum AppActionsMenu {
         case .snippet: return "Paste Snippet"
         case .systemAction: return "Run System Action"
         case .windowCommand: return "Move Window"
+        case .quicklink: return "Open Quicklink"
         }
     }
 }

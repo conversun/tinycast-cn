@@ -75,10 +75,10 @@ app; changes always apply (fixed build path — no need to delete `build/`).
 There's no XCTest target. Standalone harnesses:
 
 ```sh
-cp Tools/fuzz-test.swift /tmp/main.swift
-swiftc -swift-version 6 Tinycast/Core/Pinyin.swift /tmp/main.swift \
-    -o /tmp/fuzz-test && /tmp/fuzz-test                            # launcher fuzzy matcher + pinyin
-swiftc -swift-version 6 Tinycast/Core/LauncherRankingStore.swift Tools/ranking-test.swift \
+swiftc -swift-version 6 Tinycast/Core/SearchRelevance.swift Tinycast/Core/Pinyin.swift \
+    Tools/fuzz-test.swift -o /tmp/fuzz-test && /tmp/fuzz-test        # launcher matcher + field priority + pinyin
+swiftc -swift-version 6 Tinycast/Core/SearchRelevance.swift \
+    Tinycast/Core/LauncherRankingStore.swift Tools/ranking-test.swift \
     -o /tmp/ranking-test && /tmp/ranking-test                      # learned launcher ranking
 swiftc Tinycast/Core/Calculator/*.swift Tools/calc-test.swift \
     -o /tmp/calc-test && /tmp/calc-test                           # calculator engine
@@ -117,12 +117,18 @@ swiftc -swift-version 6 Tinycast/Core/Uninstall/UninstallTarget.swift \
     Tinycast/Core/Uninstall/UninstallSearchRoot.swift Tinycast/Core/Uninstall/UninstallRules.swift \
     Tinycast/Core/Uninstall/UninstallProtection.swift Tinycast/Core/Uninstall/UninstallPlan.swift \
     Tools/uninstall-test.swift -o /tmp/uninstall-test && /tmp/uninstall-test  # uninstall attribution + locking
+swiftc -swift-version 6 Tinycast/Core/Quicklinks/Quicklink.swift \
+    Tinycast/Core/Quicklinks/QuicklinkDestination.swift \
+    Tinycast/Core/Quicklinks/QuicklinkStore.swift Tinycast/Core/Quicklinks/QuicklinkArchive.swift \
+    Tools/quicklink-test.swift -o /tmp/quicklink-test && /tmp/quicklink-test  # quicklink destinations + store
 ```
 
-`Tools/fuzz-test.swift` holds a **copy** of `FuzzyMatch` from `Tinycast/Core/AppIndex.swift` —
-change the scoring in one and mirror it in the other. It compiles the real `Core/Pinyin.swift`, which
-must stay Foundation-only. The calc harness compiles the real engine sources, which is why
- `Tinycast/Core/Calculator/` must stay Foundation-only. The system-action harness
+`Tools/fuzz-test.swift` compiles the real `Tinycast/Core/SearchRelevance.swift` and the real
+`Tinycast/Core/Pinyin.swift`, which is why both files must stay Foundation-only and pure. Alongside
+the fixed cases it runs a seeded randomized loop
+(~100k queries) asserting that every score stays inside its field band, that the learned boost cap
+can never lift one out, and that scoring is deterministic. The calc harness compiles the real engine
+sources, which is why `Tinycast/Core/Calculator/` must stay Foundation-only. The system-action harness
 similarly keeps `SystemAction.swift` independent from AppKit and all command side effects. The
 uninstall harness is the same idea taken furthest: it touches no filesystem at all, because
 `UninstallScanner` hands the rules directory *names* and the protection classifier takes its
@@ -150,6 +156,13 @@ committed. Turning payload values into Tinycast's own types lives in `RaycastImp
 AppKit and is covered by the app build instead. The format contract is in
 [raycast-import.md](raycast-import.md).
 
+The quicklink harness compiles the real model, destination detector, SQLite store and JSON archive,
+so those four must stay Foundation-only (plus SQLite3). Each store is rooted in a throwaway temp
+directory and every path rule is asked against an injected home, so a run can never reach a real
+library. One case deliberately corrupts a database file and asserts the store reports itself
+unavailable **and leaves the file byte-for-byte intact** — quicklinks are authored data, so unlike
+`ClipboardStore` this one never deletes and recreates.
+
 The window-command harness compiles the real catalog, geometry and action memory (Foundation +
 CoreGraphics — `CGRect`'s `Equatable` conformance lives in the CoreGraphics overlay, not Foundation).
 It covers tiling, gaps, cycling, restore, display moves and the memory's reset rules against synthetic
@@ -158,21 +171,10 @@ frame. All of it runs headless because the layer is pure: `WindowMover` owns eve
 and is deliberately not compiled in. The full contract is in
 [window-management.md](window-management.md).
 
-## Format & lint
+## Formatting
 
-Formatting is whatever Xcode's own reindent does — there's no separate formatter. Linting is
-[SwiftLint](https://github.com/realm/SwiftLint), configured in [`.swiftlint.yml`](../.swiftlint.yml)
-(default ruleset, scoped to `Tinycast/`, the two `.generated.swift` files excluded):
-
-```sh
-brew install swiftlint   # once
-swiftlint lint           # report issues
-swiftlint lint --fix     # auto-fix what's fixable, then re-run lint to see what's left
-```
-
-Lint runs on the PR as a blocking check (below), but not `--strict` — warnings annotate the diff,
-only the config's `error` thresholds fail it. Clear the warnings anyway; CONTRIBUTING.md's "builds
-clean" bar is about compiler warnings, which SwiftLint doesn't touch.
+Formatting is whatever Xcode's own reindent does — there's no formatter and no linter. The bar is
+CONTRIBUTING.md's "builds clean": no new compiler warnings.
 
 ## Generated data
 
@@ -218,21 +220,17 @@ Full details in [signing.md](signing.md).
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every PR and every push to `main`, on a `macos-26` runner with
-Xcode 26 (same selection step as the release workflow). Both jobs are merge gates and both run in
-parallel; a new push cancels the in-flight run for the same ref:
+Xcode 26 (same selection step as the release workflow). It has one job, a merge gate; a new push
+cancels the in-flight run for the same ref:
 
 - **`test`** — every `Tools/*.swift` harness from [Tests](#tests) above, in order.
-- **`lint`** — `swiftlint lint --reporter github-actions-logging`, so violations land as inline
-  annotations on the PR diff. Not `--strict`: warnings annotate but don't fail, the config's `error`
-  thresholds do.
 
 There is **no `xcodebuild` step**: a Debug build costs minutes on every run and the release workflow
-builds before it ships anyway, so CI keeps to the two checks that finish in about a minute. A change
+builds before it ships anyway, so CI keeps to the one check that finishes in about a minute. A change
 that compiles nowhere still turns the PR green — **build locally before you open one** (`xcodebuild
 -project Tinycast.xcodeproj -scheme Tinycast -configuration Debug build`, or just ⌘B in Xcode).
 
-Same commands locally: the harness block from [Tests](#tests), then `swiftlint lint` from
-[Format & lint](#format--lint).
+Same commands locally: the harness block from [Tests](#tests).
 
 ## CI releases
 

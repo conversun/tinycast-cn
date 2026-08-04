@@ -14,6 +14,14 @@ enum SnippetTemplateEngine {
 
         var clipboard: String { clipboardHistory.first ?? "" }
 
+        /// A copy reading a different selection, for a caller that only learns the value after the
+        /// context was captured — a quicklink whose selection had to be asked for or fallen back to.
+        func replacingSelection(with selection: String) -> Self {
+            Self(
+                clipboardHistory: clipboardHistory, selection: selection, now: now,
+                calendar: calendar, locale: locale, timeZone: timeZone, makeUUID: makeUUID)
+        }
+
         init(
             clipboardHistory: [String],
             selection: String,
@@ -67,6 +75,14 @@ enum SnippetTemplateEngine {
         let missingArguments: [MissingArgument]
     }
 
+    /// Formatting the *result* asks for, applied to every value a token produces. A snippet expands
+    /// into plain text and wants none; a quicklink expands into a URL, where an unescaped space or
+    /// `&` would silently truncate the destination.
+    enum ValueEncoding: Sendable {
+        case none
+        case percentEncoding
+    }
+
     private static let maximumReferenceDepth = 5
     private static let comparisonLocale = Locale(identifier: "en_US_POSIX")
 
@@ -76,19 +92,51 @@ enum SnippetTemplateEngine {
         context: ExpansionContext,
         userArguments: [String: String] = [:]
     ) -> ExpansionResult {
-        let orderedSnippets = snippets.sorted { $0.id < $1.id }
-        let expansion = expandRecord(
-            record,
-            snippets: orderedSnippets,
-            context: context,
-            userArguments: userArguments,
-            depth: 0,
-            visitedIDs: [record.id]
-        )
-        let cursorOffset = expansion.cursorCharacterOffset.map { expansion.text.count - $0 }
-        return ExpansionResult(
+        result(
+            of: expandText(
+                record.snippet.text,
+                snippets: snippets.sorted { $0.id < $1.id },
+                context: context,
+                userArguments: userArguments,
+                encoding: .none,
+                depth: 0,
+                visitedIDs: [record.id]
+            ))
+    }
+
+    /// Expands a template that isn't a snippet. `{snippet:…}` has nothing to resolve against here,
+    /// so it is left in the text like any other token the engine can't complete.
+    static func expand(
+        text: String,
+        context: ExpansionContext,
+        userArguments: [String: String] = [:],
+        encoding: ValueEncoding = .none
+    ) -> ExpansionResult {
+        result(
+            of: expandText(
+                text,
+                snippets: [],
+                context: context,
+                userArguments: userArguments,
+                encoding: encoding,
+                depth: 0,
+                visitedIDs: []
+            ))
+    }
+
+    /// Whether the template reads the selection. Parsed rather than searched for, so a `{selection}`
+    /// inside a literal brace run or a malformed token doesn't count.
+    static func usesSelection(_ text: String) -> Bool {
+        parseSegments(text).contains { segment in
+            if case .selection = segment { return true }
+            return false
+        }
+    }
+
+    private static func result(of expansion: Expansion) -> ExpansionResult {
+        ExpansionResult(
             text: expansion.text,
-            cursorOffsetFromEnd: cursorOffset,
+            cursorOffsetFromEnd: expansion.cursorCharacterOffset.map { expansion.text.count - $0 },
             missingArguments: expansion.missingArguments
         )
     }
@@ -179,32 +227,34 @@ enum SnippetTemplateEngine {
 
     // MARK: - Expansion
 
-    private static func expandRecord(
-        _ record: StoredSnippet,
+    private static func expandText(
+        _ text: String,
         snippets: [StoredSnippet],
         context: ExpansionContext,
         userArguments: [String: String],
+        encoding: ValueEncoding,
         depth: Int,
         visitedIDs: Set<StoredSnippet.ID>
     ) -> Expansion {
         var result = Expansion()
-        for segment in parseSegments(record.snippet.text) {
+        for segment in parseSegments(text) {
             switch segment {
             case .literal(let value):
                 result.append(value)
             case .clipboard(let offset, let modifiers):
                 let value = offset < context.clipboardHistory.count
                     ? context.clipboardHistory[offset] : ""
-                result.append(apply(modifiers, to: value))
+                result.append(apply(modifiers, to: value, encoding: encoding))
             case .selection(let modifiers):
-                result.append(apply(modifiers, to: context.selection))
+                result.append(apply(modifiers, to: context.selection, encoding: encoding))
             case .dateTime(let token, let modifiers):
-                result.append(apply(modifiers, to: format(token, context: context)))
+                result.append(
+                    apply(modifiers, to: format(token, context: context), encoding: encoding))
             case .uuid(let modifiers):
-                result.append(apply(modifiers, to: context.makeUUID()))
+                result.append(apply(modifiers, to: context.makeUUID(), encoding: encoding))
             case .argument(let token, let source, let modifiers):
                 if let value = userArguments[token.name] ?? token.defaultValue {
-                    result.append(apply(modifiers, to: value))
+                    result.append(apply(modifiers, to: value, encoding: encoding))
                 } else {
                     result.append(source)
                     result.addMissingArgument(
@@ -222,11 +272,12 @@ enum SnippetTemplateEngine {
                 }
                 var nestedVisited = visitedIDs
                 nestedVisited.insert(target.id)
-                result.append(expandRecord(
-                    target,
+                result.append(expandText(
+                    target.snippet.text,
                     snippets: snippets,
                     context: context,
                     userArguments: userArguments,
+                    encoding: encoding,
                     depth: depth + 1,
                     visitedIDs: nestedVisited
                 ))
@@ -235,8 +286,10 @@ enum SnippetTemplateEngine {
         return result
     }
 
-    private static func apply(_ modifiers: [Modifier], to value: String) -> String {
-        modifiers.reduce(value) { partial, modifier in
+    private static func apply(
+        _ modifiers: [Modifier], to value: String, encoding: ValueEncoding
+    ) -> String {
+        let modified = modifiers.reduce(value) { partial, modifier in
             switch modifier {
             case .uppercase: return partial.uppercased()
             case .lowercase: return partial.lowercased()
@@ -246,6 +299,12 @@ enum SnippetTemplateEngine {
             case .raw: return partial
             }
         }
+        // Applied last so `| uppercase` can't rewrite the `%xx` hex, and skipped when the template
+        // already spoke for itself — `raw` opts out, `percent-encode` has done it once already.
+        guard encoding == .percentEncoding,
+            !modifiers.contains(.raw), !modifiers.contains(.percentEncode)
+        else { return modified }
+        return percentEncoded(modified)
     }
 
     /// Percent-encodes everything outside RFC 3986's unreserved set, so the result is safe in any URL component.
@@ -335,7 +394,10 @@ enum SnippetTemplateEngine {
                 token.hasOnly(["offset"])
             else { return nil }
             return .clipboard(offset: offset, modifiers: modifiers)
-        case "selection":
+        // `selectedText` is the spelling Raycast's own documentation uses; both name the captured
+        // selection. Nothing ever writes the alias — the Insert… menus emit `{selection}` — so it is
+        // accepted on the way in without becoming a second name in saved data.
+        case "selection", "selectedtext":
             guard token.parameters.isEmpty else { return nil }
             return .selection(modifiers: modifiers)
         case "uuid":

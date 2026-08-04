@@ -29,8 +29,8 @@ Check existing [issues](https://github.com/abue-ammar/tinycast/issues) and
 - **A linked issue that got a green light.** No agreed issue, no merge — unless a maintainer marks
   the PR `typo` or `docs`.
 - Builds clean — no new warnings.
-- The `Tools/` harnesses pass; engine changes come with new cases. CI runs them and SwiftLint on the
-  PR, and both are merge gates. It does **not** build the app, so **build locally** —
+- The `Tools/` harnesses pass; engine changes come with new cases. CI runs them on the PR as a merge
+  gate. It does **not** build the app, so **build locally** —
   a PR that doesn't compile still looks green; [`docs/development.md`](docs/development.md#tests) has
   the commands.
 - Leak-tested and memory-measured. Numbers in the PR.

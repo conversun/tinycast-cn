@@ -66,7 +66,7 @@ struct ClipboardSettingsView: View {
                     .buttonStyle(.borderless)
                     .popover(isPresented: $showingAppPicker, arrowEdge: .bottom) {
                         AppPickerPopover(excluded: Set(settings.clipboardDisabledApps)) { bundleID in
-                            settings.clipboardDisabledApps.append(bundleID)
+                            if let bundleID { settings.clipboardDisabledApps.append(bundleID) }
                             showingAppPicker = false
                         }
                     }
@@ -110,7 +110,7 @@ private struct DisabledAppRow: View {
     @EnvironmentObject private var appIndex: AppIndex
 
     var body: some View {
-        let (name, icon) = resolve()
+        let (name, icon) = AppPresentation.resolve(bundleID: bundleID, in: appIndex)
         HStack(spacing: Theme.Spacing.lg) {
             Image(nsImage: icon)
                 .resizable()
@@ -127,64 +127,5 @@ private struct DisabledAppRow: View {
         }
         .padding(.horizontal, Theme.Spacing.xl)
         .padding(.vertical, Theme.Spacing.lg)
-    }
-
-    private func resolve() -> (String, NSImage) {
-        if let app = appIndex.apps.first(where: { $0.bundleID == bundleID }) {
-            return (app.name, app.icon)
-        }
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-            let name = url.deletingPathExtension().lastPathComponent
-            return (name, IconCache.icon(forFile: url.path))
-        }
-        return (bundleID, NSWorkspace.shared.icon(for: .applicationBundle))
-    }
-}
-
-/// Searchable list of installed apps (from the launcher's index) used to add a disabled app.
-private struct AppPickerPopover: View {
-    let excluded: Set<String>
-    let onSelect: (String) -> Void
-
-    @EnvironmentObject private var appIndex: AppIndex
-    @State private var query = ""
-
-    private var candidates: [AppEntry] {
-        (query.isEmpty ? appIndex.apps : appIndex.matches(query))
-            .filter { $0.kind == .application }
-            .filter { $0.bundleID.map { !excluded.contains($0) } ?? false }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            TextField("Search apps…", text: $query)
-                .textFieldStyle(.roundedBorder)
-                .padding(Theme.Spacing.md)
-            Divider()
-            ScrollView {
-                LazyVStack(spacing: 1) {
-                    ForEach(candidates) { app in
-                        Button {
-                            if let id = app.bundleID { onSelect(id) }
-                        } label: {
-                            HStack(spacing: Theme.Spacing.lg) {
-                                Image(nsImage: app.icon)
-                                    .resizable()
-                                    .frame(width: 20, height: 20)
-                                Text(app.name)
-                                    .lineLimit(1)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, Theme.Spacing.md)
-                            .padding(.vertical, Theme.Spacing.sm)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(Theme.Spacing.sm)
-            }
-        }
-        .frame(width: 280, height: 320)
     }
 }

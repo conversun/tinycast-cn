@@ -41,7 +41,8 @@ Full detail: [`docs/architecture.md`](docs/architecture.md).
   accessory apps).
 - **Subsystems:** [palette](docs/palette.md) · [launcher & fuzzy match](docs/launcher.md) ·
   [calculator](docs/calculator.md) · [clipboard](docs/clipboard.md) · [emoji](docs/emoji.md) ·
-  [snippets](docs/snippets.md) · [window management](docs/window-management.md) ·
+  [snippets](docs/snippets.md) · [quicklinks](docs/quicklinks.md) ·
+  [window management](docs/window-management.md) ·
   [hotkeys](docs/hotkeys.md) · [uninstall](docs/uninstall.md) ·
   [Raycast import](docs/raycast-import.md) · [UI & design system](docs/ui.md).
 
@@ -117,8 +118,27 @@ Never break these without an explicit task to do so.
   `UninstallSelection`'s one intersection, not in the view. Tinycast also refuses to plan its own
   uninstall, compared against the **running** identity so the Dev channel refuses itself too.
   See [uninstall.md](docs/uninstall.md).
-- **`Tools/fuzz-test.swift` holds a COPY of `FuzzyMatch`** from `Core/AppIndex.swift`. Change the
-  scoring in one, mirror it in the other, or the test is meaningless.
+- **Quicklinks are authored data, and their store never deletes.** `Core/Quicklinks/` splits like
+  `Core/Uninstall/`: `Quicklink.swift`, `QuicklinkDestination.swift`, `QuicklinkStore.swift` and
+  `QuicklinkArchive.swift` stay Foundation-only (plus SQLite3) and pure for
+  `Tools/quicklink-test.swift` — the home directory is injected, never read — while `QuicklinkLauncher`
+  owns every `NSWorkspace` call and `QuicklinkArgumentSession` the prompt state. The database lives in
+  **Application Support**, not Caches, and a database that won't open is **reported, never discarded**:
+  `ClipboardStore`'s delete-and-recreate is only sound because history is regenerable, and a link
+  library is not. `Quicklink.precedes` is the one display order, sorted through by both the store and
+  the `AppIndex` slice. There is **one template engine**: quicklinks expand through
+  `SnippetTemplateEngine` rather than a second parser, which is what makes `| raw` mean something —
+  it opts a value out of the automatic percent-encoding a URL destination asks for. `{selectedText}`
+  is accepted as an alias for `{selection}`, but nothing ever *writes* it. See
+  [quicklinks.md](docs/quicklinks.md).
+- **`Core/SearchRelevance.swift` is Foundation-only and pure**, so `Tools/fuzz-test.swift` compiles
+  the shipped scorer rather than a copy of it. It owns both `FuzzyMatch` (the tiered
+  exact/prefix/word-start/substring/subsequence scorer) and the field bands. **Searchable fields stay
+  separate** — display name, Spotlight alternate names, bundle id, executable name are never flattened
+  into one string, because the field is what picks the band. Bands are one `bandStride` apart, an
+  order of magnitude above `FuzzyMatch.maximumScore` and two above `LauncherRankingStore`'s boost cap:
+  that gap is what keeps a learned boost reordering *within* a tier and never across a tier or a
+  field. A new searchable field means a new `Band` case and a `consider` call, in priority order.
 - **`EmojiData.generated.swift` is emitted by `node Tools/gen-emoji.js` and
   `CurrencyData.generated.swift` by `node Tools/gen-currencies.js`** — never edit either by hand.
   Currency names, signs and uncontested nouns are generated (Frankfurter × CLDR); the only
@@ -210,11 +230,14 @@ Never break these without an explicit task to do so.
 
 - `Tinycast/Core/` — managers, stores, windows, AppKit glue (no view bodies beyond hosting).
   `Core/Calculator/` and `Core/Emoji/` are Foundation-only engines; `Core/Snippets/` is a
-  standalone-harness input in full; `Core/WindowManagement/` is a pure geometry layer plus its one AX
-  file; `Core/Uninstall/` splits the same way — five pure files, one scanner, one Trash runner;
+  standalone-harness input in full (and owns the template engine both it and Quicklinks expand
+  through); `Core/WindowManagement/` is a pure geometry layer plus its one AX file; `Core/Uninstall/`
+  splits the same way — five pure files, one scanner, one Trash runner; `Core/Quicklinks/` is four
+  pure files plus the opener and the argument session;
   `Core/Theme.swift` is the design-token source; `Core/HotKey/` is the in-house hotkey stack.
 - `Tinycast/Features/` — SwiftUI views: `RootPaletteView`, `Launcher/`, `Clipboard/`, `Calculator/`,
-  `Emoji/`, `Uninstall/`, `Settings/`, `About/`, `Onboarding/`, plus shared `PopoverMenu`. Each
+  `Emoji/`, `Quicklinks/`, `Uninstall/`, `Settings/`, `About/`, `Onboarding/`, plus shared
+  `PopoverMenu`. Each
   `SettingsTab` maps to
   one `…SettingsView` built on the `SettingsPane` / `SettingsCard` scaffold in `SettingsComponents.swift`;
   the four launcher-category panes (Applications, System Settings, System Actions, Commands) are thin
@@ -229,7 +252,7 @@ Never break these without an explicit task to do so.
 - [`docs/palette.md`](docs/palette.md) — palette state flow, menu-open freeze, focus restoration.
 - [`docs/launcher.md`](docs/launcher.md) · [`docs/calculator.md`](docs/calculator.md) ·
   [`docs/clipboard.md`](docs/clipboard.md) · [`docs/emoji.md`](docs/emoji.md) ·
-  [`docs/snippets.md`](docs/snippets.md) ·
+  [`docs/snippets.md`](docs/snippets.md) · [`docs/quicklinks.md`](docs/quicklinks.md) ·
   [`docs/window-management.md`](docs/window-management.md) ·
   [`docs/hotkeys.md`](docs/hotkeys.md) · [`docs/uninstall.md`](docs/uninstall.md) — subsystem
   internals.

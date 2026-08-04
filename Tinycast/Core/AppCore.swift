@@ -8,6 +8,10 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     case calculatorHistory
     case emoji
     case uninstall
+    case quicklinks
+    /// Collects a quicklink's `{argument}` values before it opens; the pending request lives on
+    /// `AppCore.quicklinkArguments`, the way `.uninstall`'s target lives on `UninstallSession`.
+    case quicklinkArguments
 
     var id: String { rawValue }
     var title: String {
@@ -17,6 +21,8 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .calculatorHistory: return String(localized: "Calculator History")
         case .emoji: return String(localized: "Emoji & Symbols")
         case .uninstall: return String(localized: "Uninstall Application")
+        case .quicklinks: return String(localized: "Quicklinks")
+        case .quicklinkArguments: return String(localized: "Open Quicklink")
         }
     }
     var systemImage: String {
@@ -26,6 +32,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .calculatorHistory: return "plus.forwardslash.minus"
         case .emoji: return "face.smiling"
         case .uninstall: return "trash"
+        case .quicklinks, .quicklinkArguments: return Quicklink.sfSymbol
         }
     }
     var placeholder: String {
@@ -36,6 +43,9 @@ enum PaletteMode: String, CaseIterable, Identifiable {
             return String(localized: "Do math, convert units, or search your past calculations…")
         case .emoji: return String(localized: "Search emoji and symbols…")
         case .uninstall: return String(localized: "Filter files and folders by name…")
+        case .quicklinks: return String(localized: "Search quicklinks…")
+        // Replaced by the pending argument's name; only reached if the session vanished mid-render.
+        case .quicklinkArguments: return String(localized: "Enter a value…")
         }
     }
 }
@@ -98,6 +108,7 @@ final class AppCore: ObservableObject {
     let launcherRanking: LauncherRankingStore
     let appIndex: AppIndex
     let customCommands = CustomCommandStore()
+    let quicklinks = QuicklinkStore()
     let clipboardStore = ClipboardStore()
     let clipboardManager: ClipboardManager
     let snippetsStore: SnippetsStore
@@ -117,6 +128,12 @@ final class AppCore: ObservableObject {
     let runningApps = RunningAppsMonitor()
     let palette = PaletteViewModel()
     let uninstall = UninstallSession()
+    let quicklinkArguments = QuicklinkArgumentSession()
+
+    /// Set when a quicklink editor should open as the Settings window appears; the pane consumes it.
+    @Published var pendingQuicklinkEdit: QuicklinkEditRequest?
+    /// Carries the menu's default-app override across the quicklink argument prompt.
+    private var pendingQuicklinkForcesDefaultApp = false
 
     private lazy var windowController = PaletteWindowController(core: self)
     private lazy var messageHUD = MessageHUDController(settings: settings)
@@ -158,6 +175,14 @@ final class AppCore: ObservableObject {
         }
         applyCustomCommandsPresence()
         applyWindowCommandsPresence()
+        quicklinks.onChange = { [weak self] _ in
+            self?.applyQuicklinksPresence()
+        }
+        // Loaded even while the feature is off, and before `hotKeys.start`: its stale-binding prune
+        // reads this list, so an unloaded store would look like "every quicklink was deleted" and
+        // throw away the user's shortcuts. The library is small, so this is one short read.
+        quicklinks.load()
+        applyQuicklinksPresence()
         Task { await appIndex.refresh() }
         Task { await emojiIndex.load() }
         currencyRates.start()
@@ -168,7 +193,10 @@ final class AppCore: ObservableObject {
         hotKeys.onRunCustomCommand = { [weak self] id in self?.runCustomCommand(id: id) }
         hotKeys.onRunSystemAction = { [weak self] id in self?.runSystemAction(id: id) }
         hotKeys.onRunWindowCommand = { [weak self] id in self?.runWindowCommand(id: id) }
-        hotKeys.start(customCommandIDs: Set(customCommands.commands.map(\.id)))
+        hotKeys.onOpenQuicklink = { [weak self] id in self?.openQuicklink(id: id) }
+        hotKeys.start(
+            customCommandIDs: Set(customCommands.commands.map(\.id)),
+            quicklinkIDs: Set(quicklinks.quicklinks.map(\.id)))
         // Deliberately keeps running while `hotKeys.recordingAction` pauses Carbon: the recorder relies on the tap's rewritten flags to capture Hyper shortcuts.
         hyperKeyTap.start(settings: settings)
 
@@ -202,6 +230,16 @@ final class AppCore: ObservableObject {
                     MainActor.assumeIsolated {
                         guard let self else { return }
                         Task { self.applyCustomCommandsPresence() }
+                    }
+                }
+                .store(in: &cancellables)
+        }
+        for publisher in [settings.$quicklinksEnabled, settings.$quicklinksShowInLauncher] {
+            publisher.dropFirst()
+                .sink { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        guard let self else { return }
+                        Task { self.applyQuicklinksPresence() }
                     }
                 }
                 .store(in: &cancellables)
@@ -248,6 +286,15 @@ final class AppCore: ObservableObject {
     private func applyWindowCommandsPresence() {
         let visible = settings.windowManagementEnabled && settings.windowManagementShowInLauncher
         appIndex.setWindowCommandsVisible(visible)
+    }
+
+    /// The launcher section and the Quicklinks commands move together with the feature switch;
+    /// "show in launcher" hides only the section, leaving the commands reachable.
+    private func applyQuicklinksPresence() {
+        let enabled = settings.quicklinksEnabled
+        appIndex.setQuicklinks(
+            enabled && settings.quicklinksShowInLauncher ? quicklinks.quicklinks : [],
+            commandsVisible: enabled)
     }
 
     private func applySnippetsLauncherPresence() {
@@ -348,6 +395,7 @@ final class AppCore: ObservableObject {
                 .environmentObject(self.visibility)
                 .environmentObject(self.customCommands)
                 .environmentObject(self.snippetsStore)
+                .environmentObject(self.quicklinks)
         }
         if !isNew {
             NotificationCenter.default.post(name: .tinycastSelectSettingsTab, object: tab)
@@ -404,6 +452,13 @@ final class AppCore: ObservableObject {
             runWindowCommand(id: command.id)
             return
         }
+        // Also before the palette hides: a quicklink with an unfilled argument stays in the palette
+        // to ask for it, and only then opens.
+        if app.kind == .quicklink {
+            guard let id = Quicklink.id(fromEntryID: app.id) else { return }
+            openQuicklink(id: id)
+            return
+        }
         let previous = windowController.previousApp
         hidePalette(restoreFocus: false)
         switch app.kind {
@@ -415,7 +470,7 @@ final class AppCore: ObservableObject {
         case .snippet:
             let snippetID = String(app.id.dropFirst("snippet:".count))
             expandSnippet(id: snippetID, targetApp: previous)
-        case .command, .customCommand, .systemAction, .windowCommand:
+        case .command, .customCommand, .systemAction, .windowCommand, .quicklink:
             break  // handled above
         }
     }
@@ -544,6 +599,249 @@ final class AppCore: ObservableObject {
         }
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: - Quicklinks
+
+    /// The one funnel for palette activation, the ⌘K menu and a quicklink's global shortcut, so
+    /// neither the feature switch nor the argument prompt can be bypassed.
+    ///
+    /// `forcingDefaultApp` is the menu's "Open With Default App": it bypasses the saved handler for
+    /// one open without changing what the quicklink is saved as.
+    func openQuicklink(id: UUID, forcingDefaultApp: Bool = false) {
+        guard settings.quicklinksEnabled, let quicklink = quicklinks.quicklink(id: id) else {
+            return
+        }
+        // With the palette closed a shortcut still reads the selection from whatever is frontmost,
+        // exactly as a system action targets the window a palette launch would have.
+        let target =
+            windowController.isVisible
+            ? windowController.previousApp : NSWorkspace.shared.frontmostApplication
+        let encoding: SnippetTemplateEngine.ValueEncoding =
+            QuicklinkDestination.usesURLEncoding(quicklink.link) ? .percentEncoding : .none
+        var context = snippetTextInjector.captureExpansionContext(
+            targetApp: target, clipboardHistory: clipboardHistoryForExpansion())
+        var arguments: [SnippetTemplateEngine.MissingArgument] = []
+
+        // An unreadable selection is a missing value, not an empty one: substitute the clipboard, or
+        // collect it through the same prompt the template's own arguments use.
+        if context.selection.isEmpty, SnippetTemplateEngine.usesSelection(quicklink.link) {
+            switch settings.quicklinkSelectionFallback {
+            case .clipboard:
+                context = context.replacingSelection(with: context.clipboard)
+            case .ask:
+                arguments.append(Self.selectionArgument)
+            }
+        }
+
+        let expansion = SnippetTemplateEngine.expand(
+            text: quicklink.link, context: context, encoding: encoding)
+        arguments += expansion.missingArguments
+        guard arguments.isEmpty else {
+            quicklinkArguments.begin(
+                quicklink: quicklink, context: context, encoding: encoding, arguments: arguments)
+            pendingQuicklinkForcesDefaultApp = forcingDefaultApp
+            // Never `restoreAnyMode`: this screen is always a fresh prompt, never a restored one.
+            showPalette(mode: .quicklinkArguments)
+            return
+        }
+        performQuicklinkOpen(
+            quicklink, link: expansion.text, forcingDefaultApp: forcingDefaultApp)
+    }
+
+    /// `{selection}` promoted to an argument when there is nothing to read and the setting says ask.
+    private static let selectionArgument = SnippetTemplateEngine.MissingArgument(
+        name: String(localized: "Selected Text"), options: [])
+
+    /// ↵ in the argument form. Returns false while more arguments remain.
+    @discardableResult
+    func submitQuicklinkArgument(_ value: String) -> Bool {
+        guard let request = quicklinkArguments.request else { return false }
+        guard let values = quicklinkArguments.submit(value) else { return false }
+
+        var context = request.context
+        if let selection = values[Self.selectionArgument.name] {
+            context = context.replacingSelection(with: selection)
+        }
+        let expansion = SnippetTemplateEngine.expand(
+            text: request.quicklink.link, context: context, userArguments: values,
+            encoding: request.encoding)
+        let forcesDefault = pendingQuicklinkForcesDefaultApp
+        cancelQuicklinkArguments()
+        performQuicklinkOpen(
+            request.quicklink, link: expansion.text, forcingDefaultApp: forcesDefault)
+        return true
+    }
+
+    func cancelQuicklinkArguments() {
+        quicklinkArguments.cancel()
+        pendingQuicklinkForcesDefaultApp = false
+    }
+
+    private func performQuicklinkOpen(
+        _ quicklink: Quicklink, link: String, forcingDefaultApp: Bool
+    ) {
+        if windowController.isVisible { hidePalette(restoreFocus: false) }
+        let openWith = forcingDefaultApp ? nil : quicklink.openWithBundleID
+        Task {
+            do throws(QuicklinkLauncher.Failure) {
+                try await QuicklinkLauncher.open(
+                    link, openWithBundleID: openWith,
+                    inNewWindow: settings.quicklinkOpensNewWindow)
+            } catch {
+                await presentQuicklinkFailure(quicklink, link: link, failure: error)
+            }
+        }
+    }
+
+    private func presentQuicklinkFailure(
+        _ quicklink: Quicklink, link: String, failure: QuicklinkLauncher.Failure
+    ) async {
+        let symbol = quicklink.iconSymbol ?? Quicklink.sfSymbol
+        guard let bundleID = failure.missingApplicationBundleID else {
+            await showNotice(
+                title: String(localized: "Couldn’t Open \(quicklink.name)"),
+                message: failure.localizedDescription, symbol: symbol, tone: .danger)
+            return
+        }
+        // The only failure with a usable second option, so it offers it rather than dead-ending.
+        let name = applicationName(forBundleID: bundleID) ?? bundleID
+        guard
+            await dialogs.reportFailure(
+                title: String(localized: "Couldn’t Open \(quicklink.name)"),
+                message: String(localized: "\(name) isn’t installed any more."), symbol: symbol,
+                recovery: "Open with Default")
+        else { return }
+        performQuicklinkOpen(quicklink, link: link, forcingDefaultApp: true)
+    }
+
+    private func applicationName(forBundleID bundleID: String) -> String? {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+            .flatMap { FileManager.default.displayName(atPath: $0.path) }
+    }
+
+    // MARK: - Quicklink library
+
+    @discardableResult
+    func addQuicklink(_ draft: Quicklink) throws -> Quicklink {
+        try quicklinks.add(draft)
+    }
+
+    func updateQuicklink(_ draft: Quicklink) throws {
+        try quicklinks.update(draft)
+    }
+
+    /// Confirms unless the user turned the gate off, then deletes and unwinds every reference the
+    /// quicklink owned. `confirming: false` is for the Settings pane, which already asked.
+    func deleteQuicklink(id: UUID, confirming: Bool = true) async {
+        guard let quicklink = quicklinks.quicklink(id: id) else { return }
+        if confirming, settings.quicklinkConfirmsBeforeDelete {
+            guard
+                await confirm(
+                    title: "Delete “\(quicklink.name)”?",
+                    message: "Its shortcut, favorite slot and learned ranking go with it.",
+                    symbol: quicklink.iconSymbol ?? Quicklink.sfSymbol, confirmTitle: "Delete")
+            else { return }
+        }
+        removeQuicklinkReferences(ids: [id], entryIDs: [quicklink.entryID])
+        try? quicklinks.remove(id: id)
+    }
+
+    func toggleQuicklinkPinned(id: UUID) {
+        try? quicklinks.togglePinned(id: id)
+    }
+
+    func setQuicklinkShowsInRootSearch(_ shows: Bool, id: UUID) {
+        try? quicklinks.setShowsInRootSearch(shows, id: id)
+    }
+
+    func duplicateQuicklink(id: UUID) {
+        _ = try? quicklinks.duplicate(id: id)
+    }
+
+    /// Opens Settings on the Quicklinks pane with the editor showing `quicklink` (nil for a new one).
+    func editQuicklink(_ quicklink: Quicklink?) {
+        pendingQuicklinkEdit = QuicklinkEditRequest(quicklink: quicklink)
+        showSettings(tab: .quicklinks)
+    }
+
+    @discardableResult
+    func replaceQuicklinks(_ incoming: [Quicklink]) -> Int {
+        let previous = quicklinks.quicklinks
+        let count = quicklinks.replace(with: incoming)
+        let liveIDs = Set(quicklinks.quicklinks.map(\.id))
+        let removed = previous.filter { !liveIDs.contains($0.id) }
+        removeQuicklinkReferences(
+            ids: Set(removed.map(\.id)), entryIDs: Set(removed.map(\.entryID)))
+        return count
+    }
+
+    private func removeQuicklinkReferences(ids: Set<UUID>, entryIDs: Set<String>) {
+        for id in ids {
+            let action = HotKeyAction.quicklink(id: id)
+            if hotKeys.recordingAction == action { hotKeys.recordingAction = nil }
+            hotKeys.setBinding(nil, for: action)
+        }
+        favorites.remove(keys: entryIDs)
+        visibility.removeItemKeys(entryIDs)
+        for entryID in entryIDs {
+            launcherRanking.reset(itemKey: entryID)
+        }
+    }
+
+    // MARK: - Quicklink import & export
+
+    func exportQuicklinks() async {
+        guard !quicklinks.quicklinks.isEmpty else {
+            await showNotice(
+                title: "Nothing to Export", message: "You haven’t created any quicklinks yet.",
+                symbol: Quicklink.sfSymbol, tone: .neutral)
+            return
+        }
+        guard let url = BackupActions.chooseSaveLocation(named: "Tinycast-Quicklinks") else {
+            return
+        }
+        do {
+            try QuicklinkArchive.encode(quicklinks.quicklinks).write(to: url, options: .atomic)
+            messageHUD.show(
+                message: String(localized: "Exported \(quicklinks.quicklinks.count) Quicklinks"))
+        } catch {
+            await showNotice(
+                title: "Export Failed", message: error.localizedDescription,
+                symbol: Quicklink.sfSymbol, tone: .danger)
+        }
+    }
+
+    func importQuicklinks() async {
+        guard let url = BackupActions.chooseJSONFile() else { return }
+        do {
+            let incoming = try QuicklinkArchive.decode(Data(contentsOf: url))
+            let merge = QuicklinkArchive.merge(incoming, into: quicklinks.quicklinks)
+            let added = quicklinks.append(merge.additions)
+            // Everything the file offered was already here — say so rather than showing "0 imported".
+            guard !added.isEmpty else {
+                await showNotice(
+                    title: "Nothing to Import",
+                    message: "Every quicklink in this file is already in your library.",
+                    symbol: Quicklink.sfSymbol, tone: .neutral)
+                return
+            }
+            let skipped = merge.skipped + (merge.additions.count - added.count)
+            let summary =
+                skipped == 0
+                ? String(localized: "Imported \(added.count) quicklinks.")
+                : String(
+                    localized:
+                        "Imported \(added.count) quicklinks. Skipped \(skipped) already in your library."
+                )
+            await showNotice(
+                title: "Quicklinks Imported", message: summary, symbol: Quicklink.sfSymbol,
+                tone: .success)
+        } catch {
+            await showNotice(
+                title: "Import Failed", message: error.localizedDescription,
+                symbol: Quicklink.sfSymbol, tone: .danger)
         }
     }
 
@@ -786,6 +1084,17 @@ final class AppCore: ObservableObject {
             showPalette(mode: .clipboard)
         case .searchEmoji:
             showPalette(mode: .emoji)
+        case .searchQuicklinks:
+            showPalette(mode: .quicklinks)
+        case .createQuicklink:
+            hidePalette(restoreFocus: false)
+            editQuicklink(nil)
+        case .importQuicklinks:
+            hidePalette(restoreFocus: false)
+            Task { await importQuicklinks() }
+        case .exportQuicklinks:
+            hidePalette(restoreFocus: false)
+            Task { await exportQuicklinks() }
         case .exportSettings:
             hidePalette(restoreFocus: false)
             Task { await BackupActions.exportSettings() }

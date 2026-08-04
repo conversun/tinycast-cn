@@ -76,7 +76,7 @@ struct WindowCommandTests {
 
     static func testCatalog() {
         let commands = WindowCommandCatalog.all
-        expect(commands.count == 29, "catalog contains all 29 agreed commands")
+        expect(commands.count == 30, "catalog contains all 30 agreed commands")
         expect(commands.map(\.id) == WindowCommand.ID.allCases, "catalog covers every ID once")
         expect(Set(commands.map(\.id)).count == commands.count, "IDs are unique")
         expect(Set(commands.map(\.entryID)).count == commands.count, "entry IDs are unique")
@@ -128,7 +128,7 @@ struct WindowCommandTests {
         expect(grouped.first { $0.group == .halves }?.commands.count == 4, "four halves")
         expect(grouped.first { $0.group == .quarters }?.commands.count == 4, "four quarters")
         expect(grouped.first { $0.group == .thirds }?.commands.count == 5, "five thirds")
-        expect(grouped.first { $0.group == .sizing }?.commands.count == 9, "nine sizing commands")
+        expect(grouped.first { $0.group == .sizing }?.commands.count == 10, "ten sizing commands")
         expect(grouped.first { $0.group == .moving }?.commands.count == 6, "six moving commands")
 
         expect(
@@ -386,6 +386,33 @@ struct WindowCommandTests {
             almost.midX == mainScreen.visibleFrame.midX
                 && almost.midY == mainScreen.visibleFrame.midY,
             "almost maximize stays centred")
+
+        let reasonable = frame(.reasonableSize)!
+        expectRect(
+            reasonable, CGRect(x: 288, y: 180, width: 864, height: 540), "reasonable size is 60%")
+        expectRect(
+            frame(.reasonableSize, window: reasonable)!, reasonable, "reasonable size is idempotent")
+
+        // Small displays never reach the cap, so the fraction is what shows.
+        let small = WindowLayout.Screen(
+            id: 7, frame: CGRect(x: 0, y: 0, width: 1280, height: 800),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1280, height: 800))
+        expectRect(
+            frame(.reasonableSize, on: small)!, CGRect(x: 256, y: 160, width: 768, height: 480),
+            "reasonable size is uncapped on a small display")
+
+        // Large ones do, which is what keeps the command display-independent.
+        let large = WindowLayout.Screen(
+            id: 8, frame: CGRect(x: 0, y: 0, width: 3840, height: 2160),
+            visibleFrame: CGRect(x: 0, y: 0, width: 3840, height: 2160))
+        let capped = frame(.reasonableSize, on: large)!
+        expect(
+            capped.width == 1025 && capped.height == 900, "reasonable size caps at 1025×900")
+        expect(large.visibleFrame.contains(capped), "a capped reasonable size stays on screen")
+        expect(
+            abs(capped.midX - large.visibleFrame.midX) <= 0.5
+                && abs(capped.midY - large.visibleFrame.midY) <= 0.5,
+            "a capped reasonable size stays centred")
 
         let window = CGRect(x: 100, y: 200, width: 300, height: 400)
         let tall = frame(.maximizeHeight, window: window)!

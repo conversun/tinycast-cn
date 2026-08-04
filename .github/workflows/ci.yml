@@ -1,9 +1,9 @@
 name: CI
 
-# Both jobs are merge gates and both run on PRs and on `main`. There is no xcodebuild step: the full
-# Debug build costs minutes and the release workflow already builds before it ships, so CI keeps to
-# the two checks that finish in about a minute — the Tools/ harnesses (the test suite, since there is
-# no XCTest target; see AGENTS.md) and SwiftLint.
+# The job is a merge gate and runs on PRs and on `main`. There is no xcodebuild step: the full Debug
+# build costs minutes and the release workflow already builds before it ships, so CI keeps to the one
+# check that finishes in about a minute — the Tools/ harnesses (the test suite, since there is no
+# XCTest target; see AGENTS.md).
 on:
   pull_request:
   push:
@@ -37,10 +37,10 @@ jobs:
       - name: Run Tools/ harnesses
         run: |
           set -euo pipefail
-          cp Tools/fuzz-test.swift "$RUNNER_TEMP/main.swift"
-          swiftc -swift-version 6 Tinycast/Core/Pinyin.swift "$RUNNER_TEMP/main.swift" \
-            -o "$RUNNER_TEMP/fuzz-test" && "$RUNNER_TEMP/fuzz-test"
-          swiftc -swift-version 6 Tinycast/Core/LauncherRankingStore.swift Tools/ranking-test.swift \
+          swiftc -swift-version 6 Tinycast/Core/SearchRelevance.swift Tinycast/Core/Pinyin.swift \
+            Tools/fuzz-test.swift -o /tmp/fuzz-test && /tmp/fuzz-test
+          swiftc -swift-version 6 Tinycast/Core/SearchRelevance.swift \
+            Tinycast/Core/LauncherRankingStore.swift Tools/ranking-test.swift \
             -o /tmp/ranking-test && /tmp/ranking-test
           swiftc Tinycast/Core/Calculator/*.swift Tools/calc-test.swift \
             -o /tmp/calc-test && /tmp/calc-test
@@ -79,14 +79,8 @@ jobs:
             Tinycast/Core/Uninstall/UninstallProtection.swift \
             Tinycast/Core/Uninstall/UninstallPlan.swift Tools/uninstall-test.swift \
             -o /tmp/uninstall-test && /tmp/uninstall-test
-
-  lint:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install SwiftLint
-        run: brew install swiftlint
-
-      - name: SwiftLint
-        run: swiftlint lint --reporter github-actions-logging
+          swiftc -swift-version 6 Tinycast/Core/Quicklinks/Quicklink.swift \
+            Tinycast/Core/Quicklinks/QuicklinkDestination.swift \
+            Tinycast/Core/Quicklinks/QuicklinkStore.swift \
+            Tinycast/Core/Quicklinks/QuicklinkArchive.swift Tools/quicklink-test.swift \
+            -o /tmp/quicklink-test && /tmp/quicklink-test

@@ -332,6 +332,13 @@ The calculator's inline `CalculatorCard` reuses this card language (`cardFill` +
 
 ---
 
+## The palette search field
+
+Its placeholder is drawn by Tinycast, not by the field's `prompt` — an `NSTextField` renders a prompt
+through either its cell or its (one point taller) field editor, so a real prompt steps vertically when
+focus moves. Don't reintroduce `prompt:` on that field. See
+[palette.md](palette.md#the-placeholder-is-tinycasts-not-the-fields).
+
 ## Rules for agents working on the UI
 
 - **Restyle from screenshots, not extracted CSS.** Pixel-matching Raycast from its bundle led to wrong results before; compare rendered screenshots over a light desktop instead. There's no screen-recording from the shell here — verify AppKit rendering with a `swiftc` harness that prints layer state, and let the user do visual sign-off.

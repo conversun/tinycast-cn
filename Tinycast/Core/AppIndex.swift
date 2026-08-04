@@ -10,6 +10,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case snippet
         case systemAction
         case windowCommand
+        case quicklink
     }
 
     let id: String  // file path (or "command:…" id) — always unique
@@ -17,15 +18,22 @@ struct AppEntry: Identifiable, Hashable, Sendable {
     let url: URL
     let bundleID: String?
     let kind: Kind
-    /// Extra strings this entry also matches on in search — a snippet's keyword. Empty for every other kind.
-    var matchAliases: [String]
-    /// Latin readings of a Han-script name, scored half a tier below the literal ladder.
+    /// Extra strings this entry matches on as strongly as its name — a snippet's keyword. Empty for every other kind.
+    var matchAliases: [String] = []
+    /// Per-item SF Symbol, for the one kind whose glyph is the user's choice rather than its kind's. Nil elsewhere.
+    var symbolName: String?
+    /// Spotlight's `kMDItemAlternateNames`, ranked below the display name. Applications only.
+    var alternateNames: [String] = []
+    /// `CFBundleExecutable`, matched literally as a last resort. Applications only.
+    var executableName: String?
+    /// Latin readings of a Han-script name, ranked under Spotlight's own aliases.
     let romanizedAliases: [String]
 
     /// Readings are derived here rather than at the call sites, so no entry kind can be added without them.
     init(
         id: String, name: String, url: URL, bundleID: String?, kind: Kind,
-        matchAliases: [String] = []
+        matchAliases: [String] = [], symbolName: String? = nil,
+        alternateNames: [String] = [], executableName: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -33,11 +41,21 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         self.bundleID = bundleID
         self.kind = kind
         self.matchAliases = matchAliases
+        self.symbolName = symbolName
+        self.alternateNames = alternateNames
+        self.executableName = executableName
         self.romanizedAliases = Pinyin.aliases(for: name)
     }
 
     /// Stable identity for learned ranking, favorites, and other per-entry preferences.
     var preferenceKey: String { bundleID ?? id }
+
+    var searchFields: SearchFields {
+        SearchFields(
+            names: [name] + matchAliases, alternateNames: alternateNames,
+            romanizedNames: romanizedAliases, bundleID: bundleID,
+            executableName: executableName)
+    }
 
     var kindLabel: String {
         switch kind {
@@ -48,6 +66,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case .snippet: return "Snippet"
         case .systemAction: return "System Action"
         case .windowCommand: return "Window Command"
+        case .quicklink: return "Quicklink"
         }
     }
 
@@ -64,19 +83,24 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return SystemActionCatalog.action(forEntryID: id).map { .systemAction(id: $0.id) }
         case .windowCommand:
             return WindowCommandCatalog.command(forEntryID: id).map { .windowCommand(id: $0.id) }
+        case .quicklink:
+            return Quicklink.id(fromEntryID: id).map { .quicklink(id: $0) }
         case .command, .snippet:
             return nil
         }
     }
 
-    /// Synthetic command entries have no file behind them to reveal.
+    /// Synthetic command entries have no file behind them to reveal. A quicklink's own entry is
+    /// synthetic too — revealing the *destination* is an action on the record, in its own menu.
     var canRevealInFinder: Bool { kind == .application || kind == .systemSettings || kind == .snippet }
 
     /// Synthetic entries draw an SF Symbol tile; everything else uses its file icon.
     var isSymbolIcon: Bool { kind != .application && kind != .systemSettings }
 
     var symbolIconName: String {
+        if let symbolName { return symbolName }
         switch kind {
+        case .quicklink: return Quicklink.sfSymbol
         case .snippet: return "text.quote"
         case .customCommand: return CustomCommand.sfSymbol
         case .command: return CommandRegistry.command(for: self)?.sfSymbol ?? "questionmark"
@@ -325,6 +349,10 @@ final class AppIndex: ObservableObject {
     private var discoveredEntries: [AppEntry] = []
     private var customCommandEntries: [AppEntry] = []
     private var windowCommandEntries: [AppEntry] = []
+    private var quicklinkEntries: [AppEntry] = []
+    /// Built-in commands minus the quicklink ones while the feature is off.
+    private var commandEntries: [AppEntry] = CommandRegistry.all
+    private var alternateNameCache = SpotlightNames.Cache()
     private var isRefreshing = false
     /// Set when a refresh is requested mid-scan, so a scope edit landing during an in-flight scan isn't silently dropped.
     private var refreshPending = false
@@ -347,6 +375,31 @@ final class AppIndex: ObservableObject {
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         guard entries != customCommandEntries else { return }
         customCommandEntries = entries
+        publishEntries()
+    }
+
+    /// Replaces the quicklink slice and, in the same publish, the built-in commands that only make
+    /// sense while the feature is on — one call so a toggle can't leave the two out of step.
+    func setQuicklinks(_ quicklinks: [Quicklink], commandsVisible: Bool) {
+        let entries = quicklinks
+            .filter(\.showsInRootSearch)
+            .sorted(by: Quicklink.precedes)
+            .map { quicklink in
+                AppEntry(
+                    id: quicklink.entryID, name: quicklink.name,
+                    url: URL(string: "tinycast://quicklink/" + quicklink.id.uuidString)!,
+                    bundleID: nil, kind: .quicklink,
+                    symbolName: quicklink.iconSymbol
+                        ?? QuicklinkDestination.detect(quicklink.link)?.defaultSymbol)
+            }
+        let commands = commandsVisible
+            ? CommandRegistry.all
+            : CommandRegistry.all.filter { entry in
+                CommandRegistry.command(for: entry).map { !$0.isQuicklinkCommand } ?? true
+            }
+        guard entries != quicklinkEntries || commands != commandEntries else { return }
+        quicklinkEntries = entries
+        commandEntries = commands
         publishEntries()
     }
 
@@ -403,15 +456,21 @@ final class AppIndex: ObservableObject {
         repeat {
             refreshPending = false
             let scopes = settings?.searchScopes ?? SearchScopes.defaults
-            let found = await Task.detached(priority: .utility) { AppIndex.scan(scopes: scopes) }
-                .value
+            let reusing = alternateNameCache
+            let (found, cache) = await Task.detached(priority: .utility) {
+                AppIndex.scan(scopes: scopes, cache: SpotlightNames.Cache(reusing: reusing))
+            }.value
+            alternateNameCache = cache
             guard found != discoveredEntries else { continue }
             discoveredEntries = found
             publishEntries()
         } while refreshPending
     }
 
-    nonisolated private static func scan(scopes: [String]) -> [AppEntry] {
+    nonisolated private static func scan(
+        scopes: [String], cache: SpotlightNames.Cache
+    ) -> ([AppEntry], SpotlightNames.Cache) {
+        var cache = cache
         var seenBundleIDs = Set<String>()
         var result: [AppEntry] = []
         for url in SearchScopes.appBundles(in: scopes) {
@@ -424,23 +483,30 @@ final class AppIndex: ObservableObject {
                 (bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
                 ?? (bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String)
                 ?? url.deletingPathExtension().lastPathComponent
+            let executable = bundle?.object(forInfoDictionaryKey: "CFBundleExecutable") as? String
             result.append(
                 AppEntry(
                     id: url.path, name: name, url: url, bundleID: bundleID,
-                    kind: .application))
+                    kind: .application,
+                    alternateNames: cache.alternateNames(for: url, displayName: name),
+                    // A binary named after the app adds nothing the display name doesn't already cover.
+                    executableName: executable.flatMap {
+                        $0.caseInsensitiveCompare(name) == .orderedSame ? nil : $0
+                    }))
         }
         // `publishEntries` appends snippets, custom commands and built-in commands after apps and Settings panes so the sectioned flat selection maps 1:1 onto rows.
         let apps = result.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
-        return apps + SettingsPaneScanner.scan()
+        // Settings panes are `.appex` bundles, which carry no Spotlight alternate names.
+        return (apps + SettingsPaneScanner.scan(), cache)
     }
 
     private func publishEntries() {
-        // Each slice is already alphabetical; the slice order is the launcher's section order (LauncherList mirrors it), so custom commands sit in their own section ahead of the built-ins.
+        // Each slice is already in its own display order — alphabetical, or pinned-first for quicklinks. The slice order is the launcher's section order (LauncherList mirrors it), so custom commands sit in their own section ahead of the built-ins.
         let updated =
-            discoveredEntries + snippetEntries + Self.systemActionEntries + windowCommandEntries
-            + customCommandEntries + CommandRegistry.all
+            discoveredEntries + quicklinkEntries + snippetEntries + Self.systemActionEntries
+            + windowCommandEntries + customCommandEntries + commandEntries
         guard updated != apps else { return }
         apps = updated
         matchCache = nil
@@ -462,19 +528,10 @@ final class AppIndex: ObservableObject {
     private func rank(_ q: String, limit: Int) -> [AppEntry] {
         let learned = ranking.boosts(query: q)
         let scored = apps.compactMap { app -> (AppEntry, Int)? in
-            // An entry matches on its name or on any alias it carries (a snippet's keyword), whichever scores best — all inside the same tiers, so an alias can never outrank a better name match.
-            var bestScore = FuzzyMatch.score(query: q, candidate: app.name)
-            for candidate in app.matchAliases {
-                guard let aliasScore = FuzzyMatch.score(query: q, candidate: candidate) else { continue }
-                bestScore = max(bestScore ?? aliasScore, aliasScore)
+            // Base relevance comes from the entry's strongest matching field; the learned boost is added after and never knows which field that was.
+            guard let score = SearchRelevance.score(query: q, fields: app.searchFields) else {
+                return nil
             }
-            // A reading is a weaker claim on the query than the name itself, so it lands below the literal match of the same kind but still above the next kind down: typing "safari" can never lose Safari to something whose pinyin spells it.
-            for candidate in app.romanizedAliases {
-                guard let aliasScore = FuzzyMatch.score(query: q, candidate: candidate) else { continue }
-                let penalized = aliasScore - FuzzyMatch.romanizedPenalty
-                bestScore = max(bestScore ?? penalized, penalized)
-            }
-            guard let score = bestScore else { return nil }
             return (app, score + (learned[app.preferenceKey] ?? 0))
         }
         return
@@ -486,70 +543,5 @@ final class AppIndex: ObservableObject {
             }
             .prefix(limit)
             .map(\.0)
-    }
-}
-
-enum FuzzyMatch {
-    /// Half the gap between two tiers, subtracted from a transliterated match so it ranks under the literal match of the same kind without falling past the kind below it. It also has to stay above `LauncherRankingStore.maximumBoost`, or learned ranking could lift a reading back over the literal match it sits under.
-    static let romanizedPenalty = 5_000
-
-    /// Tiered relevance score (higher is better), or nil when the query doesn't match; tiers are spaced so a better kind always wins.
-    static func score(query: String, candidate: String) -> Int? {
-        let q = normalized(query)
-        let c = normalized(candidate)
-        guard !q.isEmpty else { return 0 }
-
-        if c == q { return 100_000 }
-        if c.hasPrefix(q) { return 90_000 - c.count }
-
-        if let range = c.range(of: q) {
-            let atWordStart = isWordStart(c, range.lowerBound)
-            return (atWordStart ? 80_000 : 70_000) - c.count
-        }
-
-        guard let sub = subsequenceScore(Array(q), Array(c)) else { return nil }
-        return sub
-    }
-
-    /// App metadata can contain invisible bidirectional/zero-width format scalars (WhatsApp's display name starts with U+200E); they must not demote an otherwise-visible prefix match.
-    private static func normalized(_ value: String) -> String {
-        let scalars = value.unicodeScalars.filter {
-            $0.properties.generalCategory != .format
-        }
-        return String(String.UnicodeScalarView(scalars)).lowercased()
-    }
-
-    private static func isWordStart(_ s: String, _ index: String.Index) -> Bool {
-        if index == s.startIndex { return true }
-        let before = s[s.index(before: index)]
-        return !before.isLetter && !before.isNumber
-    }
-
-    /// Subsequence match with bonuses for consecutive hits and word boundaries, or nil when `q` isn't a subsequence of `c`.
-    private static func subsequenceScore(_ q: [Character], _ c: [Character]) -> Int? {
-        var qi = 0
-        var score = 0
-        var run = 0
-        var prev = -2
-        for (ci, ch) in c.enumerated() where qi < q.count && ch == q[qi] {
-            var bonus = 1
-            if ci == prev + 1 {
-                run += 1
-                bonus += run * 3
-            } else {
-                run = 0
-            }
-            if ci == 0 {
-                bonus += 12
-            } else {
-                let before = c[ci - 1]
-                if !before.isLetter && !before.isNumber { bonus += 8 }
-            }
-            score += bonus
-            prev = ci
-            qi += 1
-        }
-        guard qi == q.count else { return nil }
-        return score
     }
 }
