@@ -62,15 +62,20 @@ enum SettingsPaneScanner {
     private static func loctableName(appexURL: URL) -> String? {
         let url = appexURL.appendingPathComponent("Contents/Resources/InfoPlist.loctable")
         guard let table = plist(at: url) else { return nil }
-        var codes = Locale.preferredLanguages.flatMap { tag -> [String] in
-            // loctable keys use underscores ("en_AU") where language tags use hyphens ("en-AU"); try the underscored tag, then the bare code ("en").
-            let underscored = tag.replacingOccurrences(of: "-", with: "_")
-            let bare = tag.split(separator: "-").first.map(String.init)
-            return ([underscored, bare].compactMap { $0 }).filter { !$0.isEmpty }
-        }
+        // Apple keys these tables by its own locale IDs ("zh_CN"), never by the tag the app runs under ("zh-Hans-US"), so a literal lookup misses every Chinese pane; `preferredLocalizations` knows that equivalence.
+        let wanted = Set(
+            Locale.preferredLanguages.compactMap {
+                Locale(identifier: $0).language.languageCode?.identifier
+            })
+        // Kept to a language the user actually asked for: unmatched, `preferredLocalizations` returns some unrelated locale, and falling through to English (then the Info.plist) beats naming a pane in Polish.
+        var codes = Bundle.preferredLocalizations(
+            from: table.keys.map { $0.replacingOccurrences(of: "_", with: "-") },
+            forPreferences: Locale.preferredLanguages
+        ).filter { wanted.contains(Locale(identifier: $0).language.languageCode?.identifier ?? "") }
         codes.append("en")
         for code in codes {
-            if let entry = table[code] as? [String: Any],
+            let key = code.replacingOccurrences(of: "-", with: "_")
+            if let entry = (table[key] ?? table[code]) as? [String: Any],
                 let name = entry["CFBundleDisplayName"] as? String {
                 return name
             }
