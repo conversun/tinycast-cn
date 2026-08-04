@@ -195,7 +195,7 @@ enum CalcEngine {
         guard let value = CalcParser.evaluate(prefixTokens) else { return nil }
         return CalcResult(
             expression: prettyExpression(query),
-            sourceBadge: "Expression", targetBadge: "Result",
+            sourceBadge: String(localized: "Expression"), targetBadge: String(localized: "Result"),
             payload: .value(
                 display: CalcFormatter.display(value),
                 copyText: CalcFormatter.copyText(value)))

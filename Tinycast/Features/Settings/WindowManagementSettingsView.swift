@@ -53,7 +53,7 @@ struct WindowManagementSettingsView: View {
                 tint: .blue
             ) {
                 HStack(spacing: Theme.Spacing.sm) {
-                    Text("\(settings.windowGap) pt")
+                    Text(String(localized: "\(settings.windowGap) pt"))
                         .font(.body.monospacedDigit())
                         .foregroundStyle(.secondary)
                     Stepper(

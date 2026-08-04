@@ -6,17 +6,17 @@ enum UnitCategory: String, CaseIterable, Sendable {
 
     var displayName: String {
         switch self {
-        case .length: return "Length"
-        case .weight: return "Weight"
-        case .temperature: return "Temperature"
-        case .time: return "Time"
-        case .area: return "Area"
-        case .volume: return "Volume"
-        case .digitalStorage: return "Digital Storage"
-        case .angle: return "Angle"
-        case .speed: return "Speed"
-        case .pressure: return "Pressure"
-        case .dataRate: return "Data Transfer Rate"
+        case .length: return String(localized: "Length")
+        case .weight: return String(localized: "Weight")
+        case .temperature: return String(localized: "Temperature")
+        case .time: return String(localized: "Time")
+        case .area: return String(localized: "Area")
+        case .volume: return String(localized: "Volume")
+        case .digitalStorage: return String(localized: "Digital Storage")
+        case .angle: return String(localized: "Angle")
+        case .speed: return String(localized: "Speed")
+        case .pressure: return String(localized: "Pressure")
+        case .dataRate: return String(localized: "Data Transfer Rate")
         }
     }
 }
@@ -31,7 +31,8 @@ struct UnitDef: Equatable, Sendable {
 
     init(_ symbol: String, _ name: String, _ category: UnitCategory, _ factor: Double, offset: Double = 0) {
         self.symbol = symbol
-        self.name = name
+        // The badge label, never a parse token — the tokenizer only ever reads the `names:` aliases.
+        self.name = String(localized: String.LocalizationValue(name))
         self.category = category
         self.factor = factor
         self.offset = offset

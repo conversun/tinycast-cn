@@ -67,10 +67,10 @@ struct QuicklinkEditorSheet: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 optionToggle(
                     "Show in root search", isOn: $showsInRootSearch,
-                    detail: "List this quicklink alongside apps and commands.")
+                    detail: "List this quicklink alongside apps and commands.".localizedUI)
                 optionToggle(
                     "Pin to top", isOn: $isPinned,
-                    detail: "Keep it above the other quicklinks.")
+                    detail: "Keep it above the other quicklinks.".localizedUI)
             }
 
             if let errorMessage {
@@ -102,7 +102,7 @@ struct QuicklinkEditorSheet: View {
         if value.isEmpty {
             EmptyView()
         } else if QuicklinkDestination.containsPlaceholder(value) {
-            Text("Resolved when you open it — placeholders are filled in first.")
+            Text(String(localized: "Resolved when you open it — placeholders are filled in first."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else if let destination = QuicklinkDestination.detect(value) {

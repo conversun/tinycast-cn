@@ -15,12 +15,12 @@ enum SnippetArgumentsPrompt {
         NSApp.activate(ignoringOtherApps: true)
 
         let alert = NSAlert()
-        alert.messageText = "Snippet: \(snippetName)"
+        alert.messageText = String(localized: "Snippet: \(snippetName)")
         alert.informativeText = "Fill in the template fields:"
-        alert.alertStyle = .informational
+        alert.informativeText = String(localized: "Fill in the template fields:")
         // ↵ expands and Esc cancels: the user just typed into these fields, so submitting is the safe default. (AppKit gives ↵ to the first button and Esc to the one titled "Cancel".)
-        alert.addButton(withTitle: "Expand")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Expand"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
 
         let form = NSHostingView(rootView: SnippetArgumentsForm(values: values))
         form.frame = NSRect(

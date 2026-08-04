@@ -47,7 +47,7 @@ enum CalcQuantity {
             guard parser.operationCount > 0 else { return nil }
             return CalcResult(
                 expression: expressionText(split.expressionTokens),
-                sourceBadge: "Expression", targetBadge: "Result",
+                sourceBadge: String(localized: "Expression"), targetBadge: String(localized: "Result"),
                 payload: .value(
                     display: CalcFormatter.display(value.effective),
                     copyText: CalcFormatter.copyText(value.effective)))
@@ -130,7 +130,7 @@ enum CalcQuantity {
     ) -> CalcResult {
         CalcResult(
             expression: expression,
-            sourceBadge: "Expression", targetBadge: unit.name,
+            sourceBadge: String(localized: "Expression"), targetBadge: unit.name,
             payload: .value(
                 display: "\(CalcFormatter.display(amount)) \(unit.symbol)",
                 copyText: "\(CalcFormatter.copyText(amount)) \(unit.symbol)"))
@@ -142,7 +142,7 @@ enum CalcQuantity {
         let formatted = CalcFormatter.currency(amount)
         return CalcResult(
             expression: expression,
-            sourceBadge: "Expression", targetBadge: definition.name,
+            sourceBadge: String(localized: "Expression"), targetBadge: definition.name,
             payload: .value(
                 display: "\(CalcFormatter.grouped(formatted)) \(definition.code)",
                 copyText: "\(formatted) \(definition.code)"))
@@ -393,7 +393,15 @@ private struct QuantityParser {
         case (.unit(let lhs), .unit(let rhs)):
             guard lhs.category == rhs.category else {
                 return fail(
-                    "Cannot \(op == "+" ? "add" : "subtract") \(lhs.category.displayName) and \(rhs.category.displayName)."
+                    op == "+"
+                        ? String(
+                            localized:
+                                "Cannot add \(lhs.category.displayName) and \(rhs.category.displayName)."
+                        )
+                        : String(
+                            localized:
+                                "Cannot subtract \(lhs.category.displayName) and \(rhs.category.displayName)."
+                        )
                 )
             }
             if lhs.category == .temperature, lhs.symbol != rhs.symbol {
@@ -421,11 +429,15 @@ private struct QuantityParser {
                 amount: converted + direction * right.amount, kind: .currency(rhs))
         case (.unit(let lhs), .currency):
             return fail(
-                "Cannot \(op == "+" ? "add" : "subtract") \(lhs.category.displayName) and Currency."
+                op == "+"
+                    ? String(localized: "Cannot add \(lhs.category.displayName) and Currency.")
+                    : String(localized: "Cannot subtract \(lhs.category.displayName) and Currency.")
             )
         case (.currency, .unit(let rhs)):
             return fail(
-                "Cannot \(op == "+" ? "add" : "subtract") Currency and \(rhs.category.displayName)."
+                op == "+"
+                    ? String(localized: "Cannot add Currency and \(rhs.category.displayName).")
+                    : String(localized: "Cannot subtract Currency and \(rhs.category.displayName).")
             )
         // A bare number takes the unit it is written against ("10kg + 5" is 15 kg). Adjacency stays
         // silent instead, because there the bare number is a half-typed unit ("1hr 30" → "1hr 30min").

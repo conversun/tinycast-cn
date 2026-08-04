@@ -405,27 +405,27 @@ private struct ClipboardInfoSection: View {
     private var rows: [InfoRow] {
         var rows: [InfoRow] = []
         if let source {
-            rows.append(InfoRow(label: "Source", value: source.name, icon: source.icon))
+            rows.append(InfoRow(label: "Source".localizedUI, value: source.name, icon: source.icon))
         }
         switch item.kind {
         case .text:
-            rows.append(InfoRow(label: "Type", value: "Text"))
+            rows.append(InfoRow(label: "Type".localizedUI, value: "Text".localizedUI))
             if let characters = details.characters {
-                rows.append(InfoRow(label: "Characters", value: characters.formatted()))
+                rows.append(InfoRow(label: "Characters".localizedUI, value: characters.formatted()))
             }
             if let words = details.words {
-                rows.append(InfoRow(label: "Words", value: words.formatted()))
+                rows.append(InfoRow(label: "Words".localizedUI, value: words.formatted()))
             }
         case .image:
-            rows.append(InfoRow(label: "Type", value: "Image"))
+            rows.append(InfoRow(label: "Type".localizedUI, value: "Image".localizedUI))
             if let size = details.pixelSize {
                 rows.append(
-                    InfoRow(label: "Dimensions", value: "\(Int(size.width))×\(Int(size.height))"))
+                    InfoRow(label: "Dimensions".localizedUI, value: "\(Int(size.width))×\(Int(size.height))"))
             }
             if let bytes = details.fileBytes {
                 rows.append(
                     InfoRow(
-                        label: "Size", value: Int64(bytes).formatted(.byteCount(style: .file))))
+                        label: "Size".localizedUI, value: Int64(bytes).formatted(.byteCount(style: .file))))
             }
         }
         rows.append(

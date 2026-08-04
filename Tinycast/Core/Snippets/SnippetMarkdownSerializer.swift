@@ -7,7 +7,7 @@ struct SnippetMarkdownSerializer {
         var errorDescription: String? {
             switch self {
             case .invalidFrontmatter(let fileURL, let line, let reason):
-                return "\(fileURL.path):\(line): \(reason)"
+                return String(localized: "\(fileURL.path):\(line): \(reason)")
             }
         }
     }

@@ -49,7 +49,7 @@ enum CalcCurrency {
     }
 
     /// The category label used in the mismatch message, mirroring `UnitCategory.displayName`.
-    static let categoryName = "Currency"
+    static let categoryName = String(localized: "Currency")
 
     /// Detects `expr currency (to|in|->) currency`, mirroring `CalcUnits.parseConversion`'s shape so both read the same. Runs *after* the unit path, so a query both sides of which are compatible units (`10 pounds to kg`) never reaches here. A missing amount defaults to 1, so `eur to usd` reads as `1 eur to usd`.
     static func parseConversion(_ tokens: [CalcToken], source: CurrencySource) -> ConversionParse? {

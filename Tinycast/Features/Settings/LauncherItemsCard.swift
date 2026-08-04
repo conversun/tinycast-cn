@@ -39,7 +39,7 @@ struct LauncherItemsCard: View {
                 // Rows dim while the category is off but stay interactive, so an item can be re-checked first.
                 LazyVStack(spacing: 1) {
                     if entries.isEmpty {
-                        Text(query.isEmpty ? "Nothing here yet." : "No matches for “\(query)”.")
+                        Text(query.isEmpty ? "Nothing here yet." : String(localized: "No matches for “\(query)”."))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .center)

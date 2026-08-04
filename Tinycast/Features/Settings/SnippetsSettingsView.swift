@@ -113,7 +113,7 @@ struct SnippetsSettingsView: View {
     private var libraryNotices: some View {
         if case .failed(let message) = snippetsStore.state {
             SettingsCallout(
-                title: "Couldn’t load the snippet library",
+                title: "Couldn’t load the snippet library".localizedUI,
                 message: message,
                 systemImage: "exclamationmark.triangle",
                 tint: .orange
@@ -158,16 +158,15 @@ struct SnippetsSettingsView: View {
     private var snippetIssueTitle: String {
         let count = snippetsStore.issues.count
         return count == 1
-            ? "1 snippet file couldn’t be loaded" : "\(count) snippet files couldn’t be loaded"
+            ? String(localized: "1 snippet file couldn’t be loaded") : String(localized: "\(count) snippet files couldn’t be loaded")
     }
 
     private var snippetIssueMessage: String {
         let first = snippetsStore.issues[0]
         if snippetsStore.issues.count == 1 {
-            return "\(first.fileURL.lastPathComponent): \(first.message)"
+            return String(localized: "\(first.fileURL.lastPathComponent): \(first.message)")
         }
-        return
-            "\(first.fileURL.lastPathComponent): \(first.message) Plus \(snippetsStore.issues.count - 1) more."
+        return String(localized: "\(first.fileURL.lastPathComponent): \(first.message) Plus \(snippetsStore.issues.count - 1) more.")
     }
 
     private func delete(_ record: StoredSnippet) {
@@ -231,7 +230,7 @@ private struct SnippetSettingsRow: View {
         guard let keyword = record.snippet.keyword?.trimmingCharacters(in: .whitespacesAndNewlines),
             !keyword.isEmpty
         else { return filename }
-        return "\(keyword) · \(filename)"
+        return String(localized: "\(keyword) · \(filename)")
     }
 }
 
@@ -266,7 +265,7 @@ private struct SnippetEditorSheet: View {
                 .font(.title2.weight(.bold))
 
             field(
-                title: "Name", placeholder: "Email Sign-off", text: $name,
+                title: "Name", placeholder: "Email Sign-off".localizedUI, text: $name,
                 hint: "Required. Shown in the library and launcher.")
             field(
                 title: "Keyword", placeholder: "Optional, for example !notes", text: $keyword,
@@ -277,7 +276,7 @@ private struct SnippetEditorSheet: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 optionToggle(
                     "Enabled", isOn: $isEnabled,
-                    detail: "Disabled snippets cannot be expanded.")
+                    detail: "Disabled snippets cannot be expanded.".localizedUI)
                 optionToggle(
                     "Show confirmation", isOn: $showsConfirmation,
                     detail: "Confirm on screen after this snippet is inserted.")

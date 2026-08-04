@@ -157,7 +157,7 @@ enum CalcDateTime {
             let sourceBadge = momentString(
                 base.date, hasTime: base.hasTime, now: now, calendar: calendar)
             return CalcResult(
-                expression: echo, sourceBadge: sourceBadge, targetBadge: "Result",
+                expression: echo, sourceBadge: sourceBadge, targetBadge: String(localized: "Result"),
                 payload: .value(display: display, copyText: display))
         }
 
@@ -173,7 +173,7 @@ enum CalcDateTime {
                 [.day], from: calendar.startOfDay(for: other.date),
                 to: calendar.startOfDay(for: base.date)
             ).day ?? 0
-        let word = abs(days) == 1 ? "day" : "days"
+        let word = abs(days) == 1 ? String(localized: "day") : String(localized: "days")
         return CalcResult(
             expression: echo,
             sourceBadge: dateString(base.date, now: now, calendar: calendar),

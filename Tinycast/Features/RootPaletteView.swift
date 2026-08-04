@@ -771,7 +771,7 @@ struct RootPaletteView: View {
     private var uninstallSummary: String {
         let total = uninstall.plan?.removableIDs.count ?? 0
         let size = MeasuredSize(bytes: uninstall.selectedBytes).formatted
-        return "\(uninstall.selectedCount) of \(total) files selected · \(size)"
+        return String(localized: "\(uninstall.selectedCount) of \(total) files selected · \(size)")
     }
 
     /// The Uninstall screen's primary action is destructive, so its pill isn't white.
