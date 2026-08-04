@@ -74,18 +74,25 @@ struct MiscellaneousSettingsView: View {
     /// Carries the off-state promise that used to need its own callout: nothing is contacted until
     /// the switch is on.
     private var conversionStatus: String {
-        let examples = "Convert inline — \"100 dollars to yen\", \"€20 to GBP\"."
-        return currencyRates.isEnabled ? examples : "\(examples) Off — no service is contacted."
+        let examples = "Convert inline — \"100 dollars to yen\", \"€20 to GBP\".".localizedUI
+        guard !currencyRates.isEnabled else { return examples }
+        return String(format: "%@ Off — no service is contacted.".localizedUI, examples)
     }
 
     private var ratesStatus: String {
-        if refreshing { return "Updating…" }
-        if refreshFailed { return "Couldn't reach \(CurrencyRateStore.provider). Try again." }
+        if refreshing { return "Updating…".localizedUI }
+        if refreshFailed {
+            return String(
+                format: "Couldn't reach %@. Try again.".localizedUI, CurrencyRateStore.provider)
+        }
         guard let fetched = currencyRates.rates?.fetchedAt else {
-            return "\(CurrencyRateStore.provider) · not downloaded yet."
+            return String(
+                format: "%@ · not downloaded yet.".localizedUI, CurrencyRateStore.provider)
         }
         let stamp = fetched.formatted(date: .abbreviated, time: .shortened)
-        return "\(CurrencyRateStore.provider) · updated \(stamp). Refreshes daily."
+        return String(
+            format: "%@ · updated %@. Refreshes daily.".localizedUI, CurrencyRateStore.provider,
+            stamp)
     }
 }
 
@@ -106,9 +113,11 @@ private struct CurrencyConsentSheet: View {
             }
 
             Text(
-                "Tinycast downloads exchange rates from \(CurrencyRateStore.provider) once a day and "
-                + "keeps a copy on your Mac. No account, no identifiers, nothing you type. "
-                + "Turning it off deletes the cached rates."
+                String(
+                    format: ("Tinycast downloads exchange rates from %@ once a day and keeps a "
+                        + "copy on your Mac. No account, no identifiers, nothing you type. "
+                        + "Turning it off deletes the cached rates.").localizedUI,
+                    CurrencyRateStore.provider)
             )
             .font(.callout)
             .foregroundStyle(.secondary)

@@ -5,7 +5,7 @@ struct AboutView: View {
     private static var version: String {
         let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
-        return "Version \(short) (\(build))"
+        return String(format: "Version %@ (%@)".localizedUI, short, build)
     }
 
     // Loaded once and cached: reading the .icns is disk I/O, and body can re-run often. Read the
@@ -154,10 +154,10 @@ private struct AboutLinkRow: View {
                 glyph
                     .frame(width: Theme.Size.settingsRowIcon)
                     .foregroundStyle(.secondary)
-                Text(link.title)
+                Text(link.title.localizedUI)
                     .font(.body)
                 Spacer(minLength: Theme.Spacing.xl)
-                Text(link.detail)
+                Text(link.detail.localizedUI)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
