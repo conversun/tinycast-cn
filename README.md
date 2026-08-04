@@ -1,8 +1,7 @@
 # Tinycast
 
-> **tinycast-cn** is the Chinese-optimized fork: it adds full-pinyin and initials search for Chinese
-> app names, and publishes Universal (`arm64` + `x86_64`) builds from upstream releases. The app UI
-> and product name remain **Tinycast**.
+> **tinycast-cn** 是面向中文用户的分支：完成了全量简体中文界面汉化，为中文应用名新增全拼与首字母搜索，
+> 并基于上游发布版本构建 Universal（`arm64` + `x86_64`）安装包。产品名仍为 **Tinycast**。
 
 A tiny, fully native macOS launcher — the essentials, without the bloat.
 
