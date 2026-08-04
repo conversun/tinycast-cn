@@ -55,7 +55,8 @@ enum SettingsPaneScanner {
     ) -> String? {
         if let override = nameOverrides[bundleID] { return override }
         if let localized = loctableName(appexURL: appexURL) { return localized }
-        return (info["CFBundleDisplayName"] as? String) ?? (info["CFBundleName"] as? String)
+        return (info["CFBundleDisplayName"] as? String)?.usableName
+            ?? (info["CFBundleName"] as? String)?.usableName
     }
 
     /// Localized `CFBundleDisplayName` from `InfoPlist.loctable` (keyed by locale), trying the user's preferred languages then English.
@@ -76,7 +77,7 @@ enum SettingsPaneScanner {
         for code in codes {
             let key = code.replacingOccurrences(of: "-", with: "_")
             if let entry = (table[key] ?? table[code]) as? [String: Any],
-                let name = entry["CFBundleDisplayName"] as? String {
+                let name = (entry["CFBundleDisplayName"] as? String)?.usableName {
                 return name
             }
         }

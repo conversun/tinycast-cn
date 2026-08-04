@@ -479,9 +479,10 @@ final class AppIndex: ObservableObject {
             // Dedup by bundle id; the earliest scope wins.
             if let bundleID, !seenBundleIDs.insert(bundleID).inserted { continue }
 
+            // Each fallback is taken only when the key is *usably* absent: RapidAPI and Asset Catalog Creator both ship an empty `CFBundleDisplayName`, and a plain `??` chain hands that blank string straight to the row.
             let name =
-                (bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
-                ?? (bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String)
+                (bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)?.usableName
+                ?? (bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String)?.usableName
                 ?? url.deletingPathExtension().lastPathComponent
             let executable = bundle?.object(forInfoDictionaryKey: "CFBundleExecutable") as? String
             result.append(
