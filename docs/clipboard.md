@@ -22,7 +22,7 @@ inserts, search, and pruning stay on the main actor.
 
 A row's ⌘K Actions menu carries **Pin Entry / Unpin Entry** (⌘P), persisted as a `pinned_at` column
 on `items` (added to existing databases by an `ALTER TABLE` migration, alongside `source_app`'s) —
-a stamp rather than a flag, because the Pinned section is ordered by *when you pinned*, not by
+a stamp rather than a flag, because the Pinned section is ordered by _when you pinned_, not by
 recency.
 
 Pins change four things:
@@ -35,13 +35,13 @@ Pins change four things:
   rather than taken from the FTS result, since the statement's `LIMIT` could otherwise drop one out
   of a busy query's matches — which holds because every pinned row is resident in `items`, however
   old (`load` fetches them all, and neither the window trim nor pruning drops one).
-- **Unpinning re-recencies.** An unpinned row rejoins the history as its *newest* entry (Raycast does
+- **Unpinning re-recencies.** An unpinned row rejoins the history as its _newest_ entry (Raycast does
   the same) rather than dropping back into the date bucket it came from, which would scroll the list
   out from under the selection. It's the same delete + re-insert `promote` uses.
 - **Retention.** Pruning skips pinned rows (`AND pinned_at IS NULL`), so a pin outlives the retention
   window. "Clear History" still deletes everything.
 - **Selection.** Pinning lifts a row out of its date bucket, so `AppCore.togglePinnedClip` moves the
-  palette selection to the row's new index in the *current* results and bumps `palette.followToken`,
+  palette selection to the row's new index in the _current_ results and bumps `palette.followToken`,
   which is what makes the list scroll the highlight back into view.
 
 Pasting a pinned entry deliberately does **not** promote it: it holds its place in the Pinned

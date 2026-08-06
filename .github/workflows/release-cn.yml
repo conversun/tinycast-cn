@@ -88,8 +88,8 @@ jobs:
           VERSION: ${{ inputs.version }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
-          swiftc -swift-version 6 Tinycast/Core/SearchRelevance.swift Tinycast/Core/Pinyin.swift \
-            Tools/fuzz-test.swift -o "$RUNNER_TEMP/fuzz-test"
+          swiftc -swift-version 6 Tinycast/Features/Launcher/Model/SearchRelevance.swift \
+            Tinycast/Platform/Pinyin.swift Tools/fuzz-test.swift -o "$RUNNER_TEMP/fuzz-test"
           "$RUNNER_TEMP/fuzz-test"
           xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Release \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \

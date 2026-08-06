@@ -1,8 +1,8 @@
-// Standalone test for the launcher matcher. Compiles the real Tinycast/Core/SearchRelevance.swift —
+// Standalone test for the launcher matcher. Compiles the real Tinycast/Features/Launcher/Model/SearchRelevance.swift —
 // there is no copy of the scorer here, so a scoring change is caught rather than mirrored by hand.
 //
-//   swiftc -swift-version 6 Tinycast/Core/SearchRelevance.swift Tinycast/Core/Pinyin.swift \
-//       Tools/fuzz-test.swift -o /tmp/fuzz-test && /tmp/fuzz-test
+//   swiftc -swift-version 6 Tinycast/Features/Launcher/Model/SearchRelevance.swift \
+//       Tinycast/Platform/Pinyin.swift Tools/fuzz-test.swift -o /tmp/fuzz-test && /tmp/fuzz-test
 
 import Foundation
 

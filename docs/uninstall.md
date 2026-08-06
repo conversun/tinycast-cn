@@ -1,6 +1,6 @@
 # Uninstall Application
 
-Removes an app *and* the files it leaves behind — caches, preferences, containers, saved state,
+Removes an app _and_ the files it leaves behind — caches, preferences, containers, saved state,
 launch agents. Reached from the launcher's Actions menu (⌘K → **Uninstall Application**) on
 any `.application` entry; it opens the `.uninstall` palette sub-screen scoped to that app.
 
@@ -14,17 +14,17 @@ the same commit.
 
 Same split as `WindowManagement`: a pure half that decides, an impure half that touches the disk.
 
-| File | Role |
-| --- | --- |
-| `Core/Uninstall/UninstallTarget.swift` | `UninstallTarget`, `UninstallEvidence`, `UninstallIdentity` — and every guard rail, applied in `UninstallIdentity.make` |
-| `Core/Uninstall/UninstallSearchRoot.swift` | The root table (where to look, which styles are legal there) and `binDirectories` |
-| `Core/Uninstall/UninstallRules.swift` | Matching, plus `isAcceptableCandidate` |
-| `Core/Uninstall/UninstallProtection.swift` | `PathFacts` → `UninstallProtection` |
-| `Core/Uninstall/UninstallPlan.swift` | `UninstallCandidate`, `UninstallPlan`, `UninstallSelection` |
-| `Core/Uninstall/UninstallScanner.swift` | **Impure.** `contentsOfDirectory`, `lstat`, sizes, the FDA probe |
-| `Core/Uninstall/UninstallRunner.swift` | **Impure.** `trashItem`, and nothing else |
-| `Core/Uninstall/UninstallSession.swift` | `@MainActor` lifecycle behind the screen |
-| `Features/Uninstall/UninstallView.swift` | List, row, actions menu |
+| File                                       | Role                                                                                                                    |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `Uninstall/UninstallTarget.swift`     | `UninstallTarget`, `UninstallEvidence`, `UninstallIdentity` — and every guard rail, applied in `UninstallIdentity.make` |
+| `Uninstall/UninstallSearchRoot.swift` | The root table (where to look, which styles are legal there) and `binDirectories`                                       |
+| `Uninstall/UninstallRules.swift`      | Matching, plus `isAcceptableCandidate`                                                                                  |
+| `Uninstall/UninstallProtection.swift` | `PathFacts` → `UninstallProtection`                                                                                     |
+| `Uninstall/UninstallPlan.swift`       | `UninstallCandidate`, `UninstallPlan`, `UninstallSelection`                                                             |
+| `Uninstall/UninstallScanner.swift`    | **Impure.** `contentsOfDirectory`, `lstat`, sizes, the FDA probe                                                        |
+| `Uninstall/UninstallRunner.swift`     | **Impure.** `trashItem`, and nothing else                                                                               |
+| `Uninstall/UninstallSession.swift`    | `@MainActor` lifecycle behind the screen                                                                                |
+| `Features/Uninstall/UninstallView.swift`   | List, row, actions menu                                                                                                 |
 
 The first five compile standalone into `Tools/uninstall-test.swift`, so they stay Foundation-only
 and take every environment fact as a parameter. The scanner hands the rules **child names**, never
@@ -40,7 +40,7 @@ and friends — repeatedly, so `…​.plist.lockfile` reduces too.
 **`bundleID`** — exact, or a namespaced child. The boundary check is load-bearing: a plain prefix
 makes `com.apple.SafariTechnologyPreview` a match for `com.apple.Safari` and trashes a different
 product's entire profile. Requiring the next character to be a separator means a match can only be a
-namespace *descendant* — `com.apple.iBooksX.CacheDelete` matches `com.apple.iBooksX`,
+namespace _descendant_ — `com.apple.iBooksX.CacheDelete` matches `com.apple.iBooksX`,
 `com.apple.iBooksXtra` does not. Both `.` and `-` count, because `-` is how vendors name release
 variants: `dev.zed.Zed-Preview.plist` belongs to Zed, unless Zed Preview is itself installed, in
 which case the sibling rule below hands it straight back.
@@ -49,7 +49,7 @@ Two further guards on that rule:
 
 - **Vendor namespaces don't prefix-match.** A two-component ID like `com.adobe` names a vendor, not a
   product, so `allowsBundleIDPrefixMatch` requires three components. `com.adobe` still matches itself.
-- **An installed sibling owns its own artifacts.** If any *other* installed app's bundle ID is a
+- **An installed sibling owns its own artifacts.** If any _other_ installed app's bundle ID is a
   longer match for the same component, that app owns it. Without this, uninstalling `com.tinycast.app`
   would also trash `com.tinycast.app.beta` and `…​.dev` — separate products that merely share a
   namespace, which is exactly the channel-isolation invariant in reverse.
@@ -81,7 +81,7 @@ Homebrew has made it user-owned it is removable, and the classifier reaches that
 without a special case.
 
 `UninstallIdentity.make` returns `nil` — refusing the whole uninstall — when the target is Tinycast
-itself, by bundle ID *or* bundle URL, compared against the **running** identity so the Dev channel
+itself, by bundle ID _or_ bundle URL, compared against the **running** identity so the Dev channel
 refuses itself too.
 
 ### Roots
@@ -128,7 +128,7 @@ Precedence, asserted by the harness:
 3. `UF_IMMUTABLE` → `.userLocked` (its own case: the user can clear it in Get Info)
 4. a TCC-gated path without Full Disk Access → `.needsFullDiskAccess`
 5. parent not writable → `.parentNotWritable`
-6. sticky parent *and* not owned by the current user → `.notOwned`
+6. sticky parent _and_ not owned by the current user → `.notOwned`
 7. → `.removable`
 
 Steps 5 and 6 are the whole ownership story, and the order is deliberate. Removing a directory entry
@@ -151,12 +151,12 @@ The TCC list is **measured, not assumed.** A probe that creates and then trashes
 directory in each candidate location shows that `~/Library/Containers`, `~/Library/Group Containers`
 and `~/Library/Cookies` refuse the move, while `~/Library/Application Scripts` and
 `~/Library/Autosave Information` allow it — which is why Books' five `Application Scripts` rows are
-checkable while the five `Containers` rows beside them are locked. Note that *listing* a directory is
+checkable while the five `Containers` rows beside them are locked. Note that _listing_ a directory is
 not the test: both container roots enumerate fine and still refuse the trash. Re-measure before
 adding an entry.
 
 **Full Disk Access is detected, never requested.** The probe opens
-`~/Library/Application Support/com.apple.TCC/TCC.db` — TCC denies that read *silently*, with no
+`~/Library/Application Support/com.apple.TCC/TCC.db` — TCC denies that read _silently_, with no
 prompt, which is what makes it usable under the rule that this feature asks for no permissions. It
 runs once per scan, not once per candidate, and can only under-report (a per-folder grant reads as
 "no access"), which just leaves a row locked.
@@ -189,9 +189,9 @@ what stayed behind.
 ## Tests
 
 ```sh
-swiftc -swift-version 6 Tinycast/Core/Uninstall/UninstallTarget.swift \
-    Tinycast/Core/Uninstall/UninstallSearchRoot.swift Tinycast/Core/Uninstall/UninstallRules.swift \
-    Tinycast/Core/Uninstall/UninstallProtection.swift Tinycast/Core/Uninstall/UninstallPlan.swift \
+swiftc -swift-version 6 Tinycast/Features/Uninstall/Model/UninstallTarget.swift \
+    Tinycast/Features/Uninstall/Model/UninstallSearchRoot.swift Tinycast/Features/Uninstall/Model/UninstallRules.swift \
+    Tinycast/Features/Uninstall/Model/UninstallProtection.swift Tinycast/Features/Uninstall/Model/UninstallPlan.swift \
     Tools/uninstall-test.swift -o /tmp/uninstall-test && /tmp/uninstall-test
 ```
 

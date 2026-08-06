@@ -1,6 +1,6 @@
 # Hotkeys (in-house, zero dependencies)
 
-`Core/HotKey/` holds:
+`Features/HotKeys/` holds:
 
 - `KeyShortcut` — Sendable model, Carbon keycode + modifiers, layout-aware glyphs via `UCKeyTranslate`.
 - `HotKeyBinding` — what an action is actually bound to: a `.combo(KeyShortcut)` or a
@@ -10,7 +10,7 @@
 
 `HotKeyManager` owns them all: persistence, conflict lookup, and dispatch. Every action reads and
 writes one `HotKeyBinding`, so the two kinds share persistence, conflict detection, the recorder and
-the keycap rendering — only the *engine* differs.
+the keycap rendering — only the _engine_ differs.
 
 ## Persistence
 
@@ -27,7 +27,7 @@ and to prune bindings whose record was deleted while Tinycast wasn't running. Th
 A `.combo` writes the original `{"carbonKeyCode":N,"carbonModifiers":N}` record and
 `HotKeyBinding.init(from:)` tries that shape first, so nothing needs migrating. A `.doubleTap` writes
 `{"doubleTapModifier":"command"}` — a shape a pre-double-tap build fails to decode and therefore reads
-as *unbound*, which is the intended degradation. The same wrapper is what `SettingsBackup.HotkeyBackup`
+as _unbound_, which is the intended degradation. The same wrapper is what `SettingsBackup.HotkeyBackup`
 stores, so old backup files import unchanged; a backup containing a double-tap cannot be read by an
 older build, which is what the `version` 3 bump records (`version` 4 adds the quicklinks array).
 
@@ -53,9 +53,9 @@ alongside, sees no key press or mouse click, and is released within `maxHold` (2
 window `HyperKeyTap` calls a quick press). A **double-tap** is a second tap of the same modifier
 starting within `maxGap` (300 ms) of the first one's release.
 
-Only *momentary* keys may feed `hasOtherModifiers`. Caps Lock must not: `maskAlphaShift` tracks the
+Only _momentary_ keys may feed `hasOtherModifiers`. Caps Lock must not: `maskAlphaShift` tracks the
 **latch**, not a press, so testing it would disqualify every tap for as long as Caps Lock is on and
-silently kill the feature. Caps Lock is still ineligible as a *binding* — that is what the Hyper Key
+silently kill the feature. Caps Lock is still ineligible as a _binding_ — that is what the Hyper Key
 is for.
 
 It **fires on the second release, not the second press**. The modifier is then already up when the
@@ -73,7 +73,7 @@ details are load-bearing:
   binding records regardless; the recorder shows an inline warning that opens System Settings, and the
   one-second health timer installs the tap the moment the grant lands.
 
-⇧ is bindable this way even though `KeyShortcut` rejects a bare ⇧ combo: a double-*tap* is unambiguous
+⇧ is bindable this way even though `KeyShortcut` rejects a bare ⇧ combo: a double-_tap_ is unambiguous
 where a bare ⇧ combo would shadow typing.
 
 ## Recorder
@@ -81,11 +81,11 @@ where a bare ⇧ combo would shadow typing.
 The settings recorder (`Features/Settings/ShortcutRecorder.swift`) is deliberately **not** a focusable
 control: the active recorder is `HotKeyManager.recordingAction` state, and keys are captured by local
 NSEvent monitors while both engines are paused. It records both kinds — type a combo, or double-tap a
-modifier — by feeding its `.flagsChanged` / `.keyDown` monitors into the *same* `DoubleTapDetector`
+modifier — by feeding its `.flagsChanged` / `.keyDown` monitors into the _same_ `DoubleTapDetector`
 the global monitor uses, so recording needs no event tap and no permission.
 
 Setting `recordingAction` is what starts and stops the capture, so there is exactly **one**
-`ShortcutCaptureSession` (`Core/HotKey/`) for the app rather than one per row — which is what lets the
+`ShortcutCaptureSession` (`HotKeys/Service/`) for the app rather than one per row — which is what lets the
 callout above the field render the live state from outside the row that opened it. The field itself
 only ever shows the binding; the prompt, the live preview and the conflict message all live in the
 callout. See [ui.md](ui.md#the-shortcut-recorder-callout).

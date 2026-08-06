@@ -9,12 +9,12 @@ entries and a still-registered shortcut moves nothing.
 
 ## Layout
 
-| File | Imports | Role |
-|---|---|---|
-| `Core/WindowManagement/WindowCommand.swift` | Foundation | Catalog: id, name, symbol, kind, group, `cyclesOnRepeat`, `resizes` |
-| `Core/WindowManagement/WindowLayout.swift` | Foundation + CoreGraphics | **Pure.** Every frame the commands produce |
-| `Core/WindowManagement/WindowActionMemory.swift` | Foundation + CoreGraphics | **Pure.** Per-window cycle position and restore point |
-| `Core/WindowManagement/WindowMover.swift` | AppKit + ApplicationServices | `@MainActor`. Every `AXUIElement` call and the coordinate flip |
+| File                                             | Imports                      | Role                                                                |
+| ------------------------------------------------ | ---------------------------- | ------------------------------------------------------------------- |
+| `Features/WindowManagement/WindowCommand.swift`      | Foundation                   | Catalog: id, name, symbol, kind, group, `cyclesOnRepeat`, `resizes` |
+| `Features/WindowManagement/WindowLayout.swift`       | Foundation + CoreGraphics    | **Pure.** Every frame the commands produce                          |
+| `Features/WindowManagement/WindowActionMemory.swift` | Foundation + CoreGraphics    | **Pure.** Per-window cycle position and restore point               |
+| `Features/WindowManagement/WindowMover.swift`        | AppKit + ApplicationServices | `@MainActor`. Every `AXUIElement` call and the coordinate flip      |
 
 The first three compile into `Tools/window-command-test.swift`, so they must not gain an AppKit,
 SwiftUI or `NSScreen` dependency, and must stay pure — `WindowActionMemory` takes `now` as a parameter
@@ -28,7 +28,7 @@ Adding a command is four edits in `WindowCommand.swift` (a case in `ID`, plus `n
 ## Coordinate space
 
 **`WindowLayout` works exclusively in AX space**: global coordinates, top-left origin, +Y pointing
-*down*. `WindowMover.AXGeometry` is the only place that converts to and from Cocoa's bottom-left space.
+_down_. `WindowMover.AXGeometry` is the only place that converts to and from Cocoa's bottom-left space.
 The visible consequence is that Top Half has `minY == visibleFrame.minY`, which the harness asserts
 specifically to stop a bottom-left convention creeping back in.
 
@@ -58,7 +58,7 @@ one-point seams.
 the nudges) work in
 `canvas = visibleFrame.insetBy(gap)` instead: a centred window has no neighbour to gutter against.
 
-**Make Larger / Make Smaller** step by 5% of the *screen*, not of the window, and the step is forced
+**Make Larger / Make Smaller** step by 5% of the _screen_, not of the window, and the step is forced
 even so each edge moves a whole point. That makes the two commands exactly invertible — `size × 0.95 ×
 1.05 ≠ size`, so a size-relative step would shrink a little on every round trip — and it feels the same
 at any window size. Both directions saturate into exact no-ops: the ceiling is the canvas, the floor is
@@ -68,7 +68,7 @@ at any window size. Both directions saturate into exact no-ops: the ceiling is t
 display-independent — a laptop gets the fraction, a 4K or 5K display gets a moderate window instead of
 a 2304×1296 one. It ignores the window's current size entirely, so it is idempotent.
 
-**Center Half** is half the screen's *area*: half width, full height, horizontally centred — the family
+**Center Half** is half the screen's _area_: half width, full height, horizontally centred — the family
 sibling of Center Third.
 
 An oversized or off-screen window is always clamped back onto the display; `clamped` pins the leading
@@ -78,7 +78,7 @@ full-height and still off-screen.
 
 ## Cycling and Restore
 
-Both reduce to one question — *has the user moved this window themselves since our last action?* — so
+Both reduce to one question — _has the user moved this window themselves since our last action?_ — so
 `WindowActionMemory` answers it once. It is generic over the key so it stays Foundation-only: the app
 keys by `AXUIElement` (via `CFEqual`/`CFHash` plus the pid), the harness keys by `Int`.
 
@@ -98,13 +98,13 @@ Two details carry their weight:
   "the user moved it" on every press and break both cycling and Restore for such apps.
 - **Restore is single-level, not a stack.** Left Half → Maximize → Top Right → Restore lands on the
   original frame, because rule 1 captures once and the intermediate actions never overwrite it. A stack
-  has no defensible answer for what a *second* Restore press should do.
+  has no defensible answer for what a _second_ Restore press should do.
 
 Rule 1 also delivers the "works for windows Tinycast never moved" requirement: the capture happens in
 `WindowMover.perform` before a single write.
 
 **Cycling covers the four halves only** (½ → ⅓ → ⅔), and is off by default. Top and Bottom Half cycle
-through *vertical* thirds, which have no commands of their own — the Thirds group is horizontal — so
+through _vertical_ thirds, which have no commands of their own — the Thirds group is horizontal — so
 they are expressed as fractions rather than other command IDs.
 
 Growth is bounded three ways: an LRU cap of 64, an `NSWorkspace.didTerminateApplicationNotification`
@@ -118,7 +118,7 @@ because the palette is frontmost when a command dispatches from it — `AppCore.
 `windowController.previousApp`, the same recorded app the paste path targets, and restores focus to it
 rather than dropping it. It is synchronous: every AX call is a bounded mach round trip capped by a 1s
 messaging timeout, and `await` would only add reentrancy between a held hotkey's repeats. The timeout
-is set on the application element *and again* on the window element — it is per-element and never
+is set on the application element _and again_ on the window element — it is per-element and never
 inherited.
 
 The write sequence is **size → position → size**. Whichever single order you pick is wrong in one

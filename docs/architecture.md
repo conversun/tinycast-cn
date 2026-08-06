@@ -9,11 +9,11 @@ System-action catalog, launcher integration and permission behavior are document
 
 ## Single-owner core
 
-`AppCore.shared` (`Core/AppCore.swift`) is a `@MainActor` singleton that owns every long-lived
+`AppCore.shared` (`App/AppCore.swift`) is a `@MainActor` singleton that owns every long-lived
 manager — `AppIndex`, `ClipboardStore`, `ClipboardManager`, `SnippetsStore`,
 `SnippetKeywordListener`, `SnippetTextInjector`, `HotKeyManager`, `AppSettings`, `FavoritesStore`,
 `VisibilityStore`, `LauncherRankingStore`, `CustomCommandStore`, `CalculatorHistoryStore`,
-`CurrencyRateStore`, `RunningAppsMonitor`, `PaletteViewModel` — plus the window controllers, including
+`CurrencyRateStore`, `RunningAppsMonitor`, `PaletteState` — plus the window controllers, including
 `DialogController` (dialogs are reached from elsewhere via `AppCore.showNotice` /
 `confirm`, so the controller stays single-owned).
 `AppDelegate.applicationDidFinishLaunching` calls
@@ -25,7 +25,7 @@ launch actions are methods on `AppCore` that the SwiftUI views call.
 `TinycastApp` (`@main`) declares only a `MenuBarExtra` scene; everything else visible is driven
 imperatively from AppKit.
 
-- **Command palette** — a borderless floating `NSPanel` (`Core/PalettePanel.swift`) hosting SwiftUI
+- **Command palette** — a borderless floating `NSPanel` (`Palette/PalettePanel.swift`) hosting SwiftUI
   via `NSHostingView`, managed by `PaletteWindowController`. It toggles between a compact bar and the
   full launcher by resizing the window. `PaletteWindowController` solely owns the frame (resolved once
   per show to a top-left anchor so it grows downward), and the hosting view sets `sizingOptions = []`
@@ -33,11 +33,11 @@ imperatively from AppKit.
   content and the top edge drifts on the compact↔expanded swap. The panel auto-dismisses on
   `windowDidResignKey`.
 - **Settings / About** — plain `NSWindow`s via `AuxWindowController` (in
-  `Features/About/AboutView.swift`). SwiftUI `Settings` / `Window` scenes are unreliable for accessory
+  `Windows/AuxWindowController.swift`). SwiftUI `Settings` / `Window` scenes are unreliable for accessory
   apps, so this is deliberate.
 - **Dialogs** borderless `DialogPanel`s driven by `DialogController`, the app's only
   presenter for confirmations, failure reports and value prompts. **HUDs** are separate:
-  `MessageHUDController` and `VolumeHUDController` (`Core/HUD/`), both over a shared `HUDPresenter`. `NSAlert` is deliberately unused: its
+  `MessageHUDController` and `VolumeHUDController` (`Windows/HUD/`), both over a shared `HUDPresenter`. `NSAlert` is deliberately unused: its
   `runModal` nested run loop lets Carbon hotkeys stack dialogs, and an Aqua alert clashes with the
   forced-dark surface. Presentation is `async`, so nothing blocks the main actor. See
   [ui.md](ui.md#dialogs--hud).
@@ -80,7 +80,7 @@ CoreAudio, process and Accessibility side effects, while `AppCore` owns confirma
 
 House idioms for the sharp edges:
 
-- Block-observer lifetimes go through the RAII `NotificationToken` (`Core/NotificationToken.swift`)
+- Block-observer lifetimes go through the RAII `NotificationToken` (`Platform/NotificationToken.swift`)
   instead of removal in a `deinit`.
 - `ClipboardStore` uses `isolated deinit` for its SQLite teardown.
 - Raw Carbon / C pointers get decoded to plain values before crossing into actor code (see

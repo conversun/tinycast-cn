@@ -4,7 +4,7 @@ A palette sub-screen (reached like Clipboard / Calculator History) presenting a 
 
 ## Layout
 
-- `Core/Emoji/` — the **Foundation-only** catalog + geometry (no AppKit / SwiftUI imports):
+- `Features/Emoji/Model/` — the **Foundation-only** catalog + geometry (no AppKit / SwiftUI imports):
   - `EmojiCatalog.swift` — the catalog model (groups, names, keywords).
   - `EmojiGridGeometry.swift` — pure grid-layout math (columns, item sizing).
   - `EmojiData.generated.swift` — the emoji dataset.
@@ -20,8 +20,8 @@ A palette sub-screen (reached like Clipboard / Calculator History) presenting a 
   `Tools/emoji-test.swift` harness compiles the real sources:
 
   ```sh
-  swiftc Tinycast/Core/Emoji/EmojiCatalog.swift Tinycast/Core/Emoji/EmojiGridGeometry.swift \
-    Tinycast/Core/Emoji/EmojiData.generated.swift Tools/emoji-test.swift -o /tmp/emoji-test && /tmp/emoji-test
+  swiftc Tinycast/Features/Emoji/Model/EmojiCatalog.swift Tinycast/Features/Emoji/Model/EmojiGridGeometry.swift \
+    Tinycast/Features/Emoji/Model/EmojiData.generated.swift Tools/emoji-test.swift -o /tmp/emoji-test && /tmp/emoji-test
   ```
 
 - The grid list uses the palette scrollbar (`.thinScrollbar()` + `.hideNativeScrollers()`) and the

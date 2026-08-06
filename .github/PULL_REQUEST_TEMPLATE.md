@@ -1,5 +1,3 @@
-<!-- Read CONTRIBUTING.md first. An agreed issue is mandatory; PRs without one get closed. -->
-
 ## Related issue
 
 Closes #

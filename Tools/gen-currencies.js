@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Generate Tinycast/Core/Calculator/CurrencyData.generated.swift.
+// Generate Tinycast/Features/Calculator/Model/CurrencyData.generated.swift.
 //
 // Usage: node Tools/gen-currencies.js [currencies.json cldr-currencies.json]
 // Downloads the sources when paths aren't given. Run occasionally, commit the output.
@@ -126,7 +126,7 @@ async function main() {
   for (const [sign, code] of unambiguous(narrowClaims)) if (!signs.has(sign)) signs.set(sign, code);
   const aliases = unambiguous(wordClaims);
 
-  const out = path.resolve(__dirname, "..", "Tinycast/Core/Calculator/CurrencyData.generated.swift");
+  const out = path.resolve(__dirname, "..", "Tinycast/Features/Calculator/Model/CurrencyData.generated.swift");
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(
     out,

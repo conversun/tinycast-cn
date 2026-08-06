@@ -63,6 +63,7 @@ keyword: "!notes"
 enabled: true
 show_confirmation: false
 ---
+
 Template body
 ```
 
@@ -89,31 +90,31 @@ require a prompt, the same context is reused afterward, so nothing can drift whi
 The token set follows [Raycast's dynamic placeholders](https://manual.raycast.com/dynamic-placeholders)
 so a migrated snippet keeps working.
 
-| Token | Result |
-| --- | --- |
-| `{clipboard}` | Captured plain-text clipboard value |
-| `{clipboard offset=1}` | Nth most recent clipboard text; `offset=1` is the one before the current |
-| `{selection}` · `{selectedText}` | Captured selected text from the target app, when Accessibility can read it. `{selectedText}` is Raycast's spelling, accepted on the way in; `{selection}` is the canonical one and the only one **Insert…** writes |
-| `{date}` · `{time}` · `{datetime}` | Captured date / time / both, in the context locale |
-| `{day}` | Weekday name |
-| `{uuid}` | A fresh UUID per token |
-| `{date format="yyyy-MM-dd"}` | Any `DateFormatter` format |
-| `{date locale="fr-FR"}` | Renders in another locale; cannot be combined with `format` |
-| `{time offset="+3h +30m"}` | Signed offsets, space-separated: `m` minutes, `h` hours, `d` days, `M` months, `y` years |
-| `{argument}` | An argument named `Argument` |
-| `{argument name="Recipient"}` | A named argument requested before expansion |
-| `{argument default="Hi"}` | Optional argument — the default expands without prompting |
-| `{argument options="a, b, c"}` | The prompt offers a picker instead of a text field |
-| `{snippet:Name}` · `{snippet name="Name"}` | Another snippet resolved by name, then keyword |
-| `{cursor}` | Final insertion point |
+| Token                                      | Result                                                                                                                                                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `{clipboard}`                              | Captured plain-text clipboard value                                                                                                                                                                                |
+| `{clipboard offset=1}`                     | Nth most recent clipboard text; `offset=1` is the one before the current                                                                                                                                           |
+| `{selection}` · `{selectedText}`           | Captured selected text from the target app, when Accessibility can read it. `{selectedText}` is Raycast's spelling, accepted on the way in; `{selection}` is the canonical one and the only one **Insert…** writes |
+| `{date}` · `{time}` · `{datetime}`         | Captured date / time / both, in the context locale                                                                                                                                                                 |
+| `{day}`                                    | Weekday name                                                                                                                                                                                                       |
+| `{uuid}`                                   | A fresh UUID per token                                                                                                                                                                                             |
+| `{date format="yyyy-MM-dd"}`               | Any `DateFormatter` format                                                                                                                                                                                         |
+| `{date locale="fr-FR"}`                    | Renders in another locale; cannot be combined with `format`                                                                                                                                                        |
+| `{time offset="+3h +30m"}`                 | Signed offsets, space-separated: `m` minutes, `h` hours, `d` days, `M` months, `y` years                                                                                                                           |
+| `{argument}`                               | An argument named `Argument`                                                                                                                                                                                       |
+| `{argument name="Recipient"}`              | A named argument requested before expansion                                                                                                                                                                        |
+| `{argument default="Hi"}`                  | Optional argument — the default expands without prompting                                                                                                                                                          |
+| `{argument options="a, b, c"}`             | The prompt offers a picker instead of a text field                                                                                                                                                                 |
+| `{snippet:Name}` · `{snippet name="Name"}` | Another snippet resolved by name, then keyword                                                                                                                                                                     |
+| `{cursor}`                                 | Final insertion point                                                                                                                                                                                              |
 
 The editor's **Insert…** menu lists every token above; parameters and modifiers are typed by hand.
 
 Any value-producing token accepts a modifier pipeline, applied left to right:
 `{clipboard | trim | uppercase}`. The modifiers are `uppercase`, `lowercase`, `trim`,
 `percent-encode` (escapes everything outside RFC 3986's unreserved set), `json-stringify` (escapes for
-use *inside* a JSON string, without adding the quotes), and `raw`, which opts a value out of any
-automatic formatting the *result* asks for. A snippet asks for none, so `raw` is a no-op there; a
+use _inside_ a JSON string, without adding the quotes), and `raw`, which opts a value out of any
+automatic formatting the _result_ asks for. A snippet asks for none, so `raw` is a no-op there; a
 quicklink expanding into a URL percent-encodes every value, and `raw` is how a template opts one out.
 `{cursor}` and snippet references are structural, so they take no modifiers.
 
@@ -148,7 +149,7 @@ enable keystroke listening.
 
 **Accessibility is the only permission snippets need.** The keyword listener installs a listen-only
 `CGEventTap`, which the Accessibility grant already authorizes — the same grant `HyperKeyTap` uses for
-its *modifying* tap, and the same one clipboard pasting needs. Input Monitoring is deliberately not
+its _modifying_ tap, and the same one clipboard pasting needs. Input Monitoring is deliberately not
 used: `CGPreflightListenEventAccess()` reports success whenever Accessibility is granted, so a second
 permission would show as permanently granted while never appearing in System Settings, which cannot be
 managed or revoked. It is managed where it always was, in **Settings → Permissions**.
@@ -243,7 +244,8 @@ Run the real model, codec, template engine, repository, keyword listener with a 
 main-actor watcher against temporary roots:
 
 ```sh
-swiftc -swift-version 6 Tinycast/Core/NotificationToken.swift \
-  Tinycast/Core/Snippets/*.swift \
+swiftc -swift-version 6 Tinycast/Platform/NotificationToken.swift \
+  Tinycast/Platform/HealthTicker.swift Tinycast/Features/Snippets/Model/*.swift \
+  Tinycast/Features/Snippets/Service/*.swift \
   Tools/snippets-test.swift -o /tmp/snippets-test && /tmp/snippets-test
 ```

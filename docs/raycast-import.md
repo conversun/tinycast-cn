@@ -3,12 +3,12 @@
 Tinycast reads both `.rayconfig` formats in the wild. They come from different generations of a
 rewritten app and share almost no data shape, so each has its own decrypt and its own mapper:
 
-| | v1 | v2 |
-| --- | --- | --- |
-| Ships in | Raycast 1.104.x (classic) | Raycast X (`appVersion` 0.68, `schemaVersion` 2) |
-| File | `IV(16) ‖ AES-256-CBC(gzip(JSON), PKCS#7)` — no header | gzip → JSON envelope → AES-256-GCM |
-| Key | `EVP_BytesToKey(SHA-256, salt: none)` | scrypt(N=16384, r=8, p=1) |
-| Reader | `RaycastImportV1` + `RaycastV1Decoder` | `RaycastImportV2` |
+|          | v1                                                     | v2                                               |
+| -------- | ------------------------------------------------------ | ------------------------------------------------ |
+| Ships in | Raycast 1.104.x (classic)                              | Raycast X (`appVersion` 0.68, `schemaVersion` 2) |
+| File     | `IV(16) ‖ AES-256-CBC(gzip(JSON), PKCS#7)` — no header | gzip → JSON envelope → AES-256-GCM               |
+| Key      | `EVP_BytesToKey(SHA-256, salt: none)`                  | scrypt(N=16384, r=8, p=1)                        |
+| Reader   | `RaycastImportV1` + `RaycastV1Decoder`                 | `RaycastImportV2`                                |
 
 ## Detection
 
@@ -42,20 +42,20 @@ passphrase in the same field v2 uses.
 
 v1 JSON is a set of `builtin_package_*` / `raycast_*` providers, with `raycast_version` at top level.
 
-| v1 path | Tinycast |
-| --- | --- |
-| `…raycastPreferences.preferencesAdvanced.popToRootTimeout` | `popToRootSeconds` (exact `PopToRootTimeout` match only) |
-| `…preferencesAdvanced.emojiSkinTone` | `emojiSkinTone` (`default` → none) |
+| v1 path                                                                             | Tinycast                                                              |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `…raycastPreferences.preferencesAdvanced.popToRootTimeout`                          | `popToRootSeconds` (exact `PopToRootTimeout` match only)              |
+| `…preferencesAdvanced.emojiSkinTone`                                                | `emojiSkinTone` (`default` → none)                                    |
 | `…preferencesAdvanced.raycast_hyperKey_state` `{enabled, keyCode, includeShiftKey}` | `hyperKey` (a Carbon code — 57 is caps lock), `hyperKeyIncludesShift` |
-| `…preferencesAdvanced.useHyperKeyIcon` | `hyperKeyReplacesGlyph` |
-| `…preferencesAppearance.raycastPreferredWindowMode` | `compactMode` (`== "compact"`) |
-| `…preferencesAppearance.showFavoritesInCompactMode` | same |
-| `…preferencesAppearance.statusBarIsVisible` | `showInMenuBar` |
-| `builtin_package_clipboardHistory.clipboardHistoryDisabledApplications` | `clipboardDisabledApps` |
-| `…clipboardHistoryRecords[]` | `[ClipboardItem]` |
-| `builtin_package_rootSearch.rootSearch[]` | app hotkeys, clipboard/emoji command hotkeys |
-| `builtin_package_navigation.pinnedMenuItems` | `favoriteApps` |
-| `builtin_package_snippets.snippets` | `[Snippet]` |
+| `…preferencesAdvanced.useHyperKeyIcon`                                              | `hyperKeyReplacesGlyph`                                               |
+| `…preferencesAppearance.raycastPreferredWindowMode`                                 | `compactMode` (`== "compact"`)                                        |
+| `…preferencesAppearance.showFavoritesInCompactMode`                                 | same                                                                  |
+| `…preferencesAppearance.statusBarIsVisible`                                         | `showInMenuBar`                                                       |
+| `builtin_package_clipboardHistory.clipboardHistoryDisabledApplications`             | `clipboardDisabledApps`                                               |
+| `…clipboardHistoryRecords[]`                                                        | `[ClipboardItem]`                                                     |
+| `builtin_package_rootSearch.rootSearch[]`                                           | app hotkeys, clipboard/emoji command hotkeys                          |
+| `builtin_package_navigation.pinnedMenuItems`                                        | `favoriteApps`                                                        |
+| `builtin_package_snippets.snippets`                                                 | `[Snippet]`                                                           |
 
 Notes that matter:
 
@@ -76,10 +76,10 @@ Notes that matter:
 ## Layout
 
 `RaycastFormat.swift` and `RaycastV1Decoder.swift` stay Foundation + CommonCrypto + Carbon so
-`Tools/raycast-test.swift` compiles them against the real sources. The decoder's job is *shape* — it
+`Tools/raycast-test.swift` compiles them against the real sources. The decoder's job is _shape_ — it
 returns Raycast's own values in a plain `RaycastV1Payload`; turning those into Tinycast's domain types
 (`PopToRootTimeout`, `EmojiSkinTone`, `HyperKeyPhysicalKey`, `KeyShortcut`) is `RaycastImportV1`'s job.
-That is the same pure-layer / platform-layer split `Core/WindowManagement/` uses.
+That is the same pure-layer / platform-layer split `Features/WindowManagement/` uses.
 
 `RaycastImport` itself is only the facade: `Result`, `selecting(_:)`, and the `read(file:passphrase:)`
 dispatcher. `BackupActions.importRaycast` runs it off the main actor.

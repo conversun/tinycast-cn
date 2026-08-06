@@ -15,14 +15,14 @@ every shortcut without re-registering.
 `QuicklinkDestination.detect` decides what a link is from its shape alone — no filesystem or Launch
 Services read — which is what keeps it pure and covered by `Tools/quicklink-test.swift`. In order:
 
-| Shape | Result |
-| --- | --- |
-| `~/…`, `/…`, `file://…` | `.path`, tilde expanded against the injected home |
-| `http:` · `https:` | `.web` |
-| `smb:` · `afp:` · `nfs:` · `ftp:` · `sftp:` · `ftps:` | `.network` |
-| any other `scheme:` | `.deeplink` (`spotify://`, `slack://`, `shortcuts://`, `mailto:`) |
-| a bare host with a letter-led TLD (`github.com/a?b=c`) | `.web`, `https://` prepended |
-| anything else | nothing — the link is rejected |
+| Shape                                                  | Result                                                            |
+| ------------------------------------------------------ | ----------------------------------------------------------------- |
+| `~/…`, `/…`, `file://…`                                | `.path`, tilde expanded against the injected home                 |
+| `http:` · `https:`                                     | `.web`                                                            |
+| `smb:` · `afp:` · `nfs:` · `ftp:` · `sftp:` · `ftps:`  | `.network`                                                        |
+| any other `scheme:`                                    | `.deeplink` (`spotify://`, `slack://`, `shortcuts://`, `mailto:`) |
+| a bare host with a letter-led TLD (`github.com/a?b=c`) | `.web`, `https://` prepended                                      |
+| anything else                                          | nothing — the link is rejected                                    |
 
 Two false positives are excluded deliberately, because both are commoner than the schemes they would
 shadow: a one-letter "scheme" is a Windows drive letter, and a `scheme:` whose remainder is all
@@ -50,7 +50,7 @@ https://chat.openai.com/?q={clipboard}
 ```
 
 **Values going into a URL or deeplink are percent-encoded automatically**, so a search term with a
-space or an `&` can't truncate the destination. Encoding is applied *after* the modifier pipeline, so
+space or an `&` can't truncate the destination. Encoding is applied _after_ the modifier pipeline, so
 `| uppercase` can't rewrite the `%xx` hex, and it is skipped when the template already spoke for
 itself — `| raw` opts out, `| percent-encode` has done it once already. A local path is never
 encoded: `%20` in a path is a literal, not a space.
@@ -65,7 +65,7 @@ A quicklink whose placeholders still need values doesn't open — it collects th
 palette, as `PaletteMode.quicklinkArguments`.
 
 Arguments are collected **one at a time** because the palette has exactly one text field, and that
-field *is* the current argument's input. The screen above it lists every argument with its answer so
+field _is_ the current argument's input. The screen above it lists every argument with its answer so
 far. ↵ commits and advances; on the last one it opens. Backspace on an empty field steps back to the
 previous argument and restores what was typed there, so a typo in the second of three fields costs
 one keypress rather than the whole flow. An argument declaring `options=` renders its choices as
@@ -118,7 +118,7 @@ Its ⌘K menu carries Open (`↵`), Open With Default App (`⌘↵`, only when a
 Duplicate, Pin/Unpin (`⌘P`), Hide/Show in Root Search, Show in Finder (`⌘F`, only for a resolved
 path), and Delete (`⌘⌫`).
 
-Choosing an *arbitrary* app belongs to the editor, which has a picker; `PopoverMenu` is a flat list
+Choosing an _arbitrary_ app belongs to the editor, which has a picker; `PopoverMenu` is a flat list
 with no nesting, so the palette offers the one alternative that always exists — bypass the saved app
 and use the system handler, once, without changing what is saved.
 
@@ -157,7 +157,7 @@ away.
 `QuicklinkArchive` is a versioned JSON document (`{"version": 1, "quicklinks": [...]}`), pretty-printed
 with ISO 8601 dates so it can be hand-edited; a bare array decodes too, and only `name` and `link` are
 required. Duplicate detection is by **name or destination** — either match means the user already has
-it — compared against the existing library *and* against the rest of the incoming file, so one file
+it — compared against the existing library _and_ against the rest of the incoming file, so one file
 can't import its own duplicates. Skipped entries are counted and reported in the summary. An import
 takes a fresh identity for every entry, so it can never collide with a shortcut an existing quicklink
 owns.
@@ -169,8 +169,8 @@ excluding it would be cargo-culting.
 ## Standalone harness
 
 ```sh
-swiftc -swift-version 6 Tinycast/Core/Quicklinks/Quicklink.swift \
-  Tinycast/Core/Quicklinks/QuicklinkDestination.swift \
-  Tinycast/Core/Quicklinks/QuicklinkStore.swift Tinycast/Core/Quicklinks/QuicklinkArchive.swift \
+swiftc -swift-version 6 Tinycast/Features/Quicklinks/Model/Quicklink.swift \
+  Tinycast/Features/Quicklinks/Model/QuicklinkDestination.swift \
+  Tinycast/Features/Quicklinks/Model/QuicklinkStore.swift Tinycast/Features/Quicklinks/Model/QuicklinkArchive.swift \
   Tools/quicklink-test.swift -o /tmp/quicklink-test && /tmp/quicklink-test
 ```

@@ -1,3 +1,21 @@
+> ## ⚠ An approved architecture refactor is in progress
+>
+> Some **structural** rules in this file — file layout, type ownership, which type does what — are being
+> changed by it. That is deliberate, and a phase contradicting one of them is **not** an error.
+>
+> **If you are executing a phase from [`docs/refactor/`](docs/refactor/), the phase document overrides
+> the architectural guidance here.** Read
+> [`docs/refactor/prompts/system-prompt.md`](docs/refactor/prompts/system-prompt.md) for the full
+> precedence ladder, and [`docs/refactor/POLICY.md`](docs/refactor/POLICY.md) for the migration and
+> compatibility rules.
+>
+> **Behavioral invariants below always hold** — UI, keyboard behaviour, accessibility, permission and
+> consent flows, Swift 6 data-race safety, and the explicitly off-limits files. A phase that contradicts
+> one of *those* is wrong: stop and say so.
+>
+> **If you are not working from a `docs/refactor/` phase**, ignore this box entirely and follow this
+> file as written.
+
 ## Project
 
 Tinycast is a native macOS menu-bar launcher (a minimal Raycast): fuzzy app launcher, global +
@@ -17,13 +35,9 @@ builds with the **Xcode 26** toolchain.
 
 ## Project Philosophy
 
-- Production-quality, as if written by a senior macOS engineer.
-- Prefer simple, maintainable solutions over clever ones; preserve existing behavior unless the task
-  changes it.
-- Keep SwiftUI views declarative and lightweight; business logic lives in models / managers.
-- Respect Swift 6 actor isolation; keep expensive work off the main actor.
-- Remove dead code rather than adding compatibility layers. Leave the codebase cleaner than you found
-  it.
+General engineering principles — simple over clever, declarative views, Swift 6 isolation, remove dead
+code — come from the global `CLAUDE.md` and are not repeated here. Tinycast adds one rule of its own:
+
 - **Comments are single-line** — no stacked / multi-line blocks. Only comment the non-obvious (a
   _why_, a gotcha, a load-bearing invariant); never restate the code.
 
@@ -31,7 +45,7 @@ builds with the **Xcode 26** toolchain.
 
 Full detail: [`docs/architecture.md`](docs/architecture.md).
 
-- **Single-owner core.** `AppCore.shared` (`Core/AppCore.swift`) is a `@MainActor` singleton owning
+- **Single-owner core.** `AppCore.shared` (`App/AppCore.swift`) is a `@MainActor` singleton owning
   every long-lived manager and the window controllers.
   `AppDelegate.applicationDidFinishLaunching` calls `AppCore.shared.start()` and nothing else — that
   is the one wiring point. Palette / paste / launch actions are methods on `AppCore` that views call.
@@ -59,7 +73,9 @@ Never break these without an explicit task to do so.
   only; do not add light-mode styling.
 - **The flat `selection` index must match the visible row order exactly**, including the inline
   calculator card at index 0 when present. Selection is the single source of truth for highlight /
-  activation.
+  activation. `Features/PaletteRowIndex.swift` is that mapping, and it stays **Foundation-only and
+  pure** — no SwiftUI, no AppKit — so `Tools/palette-selection-test.swift` compiles the shipped type
+  rather than a copy. Section headers are not selectable and never consume an index.
 - **`AppEntry.Kind` is the only thing that says what an entry is.** One case per launcher section, per
   `VisibilityStore` category and per Settings pane — never re-derive a category by sniffing an entry ID
   (that's what `isCustomCommand` used to do). A new category means a new case, a slice in
@@ -68,27 +84,27 @@ Never break these without an explicit task to do so.
   frozen instead (resigning shifts the text a point or two). See [palette.md](docs/palette.md).
 - **Focus restoration is load-bearing.** Paste targets the recorded `previousApp` and requires the
   Accessibility permission (`Permissions.ensureAccessibility()`). See [palette.md](docs/palette.md).
-- **`Core/Calculator/` (incl. `CalcDateTime`) must stay Foundation-only *and pure*** — no AppKit /
+- **`Features/Calculator/Model/` (incl. `CalcDateTime`) must stay Foundation-only *and pure*** — no AppKit /
   SwiftUI imports, no clock or network reads. `Tools/calc-test.swift` compiles the real engine
   sources. Both externally-sourced inputs are injected: the clock via `now`/`calendar`, the FX table
-  via `rates` (`CurrencyRateStore` owns the fetch). Likewise `Core/Emoji/`
+  via `rates` (`CurrencyRateStore` owns the fetch). Likewise `Features/Emoji/Model/`
   (`EmojiCatalog`, `EmojiGridGeometry`) stays AppKit/SwiftUI-free for `Tools/emoji-test.swift`, and
-  `Core/ClipboardStore.swift` must keep to Foundation + SQLite3 with no other app source, so
-  `Tools/clipboard-test.swift` can compile it standalone. `Core/LauncherRankingStore.swift` is the
+  `Features/Clipboard/Model/ClipboardStore.swift` must keep to Foundation + SQLite3 with no other app source, so
+  `Tools/clipboard-test.swift` can compile it standalone. `Launcher/Model/LauncherRankingStore.swift` is the
   same deal for `Tools/ranking-test.swift` — Foundation only, with the clock injected via `now` and
-  the store path via `fileURL`, as is `Core/SearchScopes.swift` for `Tools/scopes-test.swift`.
-  `Core/CustomCommand.swift` and `Core/ShellCommandRunner.swift` must likewise stay free of AppKit /
-  SwiftUI (Foundation plus Combine for `ObservableObject` and Darwin for `mkstemp`) so
+  the store path via `fileURL`, as is `Launcher/Model/SearchScopes.swift` for `Tools/scopes-test.swift`.
+  `CustomCommands/Model/CustomCommand.swift` and `CustomCommands/Service/ShellCommandRunner.swift` must stay free of AppKit /
+  SwiftUI (Foundation plus Darwin for `mkstemp`) so
   `Tools/custom-command-test.swift` can compile them standalone — which is why the custom-command
-  confirmation gate lives in `AppCore` and not in the runner. All of `Core/Snippets/` compiles into
-  `Tools/snippets-test.swift` (the harness globs the directory), so the model, Markdown serializer,
+  confirmation gate lives in `AppCore` and not in the runner. All of `Features/Snippets/Model/` and
+  `Service/` compiles into `Tools/snippets-test.swift` (it globs both), so the model, Markdown serializer,
   template engine, repository and keyword policies stay Foundation-only, and the AppKit files there
-  keep their dependencies to what the harness can stub. `Core/SystemAction.swift` is also
+  keep their dependencies to what the harness can stub. `SystemActions/Model/SystemAction.swift` is also
   Foundation-only for `Tools/system-action-test.swift`; platform effects belong in
   `SystemActionRunner`, while confirmation and failure UI remain in `AppCore`.
-  `Core/VolumeLevel.swift` is the same split for `Tools/volume-test.swift` — the 5% step grid and the
+  `SystemActions/Model/VolumeLevel.swift` is the same split for `Tools/volume-test.swift` — the 5% step grid and the
   percentage string are pure Foundation, CoreAudio lives in `SystemActionRunner` and observation in
-  `VolumeState`, so both the HUD and the Set Volume slider walk one tested grid. `Core/WindowManagement/`
+  `VolumeState`, so both the HUD and the Set Volume slider walk one tested grid. `Features/WindowManagement/`
   splits the same way for `Tools/window-command-test.swift`: `WindowCommand.swift`, `WindowLayout.swift`
   and `WindowActionMemory.swift` stay Foundation + CoreGraphics and pure (no AX, no `NSScreen`, no
   clock — `WindowActionMemory` takes `now` as a parameter), while every `AXUIElement` call and the
@@ -118,8 +134,8 @@ Never break these without an explicit task to do so.
   `UninstallSelection`'s one intersection, not in the view. Tinycast also refuses to plan its own
   uninstall, compared against the **running** identity so the Dev channel refuses itself too.
   See [uninstall.md](docs/uninstall.md).
-- **Quicklinks are authored data, and their store never deletes.** `Core/Quicklinks/` splits like
-  `Core/Uninstall/`: `Quicklink.swift`, `QuicklinkDestination.swift`, `QuicklinkStore.swift` and
+- **Quicklinks are authored data, and their store never deletes.** `Quicklinks/Model/` splits like
+  `Uninstall/Model/`: `Quicklink.swift`, `QuicklinkDestination.swift`, `QuicklinkStore.swift` and
   `QuicklinkArchive.swift` stay Foundation-only (plus SQLite3) and pure for
   `Tools/quicklink-test.swift` — the home directory is injected, never read — while `QuicklinkLauncher`
   owns every `NSWorkspace` call and `QuicklinkArgumentSession` the prompt state. The database lives in
@@ -131,7 +147,7 @@ Never break these without an explicit task to do so.
   it opts a value out of the automatic percent-encoding a URL destination asks for. `{selectedText}`
   is accepted as an alias for `{selection}`, but nothing ever *writes* it. See
   [quicklinks.md](docs/quicklinks.md).
-- **`Core/SearchRelevance.swift` is Foundation-only and pure**, so `Tools/fuzz-test.swift` compiles
+- **`Launcher/Model/SearchRelevance.swift` is Foundation-only and pure**, so `Tools/fuzz-test.swift` compiles
   the shipped scorer rather than a copy of it. It owns both `FuzzyMatch` (the tiered
   exact/prefix/word-start/substring/subsequence scorer) and the field bands. **Searchable fields stay
   separate** — display name, Spotlight alternate names, bundle id, executable name are never flattened
@@ -184,13 +200,13 @@ Never break these without an explicit task to do so.
   is recognized by `DoubleTapMonitor` (Carbon cannot see a lone modifier at all). Its `Codable`
   conformance is the compatibility seam — a `.combo` must keep encoding as the bare
   `{"carbonKeyCode":N,"carbonModifiers":N}` record and decoding must keep trying that shape first, or
-  every existing binding and backup breaks. `Core/HotKey/DoubleTapModifier.swift` and
+  every existing binding and backup breaks. `HotKeys/Model/DoubleTapModifier.swift` and
   `DoubleTapDetector.swift` stay Foundation-only and pure with the clock injected as a parameter, for
   `Tools/hotkey-test.swift`; every `CGEvent` call lives in `DoubleTapMonitor.swift`, which is
   listen-only, installs *only* while something is bound to a double-tap, and never prompts for
   Accessibility. See [hotkeys.md](docs/hotkeys.md).
 - **Tinycast presents its own dialogs, never `NSAlert` / `NSSlider` / system popovers.** Every
-  confirmation, failure report and value prompt goes through `DialogController` (`Core/Dialog/`,
+  confirmation, failure report and value prompt goes through `DialogController` (`Windows/Dialog/`,
   owned by `AppCore`; reachable elsewhere via `AppCore.showNotice` / `confirm`). Presentation is
   `async`, so there is no nested run loop, and the presenter refuses a second dialog while one is up
   — that, not a flag, is what stops a held hotkey stacking dialogs. **↵ runs the primary action,
@@ -204,7 +220,7 @@ Never break these without an explicit task to do so.
   still carry a plain white button — as "Import executable commands?" does. Resolve every glyph
   through `SymbolImage`, not `Image(systemName:)`: some catalog symbols are bundled assets
   (`toggleBluetooth`). A button never prints its key cap; hovering it shows a `Tooltip`
-  (`Core/Tooltip.swift`) instead, styled like the palette's own keycap chips.
+  (`DesignSystem/Tooltip.swift`) instead, styled like the palette's own keycap chips.
 - **A transient readout is a HUD, not a dialog.** `VolumeHUDController`'s box is volume/mute only,
   since that one needs an actual level and number; every other success/info confirmation (system
   commands, Custom Commands, Snippets) goes through `MessageHUDController`'s pill, whose trailing
@@ -218,44 +234,84 @@ Never break these without an explicit task to do so.
   menu circle, `PopoverMenu`, a dialog's buttons. On a bare borderless panel it falls back to an
   opaque backing and shows as a dark edge. Both HUDs therefore use `black panelDimming` →
   `VisualEffectView()` → `clipShape`, exactly like a dialog.
-- **Read [`docs/ui.md`](docs/ui.md) before any restyle or new view.** `Core/Theme.swift` is the single
-  design-token source.
-- **`Core/EdgeDissolve.swift` and `Core/ThinScrollbar.swift` are off-limits.** Both are tuned by eye
-  against the palette's floating bars, so any edit is a visual regression. Do not touch them to fix a
+- **Read [`docs/ui.md`](docs/ui.md) before any restyle or new view.** `DesignSystem/Theme.swift` is the
+  single design-token source.
+- **`DesignSystem/Scrolling/EdgeDissolve.swift` and `DesignSystem/Scrolling/ThinScrollbar.swift` are
+  off-limits.** Both are tuned by eye against the palette's floating bars, so any edit is a visual regression. Do not touch them to fix a
   scroll bug, and never as a side effect of a restyle or refactor — needing to is the signal that the
   real fix belongs elsewhere (a scroll target, an inset, an intent). Edit either one only under an
   explicit task to change that look.
 
 ## Project Layout
 
-- `Tinycast/Core/` — managers, stores, windows, AppKit glue (no view bodies beyond hosting).
-  `Core/Calculator/` and `Core/Emoji/` are Foundation-only engines; `Core/Snippets/` is a
-  standalone-harness input in full (and owns the template engine both it and Quicklinks expand
-  through); `Core/WindowManagement/` is a pure geometry layer plus its one AX file; `Core/Uninstall/`
-  splits the same way — five pure files, one scanner, one Trash runner; `Core/Quicklinks/` is four
-  pure files plus the opener and the argument session;
-  `Core/Theme.swift` is the design-token source; `Core/HotKey/` is the in-house hotkey stack.
-- `Tinycast/Features/` — SwiftUI views: `RootPaletteView`, `Launcher/`, `Clipboard/`, `Calculator/`,
-  `Emoji/`, `Quicklinks/`, `Uninstall/`, `Settings/`, `About/`, `Onboarding/`, plus shared
-  `PopoverMenu`. Each
-  `SettingsTab` maps to
-  one `…SettingsView` built on the `SettingsPane` / `SettingsCard` scaffold in `SettingsComponents.swift`;
-  the four launcher-category panes (Applications, System Settings, System Actions, Commands) are thin
-  wrappers over the shared `LauncherItemsCard`.
-- `Tinycast/App/` — `@main` app + delegate.
+- `Tinycast/DesignSystem/` — the shared visual primitives: `Theme.swift` is the design-token source,
+  plus `KeyCapChip`, `Tooltip`, `SymbolImage`, `VisualEffectView`, `PopoverMenu`,
+  `SettingsComponents`, `Scrolling/` and `Interaction/`.
+- `Tinycast/Platform/` — the system shims: `Permissions`, `LaunchAtLogin`, `CursorScreen`,
+  `AppDisplayName`, `NotificationToken`, `AppPaths`, `Signposts` and `Images/`.
+- `Tinycast/Palette/` — the palette shell: `PalettePanel`, `PaletteWindowController`,
+  `RootPaletteView`, the `PaletteScreen` protocol, `PaletteCoordinator` and the `PaletteState` /
+  `PaletteMode` / `PasteTarget` state types.
+- `Tinycast/Windows/` — the non-palette AppKit surfaces: `AuxWindowController` (Settings, About,
+  Onboarding), `Dialog/` and `HUD/`, kept separate because a dialog asks and a HUD reports, plus
+  `About/`.
+- `Tinycast/Features/<Name>/` — one folder per feature, holding everything that feature owns:
+  `Launcher/`, `Clipboard/`, `Calculator/`, `Emoji/`, `Quicklinks/`, `Snippets/`, `Uninstall/`,
+  `SystemActions/`, `CustomCommands/`, `HotKeys/`, `Backup/`, `WindowManagement/`, `Onboarding/`.
+  Larger features split into `Model/` (pure — the standalone-harness inputs), `Service/` (effects:
+  stores, monitors, runners, AppKit glue), `UI/` (screens, views and the feature's coordinator) and
+  `Settings/` (its own panes). **A file under `Model/` may not import AppKit or SwiftUI** — that is
+  the checkable form of the purity invariants above. Small features stay flat.
+  `Features/PaletteRowIndex.swift` sits at the top level because the palette, not one feature, owns it.
+- `Tinycast/Features/Settings/` — the Settings shell only: `SettingsRootView`, `SettingsTab`,
+  `AppSettings`, and `Panes/` for the two panes no feature owns (General, Permissions). Every other
+  pane lives with its feature. Each `SettingsTab` maps to one `…SettingsView` built on the
+  `SettingsPane` / `SettingsCard` scaffold in `DesignSystem/SettingsComponents.swift`; the four
+  launcher-category panes (Applications, System Settings, System Actions, Commands) are thin wrappers
+  over the shared `LauncherItemsCard`.
+- `Tinycast/App/` — `@main` app, delegate and `AppCore`, the composition root.
 - `Tools/` — standalone test harnesses and the emoji generator.
 - `.github/workflows/release.yml` — the entire release pipeline (see `docs/development.md`).
 
-## Additional Documentation
+## Naming vocabulary
 
-- [`docs/architecture.md`](docs/architecture.md) — core ownership, windows, concurrency.
-- [`docs/palette.md`](docs/palette.md) — palette state flow, menu-open freeze, focus restoration.
-- [`docs/launcher.md`](docs/launcher.md) · [`docs/calculator.md`](docs/calculator.md) ·
-  [`docs/clipboard.md`](docs/clipboard.md) · [`docs/emoji.md`](docs/emoji.md) ·
-  [`docs/snippets.md`](docs/snippets.md) · [`docs/quicklinks.md`](docs/quicklinks.md) ·
-  [`docs/window-management.md`](docs/window-management.md) ·
-  [`docs/hotkeys.md`](docs/hotkeys.md) · [`docs/uninstall.md`](docs/uninstall.md) — subsystem
-  internals.
-- [`docs/ui.md`](docs/ui.md) — the full visual design system, tokens, scrollbars, section headers.
-- [`docs/development.md`](docs/development.md) — build, test, package, release.
-- [`docs/signing.md`](docs/signing.md) — signing model and Gatekeeper.
+A type's suffix says what it *is*. Each row below is a suffix, what it means, and — where the set is
+small enough to enumerate — every type that currently carries it, so a reader can tell a closed set
+from an open one. The table governs **top-level types**; a private nested helper is free to be named
+for its job.
+
+**A new type takes an existing suffix, or this table gains a row in the same commit.**
+
+| Suffix        | Means                                                          | Members                                                                        |
+| ------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `Store`       | Owns persisted state and publishes it                          | open (10)                                                                      |
+| `Coordinator` | A feature's action surface, called by `AppCore` and the palette | open (10)                                                                      |
+| `Controller`  | Owns one AppKit window or surface                              | open (5)                                                                       |
+| `Catalog`     | Pure static namespace over a built-in list                     | `CommandCatalog`, `EmojiCatalog`, `SystemActionCatalog`, `WindowCommandCatalog` |
+| `Index`       | A searchable collection, rebuilt as its inputs change          | `AppIndex`, `EmojiIndex`, `PaletteRowIndex`                                    |
+| `Runner`      | Performs one effectful operation on request                    | `ShellCommandRunner`, `SystemActionRunner`, `UninstallRunner`                   |
+| `Session`     | Transient state for one in-progress interaction                | `QuicklinkArgumentSession`, `ShortcutCaptureSession`, `UninstallSession`        |
+| `Policy`      | A pure decision — no state, no effects                         | the three `Snippet…Policy` types                                               |
+| `Engine`      | A pure evaluator: input → output                               | `CalcEngine`, `SnippetTemplateEngine`                                          |
+| `Monitor`     | Watches an external stream and reports changes; owns no policy | `DoubleTapMonitor`, `RunningAppsMonitor`                                       |
+| `Scanner`     | Reads the filesystem to produce candidates                     | `SettingsPaneScanner`, `UninstallScanner`                                      |
+| `State`       | Shared observable state that persists nothing itself           | `OnboardingState`, `PaletteState`, `VolumeState`                               |
+| `Manager`     | **Closed set of two.** Sole owner of a subsystem's lifecycle *and* its policy, started from `AppCore.start()`. Do not add a third — a new type wanting this suffix wants `Store`, `Monitor` or `Coordinator` instead. | `ClipboardManager`, `HotKeyManager` |
+
+`Manager` survives on two types because neither alternative is honest. `ClipboardManager` polls, but it
+also owns the capture policy (`sensitiveTypes`, `maxTextLength`, `internalType`, the disabled-apps
+filter) and the paste-side handshake, which the two real `Monitor`s do not. `HotKeyManager` persists
+bindings like a `Store`, but it also drives Carbon registration and double-tap dispatch.
+
+Exceptions, each earning its own word:
+
+- `Launcher` (`AppLauncher`, `QuicklinkLauncher`) — reserved synonym for an `NSWorkspace.open` wrapper.
+  Clearer than `Runner` for opening things.
+- `Repository` (`SnippetRepository`) — conflict-detecting, revision-checked file semantics that `Store`
+  does not imply.
+- `Center` (`HotKeyCenter`) — the Carbon registration layer specifically.
+- `Presenter` (`HUDPresenter`) — owns the one-at-a-time / auto-dismiss / fade policy for both HUDs.
+- Domain terms with no better alternative: `SnippetTextInjector`, `WindowMover`, `HyperKeyTap`.
+- `Registry` and `ViewModel` are retired: a static table is a `Catalog`, shared app state is a `State`.
+- SwiftUI-layer suffixes (`View`, `Screen`, `Card`, `Row`, `Sheet`) are a separate vocabulary and are
+  not governed by this table.

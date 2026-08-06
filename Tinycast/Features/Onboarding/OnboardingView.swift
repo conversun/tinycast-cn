@@ -5,9 +5,10 @@ import SwiftUI
 /// First-launch wizard: set the palette shortcut, offer Accessibility + launch-at-login, offer a Raycast import, then drop into the launcher. Re-runnable from Settings. Reuses the app's own controls (`ShortcutRecorder`, `SettingsCard`, `BackupActions`) so it looks and behaves like the rest of Tinycast.
 struct OnboardingView: View {
     @State private var step = 0
-    @StateObject private var model = OnboardingModel()
-    @ObservedObject private var settings = AppCore.shared.settings
-    @ObservedObject private var hotKeys = AppCore.shared.hotKeys
+    @State private var model = OnboardingModel()
+    @Environment(AppCore.self) private var core
+    @Environment(AppSettings.self) private var settings
+    @Environment(HotKeyManager.self) private var hotKeys
 
     @State private var accessibilityTrusted = Permissions.isAccessibilityTrusted()
     private let refreshTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -129,7 +130,8 @@ struct OnboardingView: View {
     }
 
     private var shortcutStep: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+        @Bindable var settings = settings
+        return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             SettingsCard {
                 SettingsRow(
                     title: "App Launcher",
@@ -284,7 +286,7 @@ struct OnboardingView: View {
         case 2 where !model.didImport:
             model.run()
         case Self.lastStep:
-            AppCore.shared.finishOnboarding()
+            core.paletteCoordinator.finishOnboarding()
         default:
             advance()
         }
@@ -350,18 +352,19 @@ struct OnboardingView: View {
 
 /// Owns the Raycast import step's state and the async import call, kept off the view so lifetimes are explicit and the body stays declarative.
 @MainActor
-final class OnboardingModel: ObservableObject {
+@Observable
+final class OnboardingModel {
     enum ImportStatus {
         case success(String)
         case failure(String)
     }
 
-    @Published var file: URL?
-    @Published var passphrase = ""
-    @Published var importing = false
-    @Published var status: ImportStatus?
-    @Published var selection: RaycastImportOptions = .all
-    @Published var format: RaycastFormat?
+    var file: URL?
+    var passphrase = ""
+    var importing = false
+    var status: ImportStatus?
+    var selection: RaycastImportOptions = .all
+    var format: RaycastFormat?
 
     var canImport: Bool { format != nil && !passphrase.isEmpty && !selection.isEmpty && !importing }
     var didImport: Bool {

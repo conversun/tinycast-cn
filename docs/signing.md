@@ -1,7 +1,7 @@
 # Signing
 
 Tinycast is signed with a **stable self-signed identity** called `Tinycast Self-Signed`. It's not an
-Apple Developer ID (there's no paid Apple account), but keeping the *same* identity on every build is
+Apple Developer ID (there's no paid Apple account), but keeping the _same_ identity on every build is
 what makes macOS remember the Accessibility permission across rebuilds and updates — ad-hoc signing
 changes every build and macOS forgets the grant.
 
