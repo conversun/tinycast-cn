@@ -2,6 +2,15 @@
 
 > **tinycast-cn** 是面向中文用户的分支：完成了全量简体中文界面汉化，为中文应用名新增全拼与首字母搜索，
 > 并基于上游发布版本构建 Universal（`arm64` + `x86_64`）安装包。产品名仍为 **Tinycast**。
+>
+> ```sh
+> brew trust --tap conversun/tinycast-cn   # 第三方 tap 需要先信任
+> brew tap conversun/tinycast-cn
+> brew install --cask tinycast-cn
+> ```
+>
+> 后续 `brew upgrade --cask tinycast-cn` 即可更新。装成 `Tinycast.app`，与上游 `tinycast`、
+> `tinycast-sequoia` 两个 cask 占用同一路径，因此三者互斥，只能装其一。
 
 A tiny, fully native macOS launcher — the essentials, without the bloat.
 
