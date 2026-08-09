@@ -5,9 +5,9 @@ struct LauncherList: View {
     let selectedID: AppEntry.ID?
     let favoriteCount: Int
     let showSections: Bool
-    /// Changes only when the list should scroll (keyboard nav / reset), so mouse selection never yanks the scroll position.
+    /// Changes only when the list should scroll, so mouse selection never yanks it.
     let scroll: ScrollIntent
-    /// Inline calculator answer; occupies flat selection index 0 when present (requires a non-empty query, so it never coexists with the sectioned view).
+    /// The inline answer, at flat index 0 when present; needs a non-empty query.
     var calc: CalcResult?
     var calcSelected = false
     var onActivateCalc: () -> Void = {}
@@ -34,7 +34,7 @@ struct LauncherList: View {
     /// Scroll target for the current selection.
     private var selectedRowID: String? { calcSelected ? Self.calcRowID : selectedID }
 
-    /// Whether the selection sits on flat index 0 — the calc card when present, else the first result.
+    /// Whether the selection sits on flat index 0: the calc card, else the first result.
     private var firstRowSelected: Bool {
         calc != nil ? calcSelected : selectedID != nil && selectedID == results.first?.id
     }
@@ -49,26 +49,20 @@ struct LauncherList: View {
         var rows: [Row] = calcRows
         let favorites = results.prefix(favoriteCount)
         let rest = results.dropFirst(favoriteCount)
-        // `rest` is apps, panes, quicklinks, snippets, system actions, window commands, custom
-        // commands, then built-in commands by the AppIndex sort invariant, so filtering by kind
-        // keeps row order identical and the flat selection index valid.
-        // Annotated: with this many sections the inference pass times out.
-        func section(_ kind: AppEntry.Kind) -> (String, [AppEntry]) {
-            (kind.descriptor.sectionTitle, rest.filter { $0.kind == kind })
+        var grouped: [AppEntry.Kind: [AppEntry]] = [:]
+        for app in rest { grouped[app.kind, default: []].append(app) }
+        if !favorites.isEmpty {
+            rows.append(.header("Favorites"))
+            rows.append(contentsOf: favorites.map(Row.app))
         }
-        let sections: [(String, [AppEntry])] = [
-            ("Favorites", Array(favorites)),
-            section(.application),
-            section(.systemSettings),
-            section(.quicklink),
-            section(.snippet),
-            section(.systemAction),
-            section(.windowCommand),
-            section(.customCommand),
-            section(.command)
+        // Publication order, so rows match the flat index.
+        let kinds: [AppEntry.Kind] = [
+            .application, .systemSettings, .quicklink, .snippet,
+            .systemAction, .windowCommand, .customCommand, .command
         ]
-        for (title, group) in sections where !group.isEmpty {
-            rows.append(.header(title))
+        for kind in kinds {
+            guard let group = grouped[kind], !group.isEmpty else { continue }
+            rows.append(.header(kind.descriptor.sectionTitle))
             rows.append(contentsOf: group.map(Row.app))
         }
         return rows
@@ -118,7 +112,7 @@ struct LauncherList: View {
                         case .top:
                             proxy.scrollToOrigin()
                         case .follow:
-                            // On the first row, snap to the origin so its section header shows too — a nil anchor won't, since the row is already visible.
+                            // Snap to the origin on the first row so its header shows too.
                             if firstRowSelected {
                                 proxy.scrollToOrigin()
                             } else if let selectedRowID {

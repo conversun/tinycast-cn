@@ -1,7 +1,7 @@
 import Foundation
 
 enum FuzzyMatch {
-    /// Everything but `.subsequence` is a literal hit — the query's own characters, contiguous — which is what lets `SearchRelevance` rank a declared alias above incidental letter soup.
+    /// All but `.subsequence` are literal hits: the query's own characters, contiguous.
     enum Tier: Sendable {
         case exact
         case prefix
@@ -17,15 +17,20 @@ enum FuzzyMatch {
         let score: Int
     }
 
-    /// A query folded once, so ranking a list doesn't re-fold the same string for every candidate field.
+    /// A query folded once, so ranking doesn't re-fold it for every candidate field.
     struct Query: Sendable {
         fileprivate let text: String
+        /// Folded once too: the subsequence pass needs random access on every candidate.
+        fileprivate let characters: [Character]
         var isEmpty: Bool { text.isEmpty }
 
-        init(_ raw: String) { text = FuzzyMatch.normalized(raw) }
+        init(_ raw: String) {
+            text = FuzzyMatch.normalized(raw)
+            characters = Array(text)
+        }
     }
 
-    /// Tiered relevance (higher is better), or nil when the query doesn't match; tiers are spaced so a better kind always wins.
+    /// Tiered relevance, or nil; tiers are spaced so a better kind always wins.
     static func match(query: String, candidate: String) -> Match? {
         match(Query(query), candidate: candidate)
     }
@@ -45,7 +50,7 @@ enum FuzzyMatch {
                 score: (atWordStart ? 80_000 : 70_000) - c.count)
         }
 
-        guard let sub = subsequenceScore(Array(q), Array(c)) else { return nil }
+        guard let sub = subsequenceScore(query.characters, c) else { return nil }
         return Match(tier: .subsequence, score: sub)
     }
 
@@ -54,11 +59,16 @@ enum FuzzyMatch {
         match(query: query, candidate: candidate)?.score
     }
 
-    /// The widest score `match` can return; `SearchRelevance` sizes its bands off this so they never overlap.
+    /// The widest score `match` returns; the bands are sized off it so they never overlap.
     static let maximumScore = 100_000
 
-    /// App metadata can contain invisible bidirectional/zero-width format scalars (WhatsApp's display name starts with U+200E); they must not demote an otherwise-visible prefix match.
+    /// No scalar below U+00AD is `.format`, so ASCII names skip the rebuild and the ICU lookup.
     private static func normalized(_ value: String) -> String {
+        guard value.unicodeScalars.contains(where: { $0.value >= 0xAD }) else {
+            return value.lowercased()
+        }
+        guard value.unicodeScalars.contains(where: { $0.properties.generalCategory == .format })
+        else { return value.lowercased() }
         let scalars = value.unicodeScalars.filter {
             $0.properties.generalCategory != .format
         }
@@ -71,29 +81,35 @@ enum FuzzyMatch {
         return !before.isLetter && !before.isNumber
     }
 
-    /// Subsequence match with bonuses for consecutive hits and word boundaries, or nil when `q` isn't a subsequence of `c`.
-    private static func subsequenceScore(_ q: [Character], _ c: [Character]) -> Int? {
+    /// Walks in place, carrying the previous character: `Array(c)` was an allocation per keystroke.
+    private static func subsequenceScore(_ q: [Character], _ c: String) -> Int? {
         var qi = 0
         var score = 0
         var run = 0
         var prev = -2
-        for (ci, ch) in c.enumerated() where qi < q.count && ch == q[qi] {
-            var bonus = 1
-            if ci == prev + 1 {
-                run += 1
-                bonus += run * 3
-            } else {
-                run = 0
+        var ci = 0
+        var previous: Character?
+        for ch in c {
+            if qi < q.count, ch == q[qi] {
+                var bonus = 1
+                if ci == prev + 1 {
+                    run += 1
+                    bonus += run * 3
+                } else {
+                    run = 0
+                }
+                if ci == 0 {
+                    bonus += 12
+                } else if let previous, !previous.isLetter, !previous.isNumber {
+                    bonus += 8
+                }
+                score += bonus
+                prev = ci
+                qi += 1
+                if qi == q.count { break }
             }
-            if ci == 0 {
-                bonus += 12
-            } else {
-                let before = c[ci - 1]
-                if !before.isLetter && !before.isNumber { bonus += 8 }
-            }
-            score += bonus
-            prev = ci
-            qi += 1
+            previous = ch
+            ci += 1
         }
         guard qi == q.count else { return nil }
         return score
@@ -102,7 +118,7 @@ enum FuzzyMatch {
 
 /// Never flatten these into one string — which field matched is what picks the band.
 struct SearchFields: Sendable {
-    /// The display name, plus anything identifying the entry just as strongly — a snippet's expansion keyword.
+    /// The display name, plus anything identifying the entry just as strongly.
     var names: [String]
     /// Spotlight's `kMDItemAlternateNames`: `iBooks`, `Codex`, `浏览器`.
     var alternateNames: [String] = []
@@ -113,7 +129,7 @@ struct SearchFields: Sendable {
 }
 
 enum SearchRelevance {
-    /// One band per (field, match strength): a literal hit on a weaker field outranks a subsequence hit on a stronger one, so a declared alias beats letter soup, while at equal strength the display name wins.
+    /// One band per field and match strength; a literal hit on a weaker field still wins.
     private enum Band: Int {
         case executableName = 0
         case bundleID = 1
@@ -125,7 +141,7 @@ enum SearchRelevance {
         var offset: Int { rawValue * SearchRelevance.bandStride }
     }
 
-    /// An order of magnitude above `FuzzyMatch`'s range and two above `LauncherRankingStore`'s boost cap, so a learned boost reorders inside a band but never lifts a result out of one.
+    /// Wide enough that a learned boost reorders inside a band, never out of one.
     static let bandStride = 10 * FuzzyMatch.maximumScore
 
     /// Docked from a transliterated match so it ranks under the literal match of the same kind. Stays above `LauncherRankingStore`'s boost cap, or learned ranking could lift a reading back over the name it sits under.
@@ -140,7 +156,7 @@ enum SearchRelevance {
 
         func consider(_ candidate: String, literal: Band, subsequence: Band?) {
             guard let match = FuzzyMatch.match(query, candidate: candidate) else { return }
-            // Identifier fields pass no subsequence band: "cop" ⊂ "com.apple.Photos" would change *which* apps appear, not just their order.
+            // No subsequence band on identifiers: it would change which apps appear at all.
             guard let band = match.tier.isLiteral ? literal : subsequence else { return }
             best = max(best ?? Int.min, band.offset + match.score)
         }
@@ -171,7 +187,7 @@ enum SearchRelevance {
         return best
     }
 
-    /// `apple.Photos` for `com.apple.Photos` — the leading reverse-DNS component carries no identity, and `com` alone prefixes nearly every installed app.
+    /// Drops the leading reverse-DNS component, which prefixes nearly every installed app.
     private static func identifyingPart(of bundleID: String) -> String {
         guard let dot = bundleID.firstIndex(of: ".") else { return bundleID }
         return String(bundleID[bundleID.index(after: dot)...])
@@ -179,7 +195,7 @@ enum SearchRelevance {
 }
 
 extension SearchFields {
-    /// Spotlight mixes junk in with the real aliases — every bundle lists its own `<Name>.app`, some repeat the display name — and indexing that makes `app` match everything.
+    /// Spotlight mixes junk in with the real aliases; indexing it makes `app` match all.
     static func usableAlternateNames(
         _ raw: [String], displayName: String, fileName: String
     ) -> [String] {
@@ -198,7 +214,7 @@ extension SearchFields {
         name.hasSuffix(".app") ? String(name.dropLast(4)) : name
     }
 
-    /// A lone SCREAMING_SNAKE token is an untranslated localization placeholder; `ALTERNATE_NAME_1` really ships on Home, Journal, Maps, Passwords and Weather.
+    /// A lone SCREAMING_SNAKE token is an untranslated placeholder, and several ship.
     private static func isPlaceholder(_ name: String) -> Bool {
         name.contains("_") && !name.contains(where: { $0.isLowercase || $0.isWhitespace })
     }

@@ -1,15 +1,15 @@
 import Foundation
 
-/// Reads a Raycast `.rayconfig` into the subset Tinycast supports, dispatching on the detected format. Neither reader is ever tried as a fallback for the other, so a wrong passphrase reports a wrong passphrase instead of "not a Raycast file". Both decrypts are CPU-heavy, so run this off the main actor.
+/// Reads a `.rayconfig`, dispatching on format. See docs/features/raycast-import.md.
 enum RaycastImport {
     struct Result {
         var backup: SettingsBackup
         var clipboard: [ClipboardItem]
         var snippets: [Snippet]
-        /// Image clips whose referenced file no longer exists on disk (reported so the UI can note them).
+        /// Image clips whose file no longer exists, reported so the UI can note them.
         var missingImages: Int
 
-        /// A copy trimmed to the chosen categories; `apply()` is already per-field non-destructive, so dropping a field is enough to skip it.
+        /// Trimmed to the chosen categories; `apply()` being per-field, dropping is enough.
         func selecting(_ options: RaycastImportOptions) -> Result {
             var trimmed = SettingsBackup()
             if options.contains(.shortcuts) { trimmed.hotkeys = backup.hotkeys }
@@ -50,10 +50,6 @@ enum RaycastImport {
                 }
                 if let key = backup.settings?.hyperKey {
                     settings.hyperKey = key
-                    hasSettings = true
-                }
-                if let glyph = backup.settings?.hyperKeyReplacesGlyph {
-                    settings.hyperKeyReplacesGlyph = glyph
                     hasSettings = true
                 }
             }

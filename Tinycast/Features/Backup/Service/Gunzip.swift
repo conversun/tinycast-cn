@@ -3,9 +3,9 @@ import Foundation
 
 enum GunzipError: Error { case notGzip, corrupt }
 
-/// Decompresses a gzip (RFC 1952) stream. Apple's `Compression` framework only speaks raw DEFLATE, so we parse and strip the gzip header/trailer ourselves and stream-inflate the payload — no zlib linkage or build-system changes.
+/// Gzip (RFC 1952); `Compression` speaks raw DEFLATE, so the wrapper is parsed here.
 enum Gunzip {
-    // Real Raycast exports are a few KB; cap inflated output so a hand-crafted gzip bomb in the import picker can't OOM the app (the outer envelope is inflated before any authentication).
+    // Cap inflated output: the outer envelope inflates before any authentication.
     static let defaultMaxOutput = 64 * 1024 * 1024
 
     static func decompress(_ data: Data, maxOutput: Int = defaultMaxOutput) throws -> Data {
@@ -24,7 +24,7 @@ enum Gunzip {
         if flags & 0x10 != 0 { index = try skipCString(bytes, from: index) }  // FCOMMENT
         if flags & 0x02 != 0 { index += 2 }  // FHCRC
         guard index < bytes.count - 8 else { throw GunzipError.corrupt }
-        // Slice `bytes`, not `data`: `index` is relative to that zero-based copy, while `data` may be a slice whose own indices start elsewhere (`subdata(in:)` would then read out of bounds and trap).
+        // Slice `bytes`, not `data`: `data` may be a slice whose indices start elsewhere.
         return try rawInflate(Data(bytes[index..<(bytes.count - 8)]), maxOutput: maxOutput)
     }
 
@@ -42,7 +42,7 @@ enum Gunzip {
         let dst = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
         defer { dst.deallocate() }
 
-        // The C struct has no zero-arg init; placeholder pointers are overwritten before processing.
+        // The C struct has no zero-arg init; the placeholders are overwritten first.
         var stream = compression_stream(
             dst_ptr: dst, dst_size: bufferSize, src_ptr: dst, src_size: 0, state: nil)
         guard

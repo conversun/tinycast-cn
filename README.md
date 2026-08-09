@@ -17,7 +17,6 @@ A tiny, fully native macOS launcher — the essentials, without the bloat.
          src="https://img.shields.io/badge/License-AGPL--3.0-3DA639?style=flat"></a>
 </p>
 
-<!-- Screenshot placeholder — drop the real image at docs/screenshot.png -->
 <p align="center">
   <img src="docs/screenshot.png" alt="Tinycast command palette" width="720">
 </p>
@@ -71,8 +70,9 @@ disabled, and keystrokes are matched locally, never stored and never sent anywhe
 
 ## Building from source
 
-See **[docs/development.md](docs/development.md)** for the toolchain, build, packaging, release,
-and website workflows, and **[docs/ui.md](docs/ui.md)** for the UI design system.
+See **[docs/development.md](docs/development.md)** for the toolchain, build, packaging, release and
+website workflows. **[docs/](docs/README.md)** indexes everything else — architecture, engineering
+standards, the design system and one document per feature.
 
 ## Contributing
 

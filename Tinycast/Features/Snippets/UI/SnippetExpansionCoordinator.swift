@@ -40,7 +40,7 @@ final class SnippetExpansionCoordinator {
         NSWorkspace.shared.open(store.snippetsDirectory)
     }
 
-    /// The pane's switch funnels through here so enabling — which is also keyword-expansion consent — confirms first. The settings sink then reconciles the store, listener and launcher presence.
+    /// The switch funnels here so enabling, which is also consent, confirms first.
     func setSnippetsEnabled(_ enabled: Bool) {
         guard enabled != settings.snippetsEnabled else { return }
         if !enabled {
@@ -74,11 +74,11 @@ final class SnippetExpansionCoordinator {
         appIndex.updateSnippets(visible ? store.snippets : [])
     }
 
-    /// Reconciles everything the snippets switch owns. Off tears down in dependency order; hotkey-free, so nothing else needs unwinding.
+    /// Reconciles everything the switch owns; off tears down in dependency order.
     func applySnippetsEnabled() {
         if settings.snippetsEnabled {
             Task { await store.start() }
-            // A stop/start round-trip over an unchanged library publishes no snapshot, so re-project the records the store already holds.
+            // An unchanged library publishes no snapshot, so re-project what the store holds.
             applySnippetsLauncherPresence()
             startSnippetKeywordListener()
             return
@@ -91,11 +91,11 @@ final class SnippetExpansionCoordinator {
 
     // MARK: - Expansion
 
-    /// How far back `{clipboard offset=N}` can reach; deeper offsets aren't a snippet idiom and this keeps the per-expansion sort trivial.
+    /// How far back `{clipboard offset=N}` reaches; deeper isn't a snippet idiom.
     private static let clipboardHistoryDepth = 20
 
     func startSnippetKeywordListener() {
-        // `beginAutomaticExpansion` is the gate: it re-checks consent, permission, Secure Event Input and the target on the injector side, so this callback doesn't duplicate it.
+        // `beginAutomaticExpansion` is the gate, so this callback doesn't re-check anything.
         listener.start { [weak self] id, keyword, keywordLength, targetApp in
             guard let self,
                 let generation = self.injector.beginAutomaticExpansion(
@@ -110,7 +110,7 @@ final class SnippetExpansionCoordinator {
         }
     }
 
-    /// Recent text copies, newest first, for `{clipboard offset=N}`. The live pasteboard leads because the poller may not have recorded the newest copy yet.
+    /// Recent copies, newest first; the live pasteboard leads, the poller may lag behind.
     func clipboardHistoryForExpansion() -> [String] {
         var history = clipboardStore.items
             .filter { $0.kind == .text }
@@ -137,7 +137,7 @@ final class SnippetExpansionCoordinator {
                 targetApp: targetApp)
             return
         }
-        // The automatic path was gated by `beginAutomaticExpansion` in the same turn, and `deliver` gates both again. Only the interactive path needs a check here: it must fail before the argument prompt, not after it.
+        // Only the interactive path needs this: it must fail before the prompt, not after.
         if automaticGeneration == nil {
             guard injector.prepareInteractiveExpansion(targetApp: targetApp) else { return }
         }
@@ -183,9 +183,10 @@ final class SnippetExpansionCoordinator {
         automaticGeneration: UInt?,
         confirmation: String?
     ) {
-        guard let arguments = SnippetArgumentsPrompt.run(
-            snippetName: record.snippet.name,
-            arguments: missingArgs)
+        guard
+            let arguments = SnippetArgumentsPrompt.run(
+                snippetName: record.snippet.name,
+                arguments: missingArgs)
         else {
             injector.cancelArgumentPrompt(
                 automaticGeneration: automaticGeneration,

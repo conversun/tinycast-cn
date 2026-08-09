@@ -1,11 +1,11 @@
 import AppKit
 
-/// Caches app icons by file path, downsampled to a small fixed bitmap and byte-bounded, so list rows don't re-hit `NSWorkspace` or balloon memory.
+/// App icons by path, downsampled and byte-bounded, so rows don't re-hit `NSWorkspace`.
 enum IconCache {
-    /// `NSCache` is thread-safe but not `Sendable`, so a detached decode populating what the main actor reads needs the guarantee asserted once here.
+    /// `NSCache` is thread-safe but not `Sendable`, so assert the guarantee once here.
     private final class Cache: NSCache<NSString, NSImage>, @unchecked Sendable {}
 
-    // 48pt (2× Retina) is plenty for the ≤24pt draw size, and keeping each icon small caps launcher memory since a scrolled `LazyVStack` pins every row's icon.
+    // Plenty for the ≤24pt draw, and a scrolled `LazyVStack` pins every row's icon.
     private static let displayPixel: CGFloat = 48
 
     private static let cache: Cache = {
@@ -23,7 +23,7 @@ enum IconCache {
     /// A freshly-decoded, thereafter-immutable `NSImage` is safe to move across the actor boundary.
     private struct Decoded: @unchecked Sendable { let image: NSImage? }
 
-    /// Return the decode directly (not a cache re-read) so an `NSCache` purge mid-decode can't strand a row on its placeholder. A missing path returns nil — not `NSWorkspace`'s broken-document icon — and never caches, so an uninstalled app can't leave a broken icon behind.
+    /// Returns the decode directly, so a purge mid-decode can't strand a placeholder.
     static func loadAsync(forFile path: String) async -> NSImage? {
         if let cached = cached(forFile: path) { return cached }
         return await Task.detached(priority: .userInitiated) { () -> Decoded in
@@ -46,7 +46,7 @@ enum IconCache {
         return icon
     }
 
-    /// Command "icons": an SF Symbol on a rounded tile, in the same bitmap shape as app icons so rows treat every entry identically.
+    /// Command icons: a symbol on a tile, in the same shape as a real app icon.
     static func symbolIcon(named name: String) -> NSImage {
         let key = "symbol:" + name as NSString
         if let cached = cache.object(forKey: key) { return cached }
@@ -72,16 +72,17 @@ enum IconCache {
         return icon
     }
 
-    /// Most tiles draw an SF Symbol, pre-tinted via `SymbolConfiguration`; names SF Symbols lacks (Bluetooth, a SIG trademark) fall back to a template asset tinted by compositing.
+    /// Symbols where they exist; the names SF Symbols lacks fall back to template assets.
     private static func glyph(named name: String, tint: NSColor) -> NSImage? {
         let config = NSImage.SymbolConfiguration(pointSize: 21, weight: .medium)
             .applying(.init(paletteColors: [tint]))
         if let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(config) {
+            .withSymbolConfiguration(config)
+        {
             return symbol
         }
         guard let asset = NSImage(named: name) else { return nil }
-        // A 24pt box lands the asset's ink at the ~22pt optical height the SF Symbols above draw at pointSize 21.
+        // A 24pt box lands the asset's ink at the symbols' ~22pt optical height.
         let assetSize = NSSize(width: 24, height: 24)
         return NSImage(size: assetSize, flipped: false) { rect in
             asset.draw(in: rect)
@@ -91,8 +92,7 @@ enum IconCache {
         }
     }
 
-    /// The share of its square canvas a macOS **app** icon paints. Measured: folders paint 98% of the
-    /// width and documents 69%, so a column mixing types reads ragged until they're scaled to match.
+    /// The share of its canvas an app icon paints; folders and documents differ, so scale.
     private static let artworkExtent: CGFloat = 0.83
 
     /// Cache-only lookup for `loadFittedAsync`.
@@ -100,8 +100,7 @@ enum IconCache {
         cache.object(forKey: fittedKey(path))
     }
 
-    /// Like `loadAsync`, but normalized so the painted artwork spans `artworkExtent` whatever the file
-    /// type. An app icon comes back untouched; a folder or document shrinks to the same visual size.
+    /// Like `loadAsync`, normalized so every file type paints to the same visual size.
     static func loadFittedAsync(forFile path: String) async -> NSImage? {
         if let cached = cachedFitted(forFile: path) { return cached }
         return await Task.detached(priority: .userInitiated) { () -> Decoded in
@@ -116,8 +115,7 @@ enum IconCache {
         let key = fittedKey(path)
         if let cached = cache.object(forKey: key) { return cached }
         let source = NSWorkspace.shared.icon(forFile: path)
-        // Drawing the source into a `side`-square box makes its artwork span `side * extent`; solving
-        // for `side * extent == displayPixel * artworkExtent` leaves an app icon exactly as it was.
+        // Solving `side * extent == displayPixel * artworkExtent` leaves an app icon as-is.
         let extent = paintedExtent(source) ?? artworkExtent
         let side = displayPixel * artworkExtent / extent
         let inset = (displayPixel - side) / 2
@@ -127,9 +125,7 @@ enum IconCache {
         return icon
     }
 
-    /// The larger dimension of the icon's non-transparent artwork, as a fraction of its canvas.
-    /// Measured at the raster's own 2× resolution: a 1× grid smears antialiased edges into the
-    /// bounding box and over-reads the extent, which would shrink app icons that should stay put.
+    /// The artwork's larger dimension, measured at 2×: a 1× grid over-reads the extent.
     private static func paintedExtent(_ source: NSImage) -> CGFloat? {
         let pixels = Int(displayPixel * 2)
         guard
@@ -163,14 +159,15 @@ enum IconCache {
         return CGFloat(side) / CGFloat(pixels)
     }
 
-    /// Rasterize the multi-rep workspace icon into one `displayPixel`-square bitmap, returning it and its decoded byte cost.
+    /// Rasterize the multi-rep icon into one square bitmap, with its decoded byte cost.
     private static func downsampled(_ source: NSImage) -> (NSImage, Int) {
-        rasterized(source, into: NSRect(origin: .zero, size: NSSize(width: displayPixel, height: displayPixel)))
+        rasterized(
+            source, into: NSRect(origin: .zero, size: NSSize(width: displayPixel, height: displayPixel)))
     }
 
     /// Draws `source` into `frame` on a `displayPixel`-square canvas.
     private static func rasterized(_ source: NSImage, into frame: NSRect) -> (NSImage, Int) {
-        // Fixed 2× (not `NSScreen.main`, which is main-thread-only) so this can rasterize on a detached decode; 96px covers the ≤24pt draw on any display.
+        // Fixed 2×, `NSScreen.main` being main-thread-only, so a detached decode works.
         let pixels = Int(displayPixel * 2)
         let fallbackCost = Int(displayPixel * displayPixel * 4)
         guard

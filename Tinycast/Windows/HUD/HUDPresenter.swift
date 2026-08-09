@@ -1,8 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Everything the two HUDs agree on: one panel at a time, replace rather than stack, fade in, dwell,
-/// fade away. What they don't share — content, anchor, dwell — is what the initializer takes.
+/// What both HUDs agree on: one at a time, replace, fade, dwell, fade away.
 @MainActor
 final class HUDPresenter {
     /// Where the panel sits above the bottom of the visible frame.
@@ -23,17 +22,17 @@ final class HUDPresenter {
         self.screen = screen
     }
 
-    /// Replaces whatever is up. `size` nil lets SwiftUI measure, which is how the pill tracks its message.
+    /// Replaces whatever is up; a nil `size` lets SwiftUI measure, as the pill needs.
     func show(_ view: some View, size: CGSize? = nil) {
         let panel = panel ?? make()
         let host = NSHostingView(rootView: view)
-        // Never size from `host.frame` after attaching: AppKit resets it to the window's content rect, zero on a fresh panel, and a zero-width window "centers" with its leading edge on the midline.
+        // Never size from `host.frame` after attaching: AppKit resets it to the content rect.
         let content = size ?? host.fittingSize
         host.setFrameSize(content)
         panel.setContentSize(content)
         panel.contentView = host
         place(panel)
-        // A panel already on screen may be mid-fade; bring it back rather than starting a second one.
+        // A panel on screen may be mid-fade, so bring it back rather than start another.
         if panel.isVisible {
             panel.cancelFade()
         } else {
@@ -42,7 +41,7 @@ final class HUDPresenter {
         scheduleDismissal()
     }
 
-    /// Re-arms the dismissal for content that updates through an observable, so a repeat extends rather than replays.
+    /// Re-arms the dismissal, so a repeat extends the dwell rather than replaying it.
     func extend() {
         guard let panel, panel.isVisible else { return }
         panel.cancelFade()

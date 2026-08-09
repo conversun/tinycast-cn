@@ -1,6 +1,6 @@
 import Carbon.HIToolbox
 
-/// C entry point for the Carbon handler: the owning `HotKeyCenter` rides in `userData`, and since Carbon dispatches on the main thread the `EventRef` is decoded to a plain `EventHotKeyID` before `assumeIsolated` crosses into actor code.
+/// C entry point: decode the `EventRef` to a plain value before crossing into actor code.
 private func hotKeyCarbonEventHandler(
     _: EventHandlerCallRef?, event: EventRef?, userData: UnsafeMutableRawPointer?
 ) -> OSStatus {
@@ -20,7 +20,7 @@ private func hotKeyCarbonEventHandler(
     return MainActor.assumeIsolated { center.handle(hotKeyID) }
 }
 
-/// The Carbon layer only: turns `KeyShortcut`s into system-wide `RegisterEventHotKey` registrations routed to closures (which shortcuts exist is `HotKeyManager`'s business).
+/// The Carbon layer only; which shortcuts exist is `HotKeyManager`'s business.
 @MainActor
 final class HotKeyCenter {
     private struct Entry {
@@ -30,14 +30,14 @@ final class HotKeyCenter {
         var ref: EventHotKeyRef?
     }
 
-    /// Live registrations keyed by the caller's stable id, plus the reverse lookup the Carbon callback needs (it only gets the numeric `EventHotKeyID`).
+    /// Live registrations by stable id, plus the reverse lookup the Carbon callback needs.
     private var entries: [String: Entry] = [:]
     private var idToKey: [UInt32: String] = [:]
     private var nextCarbonID: UInt32 = 0
     private var eventHandler: EventHandlerRef?
     private let signature: OSType = 0x5459_4354  // FourCC "TYCT"
 
-    /// While `true` every hotkey is soft-unregistered (entries stay, system registrations go), so a recorder can capture combos without triggering them.
+    /// While true every hotkey is soft-unregistered, so a recorder can capture combos.
     var isPaused = false {
         didSet {
             guard isPaused != oldValue else { return }
@@ -47,7 +47,7 @@ final class HotKeyCenter {
         }
     }
 
-    /// Registers (or re-registers) `shortcut` under `id`, dropping any previous registration first so changing a binding never leaks the old combo.
+    /// Registers `shortcut` under `id`, dropping any previous one so no combo leaks.
     func register(id: String, shortcut: KeyShortcut, onKeyDown: @escaping () -> Void) {
         unregister(id: id)
         nextCarbonID += 1
@@ -75,7 +75,7 @@ final class HotKeyCenter {
             0,
             &ref
         )
-        // Registration can fail if another app owns the combo system-wide; the binding stays visible in settings but doesn't fire — same as the old package.
+        // Another app may own the combo; the binding stays visible but doesn't fire.
         guard error == noErr, let ref else {
             NSLog("Tinycast: could not register hotkey for %@ (OSStatus %d)", id, error)
             return

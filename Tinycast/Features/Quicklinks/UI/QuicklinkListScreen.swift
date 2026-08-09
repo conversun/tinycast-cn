@@ -90,9 +90,7 @@ enum QuicklinkActionsMenu {
                 core.quicklinkCoordinator.openQuicklink(id: quicklink.id)
             }
         ]
-        // `PopoverMenu` is a flat list with no picker, so choosing an *arbitrary* app belongs to the
-        // editor, which has one. What the palette can usefully offer is the one alternative that
-        // always exists: bypass the saved app and use the system handler, once.
+        // A flat menu has no picker, so the palette offers only the system-handler bypass.
         if quicklink.openWithBundleID != nil {
             items.append(
                 PopoverMenuItem(
@@ -113,8 +111,9 @@ enum QuicklinkActionsMenu {
             })
         items.append(
             quicklink.isPinned
-                ? PopoverMenuItem(title: "Unpin Quicklink", systemImage: "pin.slash", shortcut: "⌘P")
-                { core.quicklinkCoordinator.toggleQuicklinkPinned(id: quicklink.id) }
+                ? PopoverMenuItem(title: "Unpin Quicklink", systemImage: "pin.slash", shortcut: "⌘P") {
+                    core.quicklinkCoordinator.toggleQuicklinkPinned(id: quicklink.id)
+                }
                 : PopoverMenuItem(title: "Pin Quicklink", systemImage: "pin", shortcut: "⌘P") {
                     core.quicklinkCoordinator.toggleQuicklinkPinned(id: quicklink.id)
                 })
@@ -124,12 +123,13 @@ enum QuicklinkActionsMenu {
                     ? "Hide from Root Search" : "Show in Root Search",
                 systemImage: quicklink.showsInRootSearch ? "eye.slash" : "eye"
             ) {
-                core.quicklinkCoordinator.setQuicklinkShowsInRootSearch(!quicklink.showsInRootSearch, id: quicklink.id)
+                core.quicklinkCoordinator.setQuicklinkShowsInRootSearch(
+                    !quicklink.showsInRootSearch, id: quicklink.id)
             })
-        // Revealing only makes sense once the destination is a real path — a template's isn't known
-        // until it expands, and a URL has no file to show.
+        // Revealing needs a real path, which a template lacks until it expands.
         if case .path(let path)? = QuicklinkDestination.detect(quicklink.link),
-            !QuicklinkDestination.containsPlaceholder(quicklink.link) {
+            !QuicklinkDestination.containsPlaceholder(quicklink.link)
+        {
             items.append(
                 PopoverMenuItem(title: "Show in Finder", systemImage: "folder", shortcut: "⌘F") {
                     core.paletteCoordinator.hidePalette(restoreFocus: false)

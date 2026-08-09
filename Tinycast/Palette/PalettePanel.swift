@@ -4,28 +4,55 @@ import SwiftUI
 
 /// Borderless floating panel that hosts the SwiftUI command palette.
 final class PalettePanel: NSPanel {
-    /// Called for a bare backspace before it reaches the field editor (return true to consume); the field editor swallows plain backspace itself, so SwiftUI `onKeyPress` up the hierarchy never sees it.
+    /// Bare backspace, which the field editor swallows before `onKeyPress` could see it.
     var onBareBackspace: (() -> Bool)?
-    /// Called for command-key chords before they reach the field editor; return true to consume the event. The field editor swallows some `⌘` chords (e.g. `⌘,`) before SwiftUI `.onKeyPress` can see them, and `LSUIElement` apps have no main menu to handle standard window equivalents like `⌘W`.
+    /// Command chords the field editor swallows, plus the ones no main menu handles.
     var onCommandShortcut: ((NSEvent) -> Bool)?
-    /// Arms the hover highlight from `sendEvent` — the one place both event streams pass through, so a keyboard-driven scroll under a still pointer never fires `.mouseMoved` and hover stays disarmed. Also carries the caret-hide hook fired when a footer menu opens.
+    /// Arms hover from `sendEvent`, the one place both event streams pass through.
     weak var paletteState: PaletteState? {
         didSet {
             paletteState?.onMenuOpenChanged = { [weak self] open in self?.setSearchCaretHidden(open) }
         }
     }
 
-    /// Keys that drive an open menu (navigate/activate/dismiss); they must reach SwiftUI's `onKeyPress` even while the menu freezes text editing.
+    /// Keys driving an open menu; they reach `onKeyPress` even while editing is frozen.
     private static let menuNavKeys: Set<Int> = [
         kVK_UpArrow, kVK_DownArrow, kVK_LeftArrow, kVK_RightArrow,
         kVK_Return, kVK_ANSI_KeypadEnter, kVK_Escape, kVK_Tab
     ]
 
-    /// Hide/show the caret on SwiftUI's *own* live field editor (the current first responder) without replacing it — SwiftUI force-casts the field editor to a private subclass, so vending our own crashes; we can only tune the existing one. The field never resigns first responder, so its text/placeholder never reflows.
+    /// ⌃N/⌃P/⌃F/⌃B respelled as their arrow, so the arrow handlers serve both spellings.
+    private static func emacsArrow(for event: NSEvent) -> NSEvent? {
+        guard event.modifierFlags.intersection([.command, .option, .control, .shift]) == .control
+        else { return nil }
+        let arrow: (key: KeyEquivalent, code: Int)
+        // Character chords, not key codes: Dvorak transposes the two.
+        switch event.charactersIgnoringModifiers?.lowercased() {
+        case "n": arrow = (.downArrow, kVK_DownArrow)
+        case "p": arrow = (.upArrow, kVK_UpArrow)
+        case "f": arrow = (.rightArrow, kVK_RightArrow)
+        case "b": arrow = (.leftArrow, kVK_LeftArrow)
+        default: return nil
+        }
+        let characters = String(arrow.key.character)
+        return NSEvent.keyEvent(
+            with: .keyDown,
+            location: event.locationInWindow,
+            modifierFlags: [.function, .numericPad],
+            timestamp: event.timestamp,
+            windowNumber: event.windowNumber,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: event.isARepeat,
+            keyCode: UInt16(arrow.code))
+    }
+
+    /// Caret hiding on SwiftUI's own field editor. docs/features/palette.md#menu-open-input-freeze
     private func setSearchCaretHidden(_ hidden: Bool) {
         guard let editor = firstResponder as? NSTextView else { return }
         editor.insertionPointColor = hidden ? .clear : .white
-        // Force an immediate redraw so the caret vanishes/returns on the menu toggle instead of waiting out the blink timer.
+        // Force a redraw so the caret flips at once rather than waiting out the blink timer.
         editor.updateInsertionPointStateAndRestartTimer(!hidden)
     }
 
@@ -35,20 +62,27 @@ final class PalettePanel: NSPanel {
         case .keyDown: paletteState?.hoverHighlightArmed = false
         default: break
         }
-        // A footer menu owns the keyboard: the search field stays first responder (no focus swap, so nothing reflows) with only its caret hidden; swallow text-editing keystrokes before the field editor consumes them, but let shortcut chords (⌘K, ⌘⌫) and menu-nav keys reach SwiftUI's onKeyPress.
+        // Before every other rule, so the arrows' own policies apply to the chords too.
+        if event.type == .keyDown, let arrow = Self.emacsArrow(for: event) {
+            sendEvent(arrow)
+            return
+        }
+        // A footer menu owns the keyboard. See docs/features/palette.md#menu-open-input-freeze.
         if event.type == .keyDown,
             paletteState?.menuOpen == true,
             event.modifierFlags.isDisjoint(with: [.command, .control]),
-            !Self.menuNavKeys.contains(Int(event.keyCode)) {
+            !Self.menuNavKeys.contains(Int(event.keyCode))
+        {
             return
         }
         if event.type == .keyDown,
             Int(event.keyCode) == kVK_Delete,
             event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
-            onBareBackspace?() == true {
+            onBareBackspace?() == true
+        {
             return
         }
-        // The field editor swallows some command chords (e.g. `⌘,`) before SwiftUI `.onKeyPress` can fire, and `LSUIElement` apps have no main menu for standard equivalents like `⌘W`. Let the controller own those so the rest still reach SwiftUI.
+        // The controller owns the chords the field editor or a missing main menu would eat.
         if event.type == .keyDown,
             event.modifierFlags.contains(.command),
             onCommandShortcut?(event) == true
@@ -80,7 +114,7 @@ final class PalettePanel: NSPanel {
 
         let hosting = NSHostingView(rootView: rootView)
         hosting.wantsLayer = true
-        // The controller owns the frame: without this the hosting view resizes the panel to fit the SwiftUI content, dropping the top edge on the first compact→expanded mount.
+        // The controller owns the frame; without this the top edge drifts on the swap.
         hosting.sizingOptions = []
         contentView = hosting
     }

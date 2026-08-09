@@ -10,12 +10,12 @@ struct ClipboardItem: Identifiable, Hashable, Sendable {
     let id: UUID
     let kind: Kind
     let text: String?
-    /// Absolute path to the image on disk. Files under the store's own `imagesDir` are owned (pruned/deleted with the row); external references (e.g. imported from another app's cache) are left untouched on delete.
+    /// Absolute path on disk; only files under `imagesDir` are ours to delete.
     let imagePath: String?
     let createdAt: Date
     /// Bundle ID of the app frontmost when the copy was captured (see `ClipboardManager.poll`).
     let sourceBundleID: String?
-    /// When the entry was pinned. Pinned entries lead the list in their own section, in pin order, and are exempt from retention pruning.
+    /// When the entry was pinned; pins lead the list and are exempt from pruning.
     let pinnedAt: Date?
 
     var isPinned: Bool { pinnedAt != nil }
@@ -45,7 +45,7 @@ struct ClipboardItem: Identifiable, Hashable, Sendable {
         self.pinnedAt = pinnedAt
     }
 
-    /// Copy with the two fields the store rewrites in place; the pin is stated outright because every rewrite either stamps it or drops the row back into the history.
+    /// Copy with the two fields the store rewrites; the pin is always stated outright.
     func with(createdAt: Date? = nil, pinnedAt: Date?) -> ClipboardItem {
         ClipboardItem(
             id: id, kind: kind, text: text, imagePath: imagePath,
@@ -53,13 +53,13 @@ struct ClipboardItem: Identifiable, Hashable, Sendable {
             pinnedAt: pinnedAt)
     }
 
-    /// Case-insensitive substring match — how the store filters without FTS: short queries, the no-database path, and the pinned block.
+    /// Case-insensitive substring match: how the store filters without FTS.
     func matches(_ query: String) -> Bool {
         text?.localizedCaseInsensitiveContains(query) ?? false
     }
 }
 
-/// How long clipboard history is kept before pruning; raw value is the age in days persisted to UserDefaults, and `forever` is -1 so an unset key (0) falls through to the default.
+/// Retention in days; `forever` is -1, so an unset key (0) falls through to the default.
 enum ClipboardRetention: Int, CaseIterable, Identifiable, Sendable {
     case day = 1
     case week = 7
@@ -88,11 +88,11 @@ enum ClipboardRetention: Int, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// SQLite-backed clipboard history (rows + trigram FTS5 index in `clipboard.sqlite3`, image blobs on disk), degrading to session-only in-memory history if the database can't be opened.
+/// SQLite-backed clipboard history. See docs/features/clipboard.md#store.
 @MainActor
 @Observable
 final class ClipboardStore {
-    /// Newest-first, pins included in place — `search` is the one place that lifts them to the head. Every pinned row is resident however old it is (`load` fetches them all; neither `trimWindow` nor `prune` drops one), which is what lets `search` match the pinned block in memory.
+    /// Newest-first with pins in place, every pin resident. docs/features/clipboard.md
     private(set) var items: [ClipboardItem] = [] {
         didSet {
             searchCache = nil
@@ -101,9 +101,9 @@ final class ClipboardStore {
     }
     var maxAge: TimeInterval = ClipboardRetention.threeMonths.maxAge
 
-    /// One-entry memo so repeated renders (e.g. arrow-key nav) for the same query reuse the FTS result instead of re-querying SQLite every frame; invalidated whenever `items` changes.
+    /// One-entry memo so repeated renders reuse the FTS result; cleared when `items` changes.
     @ObservationIgnored private var searchCache: (query: String, result: [ClipboardItem])?
-    /// Same memo for the empty query — every render reads the full display order, so the pinned/unpinned split runs once per mutation.
+    /// Same memo for the empty query, so the pinned split runs once per mutation.
     @ObservationIgnored private var orderedCache: [ClipboardItem]?
 
     private static let memoryWindow = 1000
@@ -142,14 +142,14 @@ final class ClipboardStore {
     @ObservationIgnored private var staleImagesStmt: OpaquePointer?
     @ObservationIgnored private var deleteStaleStmt: OpaquePointer?
 
-    /// `directory` defaults to the per-channel cache; `Tools/clipboard-test.swift` passes a throwaway one so a harness run can never reach a real history.
+    /// `directory` defaults to the per-channel cache; the harness passes a throwaway one.
     init(directory: URL? = nil) {
         let base = directory ?? Self.defaultDirectory
         imagesDir = base.appendingPathComponent("images", isDirectory: true)
         dbURL = base.appendingPathComponent("clipboard.sqlite3")
         try? FileManager.default.createDirectory(at: imagesDir, withIntermediateDirectories: true)
         if !openDatabase() {
-            // The database is a regenerable cache: discard a corrupt or outdated one and start over.
+            // A regenerable cache: discard a corrupt or outdated one and start over.
             closeDatabase()
             for suffix in ["", "-wal", "-shm"] {
                 try? FileManager.default.removeItem(atPath: dbURL.path + suffix)
@@ -158,7 +158,7 @@ final class ClipboardStore {
         }
     }
 
-    /// Under ~/Library/Caches/<bundle-id> since clipboard history is regenerable; "Clear History" is the durable control.
+    /// Under Caches, history being regenerable; "Clear History" is the durable control.
     private static var defaultDirectory: URL {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.tinycast.app"
         return FileManager.default
@@ -166,7 +166,7 @@ final class ClipboardStore {
             .appendingPathComponent(bundleID, isDirectory: true)
     }
 
-    // Isolated so teardown may touch the main-actor statement/db pointers; AppCore only ever releases the store on the main actor, so no hop.
+    // Isolated so teardown may touch the main-actor pointers; the release is already on main.
     isolated deinit {
         closeDatabase()
     }
@@ -190,7 +190,7 @@ final class ClipboardStore {
         prune()
     }
 
-    /// Rowid of the oldest unpinned row the in-memory window keeps — the floor `loadStmt` reads from. 0 (no floor, load everything) when the history is shorter than the window.
+    /// The floor rowid `loadStmt` reads from; 0 means no floor, so load everything.
     private func windowFloor() -> sqlite3_int64 {
         guard let stmt = windowFloorStmt else { return 0 }
         defer {
@@ -209,20 +209,20 @@ final class ClipboardStore {
     func addImage(_ data: Data, sourceBundleID: String?) {
         let url = imagesDir.appendingPathComponent(UUID().uuidString + ".png")
         let item = ClipboardItem(imagePath: url.path, sourceBundleID: sourceBundleID)
-        // The blob write is multi-MB disk I/O; only the row insert (a failed write inserts nothing) returns to the main actor.
+        // The blob write is multi-MB I/O; only the row insert returns to the main actor.
         Task.detached(priority: .utility) { [weak self] in
             guard (try? data.write(to: url, options: .atomic)) != nil else { return }
             await self?.insert(item)
         }
     }
 
-    /// Bulk-insert history from an external source (e.g. a Raycast import). Entries carry their original `createdAt` and image *paths* are stored as external references (zero-copy) — the store never owns or prunes files outside `imagesDir`. Dedups within the batch and against existing rows; imported items older than `maxAge` are pruned on reload.
+    /// Bulk-insert from an import: original timestamps, external image paths, deduped.
     func importEntries(_ entries: [ClipboardItem]) -> Int {
         guard let stmt = insertStmt else { return 0 }
         var seenText = Set<String>()
         var seenPath = Set<String>()
         var inserted = 0
-        // One transaction for the whole batch: ~1 WAL commit instead of one per row (dedup reads still see the in-progress inserts on this connection).
+        // One transaction for the batch: ~1 WAL commit rather than one per row.
         sqlite3_exec(db, "BEGIN", nil, nil, nil)
         // Oldest first so newest ends up with the highest rowid (load orders by rowid DESC).
         for item in entries.sorted(by: { $0.createdAt < $1.createdAt }) {
@@ -245,9 +245,9 @@ final class ClipboardStore {
         return inserted
     }
 
-    /// Move an item to the top of history (pasting/copying it from the palette re-recencies it, Raycast-style).
+    /// Move an item to the top; pasting or copying it from the palette re-recencies it.
     func promote(_ item: ClipboardItem) {
-        // A pinned row holds its place in the Pinned section, so re-recencying one would rewrite the row and its FTS entry for no visible change.
+        // A pinned row holds its place, so re-recencying it would rewrite for no change.
         guard !item.isPinned, items.first?.id != item.id else { return }
         reinsert(item.with(createdAt: Date(), pinnedAt: nil))
     }
@@ -284,19 +284,19 @@ final class ClipboardStore {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return orderedItems }
         if let searchCache, searchCache.query == q { return searchCache.result }
-        // Pins are matched in memory rather than taken from the FTS result: they are all resident (see `items`), and the statement's LIMIT would otherwise drop one out of a busy query's matches.
+        // Pins are matched in memory: all resident, and the LIMIT would otherwise drop one.
         let result = pinnedItems.filter { $0.matches(q) } + runSearch(q).filter { !$0.isPinned }
         searchCache = (q, result)
         return result
     }
 
-    /// Row index of `item` among the results for `query` — lets the palette keep its selection on a row that moved (pin toggle, promote) whether or not the search is filtered. Reads the same memoized result the list renders.
+    /// Row index of `item` for `query`, so the palette can follow a row that moved.
     func rowIndex(of item: ClipboardItem, in query: String) -> Int? {
         search(query).firstIndex { $0.id == item.id }
     }
 
     private func runSearch(_ q: String) -> [ClipboardItem] {
-        // Trigram FTS needs ≥3 characters; shorter queries (and the no-database path) fall back to filtering the in-memory window.
+        // Trigram FTS needs ≥3 characters; shorter queries filter the in-memory window.
         guard let stmt = searchStmt, q.count >= 3 else { return fallbackSearch(q) }
         let match = "\"" + q.replacingOccurrences(of: "\"", with: "\"\"") + "\""
         sqlite3_bind_text(stmt, 1, match, -1, SQLITE_TRANSIENT)
@@ -326,13 +326,13 @@ final class ClipboardStore {
         return result
     }
 
-    /// The Pinned section's contents in pin order, oldest pin first: a new pin joins the end of the section instead of displacing the ones already there.
+    /// The Pinned section in pin order, so a new pin joins the end rather than the head.
     private var pinnedItems: [ClipboardItem] {
         items.filter(\.isPinned)
             .sorted { ($0.pinnedAt ?? .distantFuture) < ($1.pinnedAt ?? .distantFuture) }
     }
 
-    /// The row keeps its place in the history and gains a stamp, which puts it at the head of the Pinned section.
+    /// The row keeps its place and gains a stamp, which heads the Pinned section.
     private func pin(_ item: ClipboardItem) {
         let stamp = Date()
         let pinned = item.with(pinnedAt: stamp)
@@ -346,21 +346,21 @@ final class ClipboardStore {
         if let index = items.firstIndex(where: { $0.id == item.id }) {
             items[index] = pinned
         } else {
-            // Pinned from an FTS hit older than the in-memory window: splice it in at its recency position, since the Pinned section can only show resident rows.
+            // Pinned from an FTS hit outside the window, so splice it in by recency.
             let index = items.firstIndex { $0.createdAt < pinned.createdAt } ?? items.count
             items.insert(pinned, at: index)
         }
     }
 
-    /// Unpinning rejoins the history as its newest entry rather than dropping the row back into the date bucket it came from, which would scroll the list out from under the selection. Raycast does the same.
+    /// Unpinning rejoins as the newest entry. See docs/features/clipboard.md#pinned-entries.
     private func unpin(_ item: ClipboardItem) {
         reinsert(item.with(createdAt: Date(), pinnedAt: nil))
     }
 
-    /// Rewrite a row under the same id so it leads the history: stored order is rowid, so this is a delete + re-insert, and the fresh `createdAt` keeps the date buckets descending. The image blob is never touched.
+    /// Rewrite a row under the same id so it leads. See docs/features/clipboard.md#store.
     private func reinsert(_ updated: ClipboardItem) {
         if let deleteStmt = deleteByIDStmt, let insertStmt {
-            // One transaction: `id` is UNIQUE and a crash between the two statements must not lose the row.
+            // One transaction: `id` is UNIQUE, and a crash between the two must not lose it.
             sqlite3_exec(db, "BEGIN", nil, nil, nil)
             sqlite3_bind_text(deleteStmt, 1, updated.id.uuidString, -1, SQLITE_TRANSIENT)
             sqlite3_step(deleteStmt)
@@ -432,7 +432,7 @@ final class ClipboardStore {
         return sqlite3_step(stmt) == SQLITE_ROW
     }
 
-    /// Whether a path lives inside our managed images directory — only those files are ours to delete.
+    /// Whether a path is inside our images directory; only those are ours to delete.
     private func owns(_ path: String) -> Bool {
         path.hasPrefix(imagesDir.path + "/")
     }
@@ -443,7 +443,7 @@ final class ClipboardStore {
             sqlite3_bind_double(imagesStmt, 1, cutoff.timeIntervalSince1970)
             var staleOwnedPaths: [String] = []
             while sqlite3_step(imagesStmt) == SQLITE_ROW {
-                // Only delete files we own; external references (e.g. imported) just lose their row.
+                // Only delete files we own; an external reference just loses its row.
                 if let path = Self.columnString(imagesStmt, 0), owns(path) {
                     staleOwnedPaths.append(path)
                 }
@@ -454,7 +454,7 @@ final class ClipboardStore {
             sqlite3_step(deleteStmt)
             sqlite3_reset(deleteStmt)
             sqlite3_clear_bindings(deleteStmt)
-            // A retention cut can strand hundreds of files; delete them off the main actor so capture-time prune doesn't hitch.
+            // A retention cut can strand hundreds of files, so delete them off the main actor.
             if !staleOwnedPaths.isEmpty {
                 Task.detached(priority: .utility) {
                     for path in staleOwnedPaths {
@@ -463,7 +463,7 @@ final class ClipboardStore {
                 }
             }
         }
-        // Checked against the oldest *unpinned* row: an exempt pin sitting at the tail would otherwise make this guard permanently true and re-scan the window on every capture.
+        // Against the oldest unpinned row: an exempt pin would make this permanently true.
         if items.last(where: { !$0.isPinned }).map({ $0.createdAt < cutoff }) == true {
             items.removeAll { $0.createdAt < cutoff && !$0.isPinned }
         }
@@ -489,7 +489,7 @@ final class ClipboardStore {
         if !columnExists("pinned_at", in: "items") {
             sqlite3_exec(db, "ALTER TABLE items ADD COLUMN pinned_at REAL", nil, nil, nil)
         }
-        // Created after the migration rather than in `schema`, since the column may not exist yet on an older database.
+        // After the migration, not in `schema`: the column may not exist yet.
         sqlite3_exec(
             db,
             "CREATE INDEX IF NOT EXISTS items_pinned_at ON items(pinned_at) WHERE pinned_at IS NOT NULL",
@@ -500,7 +500,7 @@ final class ClipboardStore {
             VALUES(?,?,?,?,?,?,?)
             """
         )
-        // Every pinned row plus the newest `memoryWindow` unpinned ones, keyed off the floor rowid `windowFloor` looks up. Two indexed branches rather than one `pinned_at IS NOT NULL OR rowid >= ?`: the planner can't drive an OR from an index while holding the row order, so that form reads the whole table.
+        // Two indexed branches, deliberately not one OR. See docs/features/clipboard.md#store.
         loadStmt = prepare(
             """
             SELECT id, kind, text, image_path, created_at, source_app, pinned_at FROM (

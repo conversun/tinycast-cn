@@ -1,11 +1,10 @@
 import AppKit
 import SwiftUI
 
-// How every borderless surface arrives and leaves: the window fades, its content scales, both on one duration pair so a dialog and a HUD read as the same gesture.
+// How every borderless surface arrives and leaves, so a dialog and a HUD read alike.
 
 extension NSWindow {
-    /// Fades the whole window — shadow included, which a content-only fade would leave snapping in
-    /// ahead of the surface. `order` runs while the window is still invisible.
+    /// Fades the whole window, shadow included; `order` runs while still invisible.
     func fadeIn(duration: TimeInterval, order: () -> Void) {
         alphaValue = 0
         order()
@@ -16,13 +15,13 @@ extension NSWindow {
         } completionHandler: { [weak self] in
             // AppKit runs the handler on the main thread; the parameter just isn't typed for it.
             MainActor.assumeIsolated {
-                // The shadow is cached from the frame it was first drawn at, which is the scaled-down one.
+                // The shadow is cached from the frame it was first drawn at, scaled down.
                 self?.invalidateShadow()
             }
         }
     }
 
-    /// Safe to interrupt: the handler checks opacity before hiding, so `cancelFade` can rescue a re-shown window.
+    /// Safe to interrupt: the handler checks opacity, so `cancelFade` can rescue it.
     func fadeOut(duration: TimeInterval) {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = duration
@@ -46,8 +45,7 @@ extension NSWindow {
 }
 
 extension View {
-    /// Scales up as the window fades in. `scaleEffect` rather than a `CALayer` transform because scaling
-    /// *up* inside the measured frame leaves `fittingSize` untouched and clips nothing.
+    /// Scales up as the window fades in, inside the measured frame, so nothing clips.
     func panelEntrance() -> some View {
         modifier(PanelEntrance())
     }

@@ -8,30 +8,33 @@ struct LauncherRankingRecord: Codable, Hashable, Sendable {
     var lastUsed: Date
 }
 
-/// Learns which launcher results the user chooses for each query and persists the bounded, on-device-only frecency data under `~/Library/Caches/<bundle-id>/`.
+/// Learns which result a query leads to, as bounded on-device frecency data in Caches.
 @MainActor
 @Observable
 final class LauncherRankingStore {
     private static let cap = 1_000
-    /// Stays below half the 10k gaps between FuzzyMatch's relevance tiers, so learned usage can reorder similarly-matching results without ever beating a stronger match kind.
+    /// Below half a tier gap, so a learned boost reorders within a tier but never across.
     private static let maximumBoost = 4_500
 
     private let fileURL: URL
     private let now: () -> Date
 
     private(set) var records: [LauncherRankingRecord]
-    /// AppIndex includes this in its one-entry cache key, invalidating a result after a visit/reset.
+    /// Part of `AppIndex`'s cache key, invalidating a result after a visit or a reset.
     private(set) var revision = 0
 
     /// `boosts(query:)` builds this from a launcher render; tracked, the write lands mid-body.
     @ObservationIgnored private var lookup: [String: [String: LauncherRankingRecord]]?
+    /// The in-flight persist, awaited by the next one so a burst can't land out of order.
+    @ObservationIgnored private var writeTask: Task<Void, Never>?
 
     init(fileURL: URL? = nil, now: @escaping () -> Date = Date.init) {
         self.fileURL = fileURL ?? Self.defaultFileURL()
         self.now = now
 
         if let data = try? Data(contentsOf: self.fileURL),
-            let decoded = try? JSONDecoder().decode([LauncherRankingRecord].self, from: data) {
+            let decoded = try? JSONDecoder().decode([LauncherRankingRecord].self, from: data)
+        {
             records = decoded.filter {
                 !$0.itemKey.isEmpty && !$0.query.isEmpty && $0.count > 0
             }
@@ -42,7 +45,12 @@ final class LauncherRankingStore {
 
     var isEmpty: Bool { records.isEmpty }
 
-    /// Records every prefix of the submitted query: choosing WhatsApp for "wha" teaches "w", "wh" and "wha", so the preferred result surfaces for progressively shorter input.
+    /// Awaits the pending persist. The launcher never needs it; reading the file back does.
+    func flush() async {
+        await writeTask?.value
+    }
+
+    /// Records every prefix, so the preferred result surfaces for shorter input too.
     func record(itemKey: String, query: String) {
         let query = Self.normalize(query)
         guard !itemKey.isEmpty, !query.isEmpty else { return }
@@ -70,7 +78,7 @@ final class LauncherRankingStore {
         didMutate()
     }
 
-    /// Learned boosts for one query, keyed by item — a ranking pass folds the query and reads the clock once here rather than per candidate.
+    /// Boosts for one query; the fold and the clock read happen once, not per candidate.
     func boosts(query: String) -> [String: Int] {
         let query = Self.normalize(query)
         guard !query.isEmpty, let learned = rankingLookup()[query] else { return [:] }
@@ -80,7 +88,7 @@ final class LauncherRankingStore {
 
     private func boost(_ record: LauncherRankingRecord, at timestamp: Date) -> Int {
         let ageInDays = max(0, timestamp.timeIntervalSince(record.lastUsed)) / 86_400
-        // Cap frequency separately so an old, once-dominant habit cannot stay permanently pinned; enough recent visits to a different result can eventually overtake it.
+        // Cap frequency separately, so an old habit cannot stay permanently pinned.
         let frequency = min(3_000, log2(Double(record.count) + 1) * 600)
         let recency = 1_500 * exp(-ageInDays / 14)
         return min(Self.maximumBoost, Int((frequency + recency).rounded()))
@@ -103,7 +111,7 @@ final class LauncherRankingStore {
         didMutate()
     }
 
-    /// `locale: nil` is the locale-independent canonical form: these are persisted lookup keys, and a locale-sensitive fold maps "I" to "ı" under Turkish, orphaning every record keyed on the dotted form.
+    /// Locale-independent: a Turkish fold maps "I" to "ı" and orphans every stored key.
     static func normalize(_ query: String) -> String {
         query
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -111,7 +119,7 @@ final class LauncherRankingStore {
     }
 
     private static func prefixes(of query: String) -> [String] {
-        // Launcher names and useful queries are short; cap pathological pasted input so one visit cannot evict the whole bounded ranking table.
+        // Cap pasted input, so one visit cannot evict the whole bounded table.
         let limit = min(query.count, 64)
         var result: [String] = []
         result.reserveCapacity(limit)
@@ -136,7 +144,13 @@ final class LauncherRankingStore {
     private func didMutate() {
         lookup = nil
         revision &+= 1
-        if let data = try? JSONEncoder().encode(records) {
+        // Off-main: this lands on ↵, in front of the launch. Chained, so writes stay ordered.
+        let snapshot = records
+        let fileURL = fileURL
+        let previous = writeTask
+        writeTask = Task.detached(priority: .utility) {
+            await previous?.value
+            guard let data = try? JSONEncoder().encode(snapshot) else { return }
             try? data.write(to: fileURL, options: .atomic)
         }
     }

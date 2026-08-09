@@ -1,6 +1,6 @@
 import Foundation
 
-/// Persists which launcher items and categories the user has hidden (only exclusions are stored); hiding affects the launcher list only, leaving favorites and hotkey bindings intact.
+/// Which items and categories are hidden; the launcher list only, not bindings.
 @MainActor
 @Observable
 final class VisibilityStore {

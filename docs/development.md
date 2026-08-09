@@ -1,24 +1,28 @@
 # Development
 
-How to build, test, package, and release Tinycast.
+The local loop: set up, build, run, regenerate. Shipping a build is [release.md](release.md);
+verifying a change is [testing.md](testing.md).
 
 ## Requirements
 
 - macOS 26 or later (Liquid Glass).
-- Xcode 26 installed — it provides the SwiftUI macro plugin and SDK used to build.
+- Xcode 26 — it provides the SwiftUI macro plugin and the SDK.
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen), and for linting:
+  `brew install swiftlint`.
 
 ## First-time setup
 
-Create the `Tinycast Self-Signed` code-signing identity once — builds sign with it, which keeps the
-macOS Accessibility grant from being forgotten every rebuild. Follow **[signing.md](signing.md) §1**
-(a few `openssl`/`security` commands).
+Create the `Tinycast Self-Signed` code-signing identity once — builds sign with it, which is what keeps
+macOS from forgetting the Accessibility grant on every rebuild. Follow **[signing.md](signing.md) §1**,
+a few `openssl`/`security` commands.
+
+That is the whole required setup. Editor configuration is personal and the repo does not prescribe it;
+the section below is a note for anyone who wants it, not a step.
 
 ## Build & run
 
-Open the project in Xcode and run it:
-
 ```sh
-open Tinycast.xcodeproj    # then press ⌘R
+open Tinycast.xcodeproj    # then ⌘R
 ```
 
 Or from the command line:
@@ -31,165 +35,122 @@ xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Debug bui
 Xcode, prefix with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (the SwiftUI
 `@State`/`@FocusState` macros need Xcode's macOS platform).
 
-`Tinycast.xcodeproj` is committed and generated from `project.yml` via
-[XcodeGen](https://github.com/yonaskolb/XcodeGen) — after changing project settings in `project.yml`,
-run `xcodegen generate` and commit the result.
+`Tinycast.xcodeproj` is committed and generated from `project.yml` via XcodeGen — after changing
+project settings in `project.yml`, run `xcodegen generate` and commit the result. There is no
+`Package.swift`, and `Bundle.module` must never be used ([decisions.md](decisions.md) entry 25).
 
 ### The dev channel
 
-Debug builds are a separate channel: **`Tinycast Dev.app`**, bundle id `com.tinycast.app.dev`. Since
-every persisted thing is keyed by bundle
-id — `~/Library/Preferences/<id>.plist` (settings + hotkey bindings),
-`~/Library/Caches/<id>/` (clipboard history, calculator history, exchange rates, frequent emoji),
-`~/Library/Application Support/<id>/` (the onboarding marker and snippets), the `SMAppService` login
-item, and the Accessibility / Input Monitoring (TCC) grants — a build you run locally can't read or
-clobber the installed app's state, and both can run side-by-side.
+Debug builds are a separate channel: **`Tinycast Dev.app`**, bundle id `com.tinycast.app.dev`. Every
+persisted thing is keyed by bundle id — `~/Library/Preferences/<id>.plist` (settings and hotkey
+bindings), `~/Library/Caches/<id>/` (clipboard history, calculator history, exchange rates, frequent
+emoji), `~/Library/Application Support/<id>/` (the onboarding marker and snippets), the `SMAppService`
+login item, and the Accessibility / Input Monitoring (TCC) grants — so a local build can neither read
+nor clobber an installed app's state, and both run side by side.
 
 Consequences worth knowing:
 
 - The dev build asks for Accessibility on its own the first time, and starts with **no** hotkeys bound
-  and onboarding unseen. Grant + bind once; it persists across rebuilds (the fixed build path and the
-  `Tinycast Self-Signed` identity keep the TCC grant alive).
+  and onboarding unseen. Grant and bind once; it persists across rebuilds, because the fixed build path
+  and the `Tinycast Self-Signed` identity keep the TCC grant alive.
 - Don't bind the same global hotkey in both — whichever registered first wins.
-- The Hyper Key's Caps Lock remap is `hidutil` state, which is **system-wide, not per-bundle**:
-  quitting one build clears the remap for the other, which then needs a rebind (or relaunch) to
-  restore it.
+- The Hyper Key's Caps Lock remap is `hidutil` state, which is **system-wide, not per-bundle**: quitting
+  one build clears the remap for the other, which then needs a rebind or a relaunch to restore it.
 
-### Editor (VS Code) code-intelligence
+## Editor
 
-Autocomplete / go-to-definition come from SourceKit-LSP driven by a `buildServer.json`. Generate it
-once (it's machine-specific and git-ignored):
+Xcode works out of the box and needs nothing here. Everything below is optional, and which editor you
+use is your business — the repo prescribes none of it.
+
+VS Code gets code intelligence from SourceKit-LSP, which needs a `buildServer.json` because there is no
+`Package.swift`. Build once, then hand the log to the sync script — that writes both `buildServer.json`
+and the flag database:
 
 ```sh
 brew install xcode-build-server
-xcode-build-server config -project Tinycast.xcodeproj -scheme Tinycast \
-    --build_root "$PWD/build/DerivedData"
+xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Debug \
+    -derivedDataPath build/DerivedData build 2>&1 | tee /tmp/tinycast-build.log
+./Scripts/sync-lsp.sh /tmp/tinycast-build.log
 ```
 
-`--build_root` matches the fixed path the VS Code build task / F5 use, so the editor indexes what you
-actually build. Do a build once (⌘⇧B or F5) to populate it. In VS Code, **F5** builds and launches the
-app; changes always apply (fixed build path — no need to delete `build/`).
+Both files are git-ignored because they embed absolute paths, and `sourcekit-lsp` looks for
+`buildServer.json` at the workspace root by name, so it cannot live in a subfolder. After this the
+**Build Tinycast.app (debug)** task (⌘⇧B) and **F5** re-run the script on every build, so new and
+renamed files keep resolving.
 
-## Tests
+**Do not run `xcode-build-server config`.** It writes `kind: xcode`, and in that mode the server ignores
+`.compile` entirely — it serves flags from a cache it scrapes out of `.xcactivitylog` instead. That
+cache is only refreshed when `LogStoreManifest.plist` advances, and when the manifest stops updating
+(it does) the editor silently pins itself to the source list from some older build: every reference to a
+file added since reads *cannot find type X in scope*, in every file, until you restart the server. It
+also mixes Release entries in with Debug and lets them win. `Scripts/sync-lsp.sh` keeps the mode
+`manual`, where `.compile` is the single source of truth.
 
-There's no XCTest target. Standalone harnesses:
+### Symbols in `Tests/`
+
+`xcodebuild` never compiles the harnesses — they are not in the Xcode project — so nothing emits a
+compile command for them, and without one an open harness reports every shipped type it uses as *cannot
+find in scope*. Measured on `fuzz-test.swift`: 60 errors with no entry, 0 with one.
 
 ```sh
-swiftc -swift-version 6 Tinycast/Features/Launcher/Model/SearchRelevance.swift \
-    Tinycast/Platform/Pinyin.swift Tools/fuzz-test.swift \
-    -o /tmp/fuzz-test && /tmp/fuzz-test                            # launcher matcher + field priority + pinyin
-swiftc -swift-version 6 Tinycast/Features/Launcher/Model/SearchRelevance.swift \
-    Tinycast/Features/Launcher/Model/LauncherRankingStore.swift Tools/ranking-test.swift \
-    -o /tmp/ranking-test && /tmp/ranking-test                      # learned launcher ranking
-swiftc Tinycast/Features/Calculator/Model/*.swift Tools/calc-test.swift \
-    -o /tmp/calc-test && /tmp/calc-test                           # calculator engine
-swiftc -swift-version 6 Tinycast/Features/Clipboard/Model/ClipboardStore.swift Tools/clipboard-test.swift \
-    -o /tmp/clipboard-test && /tmp/clipboard-test                 # clipboard store
-swiftc -swift-version 6 Tinycast/Features/Launcher/Model/SearchScopes.swift Tools/scopes-test.swift \
-    -o /tmp/scopes-test && /tmp/scopes-test                       # launcher search scopes
-swiftc -swift-version 6 Tinycast/Features/Backup/Model/RaycastFormat.swift \
-    Tinycast/Features/Backup/Model/RaycastV1Decoder.swift Tinycast/Features/Backup/Service/Gunzip.swift \
-    Tinycast/Features/Clipboard/Model/ClipboardStore.swift Tools/raycast-test.swift \
-    -o /tmp/raycast-test && /tmp/raycast-test                     # raycast format detect + v1 decode
-swiftc Tinycast/Features/Emoji/Model/EmojiCatalog.swift Tinycast/Features/Emoji/Model/EmojiGridGeometry.swift \
-    Tinycast/Features/Emoji/Model/EmojiData.generated.swift Tools/emoji-test.swift \
-    -o /tmp/emoji-test && /tmp/emoji-test                         # emoji catalog + geometry
-swiftc -swift-version 6 Tinycast/Features/CustomCommands/Model/CustomCommand.swift \
-    Tinycast/Features/CustomCommands/Service/ShellCommandRunner.swift Tools/custom-command-test.swift \
-    -o /tmp/custom-command-test && /tmp/custom-command-test        # custom command store + runner
-swiftc -swift-version 6 Tinycast/Platform/NotificationToken.swift \
-    Tinycast/Platform/HealthTicker.swift Tinycast/Features/Snippets/Model/*.swift \
-    Tinycast/Features/Snippets/Service/*.swift \
-    Tools/snippets-test.swift -o /tmp/snippets-test && /tmp/snippets-test  # snippets
-swiftc -swift-version 6 Tinycast/Features/HotKeys/Model/DoubleTapModifier.swift \
-    Tinycast/Features/HotKeys/Model/DoubleTapDetector.swift Tools/hotkey-test.swift \
-    -o /tmp/hotkey-test && /tmp/hotkey-test                        # double-tap modifier recognizer
-swiftc -swift-version 6 Tinycast/DesignSystem/Theme.swift \
-    Tinycast/Features/HotKeys/UI/CalloutPlacement.swift Tools/callout-test.swift \
-    -o /tmp/callout-test && /tmp/callout-test                      # shortcut-recorder callout placement
-swiftc -swift-version 6 Tinycast/Features/SystemActions/Model/SystemAction.swift Tools/system-action-test.swift \
-    -o /tmp/system-action-test && /tmp/system-action-test        # system action metadata + safety
-swiftc -swift-version 6 Tinycast/Features/SystemActions/Model/VolumeLevel.swift Tools/volume-test.swift \
-    -o /tmp/volume-test && /tmp/volume-test                        # volume step grid + percentage
-swiftc -swift-version 6 Tinycast/Features/WindowManagement/WindowCommand.swift \
-    Tinycast/Features/WindowManagement/WindowLayout.swift \
-    Tinycast/Features/WindowManagement/WindowActionMemory.swift Tools/window-command-test.swift \
-    -o /tmp/window-command-test && /tmp/window-command-test        # window geometry + action memory
-swiftc -swift-version 6 Tinycast/Features/Uninstall/Model/UninstallTarget.swift \
-    Tinycast/Features/Uninstall/Model/UninstallSearchRoot.swift \
-    Tinycast/Features/Uninstall/Model/UninstallRules.swift \
-    Tinycast/Features/Uninstall/Model/UninstallProtection.swift \
-    Tinycast/Features/Uninstall/Model/UninstallPlan.swift \
-    Tools/uninstall-test.swift -o /tmp/uninstall-test && /tmp/uninstall-test  # uninstall attribution + locking
-swiftc -swift-version 6 Tinycast/Features/Quicklinks/Model/Quicklink.swift \
-    Tinycast/Features/Quicklinks/Model/QuicklinkDestination.swift \
-    Tinycast/Features/Quicklinks/Model/QuicklinkStore.swift \
-    Tinycast/Features/Quicklinks/Model/QuicklinkArchive.swift \
-    Tools/quicklink-test.swift -o /tmp/quicklink-test && /tmp/quicklink-test  # quicklink destinations + store
-swiftc -swift-version 6 Tinycast/Features/PaletteRowIndex.swift \
-    Tinycast/Features/Emoji/Model/EmojiGridGeometry.swift Tools/palette-selection-test.swift \
-    -o /tmp/palette-selection-test && /tmp/palette-selection-test  # palette flat-selection row order
+./Scripts/run-tests.sh --index    # merge the harness compile commands into .compile
 ```
 
-`Tools/fuzz-test.swift` compiles the real `Tinycast/Features/Launcher/Model/SearchRelevance.swift` and the real
-`Tinycast/Platform/Pinyin.swift`, which is why both files must stay Foundation-only and pure. Alongside
-the fixed cases it runs a seeded randomized loop
-(~100k queries) asserting that every score stays inside its field band, that the learned boost cap
-can never lift one out, and that scoring is deterministic. The calc harness compiles the real engine
-sources, which is why `Tinycast/Features/Calculator/Model/` must stay Foundation-only. The system-action harness
-similarly keeps `SystemAction.swift` independent from AppKit and all command side effects. The
-uninstall harness is the same idea taken furthest: it touches no filesystem at all, because
-`UninstallScanner` hands the rules directory _names_ and the protection classifier takes its
-environment facts as parameters.
+It reads the source lists from `run-tests.sh` itself, so they cannot drift from what the suite actually
+compiles. `Scripts/sync-lsp.sh` runs it too. Three things it has to get right, all of which fail
+silently otherwise: every path is absolute, because `sourcekit-lsp` resolves the command itself and does
+not apply `directory` to relative arguments; the command carries an explicit `-sdk`; and each entry
+claims **only its own harness** in `files`. The command still lists every shipped source it compiles, so
+symbols resolve inside the harness — but claiming those sources too would hand them this three-file
+command instead of the app's, and `.compile` is last-wins.
 
-The clipboard harness likewise compiles the real `ClipboardStore.swift`, so that file must keep to
-Foundation + SQLite3 and depend on no other app source. Each case drives a store rooted in a
-throwaway temp directory (`ClipboardStore(directory:)`), so a run can never reach a real history.
+Re-run it after adding a harness, then **Swift: Restart LSP Server** from the Command Palette — an
+already-running server does not re-read `.compile`.
 
-The custom-command harness spawns **real `/bin/zsh`** processes. Its shell-environment cases point
-`ZDOTDIR` at a throwaway fixture directory (and unset `TERM_PROGRAM`), so a run can never read or write
-the developer's own dotfiles. `/etc/zshrc` is still sourced for interactive shells, so the assertions
-are relative — the fixture's alias resolves with `-i` and not without — rather than absolute.
+## Linting
 
-The snippets harness compiles the real model, codec, template engine, Foundation-only repository,
-keyword/event/lifecycle policies, AppKit delivery primitives and main-actor store. Injected temporary
-roots and named pasteboards cover identity, per-channel isolation, malformed files, revision
-conflicts, watcher rearming, template determinism, delivery serialization and pasteboard restoration without touching a real snippets library or clipboard. The
-complete subsystem contract is in [snippets.md](snippets.md).
+```sh
+./Scripts/lint.sh          # lint the whole project
+./Scripts/lint.sh --fix    # auto-correct the mechanical subset first
+```
 
-The Raycast harness compiles the real format detector and v1 decoder, so both must stay Foundation +
-CommonCrypto + Carbon (no AppKit). It builds its own v1 files in-process — a small embedded gzip blob
-encrypted with `CCCrypt` — and feeds the mapper hand-written JSON, so no real `.rayconfig` is ever
-committed. Turning payload values into Tinycast's own types lives in `RaycastImportV1`, which needs
-AppKit and is covered by the app build instead. The format contract is in
-[raycast-import.md](raycast-import.md).
-
-The quicklink harness compiles the real model, destination detector, SQLite store and JSON archive,
-so those four must stay Foundation-only (plus SQLite3). Each store is rooted in a throwaway temp
-directory and every path rule is asked against an injected home, so a run can never reach a real
-library. One case deliberately corrupts a database file and asserts the store reports itself
-unavailable **and leaves the file byte-for-byte intact** — quicklinks are authored data, so unlike
-`ClipboardStore` this one never deletes and recreates.
-
-The window-command harness compiles the real catalog, geometry and action memory (Foundation +
-CoreGraphics — `CGRect`'s `Equatable` conformance lives in the CoreGraphics overlay, not Foundation).
-It covers tiling, gaps, cycling, restore, display moves and the memory's reset rules against synthetic
-`WindowLayout.Screen` values, plus a fuzz sweep over every command × gap × screen × degenerate window
-frame. All of it runs headless because the layer is pure: `WindowMover` owns every `AXUIElement` call
-and is deliberately not compiled in. The full contract is in
-[window-management.md](window-management.md).
-
-The palette-selection harness compiles `PaletteRowIndex`, the pure map from the flat selection index
-to the visible row order, which is why that file must stay Foundation-only even though it lives under
-`Features/`. It cannot import SwiftUI, so it tests no `body` — instead it asserts the row-order
-contract the palette guarantees: the calculator card occupies index 0 when present, section headers
-consume no index, empty sections are stepped over, `row(at:)` and `index(section:offset:)` invert each
-other across a sweep of section shapes, and a clamped selection always resolves to a row.
+[SwiftLint](https://github.com/realm/SwiftLint) is the only code-quality tool here. `.swiftlint.yml` at
+the repo root excludes the generated files and the two off-limits files in `DesignSystem/Scrolling/`.
+The comment policy in [standards.md](standards.md#comments) is deliberately not among its rules.
 
 ## Formatting
 
-Formatting is whatever Xcode's own reindent does — there's no formatter and no linter. The bar is
-CONTRIBUTING.md's "builds clean": no new compiler warnings.
+```sh
+./Scripts/format.sh            # format Tinycast/ and Tests/ in place
+./Scripts/format.sh --check    # report what would change, write nothing (exit 1 if any)
+```
+
+`swift-format` from the Xcode toolchain — the same binary sourcekit-lsp formats with, so ⌘S in VS Code
+and this script cannot disagree. `.swift-format` at the repo root tunes it to this tree; without it the
+stock config defaults to 2-space indent and rewrites all 200 files.
+
+Both `*.generated.swift` files are excluded: formatting one is hand-editing it, and the next
+`node Scripts/gen-emoji.js` would revert it. swift-format also refuses any file that does not parse, so
+a failure from either command is a syntax error rather than a tooling problem — and it is why ⌘S looks
+like it does nothing while a file is mid-edit with unbalanced braces.
+
+**Read [decisions.md](decisions.md) entry 26 before leaning on this.** A formatter was rejected here on
+measured evidence, and the entry stands: running it over the tree touched 68 files, and 67 of those
+changed more than whitespace.
+
+The config sticks to rules that catch defects and stays quiet about style, because **there is no
+formatter** — see [decisions.md](decisions.md) entry 26 for the measurements behind that. Formatting is
+Xcode's re-indent (⌃I), as it always has been. Two consequences worth knowing:
+
+- `empty_count` is **disabled**, and `isEmpty`-style rewrites are unsafe here generally:
+  `LauncherRankingRecord` and `PaletteRowIndex` have a `count` that is a hit count, not a collection
+  count. A rule that rewrites `count > 0` to `!isEmpty` on them does not compile.
+- `force_try` is an error; `force_cast` only warns, because the AX and AppKit bridges have four
+  legitimate ones.
+
+Errors block, warnings do not. CI runs this same script on every PR and annotates the diff with each
+violation — see [release.md](release.md#continuous-integration) — so run it locally first rather than
+finding out from a review.
 
 ## Generated data
 
@@ -197,86 +158,17 @@ Two Swift files are emitted by scripts and must never be hand-edited. Both downl
 run them online, then commit the result:
 
 ```sh
-node Tools/gen-emoji.js            # -> Tinycast/Features/Emoji/Model/EmojiData.generated.swift
-node Tools/gen-currencies.js       # -> Tinycast/Features/Calculator/Model/CurrencyData.generated.swift
+node Scripts/gen-emoji.js            # -> Tinycast/Features/Emoji/Model/EmojiData.generated.swift
+node Scripts/gen-currencies.js       # -> Tinycast/Features/Calculator/Model/CurrencyData.generated.swift
 ```
 
-`gen-currencies.js` joins two sources on the ISO code: **Frankfurter**'s currency list (the same feed
-`CurrencyRateStore` fetches rates from, so the table and the rate source can't drift apart) and
+`gen-currencies.js` joins two sources on the ISO code: **Frankfurter**'s currency list — the same feed
+`CurrencyRateStore` fetches rates from, so the table and the rate source cannot drift apart — and
 **Unicode CLDR**'s `en` currency data, which supplies display names, signs and the singular/plural
-noun. It reads the pinned `cldr-json` checkout rather than the host's `Intl`, whose output shifts
-with the local ICU version and would make the file unreproducible.
+noun. It reads the pinned `cldr-json` checkout rather than the host's `Intl`, whose output shifts with
+the local ICU version and would make the file unreproducible.
 
 Only unambiguous data is emitted. Anything two currencies claim — `dollars`, `pounds`, `krona` — is
-left out and decided by hand in `CalcCurrency.contested`, the one currency table still written by
-hand. Re-run the script when a currency is added or retired; nothing breaks in the meantime, since
-an unquoted code just reports "no exchange rate".
-
-## Packaging a DMG
-
-For a local signed DMG:
-
-```sh
-./build-dmg.sh            # -> build/Tinycast-<version>.dmg (version from project.yml)
-./build-dmg.sh 0.5.7      # -> build/Tinycast-0.5.7.dmg
-```
-
-It builds a Release `Tinycast.app` signed with `Tinycast Self-Signed` and packs it (with an
-`/Applications` symlink). Official per-channel releases (beta/stable) are built by CI — see
-below and [`.github/workflows/release.yml`](../.github/workflows/release.yml).
-
-## Signing & Gatekeeper
-
-Both local builds and CI releases sign with the same stable `Tinycast Self-Signed` identity (not an
-Apple Developer ID), so macOS quarantines a directly-downloaded DMG — the Homebrew cask strips that
-automatically, and direct downloaders run `xattr -dr com.apple.quarantine "…/Tinycast.app"` once.
-Full details in [signing.md](signing.md).
-
-## Continuous integration
-
-`.github/workflows/ci.yml` runs on every PR and every push to `main`, on a `macos-26` runner with
-Xcode 26 (same selection step as the release workflow). It has one job, a merge gate; a new push
-cancels the in-flight run for the same ref:
-
-- **`test`** — every `Tools/*.swift` harness from [Tests](#tests) above, in order.
-
-There is **no `xcodebuild` step**: a Debug build costs minutes on every run and the release workflow
-builds before it ships anyway, so CI keeps to the one check that finishes in about a minute. A change
-that compiles nowhere still turns the PR green — **build locally before you open one** (`xcodebuild
--project Tinycast.xcodeproj -scheme Tinycast -configuration Debug build`, or just ⌘B in Xcode).
-
-Same commands locally: the harness block from [Tests](#tests).
-
-## CI releases
-
-`.github/workflows/release.yml` builds and publishes a DMG from GitHub Actions — no local machine
-needed. Run it from the **Actions** tab (`Release` → **Run workflow**) and pick:
-
-- **channel** — `beta` or `stable`. Each builds a distinct app
-  (`Tinycast Beta.app` / `Tinycast.app`) with its own bundle id, alongside the local
-  `Tinycast Dev.app` (above).
-  Beta gets an auto-incrementing `-beta.N` suffix (`N` = the Actions run number)
-  so re-running never collides; stable ships the version as-is.
-- **version** — base semver, e.g. `0.2.0`.
-
-It builds on a `macos-26` runner with Xcode 26 and publishes a GitHub Release tagged
-`v<full-version>` with a versioned DMG asset (`Tinycast-<full-version>.dmg`), marked prerelease
-for beta. On success it also bumps the matching cask in the tap (below).
-
-### Homebrew tap automation
-
-The release job's final step rewrites the `version` + `sha256` of the channel's cask (`tinycast`
-or `tinycast@beta`) in the
-[`homebrew-tinycast`](https://github.com/abue-ammar/homebrew-tinycast) tap and pushes. It needs a
-`HOMEBREW_TAP_TOKEN` repo secret — a fine-grained PAT with **Contents: read/write** on the tap
-repo. Without the secret the step logs a warning and skips (the release still publishes).
-
-## Website
-
-`.github/workflows/website.yml` builds `website/` (Vite + React + TS) and deploys it to GitHub
-Pages at `https://abue-ammar.github.io/tinycast/` on every push to `main` that touches
-`website/`. Enable it once via **Settings → Pages → Source = GitHub Actions**.
-
-```sh
-cd website && npm install && npm run dev     # local preview
-```
+left out and decided by hand in `CalcCurrency.contested`, the one currency table still written by hand.
+Re-run the script when a currency is added or retired; nothing breaks in the meantime, since an
+unquoted code just reports "no exchange rate".

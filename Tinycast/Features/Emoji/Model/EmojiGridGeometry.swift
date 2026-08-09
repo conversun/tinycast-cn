@@ -1,4 +1,4 @@
-/// Pure flat-index navigation math over sectioned rows of `columns` cells; vertical moves keep the column and spill into the adjacent section. Foundation-free so the Tools harness can compile the real sources.
+/// Flat-index navigation over sectioned rows; vertical moves keep the column across sections.
 struct EmojiGridGeometry {
     let counts: [Int]
     let columns: Int

@@ -22,7 +22,7 @@ struct Snippet: Sendable, Hashable {
     }
 }
 
-/// Fingerprint of a snippet file's bytes, used to detect an external edit before a save or delete commits.
+/// Fingerprint of a snippet file's bytes, detecting an external edit before a save or delete.
 struct SnippetSourceRevision: Sendable, Hashable {
     private let value: String
 

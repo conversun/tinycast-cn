@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The category picker shared by the Settings and onboarding Raycast-import screens: a 3-column grid of checkboxes over one `RaycastImportOptions` bitset, plus a Select All / Deselect All link. Categories the detected export can't carry are disabled rather than hidden, so the grid doesn't reflow when a file is chosen.
+/// The shared category picker; unsupported categories disable rather than disappear.
 struct RaycastImportSelection: View {
     @Binding var selection: RaycastImportOptions
     var format: RaycastFormat?
@@ -65,7 +65,7 @@ struct RaycastImportSelection: View {
         }
         .font(.callout)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Clearing unsupported bits keeps a box that was ticked before the file was chosen from importing nothing.
+        // Clear unsupported bits, so a box ticked before the file can't import nothing.
         .onChange(of: available) { _, options in selection.formIntersection(options) }
     }
 }

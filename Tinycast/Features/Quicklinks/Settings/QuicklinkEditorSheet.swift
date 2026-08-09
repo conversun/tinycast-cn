@@ -1,8 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Identifies the editor a caller wants opened, so `.sheet(item:)` can present it. A nil quicklink
-/// is "add"; the UUID makes two consecutive opens distinct presentations.
+/// Identifies the editor to present; nil is "add", and the UUID keeps two opens distinct.
 struct QuicklinkEditRequest: Identifiable {
     let id = UUID()
     var quicklink: Quicklink?
@@ -95,8 +94,7 @@ struct QuicklinkEditorSheet: View {
 
     // MARK: - Fields
 
-    /// The destination as it will actually be opened — the only feedback a templated link can give
-    /// before it runs, since its real value isn't known until the arguments are filled in.
+    /// The destination as it will be opened: all the feedback a templated link can give.
     @ViewBuilder
     private var destinationPreview: some View {
         let value = trimmed(link)
@@ -119,8 +117,7 @@ struct QuicklinkEditorSheet: View {
         }
     }
 
-    /// Only the tokens that mean something in a destination: `{cursor}` and `{snippet:…}` are text
-    /// concerns and would be left literal here.
+    /// Only tokens meaningful in a destination; `{cursor}` and `{snippet:…}` stay literal.
     private var insertMenu: some View {
         Menu("Insert…") {
             Button("Argument") { insert("{argument}") }
@@ -243,8 +240,7 @@ struct QuicklinkEditorSheet: View {
     }
 }
 
-/// A small fixed grid — enough to tell one quicklink from another at a glance without becoming a
-/// symbol browser. "Automatic" is always first, since the detected destination is the better default.
+/// A small fixed grid, not a symbol browser; "Automatic" is first, being the better default.
 private struct QuicklinkIconPicker: View {
     @Binding var selection: String?
     let automatic: String

@@ -12,7 +12,7 @@ struct EmojiGridSection: Identifiable {
 enum EmojiGrid {
     static let columns = 8
 
-    /// The visible sections for a query: ranked results while searching, otherwise Frequently Used + every category.
+    /// Ranked results while searching, otherwise Frequently Used plus every category.
     @MainActor
     static func sections(
         query: String, index: EmojiIndex, frequent: FrequentEmojiStore
@@ -36,7 +36,7 @@ enum EmojiGrid {
     }
 }
 
-/// One visual grid row of up to `EmojiGrid.columns` cells; `start` is the flat selection index of its first cell.
+/// One grid row of up to `EmojiGrid.columns` cells; `start` is its first cell's flat index.
 private struct EmojiGridRow: Identifiable {
     let id: String
     let start: Int
@@ -58,16 +58,16 @@ private enum EmojiGridItem: Identifiable {
 
 struct EmojiGridView: View {
     let sections: [EmojiGridSection]
-    /// Flat selection index across all sections in order — the same single-source-of-truth contract as the list modes.
+    /// Flat selection index across all sections, as in the list modes.
     let selection: Int
     let tone: EmojiSkinTone
-    /// The pending scroll request; mouse selection leaves it untouched so clicking a row never yanks the scroll position.
+    /// The pending scroll request; mouse selection leaves it untouched.
     let scroll: ScrollIntent
     let onSelect: (Int) -> Void
     let onActivate: () -> Void
     let onActions: (Int) -> Void
 
-    /// Header + row items in visible order; rows sit directly under the outer `LazyVStack` so `ScrollViewReader` can reach any of them even while off-screen — a cell nested in a `LazyVGrid` can't be scrolled to until realized, which broke keyboard scroll on key-hold.
+    /// Headers + rows in visible order; rows are the scroll targets. docs/features/emoji.md
     private var items: [EmojiGridItem] {
         var items: [EmojiGridItem] = []
         for section in sections {
@@ -89,7 +89,7 @@ struct EmojiGridView: View {
         return items
     }
 
-    /// Scroll target for the current selection — the row that holds it (IDs are section-namespaced because a frequent emoji repeats inside its category).
+    /// The row holding the selection; IDs are section-namespaced, as frequents repeat.
     private var selectedRowID: String? {
         guard let section = sections.last(where: { selection >= $0.start }),
             selection - section.start < section.entries.count
@@ -97,7 +97,7 @@ struct EmojiGridView: View {
         return section.id + "-row-\((selection - section.start) / EmojiGrid.columns)"
     }
 
-    /// First grid row, ID'd the same way as `items` — selecting into it restores the origin instead, so its header shows.
+    /// First grid row; selecting into it restores the origin instead, so its header shows.
     private var firstRowID: String? { sections.first.map { $0.id + "-row-0" } }
 
     var body: some View {
@@ -131,7 +131,7 @@ struct EmojiGridView: View {
                     proxy.scrollToOrigin()
                 case .follow:
                     guard let selectedRowID else { return }
-                    // On the first row, snap to the origin so its header shows too — a nil anchor won't, since the row is already visible.
+                    // Snap to the origin on the first row so its header shows too.
                     if selectedRowID == firstRowID {
                         proxy.scrollToOrigin()
                     } else {
@@ -143,7 +143,7 @@ struct EmojiGridView: View {
     }
 }
 
-/// One grid row. All interaction (tap, double-tap, right-click, hover) lives here — once per row, not per cell — because a fast scroll realizes every cell and per-cell interaction machinery (notably the NSView-backed right-click catcher) at ~2k cells costs ~100 MB that lazy containers never release; per-row keeps that bounded to the handful of visible rows.
+/// One grid row, owning all interaction for its cells. See docs/features/emoji.md#rendering.
 private struct EmojiGridRowView: View {
     let row: EmojiGridRow
     let selection: Int
@@ -166,7 +166,7 @@ private struct EmojiGridRowView: View {
                         hovered: column == hoveredColumn
                     )
                 } else {
-                    // Empty trailing slots of a partial last row keep the columns aligned with full rows above.
+                    // Empty trailing slots keep a partial last row aligned with the full rows.
                     Color.clear.frame(maxWidth: .infinity, minHeight: Theme.Size.emojiCell)
                 }
             }
@@ -177,7 +177,7 @@ private struct EmojiGridRowView: View {
         } action: {
             width = $0
         }
-        // Single tap selects immediately; the double-tap paste rides along as a simultaneous gesture (the list rows' pattern).
+        // Single tap selects; the double-tap paste rides along as a simultaneous gesture.
         .gesture(
             SpatialTapGesture().onEnded { value in
                 if let column = column(at: value.location) { onSelect(row.start + column) }
@@ -193,7 +193,7 @@ private struct EmojiGridRowView: View {
         .onRightClick { point in
             if let column = column(at: point) { onActions(row.start + column) }
         }
-        // Column hover, gated on real pointer movement like `armedHover`: cleared unless `hoverHighlightArmed`.
+        // Column hover, gated on real pointer movement like `armedHover`.
         .onContinuousHover(coordinateSpace: .local) { phase in
             switch phase {
             case .active(let point):
@@ -204,7 +204,7 @@ private struct EmojiGridRowView: View {
         }
     }
 
-    /// Point → column, exact because cells split the width evenly with zero spacing; the empty trailing slots of a partial last row resolve to nil.
+    /// Point → column; exact, as cells split the width evenly. Trailing slots resolve to nil.
     private func column(at point: CGPoint) -> Int? {
         guard width > 0, point.x >= 0, point.x < width else { return nil }
         let column = min(
@@ -213,7 +213,7 @@ private struct EmojiGridRowView: View {
     }
 }
 
-/// Pure content — no gestures, overlays or hover tracking; interaction is handled by `EmojiSectionGrid` so realized cells stay cheap.
+/// Pure content: no gestures, overlays or hover tracking. See docs/features/emoji.md#rendering.
 private struct EmojiCell: View {
     let glyph: String
     let selected: Bool

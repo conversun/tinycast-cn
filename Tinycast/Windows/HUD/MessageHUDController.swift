@@ -1,7 +1,6 @@
 import AppKit
 
-/// The message pill: a transient confirmation flashed near the bottom of the active screen.
-/// Shared — snippets, custom commands and system commands all report through it.
+/// The message pill, shared by every feature that reports a transient confirmation.
 @MainActor
 final class MessageHUDController {
     private let presenter: HUDPresenter

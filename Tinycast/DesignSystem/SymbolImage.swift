@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// An SF Symbol falling back to a bundled template asset of the same name: not every glyph the command
-/// catalogs name is a system symbol — `toggleBluetooth` ships artwork, the logo being a SIG trademark —
-/// and `Image(systemName:)` renders nothing for those. Size is explicit so both branches match.
+/// A symbol falling back to a bundled asset of the same name, since not all are system.
 struct SymbolImage: View {
     let name: String
     let size: CGFloat

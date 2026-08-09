@@ -48,13 +48,14 @@ struct ClipboardScreen: PaletteScreen {
         store.remove(item)
     }
 
-    /// Follow a row the store moved: a fresh capture (or promote-on-paste) lands at the head of its section, and pinning lifts a row into the Pinned section. With a query typed the highlight stays put; `AppCore` has already placed it for pin/paste.
+    /// Follow a row the store moved; with a query typed the highlight stays put.
     private func follow(from old: ClipFollowKey, to new: ClipFollowKey) {
         // A nil `old.id` is the first load landing, not a row that moved.
         guard old.id != nil else { return }
         let rows = rows
         if vm.query.trimmingCharacters(in: .whitespaces).isEmpty, old.id != new.id, let id = new.id,
-            let index = rows.firstIndex(where: { $0.id == id }) {
+            let index = rows.firstIndex(where: { $0.id == id })
+        {
             vm.selection = index
         }
         scrollToFollow()
@@ -73,7 +74,7 @@ struct ClipboardScreen: PaletteScreen {
     @ViewBuilder
     private func content(selection: Int, scroll: ScrollIntent) -> some View {
         let rows = rows
-        // Empty history: center one message across the whole panel rather than wedging it into the narrow list column beside a blank preview.
+        // Empty history: centre one message across the panel, not in the list column.
         if rows.isEmpty {
             EmptyResults(text: "Clipboard history is empty")
         } else {
@@ -100,13 +101,13 @@ struct ClipboardScreen: PaletteScreen {
     }
 }
 
-/// Change key for the clipboard list's follow-the-moved-row handler: the newest stored clip (a capture or promote puts a different row there) plus the token an action bumps when it reorders the list (pin/unpin). Deliberately read from the store, not the filtered results, so typing a query never reads as a row that moved.
+/// Change key for the follow-the-moved-row handler, read from the store, not the results.
 private struct ClipFollowKey: Equatable {
     let id: ClipboardItem.ID?
     let token: UUID
 }
 
-/// Actions menu content for a clipboard entry, shown bottom-right on right-click, mirroring `AppActionsMenu`.
+/// Actions menu for an entry, shown bottom-right on right-click like `AppActionsMenu`.
 @MainActor
 enum ClipboardActionsMenu {
     static func content(
@@ -161,7 +162,7 @@ enum ClipboardActionsMenu {
     private static func headerText(_ item: ClipboardItem) -> String {
         switch item.kind {
         case .text:
-            // Collapse whitespace/newlines to single spaces so a multi-line copy stays a clean one-line title.
+            // Collapse whitespace so a multi-line copy stays a clean one-line title.
             let oneLine = (item.text ?? "").split(whereSeparator: \.isWhitespace).joined(
                 separator: " ")
             return String(oneLine.prefix(40))

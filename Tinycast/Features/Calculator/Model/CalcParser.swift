@@ -2,18 +2,18 @@ import Foundation
 
 enum CalcToken: Equatable, Sendable {
     case number(Double)
-    /// A number written in shorthand (`10k` / `2.5K`, `1e5`), kept distinct so a lone one still earns a calculator card.
+    /// Shorthand (`10k`, `1e5`), kept distinct so a lone one still earns a card.
     case compactNumber(Double)
     /// Radix-prefixed integer literal (0xff / 0b1010 / 0o777), kept exact for base conversion.
     case intLiteral(UInt64, radix: Int)
-    /// Lowercased word (function, constant, unit, or connector); `²`/`³` fold to "2"/"3" so `m²` and `m2` match, while `°` is kept.
+    /// Lowercased word; `²`/`³` fold to "2"/"3" so `m²` matches `m2`, while `°` is kept.
     case ident(String)
     case op(Character)  // + - * / ^ ! % ( )
     case arrow  // -> or →
 }
 
 enum CalcTokenizer {
-    /// nil on any character that can't be calculator input — the caller treats that as "not a calculation", never an error.
+    /// nil on any character that can't be calculator input — "not a calculation", not an error.
     static func tokenize(_ input: String) -> [CalcToken]? {
         let chars = Array(input)
         var tokens: [CalcToken] = []
@@ -28,9 +28,10 @@ enum CalcTokenizer {
                 continue
             }
 
-            // Radix literals: 0x… / 0b… / 0o… — needs ≥1 digit after the prefix, else fall through so "0" parses as a plain number.
+            // Radix literals need ≥1 digit after the prefix, else "0" is a plain number.
             if ch == "0", i + 2 < chars.count,
-                let radix = ["x": 16, "b": 2, "o": 8][String(chars[i + 1]).lowercased()] {
+                let radix = ["x": 16, "b": 2, "o": 8][String(chars[i + 1]).lowercased()]
+            {
                 let start = i + 2
                 var end = start
                 while end < chars.count, chars[end].isHexDigit { end += 1 }
@@ -58,7 +59,7 @@ enum CalcTokenizer {
                     }
                     i += 1
                 }
-                // Scientific notation, but only while the exponent hugs the mantissa — a spaced `2 e` stays 2 × e.
+                // Only while the exponent hugs the mantissa — a spaced `2 e` stays 2 × e.
                 var isShorthand = false
                 if i < chars.count, chars[i] == "e" || chars[i] == "E" {
                     var digits = i + 1
@@ -73,9 +74,9 @@ enum CalcTokenizer {
                         isShorthand = true
                     }
                 }
-                // An overflowing literal ("1e400") isn't calculator input at all, so no card rather than a bogus one.
+                // An overflowing literal ("1e400") isn't calculator input, so no card.
                 guard let value = Double(text), value.isFinite else { return nil }
-                // Attached `k` means ×1,000; whitespace keeps Kelvin explicit, and `10kg` remains a unit literal.
+                // Attached `k` is ×1,000; whitespace keeps Kelvin, and `10kg` stays a unit.
                 if i < chars.count, chars[i] == "k" || chars[i] == "K", isCompactSuffix(chars, i) {
                     tokens.append(.compactNumber(value * 1_000))
                     i += 1
@@ -88,7 +89,7 @@ enum CalcTokenizer {
             }
 
             if ch.isLetter || ch == "°" {
-                // Split an attached currency prefix (`USD1K`) before the generic ident scanner absorbs its digits.
+                // Split an attached currency prefix (`USD1K`) before the ident scanner eats it.
                 if ch.isLetter {
                     var letterEnd = i
                     while letterEnd < chars.count, chars[letterEnd].isLetter { letterEnd += 1 }
@@ -119,7 +120,7 @@ enum CalcTokenizer {
                 continue
             }
 
-            // Currency signs are punctuation, not letters: fold each to its ISO code so `€20 to gbp` tokenizes exactly like `20 eur to gbp`.
+            // Signs are punctuation, so fold to ISO: `€20 to gbp` tokenizes as `20 eur to gbp`.
             if let code = CurrencyData.signs[ch] {
                 tokens.append(.ident(code))
                 i += 1
@@ -162,7 +163,7 @@ enum CalcTokenizer {
         return tokens
     }
 
-    /// Whether the `k` at `index` is a thousands suffix rather than Kelvin or the head of a unit: true at the end of the number, before a non-letter, or before a currency word (`1kUSD`) — never when an explicit temperature target follows (`273.15K to C`).
+    /// Whether the `k` at `index` is a thousands suffix rather than Kelvin or a unit's head.
     private static func isCompactSuffix(_ chars: [Character], _ index: Int) -> Bool {
         let next = index + 1
         guard next < chars.count else { return true }
@@ -174,7 +175,7 @@ enum CalcTokenizer {
         return CalcCurrency.byName[String(chars[next..<end]).lowercased()] != nil
     }
 
-    /// True when the remainder reads as a conversion into a temperature unit, which keeps `k` as Kelvin.
+    /// True when the rest reads as a conversion into a temperature unit, keeping `k` as Kelvin.
     private static func isTemperatureConversion(_ chars: [Character], from index: Int) -> Bool {
         let remainder = String(chars[index...])
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -188,7 +189,7 @@ enum CalcTokenizer {
     }
 }
 
-/// Precedence-climbing evaluator over the token stream (evaluates while parsing, no AST), returning nil for anything malformed or non-finite.
+/// Precedence-climbing evaluator, no AST; nil for anything malformed or non-finite.
 enum CalcParser {
     static func evaluate(_ tokens: [CalcToken]) -> Double? {
         var parser = Parser(tokens: tokens)
@@ -198,7 +199,7 @@ enum CalcParser {
         return result.effective
     }
 
-    // Capture-free closures (not bare C function references) so every entry infers `@Sendable` under both language modes — the harness compiles this in Swift 5.
+    // Capture-free closures, not C function refs, so every entry infers `@Sendable` in Swift 5.
     fileprivate static let functions: [String: @Sendable (Double) -> Double] = [
         "sqrt": { sqrt($0) }, "log": { log10($0) }, "ln": { log($0) }, "sin": { sin($0) },
         "cos": { cos($0) }, "tan": { tan($0) }, "abs": { abs($0) }, "floor": { floor($0) },
@@ -221,7 +222,7 @@ enum CalcParser {
 }
 
 private struct Parser {
-    /// A value that may still be a "percent" (`20%`): additive ops treat it as a relative change, everything else as value/100.
+    /// A value that may still be a "percent": relative for additive ops, else value/100.
     struct Value {
         var value: Double
         var isPercent = false
@@ -236,7 +237,7 @@ private struct Parser {
     var isAtEnd: Bool { pos == tokens.count }
     private var current: CalcToken? { pos < tokens.count ? tokens[pos] : nil }
 
-    // Binding powers: additive 10, multiplicative (incl. "of" and juxtaposition) 20, unary minus 25, power 30 (right-assoc), postfix ! % deg tightest.
+    // Binding powers: additive 10, multiplicative 20, unary 25, power 30, postfix tightest.
     private static let unaryBP = 25
     private static let mulBP = 20
 
@@ -262,7 +263,7 @@ private struct Parser {
         return lhs
     }
 
-    /// Deliberately narrow — no unit or currency ident is a constant or function, so `10km` keeps its own path.
+    /// Deliberately narrow: no unit or currency ident is a constant, so `10km` keeps its path.
     private func impliesMultiplication() -> Bool {
         switch current {
         case .op("("): return true
@@ -286,7 +287,7 @@ private struct Parser {
             return BinaryOp(op: op, bindingPower: Self.mulBP, rightBindingPower: Self.mulBP + 1)
         case .ident("of"):
             return BinaryOp(op: "*", bindingPower: Self.mulBP, rightBindingPower: Self.mulBP + 1)
-        // Spelled-out only: "%" is already percent, and "20% - 5" gives no local signal to tell the two apart.
+        // Spelled-out only: "%" is already percent, and "20% - 5" gives no local signal.
         case .ident("mod"):
             return BinaryOp(op: "%", bindingPower: Self.mulBP, rightBindingPower: Self.mulBP + 1)
         case .op("^"):
@@ -377,7 +378,7 @@ private struct Parser {
                     guard case .op(")") = current else { return nil }
                     pos += 1
                 } else {
-                    // Bare application: `sqrt 64`, `sin 30deg` — the argument is one operand, so `sqrt 64 + 36` is sqrt(64) + 36.
+                    // Bare application takes one operand, so `sqrt 64 + 36` is sqrt(64) + 36.
                     argument = parseOperand()
                 }
                 guard let argument else { return nil }

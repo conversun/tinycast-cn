@@ -4,7 +4,7 @@ import SwiftUI
 struct ClipboardList: View {
     let results: [ClipboardItem]
     let selectedID: ClipboardItem.ID?
-    /// Changes only when the list should scroll (keyboard nav / reset), so mouse selection never yanks the scroll position.
+    /// Changes only when the list should scroll, so mouse selection never yanks it.
     let scroll: ScrollIntent
     let onSelect: (ClipboardItem) -> Void
     let onActivate: () -> Void
@@ -27,7 +27,7 @@ struct ClipboardList: View {
         selectedID != nil && selectedID == results.first?.id
     }
 
-    /// Pinned entries come first from the store and share one "Pinned" header; the rest are newest-first, so grouping walks and emits a date header whenever the bucket changes — mirrors the launcher's sectioning.
+    /// Pins share one header; the rest are newest-first, a header per date bucket.
     private var rows: [Row] {
         var rows: [Row] = []
         var currentTitle: String?
@@ -57,7 +57,7 @@ struct ClipboardList: View {
                                 imageURL: store.imageURL(for: item)
                             )
                             .contentShape(Rectangle())
-                            // Single click selects instantly (double-click-to-paste is a `.simultaneousGesture`, so the tap never waits on the double-click timeout); right-click uses the lightweight catcher, since `.contextMenu` stalls clicks for seconds in a LazyVStack.
+                            // Simultaneous gestures, and the light catcher: `.contextMenu` stalls.
                             .onTapGesture { onSelect(item) }
                             .simultaneousGesture(
                                 TapGesture(count: 2).onEnded {
@@ -82,7 +82,7 @@ struct ClipboardList: View {
                 case .top:
                     proxy.scrollToOrigin()
                 case .follow:
-                    // On the first row, snap to the origin so its section header shows too — a nil anchor won't, since the row is already visible.
+                    // Snap to the origin on the first row so its section header shows too.
                     if firstRowSelected {
                         proxy.scrollToOrigin()
                     } else if let selectedID {
@@ -94,7 +94,7 @@ struct ClipboardList: View {
     }
 }
 
-/// Coarse date buckets (Today / Yesterday / This Week / …) for sectioning clipboard and calculator-history entries, ordered newest-first by raw value.
+/// Coarse date buckets for sectioning, ordered newest-first by raw value.
 enum DateBucket: Int {
     case today, yesterday, thisWeek, thisMonth, earlier
 
@@ -156,7 +156,7 @@ private struct ClipboardRow: View {
 
     private var previewText: String {
         switch item.kind {
-        // Single-line row, so cap before trimming — never walk a multi-MB clipboard string per row.
+        // Cap before trimming: never walk a multi-MB clipboard string per row.
         case .text:
             return String((item.text ?? "").prefix(200)).trimmingCharacters(
                 in: .whitespacesAndNewlines)
@@ -183,7 +183,7 @@ private struct ClipboardRow: View {
         }
     }
 
-    /// An SF Symbol centered on a rounded tile, sized to match the launcher's app icon so text and image rows share one thumbnail shape.
+    /// A symbol on a rounded tile, sized so text and image rows share one shape.
     private func glyphTile(_ systemName: String) -> some View {
         RoundedRectangle(cornerRadius: Theme.Radius.thumbnail, style: .continuous)
             .fill(Theme.Colors.controlSurface)
@@ -197,7 +197,7 @@ private struct ClipboardRow: View {
     }
 }
 
-/// Renders a downsampled clipboard thumbnail, decoding misses off the main thread (cache hits resolve on the first tick, misses show `placeholder`); `content` styles the loaded image per site.
+/// A downsampled thumbnail, decoding misses off the main thread.
 private struct AsyncThumbnail<Content: View, Placeholder: View>: View {
     let url: URL?
     let maxPixel: CGFloat
@@ -230,7 +230,7 @@ private struct AsyncThumbnail<Content: View, Placeholder: View>: View {
 }
 
 struct ClipboardPreview: View {
-    /// The preview pane is ~460pt wide (panel 750 − list 290); 900px keeps it crisp at 2× Retina without over-decoding.
+    /// The preview pane is ~460pt wide, so 900px stays crisp at 2× without over-decoding.
     private static let previewMaxPixel: CGFloat = 900
 
     let item: ClipboardItem?
@@ -258,7 +258,6 @@ struct ClipboardPreview: View {
                     .font(.system(.subheadline, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .overlayScroller()
             }
         case .image:
             AsyncThumbnail(url: store.imageURL(for: item), maxPixel: Self.previewMaxPixel) { image in
@@ -280,7 +279,7 @@ struct ClipboardPreview: View {
     }
 }
 
-/// The "Information" block under the preview (label/value rows split by hairlines); disk- or full-text-touching details are gathered off the main actor per selection so clicking huge entries never hitches.
+/// The "Information" block; disk-touching details are gathered off the main actor.
 private struct ClipboardInfoSection: View {
     let item: ClipboardItem
     let imageURL: URL?
@@ -301,7 +300,7 @@ private struct ClipboardInfoSection: View {
         var id: String { label }
     }
 
-    /// Relative day name plus exact time ("Today at 1:22:57 AM"); shared because `DateFormatter` is expensive to build.
+    /// Relative day plus exact time; shared, `DateFormatter` being expensive to build.
     @MainActor private static let copiedFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -369,7 +368,7 @@ private struct ClipboardInfoSection: View {
         return rows
     }
 
-    /// Source app name + icon from the recorded bundle ID; the Launch Services lookup is a quick main-thread call and the icon comes from the shared `IconCache`.
+    /// Name and icon from the recorded bundle ID, via Launch Services and `IconCache`.
     private var source: (name: String, icon: NSImage)? {
         guard let bundleID = item.sourceBundleID,
             let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
@@ -394,7 +393,7 @@ private struct ClipboardInfoSection: View {
         }.value
     }
 
-    /// Single pass over scalars — `split(whereSeparator:)` would allocate a substring per word, which matters for a multi-MB copy.
+    /// Single pass: `split(whereSeparator:)` allocates per word, which a multi-MB copy feels.
     private nonisolated static func wordCount(_ text: String) -> Int {
         var count = 0
         var inWord = false

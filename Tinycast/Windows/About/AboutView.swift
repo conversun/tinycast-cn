@@ -8,13 +8,12 @@ struct AboutView: View {
         return String(format: "Version %@ (%@)".localizedUI, short, build)
     }
 
-    // Loaded once and cached: reading the .icns is disk I/O, and body can re-run often. Read the
-    // bundled file directly since NSApp.applicationIconImage returns the generic placeholder until
-    // LaunchServices registers the app, which it hasn't when run from build/.
+    // Cached, and read from the bundle: the app icon is generic until LaunchServices registers.
     @MainActor private static let appIcon: NSImage = {
         if let name = Bundle.main.infoDictionary?["CFBundleIconFile"] as? String,
             let url = Bundle.main.url(forResource: name, withExtension: "icns"),
-            let image = NSImage(contentsOf: url) {
+            let image = NSImage(contentsOf: url)
+        {
             return image
         }
         return NSApp.applicationIconImage
@@ -24,23 +23,21 @@ struct AboutView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                // A tighter block rhythm than `SettingsPane`'s `xxl` so hero, links and support all land above the fold of the fixed-height Settings window.
-                VStack(spacing: Theme.Spacing.xl) {
+            Form {
+                Section {
                     hero
-                    links
-                    support
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.lg)
                 }
-                // Ignore the transparent-titlebar safe area and use one fixed `xxl` inset every side, matching `SettingsPane`.
-                .padding(Theme.Spacing.xxl)
-                .frame(maxWidth: .infinity)
-                .overlayScroller()
+                links
+                support
             }
-            // Outside the scroll view so the copyright stays pinned to the pane's bottom edge, the way a real About window reads.
+            .formStyle(.grouped)
+
+            // Outside the form, so the copyright stays pinned to the bottom edge.
             footer
                 .padding(.bottom, Theme.Spacing.xxl)
         }
-        .ignoresSafeArea(edges: .top)
     }
 
     private var hero: some View {
@@ -74,27 +71,32 @@ struct AboutView: View {
     }
 
     private var links: some View {
-        SettingsCard(header: "Links") {
-            // Rows paint a full-bleed hover fill, so the stack is clipped to the card's corner — otherwise the first/last row's highlight squares off the rounded ends.
-            VStack(spacing: 0) {
-                ForEach(AboutLink.all) { link in
-                    if link.id != AboutLink.all.first?.id { SettingsDivider() }
-                    AboutLinkRow(link: link)
-                }
+        Section {
+            ForEach(AboutLink.all) { link in
+                AboutLinkRow(link: link)
             }
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+        } header: {
+            Text("Links")
         }
     }
 
-    // No section header: the callout's own title is the header.
     private var support: some View {
-        SettingsCallout(
-            title: "Buy Me Brave Origin",
-            message:
-                "If you enjoy my work and would like to support me or buy me Brave Origin, feel free to reach out on Discord, X, or via email.",
-            systemImage: "bolt.fill",
-            tint: Theme.Colors.brand
-        )
+        Section {
+            HStack(alignment: .top, spacing: Theme.Spacing.lg) {
+                Image(systemName: "bolt.fill")
+                    .foregroundStyle(Theme.Colors.brand)
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Text("Buy Me Brave Origin")
+                    Text(
+                        ("If you enjoy my work and would like to support me or buy me Brave Origin,"
+                            + " feel free to reach out on Discord, X, or via email.").localizedUI
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
     }
 
     private var footer: some View {
@@ -108,7 +110,7 @@ struct AboutView: View {
 private struct AboutLink: Identifiable {
     enum Glyph {
         case symbol(String)
-        /// A brand mark from `Assets.xcassets` (template SVG) — SF Symbols ships no GitHub/Discord/X logo.
+        /// A brand mark from the asset catalog; SF Symbols ships no such logo.
         case brand(String)
     }
 
@@ -140,7 +142,7 @@ private struct AboutLink: Identifiable {
     ]
 }
 
-/// A tappable row inside the About "Links" card: glyph, title, the destination in plain text, and the external-link arrow.
+/// A row in the About "Links" card: glyph, title, destination and the arrow.
 private struct AboutLinkRow: View {
     let link: AboutLink
 
@@ -150,24 +152,22 @@ private struct AboutLinkRow: View {
         Button {
             NSWorkspace.shared.open(link.url)
         } label: {
-            HStack(spacing: Theme.Spacing.lg) {
-                glyph
-                    .frame(width: Theme.Size.settingsRowIcon)
-                    .foregroundStyle(.secondary)
-                Text(link.title.localizedUI)
-                    .font(.body)
-                Spacer(minLength: Theme.Spacing.xl)
-                Text(link.detail.localizedUI)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(hovered ? .secondary : .tertiary)
+            LabeledContent {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Text(link.detail.localizedUI)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(hovered ? .secondary : .tertiary)
+                }
+            } label: {
+                Label {
+                    Text(link.title.localizedUI)
+                } icon: {
+                    glyph
+                }
             }
-            .padding(.horizontal, Theme.Spacing.xl)
-            .padding(.vertical, Theme.Spacing.lg)
-            .background(hovered ? Theme.Colors.rowHover : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -181,7 +181,7 @@ private struct AboutLinkRow: View {
             Image(systemName: name)
                 .font(.system(size: 13, weight: .medium))
         case .brand(let name):
-            // Brand marks paint edge to edge, so they sit a point under the SF Symbol box to read the same weight.
+            // Brand marks paint edge to edge, so they sit under the symbol box to match.
             Image(name)
                 .renderingMode(.template)
                 .resizable()

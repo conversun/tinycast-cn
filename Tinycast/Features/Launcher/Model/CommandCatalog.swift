@@ -1,6 +1,6 @@
 import Foundation
 
-/// Built-in launcher actions surfaced alongside user-authored commands, with dispatch in `AppCore.runCommand`.
+/// Built-in launcher actions, surfaced alongside the user-authored ones.
 enum CommandID: String, CaseIterable, Sendable {
     case calculatorHistory = "command:calculator-history"
     case clipboardHistory = "command:clipboard-history"
@@ -52,8 +52,7 @@ enum CommandID: String, CaseIterable, Sendable {
         }
     }
 
-    /// Only meaningful while Quicklinks is on, so `AppIndex` drops these from the built-in slice
-    /// when the feature is off.
+    /// Only meaningful while Quicklinks is on, so `AppIndex` drops these when it is off.
     var isQuicklinkCommand: Bool {
         switch self {
         case .createQuicklink, .searchQuicklinks, .importQuicklinks, .exportQuicklinks: return true
@@ -63,7 +62,7 @@ enum CommandID: String, CaseIterable, Sendable {
 }
 
 enum CommandCatalog {
-    /// Sorted by name to keep the AppIndex sort invariant; the URL is a placeholder since commands are never launched from disk.
+    /// Sorted by name for the `AppIndex` invariant; the URL is a placeholder.
     nonisolated static let all: [AppEntry] =
         CommandID.allCases
         .map { id in

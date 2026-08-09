@@ -1,9 +1,6 @@
 import SwiftUI
 
-/// One-deep memo over `CalcEngine.evaluate`, mirroring `AppIndex.matchMemo`, so hover/selection
-/// re-renders with the same query don't re-run the evaluator. Keyed on the consent flag plus the
-/// snapshot's `fetchedAt`, so flipping the setting or landing a fresh table invalidates the memo
-/// without comparing the rate table itself.
+/// One-deep memo over `CalcEngine.evaluate`, keyed on consent plus the snapshot's `fetchedAt`.
 @MainActor
 enum CalcMemo {
     private struct Cache {
@@ -35,7 +32,7 @@ enum CalcMemo {
     }
 }
 
-/// The inline answer card pinned above the app results (expression → result, or a friendly message on impossible conversion); selectable like a row, Enter copies.
+/// The inline answer card above the app results; selectable like a row, Enter copies.
 struct CalculatorCard: View {
     let result: CalcResult
     let selected: Bool
@@ -85,7 +82,7 @@ struct CalculatorCard: View {
     }
 }
 
-/// One side of the two-column answer card: the value line with an optional word-name badge pill beneath ("Meters", "9:00 AM").
+/// One side of the answer card: a value line with an optional word-name badge pill beneath.
 private struct CalcColumn: View {
     let text: String
     let badge: String?
@@ -116,7 +113,7 @@ private struct CalcColumn: View {
     }
 }
 
-/// Actions menu content for the calculator card — only answers can be copied, so an error card gets no menu (the caller passes `calc` only for value payloads).
+/// Actions menu for the card; only answers copy, so an error card is never passed one.
 @MainActor
 enum CalcActionsMenu {
     static func content(result: CalcResult, core: AppCore) -> PopoverMenuContent {

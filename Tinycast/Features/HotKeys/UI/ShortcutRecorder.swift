@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// Deliberately not a focusable control: the open recorder is just `HotKeyManager.recordingAction`, and setting it starts the capture. The field only shows the binding — recording is narrated by `ShortcutRecorderPopover`, which is why it fits in half the width.
+/// Deliberately not a focusable control. See docs/features/hotkeys.md#recorder.
 struct ShortcutRecorder: View {
     let action: HotKeyAction
 
     @Environment(HotKeyManager.self) private var hotKeys
-    /// Observed so a bound double-tap surfaces its Accessibility warning the moment the grant changes.
+    /// Observed so a bound double-tap surfaces its warning the moment the grant changes.
     private var doubleTapMonitor: DoubleTapMonitor { hotKeys.doubleTapMonitor }
     @State private var hovered = false
 

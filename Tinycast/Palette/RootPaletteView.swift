@@ -8,8 +8,7 @@ struct RootPaletteView: View {
     @Environment(FavoritesStore.self) private var favorites
     @Environment(VisibilityStore.self) private var visibility
     @Environment(CalculatorHistoryStore.self) private var calcHistory
-    /// Observed so the inline card re-evaluates the moment a fresh FX snapshot lands, or the user
-    /// turns currency conversion on or off.
+    /// Observed so the card re-evaluates when a snapshot lands or consent changes.
     @Environment(CurrencyRateStore.self) private var currencyRates
     @Environment(EmojiIndex.self) private var emojiIndex
     @Environment(FrequentEmojiStore.self) private var frequentEmoji
@@ -20,14 +19,14 @@ struct RootPaletteView: View {
     @FocusState private var searchFocused: Bool
     @State private var showActions = false
     @State private var showAppMenu = false
-    /// The selection's running state, sampled once by `openActions` — an app launching or quitting elsewhere must not add or drop the Quit row while the menu is up. `RunningAppsMonitor` is deliberately not observed here: only `LauncherList` needs live running state, and observing it would re-render the whole palette on every workspace launch/terminate.
+    /// Sampled once by `openActions`, so the Quit row can't appear while the menu is up.
     @State private var selectionIsRunning = false
-    /// Highlighted row of whichever popover menu is open; reset to the first row on open, moved by ↑/↓ and hover, activated by ↵/click.
+    /// Highlighted row of whichever menu is open; reset to the first row on open.
     @State private var menuSelection = 0
-    /// The pending scroll request for whichever list or grid is mounted (modes are exclusive, so one piece of state serves all of them). Set only by keyboard nav and resets; mouse selection targets a visible row, so it leaves this and the scroll position put.
+    /// The pending scroll request; modes are exclusive, so one piece of state serves all.
     @State private var scroll = ScrollIntent(kind: .top)
 
-    /// Slim compact bar vs. full window — the single source of truth lives on `AppCore` so the window controller and this view can never disagree.
+    /// Compact vs. full; the source of truth is on `AppCore`, so the two can't disagree.
     private var isCollapsed: Bool { core.paletteCoordinator.paletteIsCollapsed }
 
     /// The current mode's screen: its rows are the visible order the flat selection indexes.
@@ -63,30 +62,39 @@ struct RootPaletteView: View {
         }
     }
 
-    private var resultCount: Int { screen.rows.count }
-    /// Selection clamped into the current results — the single source of truth for highlight, preview and activation so the list and preview can never disagree.
-    private var selection: Int { resultCount == 0 ? 0 : min(max(vm.selection, 0), resultCount - 1) }
+    /// Selection clamped into the results: one source for highlight, preview and activation.
+    private func selection(count: Int) -> Int {
+        count == 0 ? 0 : min(max(vm.selection, 0), count - 1)
+    }
+
+    /// Takes a resolved screen — reaching `rows` costs a list build, so callers resolve it once.
+    private func selection(in screen: any PaletteScreen) -> Int {
+        selection(count: screen.rows.count)
+    }
 
     private var menuOpen: Bool { showActions || showAppMenu }
 
     // MARK: - Popover menu content
 
-    /// The bottom-right Actions menu content for the current mode's selection, or nil when the selection has no actions.
-    private var actionsContent: PopoverMenuContent? { screen.actions(at: selection) }
+    /// The Actions menu for the current selection, or nil when it has no actions.
+    private var actionsContent: PopoverMenuContent? {
+        let screen = screen
+        return screen.actions(at: selection(in: screen))
+    }
 
     /// The bottom-left app menu content (About / Settings).
     private var appMenuContent: PopoverMenuContent {
         PopoverMenuContent(items: [
             PopoverMenuItem(title: "About Tinycast", systemImage: "info.circle") {
-                core.paletteCoordinator.showAbout()
+                core.settingsCoordinator.showAbout()
             },
             PopoverMenuItem(title: "Settings", systemImage: "gearshape", shortcut: "⌘,") {
-                core.paletteCoordinator.showSettings()
+                core.settingsCoordinator.showSettings()
             }
         ])
     }
 
-    /// Whichever menu is open (Actions takes precedence; the two are kept mutually exclusive) — the source for keyboard navigation and activation.
+    /// Whichever menu is open; the two are mutually exclusive, Actions taking precedence.
     private var menuContent: PopoverMenuContent? {
         if showActions { return actionsContent }
         if showAppMenu { return appMenuContent }
@@ -94,16 +102,15 @@ struct RootPaletteView: View {
     }
 
     var body: some View {
-        // Resolve the screen once per render: its rows are the visible order, so the flat selection index can't drift from what's drawn.
+        // Resolve the screen once per render, so the flat index can't drift from the rows.
         let screen = screen
         let count = screen.rows.count
-        let sel = count == 0 ? 0 : min(max(vm.selection, 0), count - 1)
-        // The argument form has no rows to count when its argument takes free text, but ↵ still
-        // does something — and the pill is the only thing that says what.
+        let sel = selection(count: count)
+        // The argument form has no rows to count, but ↵ still does something.
         let showActionGroup =
             (count > 0 || vm.mode == .quicklinkArguments) && screen.hasPrimaryAction(at: sel)
 
-        // The `header` (and its single search field) is always attached in the same position via safeAreaInset so its focus survives the compact↔expanded swap — only the results below it toggle. Collapsed shows the bar alone; expanded floats header + action bar over the list with edge-dissolve (see docs/ui.md).
+        // One header position, so focus survives the swap. See docs/features/palette.md.
         return Group {
             if isCollapsed {
                 Color.clear
@@ -118,7 +125,7 @@ struct RootPaletteView: View {
                     pillLabel: screen.primaryActionTitle, showActionGroup: showActionGroup)
             }
         }
-        // Menus are in-window overlays anchored to a bottom corner, so they stay clipped inside the panel — never a system popover spilling outside the window.
+        // In-window overlays, so a menu stays clipped inside the panel.
         .overlay {
             if showAppMenu || showActions {
                 Color.black.opacity(0.001)
@@ -147,12 +154,12 @@ struct RootPaletteView: View {
                 .transition(Self.menuTransition(.bottomTrailing))
             }
         }
-        // The window's own frame (driven by `PaletteWindowController`) is the size source of truth; filling it keeps the glass background and corner clip matched to the current compact/expanded window height.
+        // The window's frame is the size source, so the glass and clip stay matched.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.black.opacity(Theme.Colors.panelDimming))
         .background(VisualEffectView())
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
-        // Every show bumps focusToken — refocus search and drop any menu left open from last time (e.g. dismissed by clicking away with a context menu up).
+        // Every show bumps focusToken: refocus search and drop any menu left open.
         .onChange(of: vm.focusToken) {
             searchFocused = true
             showActions = false
@@ -171,11 +178,11 @@ struct RootPaletteView: View {
             // Same for a half-filled argument form: leaving the screen abandons the pending open.
             if vm.mode != .quicklinkArguments { core.quicklinkCoordinator.cancelQuicklinkArguments() }
         }
-        // Pop-to-root: `prepare` clears query/selection, but if both were already at their defaults the handlers above never fire — this intent guarantees the scroll itself snaps back to the origin.
+        // `prepare` may change nothing, so this intent still snaps the scroll to the origin.
         .onChange(of: vm.resetToken) {
             scroll = ScrollIntent(kind: .top)
         }
-        // Opening either menu highlights its first row and closes the other, so exactly one menu is ever open and always has a highlight.
+        // Opening either menu closes the other, so exactly one is open and highlighted.
         .onChange(of: showActions) {
             if showActions {
                 showAppMenu = false
@@ -191,11 +198,11 @@ struct RootPaletteView: View {
             vm.menuOpen = menuOpen
         }
         .onAppear { searchFocused = true }
-        // Typing/clearing/overflow/settings all flip `paletteIsCollapsed`; resize the window to match.
+        // Several paths flip `paletteIsCollapsed`, so resize the window to match.
         .onChange(of: core.paletteCoordinator.paletteIsCollapsed) {
             core.paletteCoordinator.syncPaletteSize()
         }
-        // ⌘1–⌘5 launch the compact bar's favorite slots (or expand, for the "…" overflow slot).
+        // ⌘1–⌘5 launch the compact bar's favorite slots, or expand for the overflow.
         .onKeyPress(keys: ["1", "2", "3", "4", "5"], phases: .down) { press in
             guard isCollapsed, settings.showFavoritesInCompactMode,
                 press.modifiers.contains(.command),
@@ -213,8 +220,7 @@ struct RootPaletteView: View {
         }
         .onKeyPress(.downArrow) {
             if isCollapsed {
-                // The compact bar has no visible selection; Down reveals the list at its first row
-                // while the shared search field stays mounted and focused.
+                // The compact bar shows no selection, so Down reveals the list's first row.
                 vm.selection = 0
                 core.paletteCoordinator.expandFromCompact()
                 return .handled
@@ -235,7 +241,7 @@ struct RootPaletteView: View {
             moveVertically(-1)
             return .handled
         }
-        // Horizontal arrows step the emoji grid; everywhere else they stay with the field editor's caret. An open menu swallows them so the list behind never moves.
+        // Horizontal arrows step the grid; elsewhere they stay with the caret.
         .onKeyPress(.leftArrow) {
             if menuOpen { return .handled }
             return moveHorizontally(-1) ? .handled : .ignored
@@ -244,7 +250,7 @@ struct RootPaletteView: View {
             if menuOpen { return .handled }
             return moveHorizontally(1) ? .handled : .ignored
         }
-        // With a menu open, plain ↵ activates its highlighted row. A modified ↵ always runs the selection's own action regardless of menu state: ⌘↵ the advertised secondary action, ⌥↵ paste-in-place; plain ↵ (no menu) falls through to the field's onSubmit.
+        // Plain ↵ activates an open menu's row; a modified ↵ always runs the selection's.
         .onKeyPress(keys: [.return], phases: .down) { press in
             let command = press.modifiers.contains(.command)
             let option = press.modifiers.contains(.option)
@@ -253,6 +259,8 @@ struct RootPaletteView: View {
                 return .handled
             }
             guard command || option else { return .ignored }
+            let screen = screen
+            let selection = selection(in: screen)
             if command { return screen.secondary(at: selection) ? .handled : .ignored }
             guard let emoji = screen as? EmojiScreen else { return .ignored }
             return emoji.pasteKeepingWindowOpen(at: selection) ? .handled : .ignored
@@ -273,18 +281,21 @@ struct RootPaletteView: View {
         // ⌘K toggles the actions panel for the current selection.
         .onKeyPress(keys: ["k"], phases: .down) { press in
             guard press.modifiers.contains(.command) else { return .ignored }
-            // The Actions menu has no anchor in the compact bar (no bottom bar); swallow ⌘K there.
+            // The Actions menu has no anchor in the compact bar, so swallow ⌘K there.
             guard !isCollapsed else { return .handled }
-            guard resultCount > 0 else { return .handled }
+            let screen = screen
+            guard !screen.rows.isEmpty else { return .handled }
             // An error calc card is the selection but has no actions — don't open an empty panel.
-            guard screen.hasPrimaryAction(at: selection) else { return .handled }
+            guard screen.hasPrimaryAction(at: selection(in: screen)) else { return .handled }
             toggleActions()
             return .handled
         }
-        // Bare backspace (back out of a sub-screen when the search is empty) is intercepted by PalettePanel.sendEvent — the field editor consumes it before onKeyPress could fire.
+        // Bare backspace is intercepted in `sendEvent`; the field editor eats it first.
         .onKeyPress(keys: [.delete, .deleteForward], phases: .down) { press in
             if menuOpen { return .handled }
             guard press.modifiers.contains(.command) else { return .ignored }
+            let screen = screen
+            let selection = selection(in: screen)
             if let quicklinks = screen as? QuicklinkListScreen {
                 return quicklinks.delete(at: selection) ? .handled : .ignored
             }
@@ -298,9 +309,11 @@ struct RootPaletteView: View {
             }
             return .ignored
         }
-        // ⌘P pins/unpins the selected clip — mirrors the Actions menu row, and works while that menu is open like the other advertised chords.
+        // ⌘P mirrors the Actions row, and works while that menu is open like the rest.
         .onKeyPress(keys: ["p"], phases: .down) { press in
             guard press.modifiers.contains(.command) else { return .ignored }
+            let screen = screen
+            let selection = selection(in: screen)
             if let clipboard = screen as? ClipboardScreen {
                 return clipboard.pin(at: selection) ? .handled : .ignored
             }
@@ -309,18 +322,18 @@ struct RootPaletteView: View {
             }
             return .ignored
         }
-        // Both cases are listed because Shift uppercases the reported key. The compact bar is excluded like ⌘K — it shows no selection to aim a destructive action at.
+        // Both cases, Shift uppercasing the key; the compact bar shows no target.
         .onKeyPress(keys: ["q", "Q"], phases: .down) { press in
             guard press.modifiers.contains(.control), press.modifiers.contains(.shift),
                 !isCollapsed, let launcher = screen as? LauncherScreen
             else { return .ignored }
-            return launcher.quit(at: selection) ? .handled : .ignored
+            return launcher.quit(at: selection(in: launcher)) ? .handled : .ignored
         }
     }
 
     private var header: some View {
         HStack(alignment: .center, spacing: Theme.Spacing.md) {
-            // Clipboard and Calculator History are sub-screens of the root search, so their header icon is a back chevron instead of a mode glyph.
+            // Sub-screens of the root search, so their header icon is a back chevron.
             if vm.mode != .launcher {
                 Button(action: exitToLauncher) {
                     Image(systemName: "chevron.left")
@@ -339,9 +352,10 @@ struct RootPaletteView: View {
                     .frame(width: Theme.Size.headerIconSlot)
             }
             searchField
-            // Compact bar pins favorites to the right of the field; expanded shows them as list rows instead.
+            // Compact pins favorites beside the field; expanded shows them as rows.
             if isCollapsed, settings.showFavoritesInCompactMode,
-                let launcher = screen as? LauncherScreen {
+                let launcher = screen as? LauncherScreen
+            {
                 let slots = launcher.compactFavoriteSlots
                 if !slots.isEmpty {
                     CompactFavoritesRow(
@@ -352,31 +366,20 @@ struct RootPaletteView: View {
                 }
             }
         }
-        // Align the search icon with the list rows and section headers below (list inset + row inset).
+        // Align the search icon with the list rows and section headers below.
         .padding(.horizontal, Theme.Spacing.md * 2)
-        // Fixed row height + top padding, identical in both states, so typing (which flips compact→expanded) can't move the search bar. Compact centers the row in symmetric slack; expanded floats the same row over the list.
+        // Identical metrics in both states, so typing can't move the search bar.
         .frame(height: Theme.Size.headerHeight)
         .padding(.top, Theme.Size.headerPadding)
         .frame(maxWidth: .infinity)
     }
 
-    /// In the argument form the field *is* the current argument's input, so it names that argument
-    /// rather than the screen.
+    /// In the argument form the field is that argument's input, so it names the argument.
     private var searchPrompt: String {
         vm.mode == .quicklinkArguments ? quicklinkArguments.prompt : vm.mode.placeholder
     }
 
-    /// The one search field, kept in a single tree position (the `header`) so its focus survives the compact↔expanded swap.
-    ///
-    /// The placeholder is drawn here rather than passed as the field's `prompt`. AppKit gives an
-    /// `NSTextField` a field editor one point taller than the field itself, and a prompt is rendered
-    /// by whichever of the two currently owns the text — so the *same* placeholder glyphs sit a point
-    /// higher once the field takes the panel's shared field editor. That editor is created lazily and
-    /// then cached on the window, which is why the step was only ever visible on the first summon
-    /// after launch. Drawing it here pins it to SwiftUI's layout, where nothing can move it —
-    /// measured identical in both focus states, against a one-point step for the real prompt.
-    ///
-    /// A background rather than an overlay, so the caret still draws over it.
+    /// The one search field, drawing its own placeholder. docs/features/palette.md#the-placeholder
     private var searchField: some View {
         @Bindable var vm = vm
         return TextField("", text: $vm.query)
@@ -405,7 +408,7 @@ struct RootPaletteView: View {
     }
 
     private func bottomBar(pillLabel: String, showActionGroup: Bool) -> some View {
-        // No bar — just floating glass controls over the list; the edge dissolve ghosts rows passing beneath, so the buttons read clearly without a hard-edged strip.
+        // Floating controls, no bar; the edge dissolve ghosts the rows passing beneath.
         HStack(spacing: 0) {
             appMenuButton
             Spacer()
@@ -449,9 +452,10 @@ struct RootPaletteView: View {
         .frosted(in: Capsule())
     }
 
-    /// The single path that opens the Actions menu: samples the state its rows depend on, then shows it. Callers set `vm.selection` first, so the sample matches the row the menu is for.
+    /// The one path opening the Actions menu, sampling the state its rows depend on.
     private func openActions() {
-        selectionIsRunning = (screen as? LauncherScreen)?.isRunning(at: selection) ?? false
+        let launcher = screen as? LauncherScreen
+        selectionIsRunning = launcher.map { $0.isRunning(at: selection(in: $0)) } ?? false
         withAnimation(Self.menuAnimation) { showActions = true }
     }
 
@@ -470,7 +474,7 @@ struct RootPaletteView: View {
         }
     }
 
-    /// Inset of the menu panels from the window's bottom corners, kept just inside the rounded corner so the menu's own corner isn't clipped.
+    /// Inset from the bottom corners, so the menu's own corner isn't clipped.
     private static let menuInset: CGFloat = 8
     private static let menuAnimation: Animation = .easeOut(duration: 0.14)
 
@@ -480,25 +484,28 @@ struct RootPaletteView: View {
 
     // MARK: - Actions
 
-    private func move(_ delta: Int) {
-        guard resultCount > 0 else { return }
-        vm.selection = min(max(selection + delta, 0), resultCount - 1)
+    private func move(_ delta: Int, in screen: any PaletteScreen) {
+        let count = screen.rows.count
+        guard count > 0 else { return }
+        vm.selection = min(max(selection(count: count) + delta, 0), count - 1)
         scroll = ScrollIntent(kind: .follow)
     }
 
-    /// ↑/↓: the screen's own move (the emoji grid's, so far), else a linear step through the rows.
+    /// ↑/↓: the screen's own move where it has one, else a linear step through the rows.
     private func moveVertically(_ delta: Int) {
-        guard let next = screen.move(delta, axis: .vertical, from: selection) else {
-            move(delta)
+        let screen = screen
+        guard let next = screen.move(delta, axis: .vertical, from: selection(in: screen)) else {
+            move(delta, in: screen)
             return
         }
         vm.selection = next
         scroll = ScrollIntent(kind: .follow)
     }
 
-    /// ←/→: consumed only by a screen that navigates horizontally; otherwise the caret keeps them.
+    /// ←/→: consumed only by a horizontally navigating screen, else the caret keeps them.
     private func moveHorizontally(_ delta: Int) -> Bool {
-        guard let next = screen.move(delta, axis: .horizontal, from: selection) else {
+        let screen = screen
+        guard let next = screen.move(delta, axis: .horizontal, from: selection(in: screen)) else {
             return false
         }
         vm.selection = next
@@ -512,31 +519,32 @@ struct RootPaletteView: View {
         menuSelection = min(max(menuSelection + delta, 0), count - 1)
     }
 
-    /// The single activation path for a menu row, shared by a click and Return: run the row's action, then close.
+    /// The one activation path for a menu row: run its action, then close.
     private func activateMenuItem(_ index: Int) {
         guard let items = menuContent?.items, items.indices.contains(index) else { return }
         items[index].action()
         closeMenus()
     }
 
-    /// Tab flips launcher↔clipboard; Calculator History (entered via its command) exits back to the launcher rather than joining the cycle.
+    /// Tab flips launcher↔clipboard; Calculator History exits rather than joining.
     private func toggleMode() {
         vm.mode = vm.mode == .launcher ? .clipboard : .launcher
     }
 
-    /// Back out to a fresh root search — `prepare` is the same reset used when the palette is shown (clears query/selection, bumps focusToken to refocus the field).
+    /// Back out to a fresh root search, the same reset `prepare` does on show.
     private func exitToLauncher() {
         vm.prepare(mode: .launcher)
     }
 
     private func activateSelection() {
-        // Nothing is visibly selected in the collapsed compact bar; launch only via ⌘1–⌘5 or by typing.
+        // Nothing is visibly selected when collapsed, so launch via ⌘1–⌘5 or typing.
         guard !isCollapsed else { return }
-        screen.activate(at: selection)
+        let screen = screen
+        screen.activate(at: selection(in: screen))
     }
 }
 
-/// The footer's glass menu circle; hover lives here so a mouse sweep never re-renders the palette body.
+/// The footer's menu circle; hover lives here, so a sweep never re-renders the body.
 private struct MenuCircleButton: View {
     let action: () -> Void
     @State private var hovered = false
@@ -592,7 +600,7 @@ private struct ArmedHover: ViewModifier {
 }
 
 extension View {
-    /// Faint mouse-hover highlight for a palette row, lit only while the pointer is physically moving (`hoverHighlightArmed`) so it never fires on open or when rows slide under a still pointer during keyboard nav. Independent of the keyboard selection, so both coexist.
+    /// Row hover, lit only while the pointer moves; independent of the keyboard selection.
     func armedHover(_ hovered: Binding<Bool>) -> some View {
         modifier(ArmedHover(hovered: hovered))
     }
@@ -610,12 +618,12 @@ struct EmptyResults: View {
     }
 }
 
-/// A slot in the compact bar's favorites strip: a launchable app, or the "…" overflow that expands the window.
+/// A compact-bar favorites slot: a launchable app, or the overflow that expands.
 enum CompactFavoriteSlot {
     case app(AppEntry)
     case more
 
-    // Stable identity so a slot keeps its icon tied to its app, not its position, when favorites reorder.
+    // Stable identity, so a reorder moves icons with their app rather than by position.
     var id: String {
         switch self {
         case .app(let app): return app.id
@@ -624,7 +632,7 @@ enum CompactFavoriteSlot {
     }
 }
 
-/// The compact bar's favorites strip — up to 5 icon buttons, ⌘1–⌘5 mirrored in each tooltip.
+/// The compact bar's favorites strip: up to 5 buttons, ⌘1–⌘5 in each tooltip.
 private struct CompactFavoritesRow: View {
     let slots: [CompactFavoriteSlot]
     let onLaunch: (AppEntry) -> Void
@@ -659,7 +667,7 @@ private struct CompactFavoritesRow: View {
     }
 }
 
-/// A single compact favorite icon: bare icon, native tooltip, click action — no hover chrome, kept tight so the strip reads as one cluster.
+/// One compact favorite: bare icon, tooltip, action; no hover chrome, so it reads tight.
 private struct CompactFavoriteButton<Content: View>: View {
     let help: String
     let action: () -> Void

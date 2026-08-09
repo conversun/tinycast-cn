@@ -1,6 +1,6 @@
 import Foundation
 
-/// What an uninstall is aimed at. Pure, for `Tools/uninstall-test.swift`.
+/// What an uninstall is aimed at. Pure, for `Tests/uninstall-test.swift`.
 struct UninstallTarget: Hashable, Sendable {
     let bundleURL: URL
     let bundleID: String?
@@ -27,19 +27,19 @@ enum UninstallEvidence: String, Hashable, Sendable, CaseIterable {
     }
 }
 
-/// Matching-ready form of a target. `make` applies every guard rail, leaving `UninstallRules` no judgement to exercise.
+/// Matching-ready form of a target; `make` applies every guard rail up front.
 struct UninstallIdentity: Hashable, Sendable {
     /// Case-folded bundle ID, or nil when the target has none.
     let bundleID: String?
-    /// False for a two-component ID: `com.adobe` names a vendor, and prefix-matching it would sweep every app they ship.
+    /// False for a two-component ID: prefix-matching `com.adobe` would sweep a whole vendor.
     let allowsBundleIDPrefixMatch: Bool
-    /// Other installed apps' folded IDs: a longer-ID sibling owns its own artifacts, so one channel can't claim another's.
+    /// Other installed apps' folded IDs, so one channel can't claim another's artifacts.
     let otherBundleIDs: Set<String>
     /// Case-folded names safe enough to claim a whole directory.
     let names: [String]
     let bundleURL: URL
 
-    /// Three, not four: Zed and IINA name their own folders. The guards below carry the safety, not the length.
+    /// Three, not four: Zed and IINA name their own folders. The guards carry the safety.
     static let minimumNameLength = 3
 
     /// Standard Library subdirectories, so an app sharing the name can never claim them.
@@ -51,8 +51,7 @@ struct UninstallIdentity: Hashable, Sendable {
         "syncservices", "webkit"
     ]
 
-    /// Nil refuses the uninstall: Tinycast never plans its own, and a target with no ID and no safe name can attribute nothing.
-    /// `ownBundleID` is the *running* identity, so the Dev channel refuses itself too.
+    /// Nil refuses the uninstall; `ownBundleID` is the running identity, so Dev refuses itself.
     static func make(
         target: UninstallTarget, otherAppNames: [String], otherBundleIDs: [String] = [],
         ownBundleID: String?, ownBundleURL: URL
@@ -78,7 +77,7 @@ struct UninstallIdentity: Hashable, Sendable {
             bundleURL: target.bundleURL.standardizedFileURL)
     }
 
-    /// Gates a name must clear: long enough, not a macOS folder name, and not shared with another installed app.
+    /// Gates a name must clear: long enough, not a macOS folder, not shared with another app.
     static func safeNames(
         displayName: String, bundleName: String?, otherAppNames: [String]
     ) -> [String] {

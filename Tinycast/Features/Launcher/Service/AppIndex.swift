@@ -63,9 +63,9 @@ struct AppEntry: Identifiable, Hashable, Sendable {
     let url: URL
     let bundleID: String?
     let kind: Kind
-    /// Extra strings this entry matches on as strongly as its name — a snippet's keyword. Empty for every other kind.
+    /// Extra strings matching as strongly as the name; empty for every kind but snippets.
     var matchAliases: [String] = []
-    /// Per-item SF Symbol, for the one kind whose glyph is the user's choice rather than its kind's. Nil elsewhere.
+    /// Per-item symbol, for the one kind whose glyph is the user's choice. Nil elsewhere.
     var symbolName: String?
     /// Spotlight's `kMDItemAlternateNames`, ranked below the display name. Applications only.
     var alternateNames: [String] = []
@@ -104,7 +104,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
 
     var kindLabel: String { kind.descriptor.label }
 
-    /// The global-hotkey action for this entry, or `nil` for built-in commands and unaddressable bundles.
+    /// The hotkey action for this entry, or nil for built-ins and unaddressable bundles.
     var hotKeyAction: HotKeyAction? {
         switch kind {
         case .application:
@@ -124,8 +124,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         }
     }
 
-    /// Synthetic command entries have no file behind them to reveal. A quicklink's own entry is
-    /// synthetic too — revealing the *destination* is an action on the record, in its own menu.
+    /// Synthetic entries have no file to reveal; a destination is its record's own action.
     var canRevealInFinder: Bool { kind.descriptor.canRevealInFinder }
 
     /// Synthetic entries draw an SF Symbol tile; everything else uses its file icon.
@@ -205,7 +204,7 @@ final class AppIndex {
     private var alternateNameCache = SpotlightNames.Cache()
     private var paneCache: SettingsPaneScanner.Cache?
     private var isRefreshing = false
-    /// Set when a refresh is requested mid-scan, so a scope edit landing during an in-flight scan isn't silently dropped.
+    /// Set when a refresh lands mid-scan, so a scope edit is never silently dropped.
     private var refreshPending = false
     private let ranking: LauncherRankingStore
     private var settings: AppSettings?
@@ -214,7 +213,7 @@ final class AppIndex {
         self.ranking = ranking
     }
 
-    /// Replaces the user-authored command slice without rescanning disk so Settings edits reach launcher search immediately.
+    /// Replaces the command slice without rescanning, so Settings edits land at once.
     func setCustomCommands(_ commands: [CustomCommand]) {
         let entries = commands.map { command in
             AppEntry(
@@ -228,10 +227,10 @@ final class AppIndex {
         publishEntries()
     }
 
-    /// Replaces the quicklink slice and, in the same publish, the built-in commands that only make
-    /// sense while the feature is on — one call so a toggle can't leave the two out of step.
+    /// Replaces the quicklink slice and its built-ins together, so a toggle can't split them.
     func setQuicklinks(_ quicklinks: [Quicklink], commandsVisible: Bool) {
-        let entries = quicklinks
+        let entries =
+            quicklinks
             .filter(\.showsInRootSearch)
             .sorted(by: Quicklink.precedes)
             .map { quicklink in
@@ -242,7 +241,8 @@ final class AppIndex {
                     symbolName: quicklink.iconSymbol
                         ?? QuicklinkDestination.detect(quicklink.link)?.defaultSymbol)
             }
-        let commands = commandsVisible
+        let commands =
+            commandsVisible
             ? CommandCatalog.all
             : CommandCatalog.all.filter { entry in
                 CommandCatalog.command(for: entry).map { !$0.isQuicklinkCommand } ?? true
@@ -253,8 +253,7 @@ final class AppIndex {
         publishEntries()
     }
 
-    /// Shows or hides the whole window-command slice; the catalog is static, so this is the on/off switch
-    /// rather than a content update.
+    /// Shows or hides the window-command slice; the catalog itself is static.
     func setWindowCommandsVisible(_ visible: Bool) {
         let entries = visible ? Self.allWindowCommandEntries : []
         guard entries != windowCommandEntries else { return }
@@ -263,7 +262,8 @@ final class AppIndex {
     }
 
     func updateSnippets(_ records: [StoredSnippet]) {
-        let entries = records
+        let entries =
+            records
             .filter { $0.snippet.isEnabled }
             .map { record in
                 AppEntry(
@@ -280,7 +280,7 @@ final class AppIndex {
         publishEntries()
     }
 
-    /// Wires the search scopes, re-indexing when the user edits them so Settings changes land without waiting for the next launcher open.
+    /// Wires the scopes, re-indexing on edit rather than waiting for the next open.
     func start(settings: AppSettings) {
         self.settings = settings
         observeSearchScopes()
@@ -299,7 +299,7 @@ final class AppIndex {
         }
     }
 
-    /// Re-scan (called on every launcher open); overlapping reopens collapse into one trailing scan and `apps` is only re-published when the set changed, so an unchanged reopen does no UI work.
+    /// Re-scan on every open; reopens collapse, and an unchanged set does no UI work.
     func refresh() async {
         guard !isRefreshing else {
             refreshPending = true
@@ -349,12 +349,12 @@ final class AppIndex {
                         id: url.path, name: name, url: url, bundleID: bundleID,
                         kind: .application,
                         alternateNames: cache.alternateNames(for: url, displayName: name),
-                        // A binary named after the app adds nothing the display name doesn't already cover.
+                        // A binary named after the app adds nothing the display name lacks.
                         executableName: executable.flatMap {
                             $0.caseInsensitiveCompare(name) == .orderedSame ? nil : $0
                         }))
             }
-            // `publishEntries` appends snippets, custom commands and built-in commands after apps and Settings panes so the sectioned flat selection maps 1:1 onto rows.
+            // Slice order is section order, so the flat selection maps 1:1 onto rows.
             let apps = result.sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
@@ -365,7 +365,7 @@ final class AppIndex {
     }
 
     private func publishEntries() {
-        // Each slice is already in its own display order — alphabetical, or pinned-first for quicklinks. The slice order is the launcher's section order (LauncherList mirrors it), so custom commands sit in their own section ahead of the built-ins.
+        // Each slice arrives in its own display order; the slice order is the section order.
         let updated =
             discoveredEntries + quicklinkEntries + snippetEntries + Self.systemActionEntries
             + windowCommandEntries + customCommandEntries + commandEntries
@@ -404,7 +404,7 @@ final class AppIndex {
         Signposts.interval("AppIndex.rank") {
             let learned = ranking.boosts(query: q)
             let scored = apps.compactMap { app -> (AppEntry, Int)? in
-                // Base relevance comes from the entry's strongest matching field; the learned boost is added after and never knows which field that was.
+                // Base relevance is the strongest field; the boost is added blind to it.
                 guard let score = SearchRelevance.score(query: q, fields: app.searchFields) else {
                     return nil
                 }

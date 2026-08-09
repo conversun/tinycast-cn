@@ -1,121 +1,77 @@
 import SwiftUI
 
-// Reusable building blocks for the Settings window; all metrics come from `Theme` so Settings shares one vocabulary with the palette.
+// The few pieces more than one Settings pane needs; everything else is a stock `Form` section.
 
-// MARK: - Pane scaffold
-
-/// Standard layout for a settings pane (title + subtitle header, then scrollable content) so headers, insets and scroll behaviour stay identical across the app.
-struct SettingsPane<Content: View>: View {
+/// Not `LabeledContent`: its selectable text field eats the taps a `ShortcutRecorder` needs.
+struct SettingsRow<Icon: View, Trailing: View>: View {
     let title: String
-    let subtitle: String
-    @ViewBuilder var content: Content
+    var subtitle: String?
+    @ViewBuilder var icon: Icon
+    @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xxl) {
-                SettingsHeader(title: title, subtitle: subtitle)
-                content
+        HStack(spacing: Theme.Spacing.lg) {
+            icon
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                Text(title.localizedUI)
+                    .lineLimit(1)
+                if let subtitle {
+                    Text(subtitle.localizedUI)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(subtitle.localizedUI)
+                }
             }
-            // Ignore the transparent-titlebar safe area and use one fixed `xxl` inset every side instead (the titlebar band is taller than the rhythm we want; traffic lights sit over the sidebar, so nothing collides).
-            .padding(Theme.Spacing.xxl)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            // Settings use the native thin overlay scroller (not the palette's SwiftUI `thinScrollbar`), matching the other windowed setting lists.
-            .overlayScroller()
-        }
-        .ignoresSafeArea(edges: .top)
-        // Outside the ScrollView, so an open recorder's callout draws over the pane instead of being clipped by it.
-        .shortcutRecorderPopoverHost()
-    }
-}
-
-/// The title + subtitle block at the top of every pane.
-struct SettingsHeader: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Text(title.localizedUI)
-                .font(.title2.weight(.bold))
-            Text(subtitle.localizedUI)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Spacer(minLength: Theme.Spacing.lg)
+            trailing
         }
     }
 }
 
-// MARK: - Grouped card
-
-/// A rounded, hairline-bordered container grouping related rows — the macOS System Settings "card" (rows split by inset dividers via `SettingsRow`/`SettingsDivider`).
-struct SettingsCard<Content: View>: View {
-    var header: String?
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            if let header {
-                Text(header.localizedUI)
-                    .font(Theme.Typography.sectionHeader)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, Theme.Spacing.xs)
-            }
-            VStack(spacing: 0) { content }
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                        .fill(Theme.Colors.cardFill)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                        .strokeBorder(Theme.Colors.cardStroke, lineWidth: 1)
-                )
-        }
+extension SettingsRow where Icon == EmptyView {
+    init(title: String, subtitle: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.init(title: title, subtitle: subtitle, icon: { EmptyView() }, trailing: trailing)
     }
 }
 
-/// The identical top card of a feature pane (Custom Commands, Snippets): the master switch, then its launcher-visibility companion, which locks while the feature is off.
-struct FeatureSwitchCard: View {
+extension View {
+    /// Dims as well as disables; `.disabled` alone leaves the title at full strength.
+    func settingsEnabled(_ isEnabled: Bool) -> some View {
+        disabled(!isEnabled).opacity(isEnabled ? 1 : 0.45)
+    }
+}
+
+/// A feature pane's opening section: the master switch, then its launcher-visibility companion.
+struct FeatureSwitchSection: View {
     let header: String
     let enableTitle: String
     let enableSubtitle: String
-    let systemImage: String
     let launcherSubtitle: String
     @Binding var isEnabled: Bool
     @Binding var showsInLauncher: Bool
 
     var body: some View {
-        SettingsCard(header: header) {
-            SettingsRow(
-                title: enableTitle,
-                subtitle: enableSubtitle,
-                systemImage: systemImage,
-                tint: .green
-            ) {
-                Toggle(enableTitle.localizedUI, isOn: $isEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .accessibilityLabel(enableTitle.localizedUI)
+        Section {
+            Toggle(isOn: $isEnabled) {
+                Text(enableTitle.localizedUI)
+                Text(enableSubtitle.localizedUI)
             }
-            SettingsDivider()
-            SettingsRow(
-                title: "Show in launcher",
-                subtitle: launcherSubtitle,
-                systemImage: "magnifyingglass",
-                tint: .green
-            ) {
-                Toggle("Show in launcher", isOn: $showsInLauncher)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .accessibilityLabel("Show in launcher")
+            Toggle(isOn: $showsInLauncher) {
+                Text("Show in launcher")
+                Text(launcherSubtitle.localizedUI)
             }
-            // Same dim as ShortcutsSettingsView's hidden-category card.
-            .opacity(isEnabled ? 1 : 0.45)
-            .disabled(!isEnabled)
+            // The switch above stays live so the feature can always be turned back on.
+            .settingsEnabled(isEnabled)
+        } header: {
+            Text(header.localizedUI)
         }
     }
 }
 
-/// The filter field above a long settings list, styled like a card so it reads as part of the group below it.
-struct SettingsSearchField: View {
+/// The filter row above a long list, shaped like a search field rather than a form text field.
+struct SettingsFilterField: View {
     let prompt: String
     @Binding var query: String
 
@@ -136,117 +92,5 @@ struct SettingsSearchField: View {
                 .accessibilityLabel("Clear search")
             }
         }
-        .font(.body)
-        .padding(Theme.Spacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-                .fill(Theme.Colors.cardFill)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-                .strokeBorder(Theme.Colors.cardStroke, lineWidth: 1)
-        )
-    }
-}
-
-/// Inset divider between rows inside a `SettingsCard`, aligned under the row's title (past the icon).
-struct SettingsDivider: View {
-    var body: some View {
-        Rectangle()
-            .fill(Theme.Colors.cardStroke)
-            .frame(height: 1)
-            .padding(.leading, Theme.Spacing.xl + Theme.Size.settingsRowIcon + Theme.Spacing.lg)
-    }
-}
-
-// MARK: - Row
-
-/// A single settings line (optional SF Symbol, title with optional subtitle, trailing control); fixed vertical rhythm keeps every card aligned regardless of the control.
-struct SettingsRow<Trailing: View>: View {
-    let title: String
-    var subtitle: String?
-    var systemImage: String?
-    var tint: Color = .secondary
-    /// Optional state indicator rendered after the title (green = active, orange = attention).
-    var statusDot: Color?
-    @ViewBuilder var trailing: Trailing
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.lg) {
-            if let systemImage {
-                Image(systemName: systemImage)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(tint)
-                    .frame(width: Theme.Size.settingsRowIcon)
-            }
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs / 2) {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Text(title.localizedUI)
-                        .font(.body)
-                    if let statusDot {
-                        Circle()
-                            .fill(statusDot)
-                            .frame(width: Theme.Size.statusDot, height: Theme.Size.statusDot)
-                    }
-                }
-                if let subtitle {
-                    Text(subtitle.localizedUI)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: Theme.Spacing.xl)
-            trailing
-        }
-        .padding(.horizontal, Theme.Spacing.xl)
-        .padding(.vertical, Theme.Spacing.lg)
-    }
-}
-
-// MARK: - Callout
-
-/// A tinted inset box for a notice or warning inside a `SettingsCard` — SF Symbol + title + optional message, with an optional trailing control (e.g. a fix-it button).
-struct SettingsCallout<Trailing: View>: View {
-    let title: String
-    var message: String?
-    var systemImage: String = "info.circle"
-    var tint: Color = .secondary
-    @ViewBuilder var trailing: Trailing
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.lg) {
-            Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(tint)
-                .frame(width: Theme.Size.settingsRowIcon)
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs / 2) {
-                Text(title.localizedUI).font(.body)
-                if let message {
-                    Text(message.localizedUI)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: Theme.Spacing.xl)
-            trailing
-        }
-        .padding(.horizontal, Theme.Spacing.xl)
-        .padding(.vertical, Theme.Spacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                .fill(tint.opacity(0.10))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                .strokeBorder(tint.opacity(0.25), lineWidth: 1)
-        )
-    }
-}
-
-extension SettingsCallout where Trailing == EmptyView {
-    init(title: String, message: String? = nil, systemImage: String = "info.circle", tint: Color = .secondary) {
-        self.init(title: title, message: message, systemImage: systemImage, tint: tint) { EmptyView() }
     }
 }

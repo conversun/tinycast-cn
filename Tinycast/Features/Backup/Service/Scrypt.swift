@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// Minimal scrypt (RFC 7914) key-derivation, vendored so the Raycast import needs no third-party crypto dependency. PBKDF2-HMAC-SHA256 rides on CryptoKit; the Salsa20/8 core, BlockMix and ROMix are the standard reference construction. Run it off the main actor — it's CPU-heavy by design.
+/// Minimal scrypt (RFC 7914), so the import needs no third-party crypto dependency.
 enum Scrypt {
     /// Derive `dkLen` key bytes. For Raycast: `n=16384, r=8, p=1, dkLen=32`.
     static func derive(

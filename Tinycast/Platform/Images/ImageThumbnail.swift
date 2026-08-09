@@ -1,19 +1,19 @@
 import AppKit
 import ImageIO
 
-/// Downsampled, memory-capped image loading for the clipboard UI: ImageIO decodes each on-disk image to exactly the pixel size needed and caches it in a system-evicted `NSCache`.
+/// Downsampled, memory-capped image loading: ImageIO decodes to exactly the size needed.
 enum ImageThumbnail {
-    /// `NSCache` is thread-safe but not annotated `Sendable`, so cross-thread use (a detached decode populating what the main actor reads) needs the guarantee asserted once here.
+    /// `NSCache` is thread-safe but not `Sendable`, so assert the guarantee once here.
     private final class ImageCache: NSCache<NSString, NSImage>, @unchecked Sendable {}
 
-    /// Small row thumbnails (≤ `rowThreshold` px), byte-bounded and kept warm across palette dismissals so re-opening draws instantly.
+    /// Row thumbnails, byte-bounded and kept warm, so re-opening draws instantly.
     private static let rowCache: ImageCache = {
         let cache = ImageCache()
         cache.totalCostLimit = 8 * 1024 * 1024
         return cache
     }()
 
-    /// Large previews (> `rowThreshold` px), byte-bounded (not object-count, which leaked) and purged on palette close so browsing memory stays flat.
+    /// Large previews, byte-bounded and purged on close, so browsing memory stays flat.
     private static let previewCache: ImageCache = {
         let cache = ImageCache()
         cache.totalCostLimit = 48 * 1024 * 1024
@@ -31,12 +31,12 @@ enum ImageThumbnail {
         "\(url.path)#\(Int(maxPixel))" as NSString
     }
 
-    /// Frees the large preview bitmaps on palette dismiss; row thumbnails stay warm for an instant re-open.
+    /// Frees the preview bitmaps on dismiss; row thumbnails stay warm for a re-open.
     static func purgePreviews() {
         previewCache.removeAllObjects()
     }
 
-    /// Cache-only lookup (never touches disk) so views render an already-decoded thumbnail on the same frame.
+    /// Cache-only, never touching disk, so a warm thumbnail renders on the same frame.
     static func cached(_ url: URL, maxPixel: CGFloat) -> NSImage? {
         pick(maxPixel).object(forKey: cacheKey(url, maxPixel))
     }
@@ -44,7 +44,7 @@ enum ImageThumbnail {
     /// A freshly-decoded, thereafter-immutable `NSImage` is safe to move across the actor boundary.
     private struct Decoded: @unchecked Sendable { let image: NSImage? }
 
-    /// Decodes off the main thread and returns the decode directly, not a cache re-read — a purge or eviction mid-decode must not strand a thumbnail on its placeholder.
+    /// Returns the decode directly, so an eviction mid-decode can't strand a placeholder.
     static func loadAsync(_ url: URL, maxPixel: CGFloat) async -> NSImage? {
         if let cached = cached(url, maxPixel: maxPixel) { return cached }
         return await Task.detached(priority: .userInitiated) {
@@ -52,7 +52,7 @@ enum ImageThumbnail {
         }.value.image
     }
 
-    /// A thumbnail no larger than `maxPixel` on its longest edge, cached per (path, size); decodes synchronously, so call off the main thread for anything user-facing.
+    /// A thumbnail capped at `maxPixel`, cached per path and size; decodes synchronously.
     static func load(_ url: URL, maxPixel: CGFloat) -> NSImage? {
         let cache = pick(maxPixel)
         let key = cacheKey(url, maxPixel)

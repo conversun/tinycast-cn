@@ -1,7 +1,6 @@
 import Foundation
 
-/// What a resolved quicklink link points at. Detection is by shape alone — no filesystem or
-/// Launch Services read — so the whole rule set is covered by `Tools/quicklink-test.swift`.
+/// What a resolved link points at, detected by shape alone. docs/features/quicklinks.md
 enum QuicklinkDestination: Hashable, Sendable {
     case web(URL)
     /// A mountable share: `smb://`, `afp://`, `nfs://`, `ftp://`, `sftp://`, `ftps://`.
@@ -45,25 +44,20 @@ enum QuicklinkDestination: Hashable, Sendable {
             if scheme == "http" || scheme == "https" { return .web(url) }
             return networkSchemes.contains(scheme) ? .network(url) : .deeplink(url)
         }
-        // A bare host is the way people actually write a website down, so `github.com/a?b=c` is
-        // treated as https rather than rejected.
+        // A bare host is how people write a website down, so it reads as https.
         guard looksLikeBareHost(trimmed), let url = url(from: "https://" + trimmed) else {
             return nil
         }
         return .web(url)
     }
 
-    /// Whether values substituted into this link need percent-encoding. Answered from the link's
-    /// prefix rather than from a parsed destination, because the encoding has to be chosen *before*
-    /// placeholders are resolved. A local path is the one kind that must not be encoded — `%20` in
-    /// a path is a literal, not a space.
+    /// Whether substituted values need percent-encoding, decided before placeholders resolve.
     static func usesURLEncoding(_ link: String, homeDirectory: String = NSHomeDirectory()) -> Bool {
         let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
         return absolutePath(trimmed, homeDirectory: homeDirectory) == nil
     }
 
-    /// True when the link still carries a placeholder. Such a link can only be checked after
-    /// expansion, so validation accepts it and the open path reports a bad *resolved* value instead.
+    /// True while a placeholder remains; validation accepts it and the open path reports.
     static func containsPlaceholder(_ link: String) -> Bool {
         guard let opening = link.firstIndex(of: "{") else { return false }
         return link[link.index(after: opening)...].contains("}")
@@ -85,17 +79,14 @@ enum QuicklinkDestination: Hashable, Sendable {
         guard let first = candidate.first, first.isLetter else { return nil }
         guard candidate.dropFirst().allSatisfy({ $0.isLetter || $0.isNumber || $0 == "+" || $0 == "-" })
         else { return nil }
-        // Two false positives worth excluding, since both are far more common than the schemes they
-        // would shadow: a Windows drive letter ("C:/…"), and a host:port ("example.com:8080") whose
-        // dot already fails the loop above but whose port would otherwise read as a path.
+        // Excludes a Windows drive letter and a host:port, both commoner than what they shadow.
         guard candidate.count > 1 else { return nil }
         let remainder = value[value.index(after: colon)...]
         guard !remainder.isEmpty, !remainder.allSatisfy(\.isNumber) else { return nil }
         return candidate.lowercased()
     }
 
-    /// A space is the one authoring mistake worth rescuing — anything else illegal is a real error,
-    /// and blanket re-encoding would corrupt the `%xx` the template engine already produced.
+    /// A space is the one mistake worth rescuing; re-encoding would corrupt existing `%xx`.
     private static func url(from value: String) -> URL? {
         URL(string: value) ?? URL(string: value.replacingOccurrences(of: " ", with: "%20"))
     }

@@ -1,7 +1,6 @@
 import AppKit
 
-/// Opens a resolved quicklink destination. Every platform effect the feature has lives here, which
-/// is what keeps `QuicklinkDestination` pure and covered by `Tools/quicklink-test.swift`.
+/// Opens a resolved destination; every platform effect the feature has lives here.
 @MainActor
 enum QuicklinkLauncher {
     enum Failure: LocalizedError, Equatable {
@@ -30,8 +29,7 @@ enum QuicklinkLauncher {
         }
     }
 
-    /// Chromium and Firefox both accept this; Safari ignores it, and an app that doesn't understand
-    /// an argument drops it, so passing it unconditionally is safe.
+    /// Chromium and Firefox accept this, Safari ignores it, so passing it always is safe.
     private static let newWindowArgument = "--new-window"
 
     /// `openWithBundleID` nil means the system default handler.

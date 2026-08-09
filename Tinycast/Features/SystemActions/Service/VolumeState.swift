@@ -1,7 +1,6 @@
 import Foundation
 
-/// The live level behind the slider and the HUD's bar. Published so a repeated command refreshes a
-/// HUD already on screen instead of rebuilding it; the arithmetic lives in `VolumeLevel`.
+/// The live level behind the slider and bar, published so a repeat refreshes in place.
 @Observable
 final class VolumeState {
     var level: Double

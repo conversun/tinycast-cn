@@ -5,10 +5,10 @@ final class ClipboardManager {
     /// Marker we attach to the pasteboard when *we* write to it, so polling ignores our own pastes.
     static let internalType = NSPasteboard.PasteboardType("com.tinycast.internal")
 
-    /// Longest text we capture into history; bigger copies are skipped outright (truncating would silently drop the tail on paste).
+    /// Longest text captured; bigger copies are skipped, truncation losing the tail.
     static let maxTextLength = 32_000
 
-    /// Pasteboard markers password managers, browsers, and the OS put on secret copies (passwords, OTPs, autofill) — never recorded, regardless of source app.
+    /// Markers put on secret copies by password managers, browsers and the OS.
     static let sensitiveTypes: Set<NSPasteboard.PasteboardType> = [
         .init("org.nspasteboard.ConcealedType"),
         .init("org.nspasteboard.TransientType"),
@@ -26,7 +26,7 @@ final class ClipboardManager {
         self.settings = settings
     }
 
-    // Isolated so teardown can touch the main-actor timer; AppCore only releases the manager on the main actor, so no hop. The poll block is `[weak self]`, so this isn't fixing a leak — it stops a stray timer firing if the manager is ever recreated.
+    // Isolated so teardown can touch the main-actor timer; the poll block is already weak.
     isolated deinit {
         timer?.invalidate()
     }
@@ -75,12 +75,12 @@ final class ClipboardManager {
         timer = nil
     }
 
-    // Drains the pending change first: the user's real copy has to reach history before our temporary text overwrites the pasteboard.
+    // Drain first: the real copy must reach history before we overwrite the pasteboard.
     func prepareForTinycastPasteboardMutation() {
         poll()
     }
 
-    // The guard is load-bearing: a foreign write that landed after ours leaves the count mismatched, and skipping the assignment keeps that write capturable by the next poll.
+    // Load-bearing: a mismatched count means a foreign write the next poll must still see.
     func synchronizeAfterTinycastPasteboardMutation(changeCount: Int) {
         guard NSPasteboard.general.changeCount == changeCount else { return }
         lastChangeCount = changeCount
@@ -93,15 +93,16 @@ final class ClipboardManager {
 
         if pb.types?.contains(Self.internalType) == true { return }
 
-        // Never record secrets: skip copies tagged sensitive by password managers, browsers, or the OS.
+        // Never record secrets: skip copies tagged sensitive by any of the marker owners.
         if let types = pb.types, !Set(types).isDisjoint(with: Self.sensitiveTypes) { return }
 
-        // The pasteboard doesn't carry its source, so attribute the change to the frontmost app (the copy happened within the last 0.5s poll).
+        // The pasteboard carries no source, so attribute it to the frontmost app.
         let sourceBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         if let sourceBundleID, settings.clipboardDisabledApps.contains(sourceBundleID) { return }
 
         if let text = pb.string(forType: .string),
-            !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
             guard text.count <= Self.maxTextLength else { return }
             store.addText(text, sourceBundleID: sourceBundleID)
             return
@@ -110,7 +111,7 @@ final class ClipboardManager {
         if let type = pb.availableType(from: [.png, .tiff]), let data = pb.data(forType: type) {
             let isPNG = type == .png
             let store = store
-            // A big copy's TIFF→PNG re-encode can take 100ms+; keep the poll (and the UI) off that path.
+            // A big TIFF→PNG re-encode can take 100ms+, so keep the poll off that path.
             Task.detached(priority: .utility) {
                 let png =
                     isPNG

@@ -5,12 +5,39 @@ struct LauncherScreen: PaletteScreen {
     let appIndex: AppIndex
     let favorites: FavoritesStore
     let visibility: VisibilityStore
-    let currencyRates: CurrencyRateStore
     let core: AppCore
     let vm: PaletteState
     /// Sampled by `openActions`, so the Quit row can't appear or vanish while the menu is up.
     let running: Bool
     let openActions: () -> Void
+
+    /// The one ordered result list; an empty query pins favorites above the ranked matches.
+    private let results: [AppEntry]
+    private let calc: CalcResult?
+    /// Resolved in `init`: the palette indexes this several times per event, so it can't recompute.
+    let rows: [Row]
+
+    init(
+        appIndex: AppIndex, favorites: FavoritesStore, visibility: VisibilityStore,
+        currencyRates: CurrencyRateStore, core: AppCore, vm: PaletteState, running: Bool,
+        openActions: @escaping () -> Void
+    ) {
+        self.appIndex = appIndex
+        self.favorites = favorites
+        self.visibility = visibility
+        self.core = core
+        self.vm = vm
+        self.running = running
+        self.openActions = openActions
+
+        let results = appIndex.orderedResults(
+            query: vm.query, visibility: visibility, favorites: favorites)
+        let calc = CalcMemo.evaluate(vm.query, currency: currencyRates.source)
+        let entries = results.map(Row.entry)
+        self.results = results
+        self.calc = calc
+        self.rows = calc.map { [.calc($0)] + entries } ?? entries
+    }
 
     /// The card is a row like any other, so the flat selection indexes `rows` with no offset.
     enum Row: Equatable, Identifiable {
@@ -23,18 +50,6 @@ struct LauncherScreen: PaletteScreen {
             case .entry(let app): return app.id
             }
         }
-    }
-
-    /// Ordered launcher results (the single source of truth for list, selection and activation): empty query pins favorites to the top, otherwise plain ranked matches.
-    private var results: [AppEntry] {
-        appIndex.orderedResults(query: vm.query, visibility: visibility, favorites: favorites)
-    }
-    private var calc: CalcResult? { CalcMemo.evaluate(vm.query, currency: currencyRates.source) }
-
-    var rows: [Row] {
-        let entries = results.map(Row.entry)
-        guard let calc else { return entries }
-        return [.calc(calc)] + entries
     }
 
     /// The pill carries no selection, so the screen applies the clamp the palette applies.
@@ -52,8 +67,7 @@ struct LauncherScreen: PaletteScreen {
     }
 
     private func row(at selection: Int) -> Row? {
-        let rows = rows
-        return rows.indices.contains(selection) ? rows[selection] : nil
+        rows.indices.contains(selection) ? rows[selection] : nil
     }
 
     private func entry(at selection: Int) -> AppEntry? {
@@ -120,7 +134,7 @@ struct LauncherScreen: PaletteScreen {
         return core.runningApps.isRunning(app)
     }
 
-    /// Favorite slots shown in the compact bar: up to 5 launchable apps, or the first 4 plus an overflow "…" that expands the window. Evaluated only in the compact render and on the rare ⌘N keypress.
+    /// The compact bar's favorite slots: 5 apps, or 4 plus an overflow that expands.
     var compactFavoriteSlots: [CompactFavoriteSlot] {
         let ordered = appIndex.orderedResults(
             query: "", visibility: visibility, favorites: favorites)
@@ -135,8 +149,6 @@ struct LauncherScreen: PaletteScreen {
 
     @ViewBuilder
     private func content(selection: Int, scroll: ScrollIntent) -> some View {
-        let rows = rows
-        let results = results
         // Sections stand in for the ranked Results list, which a typed query collapses to.
         let showSections = vm.query.trimmingCharacters(in: .whitespaces).isEmpty
         LauncherList(

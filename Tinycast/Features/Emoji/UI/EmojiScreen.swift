@@ -39,7 +39,7 @@ struct EmojiScreen: PaletteScreen {
         return true
     }
 
-    /// ⌥↵ — the one chord that leaves the palette up, so a run of emoji can be pasted in a row.
+    /// ⌥↵, the one chord that leaves the palette up, so emoji can be pasted in a run.
     func pasteKeepingWindowOpen(at selection: Int) -> Bool {
         guard let entry = entry(at: selection) else { return false }
         core.emojiCoordinator.pasteEmojiKeepingWindowOpen(entry)
@@ -89,11 +89,14 @@ struct EmojiScreen: PaletteScreen {
     }
 }
 
-/// Actions menu content for an emoji/symbol cell, shown bottom-right on right-click, mirroring `ClipboardActionsMenu`.
+/// Actions menu for a cell, shown bottom-right on right-click like `ClipboardActionsMenu`.
 @MainActor
 enum EmojiActionsMenu {
-    static func content(entry: EmojiEntry, core: AppCore, target: PasteTarget?)
-        -> PopoverMenuContent {
+    static func content(
+        entry: EmojiEntry, core: AppCore, target: PasteTarget?
+    )
+        -> PopoverMenuContent
+    {
         PopoverMenuContent(
             header: entry.displayName,
             items: [

@@ -47,9 +47,7 @@ enum QuicklinkArchive {
         return decoded
     }
 
-    /// Duplicate detection is by name **or** destination — either match means the user already has
-    /// this quicklink, so it is skipped rather than creating a near-identical second row. Incoming
-    /// entries are also compared against each other, so one file can't import its own duplicates.
+    /// Duplicates are by name or destination. See docs/features/quicklinks.md#import--export.
     static func merge(_ incoming: [Quicklink], into existing: [Quicklink]) -> MergeResult {
         var names = Set(existing.map(normalizedName))
         var links = Set(existing.map(normalizedLink))
@@ -66,8 +64,7 @@ enum QuicklinkArchive {
                 skipped += 1
                 continue
             }
-            // A fresh identity: an import must never collide with a hotkey or visibility reference
-            // an existing quicklink already owns.
+            // A fresh identity, so an import can't collide with an existing reference.
             additions.append(
                 Quicklink(
                     name: candidate.name.trimmingCharacters(in: .whitespacesAndNewlines),

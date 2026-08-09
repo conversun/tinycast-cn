@@ -49,7 +49,7 @@ struct SnippetMarkdownSerializer {
             switch key {
             case "name":
                 let decoded = try decodeScalar(rawValue, fileURL: fileURL, line: lineNumber)
-                // A blank name is treated as absent so the filename fallback still yields something selectable.
+                // A blank name reads as absent, so the filename fallback still yields a label.
                 name = decoded.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : decoded
             case "keyword":
                 keyword = try decodeScalar(rawValue, fileURL: fileURL, line: lineNumber)

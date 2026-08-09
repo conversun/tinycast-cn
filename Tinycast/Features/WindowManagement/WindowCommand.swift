@@ -34,7 +34,7 @@ struct WindowCommand: Identifiable, Hashable, Sendable {
         case toggleFullscreen = "toggle-fullscreen"
     }
 
-    /// What the mover has to do, so its dispatch stays exhaustive and the catalog remains the one source of truth.
+    /// What the mover has to do, so its dispatch stays exhaustive over the catalog.
     enum Kind: String, Sendable {
         /// Resolve a target frame from the screen and write it.
         case geometry
@@ -70,7 +70,7 @@ struct WindowCommand: Identifiable, Hashable, Sendable {
     let sfSymbol: String
     let kind: Kind
     let group: Group
-    /// Only the four halves cycle ½ → ⅓ → ⅔; every other command ignores the step it is handed.
+    /// Only the four halves cycle ½ → ⅓ → ⅔; the rest ignore the step they are handed.
     let cyclesOnRepeat: Bool
     /// False for the nudges, so the mover never writes `kAXSizeAttribute` for them.
     let resizes: Bool
@@ -93,7 +93,7 @@ enum WindowCommandCatalog {
 
     static func command(forEntryID entryID: String) -> WindowCommand? { byEntryID[entryID] }
 
-    /// Catalog order grouped for the Settings list; `ID.allCases` is already in group order, so this only partitions it.
+    /// Catalog order grouped for Settings; `ID.allCases` is in group order, so this partitions.
     static func grouped() -> [(group: WindowCommand.Group, commands: [WindowCommand])] {
         WindowCommand.Group.allCases.compactMap { group in
             let commands = all.filter { $0.group == group }

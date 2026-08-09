@@ -28,104 +28,78 @@ struct BackupSettingsView: View {
     }
 
     var body: some View {
-        SettingsPane(
-            title: "Backup",
-            subtitle: "Export your settings, restore a backup, or import from Raycast."
-        ) {
-            SettingsCard(header: "Tinycast") {
-                SettingsRow(
-                    title: "Export Settings",
-                    subtitle:
-                        "Save your shortcuts, custom commands, favorites, and preferences to JSON.",
-                    systemImage: "square.and.arrow.up",
-                    tint: .blue
-                ) {
-                    Button("Export…") { Task { await BackupActions.exportSettings() } }
-                        .controlSize(.small)
+        Form {
+            Section {
+                LabeledContent {
+                    Button("Export…") { Task { await BackupActions.exportSettings(core: core) } }
+                } label: {
+                    Text("Export Settings")
+                    Text("Save your shortcuts, custom commands, favorites, and preferences to JSON.")
                 }
-                SettingsDivider()
-                SettingsRow(
-                    title: "Import Settings",
-                    subtitle:
-                        "Restore from a Tinycast backup. Only values in the file are changed.",
-                    systemImage: "square.and.arrow.down",
-                    tint: .green
-                ) {
-                    Button("Import…") { Task { await BackupActions.importSettings() } }
-                        .controlSize(.small)
+                LabeledContent {
+                    Button("Import…") { Task { await BackupActions.importSettings(core: core) } }
+                } label: {
+                    Text("Import Settings")
+                    Text("Restore from a Tinycast backup. Only values in the file are changed.")
                 }
+            } header: {
+                Text("Tinycast")
             }
 
-            SettingsCard(header: "Import from Raycast") {
-                SettingsRow(
-                    title: "Raycast Export",
-                    subtitle: raycastFileSubtitle,
-                    systemImage: "doc.badge.gearshape",
-                    tint: .orange
-                ) {
+            Section {
+                LabeledContent {
                     Button("Choose…") { chooseRaycastFile() }
-                        .controlSize(.small)
+                } label: {
+                    Text("Raycast Export")
+                    Text(raycastFileSubtitle)
                 }
-                SettingsDivider()
-                SettingsRow(
-                    title: "Passphrase",
-                    subtitle: "The password you set when exporting from Raycast.",
-                    systemImage: "key",
-                    tint: .gray
-                ) {
+                LabeledContent {
                     SecureField("Passphrase", text: $passphrase)
-                        .textFieldStyle(.roundedBorder)
                         .frame(width: 160)
                         .onSubmit(runRaycastImport)
+                } label: {
+                    Text("Passphrase")
+                    Text("The password you set when exporting from Raycast.")
                 }
-                SettingsDivider()
-                SettingsRow(
-                    title: "Import",
-                    subtitle: "Choose what to bring over, then import.",
-                    systemImage: "arrow.down.circle",
-                    tint: .indigo
-                ) {
+                LabeledContent {
                     if importing {
                         ProgressView().controlSize(.small)
                     } else {
                         Button("Import") { runRaycastImport() }
-                            .controlSize(.small)
                             .disabled(format == nil || passphrase.isEmpty || selection.isEmpty)
                     }
+                } label: {
+                    Text("Import")
+                    Text("Choose what to bring over, then import.")
                 }
                 RaycastImportSelection(selection: $selection, format: format)
-                    .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.bottom, Theme.Spacing.lg)
-                conflictCallout
-                if let status {
-                    SettingsDivider()
-                    statusRow(status)
-                }
+                conflictNotice
+                if let status { statusRow(status) }
+            } header: {
+                Text("Import from Raycast")
             }
         }
+        .formStyle(.grouped)
     }
 
     @ViewBuilder
-    private var conflictCallout: some View {
+    private var conflictNotice: some View {
         if raycastRunning {
-            SettingsCallout(
-                title: "Raycast is running — quit it to avoid hotkey conflicts.",
-                systemImage: "exclamationmark.triangle.fill",
-                tint: .orange
-            ) {
+            LabeledContent {
                 Button("Quit Raycast") { BackupActions.quitRaycast() }
-                    .controlSize(.small)
+            } label: {
+                Label(
+                    "Raycast is running — quit it to avoid hotkey conflicts.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .foregroundStyle(.orange)
             }
-            .padding(.horizontal, Theme.Spacing.xl)
-            .padding(.vertical, Theme.Spacing.lg)
         } else {
-            SettingsCallout(
-                title: "Tip: unset the matching Raycast shortcuts to avoid conflicts.",
-                systemImage: "info.circle",
-                tint: .secondary
+            Label(
+                "Tip: unset the matching Raycast shortcuts to avoid conflicts.",
+                systemImage: "info.circle"
             )
-            .padding(.horizontal, Theme.Spacing.xl)
-            .padding(.vertical, Theme.Spacing.lg)
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -133,13 +107,11 @@ struct BackupSettingsView: View {
     private func statusRow(_ status: Status) -> some View {
         switch status {
         case .success(let message):
-            SettingsRow(title: message, systemImage: "checkmark.circle.fill", tint: .green) {
-                EmptyView()
-            }
+            Label(message, systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
         case .failure(let message):
-            SettingsRow(title: message, systemImage: "exclamationmark.triangle.fill", tint: .orange) {
-                EmptyView()
-            }
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
         }
     }
 
@@ -160,7 +132,7 @@ struct BackupSettingsView: View {
             defer { importing = false }
             do {
                 let outcome = try await BackupActions.importRaycast(
-                    file: file, passphrase: passphrase, options: selection)
+                    core: core, file: file, passphrase: passphrase, options: selection)
                 status = .success(BackupActions.raycastSummaryText(outcome))
                 passphrase = ""
             } catch {

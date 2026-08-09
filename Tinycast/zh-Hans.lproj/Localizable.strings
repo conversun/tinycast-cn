@@ -797,3 +797,20 @@
 "Megabits per Second" = "兆比特每秒";
 "Gigabits per Second" = "吉比特每秒";
 "Terabits per Second" = "太比特每秒";
+
+/* Upstream v0.8.8 → v0.9.1: menu bar commands and the rewritten Settings panes. */
+"About %@" = "关于 %@";
+"Settings…" = "设置…";
+"Close Settings" = "关闭设置";
+"Add Application…" = "添加应用…";
+"Add Custom Command…" = "添加自定义命令…";
+"Add Quicklink…" = "添加快速链接…";
+"Remove %@" = "移除%@";
+"Stop excluding %@" = "不再排除%@";
+"Couldn’t Delete “%@”" = "无法删除“%@”";
+"Couldn’t Save the Change" = "无法保存更改";
+"Quicklinks can't be saved: the database couldn't be opened, so nothing you change here will stick. The existing file was left untouched." = "无法保存快速链接：快速链接数据库打开失败，因此这里的任何更改都不会保留。已有文件未被改动。";
+"Launcher" = "启动器";
+"Features" = "功能";
+"Advanced" = "高级";
+"Forward" = "前进";

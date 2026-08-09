@@ -34,7 +34,7 @@ struct KeyCapChip: View {
     var style: Style = .filled
     var scale: Scale = .standard
 
-    /// "↵" is absent from SF Pro and falls back to Lucida Grande UI, which seats it 1.1pt higher in the line box than the SF caps — visibly top-heavy in a chip. Nudging via `offset` is render-only, so the chip keeps the same footprint as every other cap.
+    /// "↵" falls back to another face that seats high, so nudge it render-only.
     private static let returnGlyphDrop: CGFloat = 1.1
 
     var body: some View {

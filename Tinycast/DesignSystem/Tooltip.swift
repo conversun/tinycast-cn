@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// A small hover-triggered label in Tinycast's own dark vocabulary, standing in for a
-/// system `.help()` tooltip on the modal's borderless panel.
+/// A hover label in Tinycast's own vocabulary, replacing a system `.help()` tooltip.
 private struct TooltipModifier: ViewModifier {
     let text: String?
     @State private var hovered = false
@@ -29,8 +28,7 @@ private struct TooltipModifier: ViewModifier {
 }
 
 extension View {
-    /// Hover label matching the palette's own keycap-chip styling, used where a system
-    /// `.help()` tooltip would look out of place on Tinycast's own chrome.
+    /// Hover label styled like the palette's keycap chips, for our own chrome.
     func tooltip(_ text: String?) -> some View {
         modifier(TooltipModifier(text: text))
     }

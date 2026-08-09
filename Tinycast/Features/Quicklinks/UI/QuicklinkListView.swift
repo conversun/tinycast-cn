@@ -5,7 +5,7 @@ import SwiftUI
 struct QuicklinkList: View {
     let results: [Quicklink]
     let selectedID: Quicklink.ID?
-    /// Changes only when the list should scroll (keyboard nav / reset), so mouse selection never yanks the scroll position.
+    /// Changes only when the list should scroll, so mouse selection never yanks the position.
     let scroll: ScrollIntent
     let onSelect: (Quicklink) -> Void
     let onActivate: () -> Void
@@ -27,8 +27,7 @@ struct QuicklinkList: View {
         selectedID != nil && selectedID == results.first?.id
     }
 
-    /// The store already publishes pinned-first order, so this walks and emits a header on the one
-    /// boundary — mirrors the clipboard's Pinned section.
+    /// The store publishes pinned-first, so this emits a header on the one boundary.
     private var rows: [Row] {
         var rows: [Row] = []
         var currentTitle: String?

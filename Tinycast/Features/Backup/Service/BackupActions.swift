@@ -1,7 +1,7 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// User-facing entry points for the backup flows, shared between the Settings pane and the palette commands. The Raycast decrypt runs off the main actor (scrypt is CPU-heavy); everything else is quick.
+/// The backup flows' entry points, shared by the Settings pane and the commands.
 @MainActor
 enum BackupActions {
     struct RaycastOutcome {
@@ -15,8 +15,7 @@ enum BackupActions {
 
     // MARK: - Tinycast native (own file panels; dialogs come from `AppCore`)
 
-    /// The JSON save panel, shared with the quicklinks archive. Tinycast is an accessory app, so it
-    /// has to activate itself before a modal panel or the panel opens behind everything.
+    /// The shared save panel; an accessory app must activate first or it opens behind.
     static func chooseSaveLocation(named base: String) -> URL? {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
@@ -36,63 +35,68 @@ enum BackupActions {
         return panel.url
     }
 
-    static func exportSettings() async {
+    static func exportSettings(core: AppCore) async {
         guard let url = chooseSaveLocation(named: "Tinycast-Settings") else { return }
         do {
-            try SettingsBackup.gather().encoded().write(to: url, options: .atomic)
+            try SettingsBackup.gather(from: core).encoded().write(to: url, options: .atomic)
         } catch {
             await present(
-                title: "Export Failed", message: error.localizedDescription,
+                core: core, title: "Export Failed", message: error.localizedDescription,
                 symbol: "square.and.arrow.up")
         }
     }
 
-    static func importSettings() async {
+    static func importSettings(core: AppCore) async {
         guard let url = chooseJSONFile() else { return }
         do {
             let backup = try SettingsBackup(json: try Data(contentsOf: url))
             let commandCount = backup.customCommands?.count ?? 0
             let shortcutCount = backup.hotkeys?.customCommands?.count ?? 0
-            guard await confirmExecutableImport(commands: commandCount, shortcuts: shortcutCount)
+            guard
+                await confirmExecutableImport(
+                    core: core, commands: commandCount, shortcuts: shortcutCount)
             else { return }
             await present(
-                title: "Settings Imported", message: summaryText(backup.apply()),
+                core: core, title: "Settings Imported",
+                message: summaryText(backup.apply(to: core)),
                 symbol: importSymbol, tone: .success)
         } catch {
             await present(
-                title: "Import Failed", message: error.localizedDescription, symbol: importSymbol)
+                core: core, title: "Import Failed", message: error.localizedDescription,
+                symbol: importSymbol)
         }
     }
 
     // MARK: - Raycast (the pane owns the passphrase field + inline status)
 
-    static func importRaycast(file: URL, passphrase: String, options: RaycastImportOptions = .all)
-        async throws -> RaycastOutcome {
-        // Detect, decrypt and parse off the main actor, inside an autoreleasepool so the large JSON tree drains at once instead of spiking the main-thread footprint. Only the value-type Result crosses back.
+    static func importRaycast(
+        core: AppCore, file: URL, passphrase: String, options: RaycastImportOptions = .all
+    ) async throws -> RaycastOutcome {
+        // Off-main in an autoreleasepool, so the large JSON tree drains at once.
         let result = try await Task.detached(priority: .userInitiated) {
             try autoreleasepool {
                 try RaycastImport.read(file: file, passphrase: passphrase).selecting(options)
             }
         }.value
-        // A snippet write failure is reported in the outcome rather than thrown: it must not abort the settings and clipboard the user also asked for.
+        // Reported, not thrown: it must not abort the rest of what was asked for.
         var snippetsImported = 0
         var snippetsError: String?
         if !result.snippets.isEmpty {
             do {
-                // Starting the (lazily started) store first gets the imported snippets into the launcher immediately. With the feature switched off the files are still written and appear once it's re-enabled.
-                if AppCore.shared.settings.snippetsEnabled {
-                    await AppCore.shared.snippetsStore.start()
+                // Start the store first, so imported snippets reach the launcher at once.
+                if core.settings.snippetsEnabled {
+                    await core.snippetsStore.start()
                 }
                 snippetsImported =
-                    try await AppCore.shared.snippetsStore.importSnippets(result.snippets).count
+                    try await core.snippetsStore.importSnippets(result.snippets).count
             } catch {
                 snippetsError = error.localizedDescription
             }
         }
-        let summary = result.backup.apply()
+        let summary = result.backup.apply(to: core)
         let imported =
             result.clipboard.isEmpty
-            ? 0 : AppCore.shared.clipboardStore.importEntries(result.clipboard)
+            ? 0 : core.clipboardStore.importEntries(result.clipboard)
         return RaycastOutcome(
             summary: summary,
             clipboardImported: imported,
@@ -106,11 +110,12 @@ enum BackupActions {
 
     static func isRaycastBundleID(_ id: String) -> Bool { id.hasPrefix(raycastBundleIDPrefix) }
 
-    /// Quit any running Raycast app so its hotkeys stop clashing; skip `.prohibited` (pure background helpers/XPC).
+    /// Quit any running Raycast so its hotkeys stop clashing; background helpers stay.
     static func quitRaycast() {
         for app in NSWorkspace.shared.runningApplications
         where app.bundleIdentifier.map(isRaycastBundleID) == true
-            && app.activationPolicy != .prohibited {
+            && app.activationPolicy != .prohibited
+        {
             app.terminate()
         }
     }
@@ -124,7 +129,7 @@ enum BackupActions {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    /// Nil when the file isn't a Raycast export at all. Reads only the leading bytes — mapped, not copied — so the pane can label a file before a passphrase is typed.
+    /// Nil when the file isn't a Raycast export; reads only the leading bytes, mapped.
     static func detectRaycastFormat(of file: URL) -> RaycastFormat? {
         guard let raw = try? Data(contentsOf: file, options: .mappedIfSafe) else { return nil }
         return try? RaycastFormat.detect(raw)
@@ -138,7 +143,7 @@ enum BackupActions {
 
     static let nothingImportedText = String(localized: "Nothing to import from this file.")
 
-    /// `nil` when the backup applied no settings, so callers that also import clipboard or snippets can compose one combined sentence instead of contradicting the empty-import wording.
+    /// nil when no settings applied, so a caller can compose one combined sentence.
     static func appliedText(_ s: SettingsBackup.ApplySummary) -> String? {
         var parts: [String] = []
         if s.settingsFields > 0 {
@@ -179,7 +184,11 @@ enum BackupActions {
         return message
     }
 
-    private static func confirmExecutableImport(commands: Int, shortcuts: Int) async -> Bool {
+    private static func confirmExecutableImport(
+        core: AppCore, commands: Int, shortcuts: Int
+    ) async
+        -> Bool
+    {
         guard commands > 0 || shortcuts > 0 else { return true }
         let commandText = commands == 1
             ? String(localized: "1 custom command")
@@ -190,7 +199,7 @@ enum BackupActions {
             : String(localized: "\(shortcuts) global shortcuts")
         // Red glyph because this is a real security warning, but a plain button: importing a file
         // destroys nothing, so the confirm action isn't destructive.
-        return await AppCore.shared.confirm(
+        return await core.confirm(
             title: String(localized: "Import executable commands?"),
             message: String(
                 format:
@@ -207,13 +216,12 @@ enum BackupActions {
         return formatter.string(from: Date())
     }
 
-    /// Every import dialog — the warning, the failure and the summary — carries the same glyph, so the flow reads as one thing.
+    /// Every import dialog carries the same glyph, so the flow reads as one thing.
     private static let importSymbol = "square.and.arrow.down"
 
     private static func present(
-        title: String, message: String, symbol: String, tone: DialogTone = .danger
+        core: AppCore, title: String, message: String, symbol: String, tone: DialogTone = .danger
     ) async {
-        await AppCore.shared.showNotice(
-            title: title, message: message, symbol: symbol, tone: tone)
+        await core.showNotice(title: title, message: message, symbol: symbol, tone: tone)
     }
 }

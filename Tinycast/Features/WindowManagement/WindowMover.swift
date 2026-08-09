@@ -1,17 +1,11 @@
 import AppKit
-// `@preconcurrency` downgrades AX concurrency diagnostics, as in `Permissions`: the `kAX…` constants are
-// mutable C globals but process-constant.
+// `@preconcurrency` downgrades AX diagnostics: `kAX…` are mutable C globals, but constant.
 @preconcurrency import ApplicationServices
 
-/// Applies window commands to the focused window of another app over Accessibility.
-///
-/// All geometry decisions live in `WindowLayout`; this type only reads the current frame, converts
-/// between coordinate spaces, writes the result, and remembers what landed. Every failure path is
-/// silent by design — a window that refuses to move is left exactly as it was, never half-moved.
+/// Applies window commands over AX. See docs/features/window-management.md#applying-a-placement.
 @MainActor
 final class WindowMover {
-    /// `AXUIElement` is a CF type, so `CFEqual`/`CFHash` are the supported identity; the pid keeps two
-    /// processes' elements from colliding in the same bucket.
+    /// `CFEqual`/`CFHash` are the supported identity; the pid separates two processes' elements.
     private struct WindowKey: Hashable {
         let pid: pid_t
         let element: AXUIElement
@@ -26,7 +20,7 @@ final class WindowMover {
         }
     }
 
-    /// A hung target must not stall the main actor for the AX default (6s). Per element, never inherited.
+    /// A hung target must not stall main for the AX default. Per element, never inherited.
     private static let messagingTimeout: Float = 1
     /// Slack when checking whether the app honoured the size we asked for.
     private static let clampTolerance: CGFloat = 2
@@ -54,10 +48,7 @@ final class WindowMover {
         terminationToken = NotificationToken(token, center: NSWorkspace.shared.notificationCenter)
     }
 
-    /// Runs `command` against `target`'s focused window. `target` is explicit because the palette is
-    /// frontmost when a command dispatches from it — `AppCore` passes the app it recorded before hiding.
-    ///
-    /// Returns whether anything actually changed, so a caller can stay quiet when nothing did.
+    /// Runs `command` against `target`'s focused window, returning whether anything changed.
     @discardableResult
     func perform(
         _ command: WindowCommand.ID, target: NSRunningApplication?, gap: CGFloat,
@@ -79,8 +70,7 @@ final class WindowMover {
 
         if catalogued.kind == .fullscreen {
             guard toggleFullScreen(window) else { return false }
-            // The size chain is meaningless now, but the pre-Tinycast frame is still the right Restore
-            // target — macOS restores the pre-fullscreen frame itself on the way out.
+            // The size chain is moot, but the pre-Tinycast frame is still the Restore target.
             memory.forgetCycle(key: key)
             return true
         }
@@ -103,8 +93,7 @@ final class WindowMover {
             lastTileCommand: decision.lastTileCommand)
         guard let placement = WindowLayout.placement(for: input) else { return false }
 
-        // Checked before a single write, so a window that can't be positioned is left untouched rather
-        // than resized in place.
+        // Checked before any write, so an unpositionable window is left untouched.
         guard isSettable(kAXPositionAttribute, on: window) else { return false }
         let canResize =
             placement.resizes && isSettable(kAXSizeAttribute, on: window)
@@ -136,8 +125,7 @@ final class WindowMover {
         }
 
         guard canResize else {
-            // The window refuses to resize: place the size it already has inside the slot and stop, so
-            // the result is one coherent move rather than a half-applied one.
+            // It refuses to resize, so place the size it has inside the slot and stop.
             var slot = placement.anchor.place(current.size, in: placement.frame)
             if let canvas { slot = WindowLayout.clamped(slot, into: canvas) }
             guard setPosition(WindowLayout.rounded(slot).origin, on: window) else { return nil }
@@ -147,9 +135,7 @@ final class WindowMover {
         let restoreEnhancedUI = suppressEnhancedUserInterface(on: application)
         defer { restoreEnhancedUI() }
 
-        // size → position → size. The first write shrinks the window so the move isn't clamped by the
-        // display it is leaving; the second applies the real size now that it is on the destination, the
-        // only display that can validate a larger frame. Whichever direction this is, one is a no-op.
+        // size → position → size. See docs/features/window-management.md#applying-a-placement.
         _ = setSize(placement.frame.size, on: window)
         guard setPosition(placement.frame.origin, on: window) else {
             _ = setSize(current.size, on: window)  // Roll the shrink back; nothing visibly moved.
@@ -159,7 +145,7 @@ final class WindowMover {
 
         guard var actual = frame(of: window) else { return placement.frame }
 
-        // The second resize can shift the origin — some apps anchor a resize on a different corner.
+        // The second resize can shift the origin: some apps anchor on a different corner.
         if abs(actual.minX - placement.frame.minX) > Self.clampTolerance
             || abs(actual.minY - placement.frame.minY) > Self.clampTolerance
         {
@@ -167,10 +153,7 @@ final class WindowMover {
             actual = frame(of: window) ?? actual
         }
 
-        // The app refused to shrink to the slot (a minimum size, which AX exposes no attribute for — the
-        // read-back is the only way to learn it). Re-place the size it insisted on per the placement's
-        // anchor, so a left half stays left-aligned instead of drifting centre. One correction, no loop:
-        // iterating against an app that fights back just makes the window visibly jitter.
+        // An app-imposed minimum: re-place once per the anchor. No loop, which would jitter.
         if actual.width > placement.frame.width + Self.clampTolerance
             || actual.height > placement.frame.height + Self.clampTolerance
         {
@@ -198,7 +181,7 @@ final class WindowMover {
         return windows.first(where: isEligible)
     }
 
-    /// A real, restorable window — not a sheet, popover or minimized one, and one that reports geometry.
+    /// A real, restorable window: not a sheet, popover or minimized one, and it reports geometry.
     private func isEligible(_ window: AXUIElement) -> Bool {
         guard string(window, kAXRoleAttribute) == (kAXWindowRole as String) else { return false }
         if bool(window, kAXMinimizedAttribute) == true { return false }
@@ -215,12 +198,7 @@ final class WindowMover {
         return (value as? Bool) ?? false
     }
 
-    /// `AXFullScreen` is undocumented but universally implemented; the green button is the fallback for
-    /// windows that expose it yet refuse the attribute write. No synthetic ⌃⌘F third attempt — it is
-    /// app-rebindable and could fire an unrelated menu command.
-    ///
-    /// Deliberately does not read geometry back: the transition is animated and asynchronous, so any
-    /// frame read here would be a mid-animation value.
+    /// `AXFullScreen`, then the green button. docs/features/window-management.md
     private func toggleFullScreen(_ window: AXUIElement) -> Bool {
         let target: CFBoolean = isFullScreen(window) ? kCFBooleanFalse : kCFBooleanTrue
         if isSettable(Self.fullScreenAttribute as String, on: window),
@@ -234,9 +212,7 @@ final class WindowMover {
         return AXUIElementPerformAction(button, kAXPressAction as CFString) == .success
     }
 
-    /// Some apps (VoiceOver clients, a few Electron shells) reinterpret frame writes while
-    /// `AXEnhancedUserInterface` is on, landing windows in the wrong place. Clear it for the duration and
-    /// restore it immediately — but never while VoiceOver is actually running, which would break it.
+    /// Cleared for the writes, never while VoiceOver runs. See docs/features/window-management.md.
     private func suppressEnhancedUserInterface(on application: AXUIElement) -> () -> Void {
         let attribute = "AXEnhancedUserInterface" as CFString
         guard !NSWorkspace.shared.isVoiceOverEnabled else { return {} }
@@ -251,7 +227,9 @@ final class WindowMover {
     // MARK: - Screens
 
     /// Cocoa screens converted into the AX space `WindowLayout` works in.
-    private static func screens(_ screens: [NSScreen], geometry: AXGeometry)
+    private static func screens(
+        _ screens: [NSScreen], geometry: AXGeometry
+    )
         -> [WindowLayout.Screen]
     {
         screens.enumerated().map { index, screen in
@@ -302,8 +280,7 @@ final class WindowMover {
         return size
     }
 
-    private func axValue(_ element: AXUIElement, _ attribute: String, type: AXValueType) -> AXValue?
-    {
+    private func axValue(_ element: AXUIElement, _ attribute: String, type: AXValueType) -> AXValue? {
         var value: CFTypeRef?
         guard
             AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
@@ -349,29 +326,18 @@ final class WindowMover {
     }
 }
 
-/// Converts between Cocoa's bottom-left, +Y-up global space and the top-left, +Y-down space AX and
-/// Quartz use.
-///
-/// Both are anchored on the **primary** display — the one whose Cocoa frame origin is `(0, 0)` — not on
-/// whichever display a window happens to be on. Flipping through the window's own screen height shears
-/// every rect on a differently-sized display by the height difference, which is invisible on a single
-/// monitor and wrong on every mixed-size multi-monitor setup.
+/// The one Cocoa↔AX converter. See docs/features/window-management.md#coordinate-space.
 struct AXGeometry {
     let anchorHeight: CGFloat
 
-    /// Snapshot the anchor once per command: `NSScreen.screens` can change between calls (hotplug, wake,
-    /// resolution change), and mixing two anchors inside one command corrupts the result.
+    /// Snapshot once per command: `NSScreen.screens` can change, and mixing anchors corrupts.
     @MainActor
     init(screens: [NSScreen]) {
         let primary = screens.first { $0.frame.origin == .zero } ?? screens.first
         anchorHeight = primary?.frame.height ?? 0
     }
 
-    /// An involution — `flip(flip(rect)) == rect`. Through `maxY`, not `minY`: the two spaces anchor a
-    /// rect on opposite edges, since one hangs up from its origin and the other hangs down.
-    ///
-    /// No scaling is involved at any point. `NSScreen.frame`, `visibleFrame` and AX coordinates are all
-    /// in points, so `backingScaleFactor` must never appear here — mixed-DPI correctness is automatic.
+    /// An involution through `maxY`, never scaled. docs/features/window-management.md
     func flip(_ rect: CGRect) -> CGRect {
         CGRect(
             x: rect.origin.x, y: anchorHeight - rect.maxY, width: rect.width, height: rect.height)

@@ -1,6 +1,6 @@
 import Foundation
 
-/// First-run marker stored as a file in Application Support (not UserDefaults) so a full uninstall — including leftover/`--zap` cleanup — clears it and a reinstall re-runs onboarding; a UserDefaults flag gets resurrected by cfprefsd and survives removal.
+/// The first-run marker as a file, not a default: cfprefsd resurrects a deleted default.
 enum OnboardingState {
     private static let markerURL = AppPaths.applicationSupport()
         .appendingPathComponent("onboarded")
@@ -10,7 +10,7 @@ enum OnboardingState {
         FileManager.default.fileExists(atPath: markerURL.path)
     }
 
-    /// Records that onboarding has been shown; called at show-time so it stays one-time even if the user quits mid-flow.
+    /// Written at show-time, so onboarding stays one-time even if they quit mid-flow.
     static func markShown() {
         try? Data().write(to: markerURL)
     }

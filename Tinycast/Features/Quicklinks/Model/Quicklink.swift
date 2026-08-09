@@ -1,9 +1,9 @@
 import Foundation
 
-/// A user-authored destination — a URL, search, file, folder or deeplink — surfaced as a launcher command.
+/// A user-authored URL, search, file, folder or deeplink, surfaced as a launcher command.
 struct Quicklink: Codable, Hashable, Identifiable, Sendable {
     static let entryIDPrefix = "quicklink:"
-    /// Fallback glyph when a quicklink has no icon of its own and its destination can't be detected.
+    /// Fallback glyph when there is no icon and the destination can't be detected.
     static let sfSymbol = "link"
 
     let id: UUID
@@ -43,8 +43,7 @@ struct Quicklink: Codable, Hashable, Identifiable, Sendable {
         return UUID(uuidString: String(entryID.dropFirst(entryIDPrefix.count)))
     }
 
-    /// The one display order — pinned first in the order they were pinned, then the rest by name.
-    /// Both the store and the launcher slice sort through this so the two can never disagree.
+    /// The one display order, sorted through by both the store and the launcher slice.
     static func precedes(_ lhs: Quicklink, _ rhs: Quicklink) -> Bool {
         switch (lhs.pinnedAt, rhs.pinnedAt) {
         case (let left?, let right?):
@@ -53,13 +52,13 @@ struct Quicklink: Codable, Hashable, Identifiable, Sendable {
         case (.none, .some): return false
         case (.none, .none):
             let order = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
-            return order != .orderedSame ? order == .orderedAscending
+            return order != .orderedSame
+                ? order == .orderedAscending
                 : lhs.id.uuidString < rhs.id.uuidString
         }
     }
 
-    // Hand-written so an exported file stays importable after a field is added, and so a
-    // hand-authored import only has to supply a name and a link.
+    // Hand-written, so an added field keeps old exports importable and imports stay minimal.
     private enum CodingKeys: String, CodingKey {
         case id, name, link, openWithBundleID, iconSymbol, showsInRootSearch, pinnedAt, createdAt
     }

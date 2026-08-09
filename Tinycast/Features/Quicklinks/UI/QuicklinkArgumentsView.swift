@@ -1,11 +1,6 @@
 import SwiftUI
 
-/// The form shown before a quicklink with placeholders opens.
-///
-/// The palette's own search field is the input for whichever argument is current, so this view only
-/// draws what has been answered and what is left — and, for an argument with `options=`, the choices
-/// as ordinary selectable rows so the flat selection index behaves exactly as it does in every other
-/// list.
+/// The form shown before a templated quicklink opens. docs/features/quicklinks.md
 struct QuicklinkArgumentsView: View {
     let options: [String]
     let selection: Int

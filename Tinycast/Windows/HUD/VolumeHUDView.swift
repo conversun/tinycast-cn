@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The volume box: speaker glyph, bar, number. Takes the palette's surface recipe rather than glass —
-/// it has content to read, not a control to press — so it reads as a sibling of the dialogs.
+/// The volume box: glyph, bar, number, on the palette's surface recipe rather than glass.
 struct VolumeHUDView: View {
     let state: VolumeState
 
@@ -23,7 +22,7 @@ struct VolumeHUDView: View {
                     }
                 }
                 .frame(height: Theme.Size.volumeTrackHeight)
-                // Muted prints the word, not 0%: the bar is already empty, and a number would contradict it or hide the level to come back to.
+                // Muted prints the word: the bar is empty, and a number would contradict it.
                 Text(state.muted ? "Muted".localizedUI : VolumeLevel.percentage(state.level))
                     .font(Theme.Typography.rowTrailing)
                     .foregroundStyle(Theme.Colors.textSecondary)
@@ -31,7 +30,7 @@ struct VolumeHUDView: View {
                     .frame(width: Theme.Size.volumeReadout, alignment: .trailing)
             }
         }
-        // Asymmetric: 20pt of side padding costs a fifth of a 200pt box against a twentieth of a 420pt dialog, and the bar is the content here.
+        // Asymmetric: side padding costs far more on a 200pt box than a 420pt dialog.
         .padding(.vertical, Theme.Spacing.xxl)
         .padding(.horizontal, Theme.Spacing.xl)
         .frame(width: Theme.Size.hudWidth, height: Theme.Size.hudHeight)

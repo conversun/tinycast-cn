@@ -4,18 +4,13 @@ import SQLite3
 // Spelled as the C macro in sqlite3.h, which isn't imported into Swift.
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-/// SQLite-backed library of the user's quicklinks.
-///
-/// Unlike `ClipboardStore` this is **authored data, not a regenerable cache**, which decides two
-/// things: it lives in Application Support rather than Caches, and a database that won't open is
-/// never deleted — the store goes read-only and says so instead of silently starting empty.
+/// SQLite library of authored quicklinks, never deleted. See docs/features/quicklinks.md#storage.
 @MainActor
 @Observable
 final class QuicklinkStore {
     /// Display order is `Quicklink.precedes`: pinned first by pin time, then the rest by name.
     private(set) var quicklinks: [Quicklink] = []
-    /// False when the database could not be opened; every mutation then refuses rather than
-    /// pretending to save.
+    /// False when the database wouldn't open; every mutation then refuses rather than pretends.
     private(set) var isAvailable = false
     var onChange: (([Quicklink]) -> Void)?
 
@@ -38,20 +33,17 @@ final class QuicklinkStore {
     @ObservationIgnored private var loadStmt: OpaquePointer?
     @ObservationIgnored private var deleteStmt: OpaquePointer?
 
-    /// `directory` defaults to the per-channel Application Support folder; the harness passes a
-    /// throwaway one so a run can never reach a real library.
+    /// `directory` defaults per channel; the harness passes a throwaway one.
     init(directory: URL? = nil) {
         let base = directory ?? Self.defaultDirectory
         dbURL = base.appendingPathComponent("quicklinks.sqlite3")
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         isAvailable = openDatabase()
-        // A failed open leaves the file exactly as it was: this is the user's library, so a bad
-        // read is a problem to report, never one to fix by deleting.
+        // A failed open leaves the file alone: this is authored data, so report, never delete.
         if !isAvailable { closeDatabase() }
     }
 
-    /// Under ~/Library/Application Support/<bundle-id> — the same per-channel root snippets use,
-    /// since neither is something Tinycast could rebuild.
+    /// Under Application Support, the same per-channel root snippets use.
     private static var defaultDirectory: URL {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.tinycast.app"
         return FileManager.default
@@ -59,8 +51,7 @@ final class QuicklinkStore {
             .appendingPathComponent(bundleID, isDirectory: true)
     }
 
-    // Isolated so teardown may touch the main-actor statement/db pointers; AppCore only ever
-    // releases the store on the main actor, so no hop.
+    // Isolated so teardown may touch the main-actor pointers; the release is already on main.
     isolated deinit {
         closeDatabase()
     }
@@ -83,8 +74,7 @@ final class QuicklinkStore {
         Quicklink.id(fromEntryID: entryID).flatMap(quicklink)
     }
 
-    // Takes a whole draft rather than a parameter per field so adding an option doesn't churn
-    // every call site.
+    // Takes a whole draft, so adding an option doesn't churn every call site.
     @discardableResult
     func add(_ draft: Quicklink) throws(QuicklinkError) -> Quicklink {
         let value = try validated(draft)
@@ -119,8 +109,7 @@ final class QuicklinkStore {
         try write(value)
     }
 
-    /// "Duplicate" in the actions menu: a new identity, so hotkey and visibility references stay
-    /// with the original, and a distinct name so validation passes.
+    /// "Duplicate": a new identity, so references stay with the original, plus a distinct name.
     @discardableResult
     func duplicate(id: UUID) throws(QuicklinkError) -> Quicklink {
         guard let source = quicklink(id: id) else { throw .storageUnavailable }
@@ -141,7 +130,7 @@ final class QuicklinkStore {
         return added
     }
 
-    /// Replaces the complete set during native-backup import, dropping invalid and duplicate records.
+    /// Replaces the whole set on backup import, dropping invalid and duplicate records.
     @discardableResult
     func replace(with incoming: [Quicklink]) -> Int {
         guard isAvailable, sqlite3_exec(db, "DELETE FROM quicklinks", nil, nil, nil) == SQLITE_OK
@@ -193,19 +182,21 @@ final class QuicklinkStore {
         var value = draft
         value.name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         value.link = draft.link.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.iconSymbol = draft.iconSymbol?.trimmingCharacters(in: .whitespacesAndNewlines)
+        value.iconSymbol =
+            draft.iconSymbol?.trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty
-        value.openWithBundleID = draft.openWithBundleID?
+        value.openWithBundleID =
+            draft.openWithBundleID?
             .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         guard !value.name.isEmpty else { throw .emptyName }
         guard !value.link.isEmpty else { throw .emptyLink }
         guard !value.name.contains("\0"), !value.link.contains("\0") else {
             throw .invalidCharacter
         }
-        // A templated link's destination is only knowable once its placeholders carry real values,
-        // so it is accepted here and reported at open time instead.
-        guard QuicklinkDestination.containsPlaceholder(value.link)
-            || QuicklinkDestination.detect(value.link) != nil
+        // A templated link is only knowable once filled, so it is reported at open time.
+        guard
+            QuicklinkDestination.containsPlaceholder(value.link)
+                || QuicklinkDestination.detect(value.link) != nil
         else { throw .unresolvableLink }
         guard
             !quicklinks.contains(where: {
@@ -243,8 +234,7 @@ final class QuicklinkStore {
                 == SQLITE_OK,
             sqlite3_exec(db, Self.schema, nil, nil, nil) == SQLITE_OK
         else { return false }
-        // Created after the schema rather than inside it, so a column added by a future migration
-        // can be indexed the same way.
+        // After the schema, so a column added later can be indexed the same way.
         sqlite3_exec(
             db,
             "CREATE INDEX IF NOT EXISTS quicklinks_pinned_at ON quicklinks(pinned_at) WHERE pinned_at IS NOT NULL",

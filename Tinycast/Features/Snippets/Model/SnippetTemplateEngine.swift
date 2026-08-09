@@ -2,7 +2,7 @@ import Foundation
 
 enum SnippetTemplateEngine {
     struct ExpansionContext: Sendable {
-        /// Clipboard history, most recent first: `{clipboard}` is offset 0, `{clipboard offset=1}` the one before it.
+        /// Clipboard history, most recent first: `{clipboard}` is offset 0.
         let clipboardHistory: [String]
         let selection: String
         let now: Date
@@ -14,8 +14,7 @@ enum SnippetTemplateEngine {
 
         var clipboard: String { clipboardHistory.first ?? "" }
 
-        /// A copy reading a different selection, for a caller that only learns the value after the
-        /// context was captured — a quicklink whose selection had to be asked for or fallen back to.
+        /// A copy reading a different selection, for a caller that learns it after capture.
         func replacingSelection(with selection: String) -> Self {
             Self(
                 clipboardHistory: clipboardHistory, selection: selection, now: now,
@@ -63,7 +62,7 @@ enum SnippetTemplateEngine {
         }
     }
 
-    /// An `{argument}` the template still needs a value for, with any `options=` the prompt should offer.
+    /// An `{argument}` still needing a value, with any `options=` the prompt should offer.
     struct MissingArgument: Sendable, Equatable {
         let name: String
         let options: [String]
@@ -75,9 +74,7 @@ enum SnippetTemplateEngine {
         let missingArguments: [MissingArgument]
     }
 
-    /// Formatting the *result* asks for, applied to every value a token produces. A snippet expands
-    /// into plain text and wants none; a quicklink expands into a URL, where an unescaped space or
-    /// `&` would silently truncate the destination.
+    /// Formatting the result asks for: none for a snippet, percent-encoding for a quicklink URL.
     enum ValueEncoding: Sendable {
         case none
         case percentEncoding
@@ -104,8 +101,7 @@ enum SnippetTemplateEngine {
             ))
     }
 
-    /// Expands a template that isn't a snippet. `{snippet:…}` has nothing to resolve against here,
-    /// so it is left in the text like any other token the engine can't complete.
+    /// Expands a non-snippet template; `{snippet:…}` has nothing to resolve and stays as text.
     static func expand(
         text: String,
         context: ExpansionContext,
@@ -124,8 +120,7 @@ enum SnippetTemplateEngine {
             ))
     }
 
-    /// Whether the template reads the selection. Parsed rather than searched for, so a `{selection}`
-    /// inside a literal brace run or a malformed token doesn't count.
+    /// Whether the template reads the selection. Parsed, so a literal brace run doesn't count.
     static func usesSelection(_ text: String) -> Bool {
         parseSegments(text).contains { segment in
             if case .selection = segment { return true }
@@ -221,7 +216,7 @@ enum SnippetTemplateEngine {
         case trim
         case percentEncode = "percent-encode"
         case jsonStringify = "json-stringify"
-        /// Opts out of automatic formatting. Tinycast applies none, so this is accepted and does nothing.
+        /// Opts out of automatic formatting; Tinycast applies none, so it does nothing.
         case raw
     }
 
@@ -242,7 +237,8 @@ enum SnippetTemplateEngine {
             case .literal(let value):
                 result.append(value)
             case .clipboard(let offset, let modifiers):
-                let value = offset < context.clipboardHistory.count
+                let value =
+                    offset < context.clipboardHistory.count
                     ? context.clipboardHistory[offset] : ""
                 result.append(apply(modifiers, to: value, encoding: encoding))
             case .selection(let modifiers):
@@ -272,15 +268,16 @@ enum SnippetTemplateEngine {
                 }
                 var nestedVisited = visitedIDs
                 nestedVisited.insert(target.id)
-                result.append(expandText(
-                    target.snippet.text,
-                    snippets: snippets,
-                    context: context,
-                    userArguments: userArguments,
-                    encoding: encoding,
-                    depth: depth + 1,
-                    visitedIDs: nestedVisited
-                ))
+                result.append(
+                    expandText(
+                        target.snippet.text,
+                        snippets: snippets,
+                        context: context,
+                        userArguments: userArguments,
+                        encoding: encoding,
+                        depth: depth + 1,
+                        visitedIDs: nestedVisited
+                    ))
             }
         }
         return result
@@ -299,22 +296,21 @@ enum SnippetTemplateEngine {
             case .raw: return partial
             }
         }
-        // Applied last so `| uppercase` can't rewrite the `%xx` hex, and skipped when the template
-        // already spoke for itself — `raw` opts out, `percent-encode` has done it once already.
+        // Last, so `| uppercase` can't rewrite the `%xx`; skipped when the template spoke first.
         guard encoding == .percentEncoding,
             !modifiers.contains(.raw), !modifiers.contains(.percentEncode)
         else { return modified }
         return percentEncoded(modified)
     }
 
-    /// Percent-encodes everything outside RFC 3986's unreserved set, so the result is safe in any URL component.
+    /// Percent-encodes outside RFC 3986's unreserved set, so it is safe in any URL component.
     private static func percentEncoded(_ value: String) -> String {
         let unreserved = CharacterSet(
             charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
         return value.addingPercentEncoding(withAllowedCharacters: unreserved) ?? value
     }
 
-    /// Escapes the value for use *inside* a JSON string; the surrounding quotes stay the template's job.
+    /// Escapes for use inside a JSON string; the surrounding quotes stay the template's job.
     private static func jsonEscaped(_ value: String) -> String {
         var escaped = ""
         for scalar in value.unicodeScalars {
@@ -342,7 +338,8 @@ enum SnippetTemplateEngine {
         var position = source.startIndex
 
         while position < source.endIndex,
-            let opening = source[position...].firstIndex(of: "{") {
+            let opening = source[position...].firstIndex(of: "{")
+        {
             if position < opening {
                 segments.append(.literal(String(source[position..<opening])))
             }
@@ -377,7 +374,7 @@ enum SnippetTemplateEngine {
             modifiers.append(modifier)
         }
 
-        // Structural tokens produce no text of their own, so a modifier on one is a malformed token.
+        // Structural tokens produce no text, so a modifier on one is malformed.
         if head == "cursor" {
             return modifiers.isEmpty ? .cursor : nil
         }
@@ -394,9 +391,7 @@ enum SnippetTemplateEngine {
                 token.hasOnly(["offset"])
             else { return nil }
             return .clipboard(offset: offset, modifiers: modifiers)
-        // `selectedText` is the spelling Raycast's own documentation uses; both name the captured
-        // selection. Nothing ever writes the alias — the Insert… menus emit `{selection}` — so it is
-        // accepted on the way in without becoming a second name in saved data.
+        // `selectedText` is Raycast's spelling, accepted on the way in but never written out.
         case "selection", "selectedtext":
             guard token.parameters.isEmpty else { return nil }
             return .selection(modifiers: modifiers)
@@ -534,7 +529,7 @@ enum SnippetTemplateEngine {
         return Int(raw)
     }
 
-    /// Splits `clipboard | trim | uppercase` on pipes that sit outside a quoted value, trimming each part.
+    /// Splits on pipes outside a quoted value, trimming each part.
     private static func splitOnPipes(_ body: String) -> [String]? {
         var parts: [String] = []
         var current = ""
@@ -567,7 +562,7 @@ enum SnippetTemplateEngine {
         return parts
     }
 
-    /// `date offset="+1d" format="yyyy"` → command `date` plus its parameters. Values may be quoted (with escapes) or bare.
+    /// `date offset="+1d"` → command plus parameters. Values may be quoted or bare.
     private static func parseToken(_ head: String) -> ParsedToken? {
         var remainder = Substring(head)
         remainder = remainder.drop(while: \Character.isWhitespace)
@@ -638,7 +633,7 @@ enum SnippetTemplateEngine {
         snippets: [StoredSnippet]
     ) -> StoredSnippet? {
         let normalizedKey = normalizeReference(key)
-        // A disabled snippet is never expandable on its own, so it must not become expandable by nesting either.
+        // A disabled snippet is not expandable alone, so nesting must not make it so.
         let candidates = snippets.filter { $0.snippet.isEnabled }
         if let nameMatch = candidates.first(where: {
             normalizeReference($0.snippet.name) == normalizedKey

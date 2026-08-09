@@ -105,7 +105,7 @@ struct CustomCommandEditorSheet: View {
     }
 
     private func save() {
-        // Editing keeps the UUID, and with it the command's favorite, visibility and hotkey references.
+        // Editing keeps the UUID, and with it every reference the command owns.
         let draft = CustomCommand(
             id: command?.id ?? UUID(), name: name, command: shellCommand,
             loadsShellEnvironment: loadsShellEnvironment,

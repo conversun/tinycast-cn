@@ -21,7 +21,7 @@ enum UnitCategory: String, CaseIterable, Sendable {
     }
 }
 
-/// One unit as an affine map onto its category's base unit (`base = value * factor + offset`); `offset` is nonzero only for temperature, so °C/°F/K convert with no special-casing. `name` is the long human label shown as a card badge ("Meters").
+/// A unit as an affine map onto its base: `base = value * factor + offset`. Temperature only.
 struct UnitDef: Equatable, Sendable {
     let symbol: String  // canonical display form: "mi", "°F", "GiB"
     let name: String  // long label for the card badge: "Miles", "Fahrenheit"
@@ -45,7 +45,7 @@ enum CalcUnits {
         case mismatch(from: UnitDef, to: UnitDef)
     }
 
-    /// A keyword-less conversion (`1m`, `1hr`) resolved to a curated counterpart unit; `compound` requests feet+inches formatting.
+    /// A keyword-less conversion to a curated counterpart; `compound` asks for feet+inches.
     struct BareConversion: Equatable {
         let input: Double
         let from: UnitDef
@@ -54,7 +54,7 @@ enum CalcUnits {
         let compound: Bool
     }
 
-    /// Detects `expr unit (to|in|->) unit` (connector second-to-last, known unit last), returning `.mismatch` only when both units are known but incompatible; matching the last position lets "in" double as inches. A missing value defaults to 1, so `day to s` reads as `1 day to s`.
+    /// `expr unit (to|in|->) unit`. Matching the last position lets "in" double as inches.
     static func parseConversion(_ tokens: [CalcToken]) -> ConversionParse? {
         guard tokens.count >= 3, isConnector(tokens[tokens.count - 2]),
             case .ident(let toName) = tokens[tokens.count - 1],
@@ -79,7 +79,7 @@ enum CalcUnits {
         return .value(input: input, from: from, to: to, output: output)
     }
 
-    /// A no-connector two-unit query (`day s`, `km mi`) → `1 <first>` in `<second>`. Both must be known units in the same category; anything else returns nil so coincidental two-word searches don't produce a card.
+    /// `day s` → `1 day` in `s`. Same category only, so two-word searches don't produce a card.
     static func parseUnitPairConversion(_ tokens: [CalcToken]) -> ConversionParse? {
         guard tokens.count == 2,
             case .ident(let fromName) = tokens[0], let from = byName[fromName],
@@ -92,7 +92,7 @@ enum CalcUnits {
         return .value(input: 1, from: from, to: to, output: output)
     }
 
-    /// Detects `expr unit` with no connector (`1m`, `2*3 kg`) and converts to a curated counterpart from `autoTargets`. Single-letter temperature aliases (c/f/k) are excluded so `5k` stays an app search rather than "5 Kelvin".
+    /// `expr unit` with no connector. c/f/k are excluded, so `5k` stays an app search.
     static func parseBareConversion(_ tokens: [CalcToken]) -> BareConversion? {
         guard tokens.count >= 2, case .ident(let fromName) = tokens[tokens.count - 1],
             !["c", "f", "k"].contains(fromName),
@@ -116,7 +116,7 @@ enum CalcUnits {
         }
     }
 
-    /// Keyword-less counterpart per unit (metric↔imperial where it applies): source `symbol` → target `byName` key + whether to render feet+inches. Only `m→ft` is compound.
+    /// Keyword-less counterpart per unit; only `m→ft` is compound.
     static let autoTargets: [String: (to: String, compound: Bool)] = [
         // Length
         "mm": ("in", false), "cm": ("in", false), "m": ("ft", true), "km": ("mi", false),
@@ -234,7 +234,7 @@ enum CalcUnits {
         add(UnitDef("pt", "Pints", .volume, 0.473176473), ["pt", "pint", "pints"])
         add(UnitDef("fl oz", "Fluid Ounces", .volume, 0.0295735295625), ["floz"])
 
-        // Digital storage (base: byte) — kB/MB/… are SI (1000ⁿ), KiB/MiB/… are IEC (1024ⁿ).
+        // Digital storage (base: byte): kB/MB are SI (1000ⁿ), KiB/MiB are IEC (1024ⁿ).
         add(UnitDef("bit", "Bits", .digitalStorage, 0.125), ["bit", "bits"])
         add(UnitDef("B", "Bytes", .digitalStorage, 1), ["b", "byte", "bytes"])
         add(UnitDef("kB", "Kilobytes", .digitalStorage, 1e3), ["kb", "kilobyte", "kilobytes"])
@@ -253,7 +253,7 @@ enum CalcUnits {
             UnitDef("TiB", "Tebibytes", .digitalStorage, 1_099_511_627_776),
             ["tib", "tebibyte", "tebibytes"])
 
-        // Angle (base: radian) — `deg` is also a trig postfix in CalcParser; the conversion path only fires for a standalone `<n> deg`.
+        // Angle (base: radian); `deg` is also a trig postfix, so conversion needs a lone `<n> deg`.
         add(UnitDef("rad", "Radians", .angle, 1), ["rad", "radian", "radians"])
         add(UnitDef("deg", "Degrees", .angle, .pi / 180), ["deg", "degree", "degrees"])
         add(UnitDef("grad", "Gradians", .angle, .pi / 200), ["grad", "grads", "gradian", "gradians", "gon"])

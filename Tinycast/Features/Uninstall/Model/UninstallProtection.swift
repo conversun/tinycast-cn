@@ -1,6 +1,6 @@
 import Foundation
 
-/// All the classifier may know about one path. Injected, which is what keeps it pure and harness-drivable.
+/// All the classifier may know about one path, injected so it stays pure.
 struct PathFacts: Hashable, Sendable {
     let path: String
     var exists = true
@@ -14,7 +14,7 @@ struct PathFacts: Hashable, Sendable {
     /// Only decides anything under a sticky parent — see `classify`.
     var isOwnedByCurrentUser = true
     var parentIsWritable = true
-    /// `S_ISVTX` on the enclosing directory: the `/tmp` rule, where only an item's owner may unlink it.
+    /// `S_ISVTX` on the parent: the `/tmp` rule, where only an owner may unlink an item.
     var parentIsSticky = false
 }
 
@@ -24,8 +24,7 @@ struct UninstallEnvironment: Hashable, Sendable {
     let hasFullDiskAccess: Bool
 }
 
-/// Why a candidate can or can't be trashed. Advisory, not a boundary: TCC is evaluated at the syscall, so this can be wrong either way.
-/// It grays a row with a reason and skips doomed attempts; `UninstallRunner` still reports per-item failure.
+/// Why a candidate can or can't be trashed. Advisory: TCC is evaluated at the syscall.
 enum UninstallProtection: String, Hashable, Sendable, CaseIterable {
     case removable
     case systemProtected
@@ -59,9 +58,8 @@ enum UninstallProtection: String, Hashable, Sendable, CaseIterable {
 }
 
 enum UninstallProtectionRules {
-    /// Precedence is asserted: a SIP file is also root-owned and often TCC-gated, and "part of macOS" is the most useful reason.
-    static func classify(_ facts: PathFacts, environment: UninstallEnvironment) -> UninstallProtection
-    {
+    /// Precedence is asserted; a SIP file is also root-owned, and "part of macOS" reads best.
+    static func classify(_ facts: PathFacts, environment: UninstallEnvironment) -> UninstallProtection {
         guard facts.exists else { return .missing }
         if facts.isSystemRestricted || facts.volumeIsReadOnly { return .systemProtected }
         if facts.isUserImmutable { return .userLocked }
@@ -70,21 +68,20 @@ enum UninstallProtectionRules {
         {
             return .needsFullDiskAccess
         }
-        // Trashing is a rename out of the parent, so its write bit decides — not who owns the item.
+        // Trashing renames out of the parent, so its write bit decides, not the item's owner.
         if !facts.parentIsWritable { return .parentNotWritable }
         // The one case where ownership does decide: a sticky parent lets only an owner unlink.
         if facts.parentIsSticky, !facts.isOwnedByCurrentUser { return .notOwned }
         return .removable
     }
 
-    /// Wider than the current roots on purpose, so adding one later can't silently start attempting denied reads.
+    /// Wider than the current roots, so adding one can't silently attempt a denied read.
     static func isTCCProtected(path: String, home: String) -> Bool {
         let relative = tccRelativePrefixes.contains { path.hasPrefix(home + "/" + $0) }
         return relative || path.hasPrefix("/Library/Application Support/com.apple.TCC")
     }
 
-    /// Measured, not assumed — probe by creating and trashing a throwaway directory. Listing is *not* the test:
-    /// both container roots list fine and still refuse the trash. Re-measure before adding an entry.
+    /// Measured, never assumed: listing is not the test. See docs/features/uninstall.md.
     static let tccRelativePrefixes: [String] = [
         "Library/Containers/",
         "Library/Group Containers/",

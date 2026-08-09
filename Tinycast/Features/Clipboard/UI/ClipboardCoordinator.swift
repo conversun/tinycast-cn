@@ -20,10 +20,16 @@ final class ClipboardCoordinator {
         self.paletteCoordinator = paletteCoordinator
     }
 
+    /// The setting names an age, the store enforces it; a shortened window culls straight away.
+    func applyRetention(_ retention: ClipboardRetention) {
+        clipboardStore.maxAge = retention.maxAge
+        clipboardStore.enforceLimits()
+    }
+
     func paste(_ item: ClipboardItem) {
         let previous = windowController.previousApp
         paletteCoordinator.hidePalette(restoreFocus: false)
-        // A successful write promotes the item to the head of its section; follow it so any preserved (pop-to-root) or open clipboard state highlights the row that moved.
+        // A write promotes the item, so follow it and keep the moved row highlighted.
         if Paster.paste(item, store: clipboardStore, previousApp: previous) {
             selectClip(item)
         }
@@ -48,14 +54,14 @@ final class ClipboardCoordinator {
         AppLauncher.showInFinder(url)
     }
 
-    /// Pin or unpin a clipboard entry: the row jumps into (or out of) the Pinned section at the top, so the selection and the scroll follow it.
+    /// Pin or unpin an entry; the selection and scroll follow the row as it moves.
     func togglePinnedClip(_ item: ClipboardItem) {
         clipboardStore.togglePinned(item)
         selectClip(item)
         palette.followToken = UUID()
     }
 
-    /// Put the selection on `item`'s row in the list as currently filtered — pinned rows hold the top, so a row that moved isn't always index 0.
+    /// Select `item`'s row as currently filtered; a moved row isn't always index 0.
     private func selectClip(_ item: ClipboardItem) {
         palette.selection = clipboardStore.rowIndex(of: item, in: palette.query) ?? 0
     }

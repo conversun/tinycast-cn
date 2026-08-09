@@ -3,15 +3,15 @@ import Foundation
 /// A single evaluated calculator answer for the launcher's inline card.
 struct CalcResult: Equatable, Sendable {
     enum Payload: Equatable, Sendable {
-        /// `display` is grouped and human-facing ("1,234,567"); `copyText` is the same answer without grouping, for pasting onwards.
+        /// `display` is grouped ("1,234,567"); `copyText` is the same answer, ungrouped.
         case value(display: String, copyText: String)
-        /// A friendly error ("Cannot convert Weight to Time.") — only for a clear conversion attempt, never a half-typed expression.
+        /// A friendly error, only for a clear conversion attempt — never a half-typed expression.
         case error(message: String)
     }
 
     /// Normalized echo of what was evaluated, shown on the card's left side ("3×3", "10 km").
     let expression: String
-    /// Optional word-name pills beneath each side of the card ("Meters"→"Feet", "12:18 AM"→"9:00 AM"); nil for plain arithmetic.
+    /// Optional word-name pills beneath each side; nil for plain arithmetic.
     let sourceBadge: String?
     let targetBadge: String?
     let payload: Payload
@@ -23,39 +23,39 @@ struct CalcResult: Equatable, Sendable {
         self.payload = payload
     }
 
-    /// True only for a copyable value — error cards are informational and have no primary action or actions menu.
+    /// True only for a copyable value; an error card has no primary action and no actions menu.
     var isActionable: Bool {
         if case .value = payload { return true }
         return false
     }
 }
 
-/// Entry point turning a raw query into a calculator answer (or nil when it isn't calculator input), via a pure pre-filter → base → unit → quantity → arithmetic pipeline; kept Foundation-only so `Tools/calc-test.swift` compiles it standalone.
+/// Raw query to answer, or nil when it isn't calculator input. See docs/features/calculator.md.
 enum CalcEngine {
-    /// Public entry: evaluates against the live clock. `currency` defaults to `.off` so any caller that
-    /// hasn't been handed a consented source gets the feature disabled rather than silently enabled.
+    /// Live clock. `currency` defaults to `.off`, so forgetting to pass one disables the feature.
     static func evaluate(_ raw: String, currency: CurrencySource = .off) -> CalcResult? {
         evaluate(raw, now: Date(), calendar: .current, currency: currency)
     }
 
-    /// `now`/`calendar` are injected so the date/time paths are deterministic under `Tools/calc-test.swift`.
+    /// `now`/`calendar` are injected so the date/time paths are deterministic under the harness.
     static func evaluate(
         _ raw: String, now: Date, calendar: Calendar, currency: CurrencySource = .off
     ) -> CalcResult? {
         let query = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty, query.count <= 256 else { return nil }
 
-        // Date/time first: `hrs till july` carries no digit, so it must run before the numeric reject below.
+        // Date/time first: `hrs till july` carries no digit, so it precedes the numeric reject.
         if let dateTime = CalcDateTime.evaluate(query, now: now, calendar: calendar) { return dateTime }
 
         guard let tokens = CalcTokenizer.tokenize(query), !tokens.isEmpty else { return nil }
 
         if let partial = partialResult(
-            tokens, query: query, now: now, calendar: calendar, currency: currency) {
+            tokens, query: query, now: now, calendar: calendar, currency: currency)
+        {
             return partial
         }
 
-        // A lone literal or constant is more likely an app search than a calculation, so no card — except a radix literal ("0xff"), where echoing the decimal is useful.
+        // A lone literal reads as an app search, so no card — except a radix one ("0xff").
         if tokens.count == 1 {
             if case .intLiteral(let value, let radix) = tokens[0], radix != 10 {
                 let display = CalcFormatter.grouped(String(value))
@@ -98,13 +98,12 @@ enum CalcEngine {
             }
         }
 
-        // Run typed arithmetic before currency conversion so unit aliases such as `pounds` keep winning in multi-term expressions.
+        // Typed arithmetic first, so aliases such as `pounds` keep winning in multi-term exprs.
         if let quantity = CalcQuantity.evaluate(tokens, query: query, currency: currency) {
             return quantity
         }
 
-        // Currency runs after units so an all-unit query keeps winning: `10 pounds to kg` is weight,
-        // `10 pounds to euros` is money. Returns nil outright when the user hasn't consented.
+        // After units, so `10 pounds to kg` stays weight. nil outright without consent.
         if let conversion = CalcCurrency.parseConversion(tokens, source: currency) {
             switch conversion {
             case .value(let input, let from, let to, let output):
@@ -150,7 +149,7 @@ enum CalcEngine {
         // Natural-language percent: `20% off 500`, `50 as % of 200`.
         if let percent = CalcPercent.evaluate(tokens, query: query) { return percent }
 
-        // Cheap reject for the arithmetic fallback: plain math always carries a digit or a constant, keeping the common app-search case a no-card.
+        // Cheap reject: plain math always carries a digit or a constant, so app searches skip it.
         guard
             query.contains(where: { $0.isASCII && $0.isNumber })
                 || query.lowercased().contains("e") || query.contains("π")
@@ -168,7 +167,7 @@ enum CalcEngine {
 
     // MARK: - Partial expressions
 
-    /// A trailing binary operator keeps the last complete prefix visible and copyable while the user types the right operand.
+    /// A trailing operator keeps the last complete prefix on the card while the user still types.
     private static func partialResult(
         _ tokens: [CalcToken], query: String, now: Date, calendar: Calendar,
         currency: CurrencySource
@@ -181,14 +180,16 @@ enum CalcEngine {
 
         if let quantity = CalcQuantity.evaluate(
             prefixTokens, query: tokenQuery(prefixTokens), currency: currency,
-            preserveStandaloneUnit: true) {
+            preserveStandaloneUnit: true)
+        {
             return replacingExpression(
                 quantity, with: "\(quantity.expression) \(operatorText)")
         }
 
-        // A conversion's own echo drops its target ("10 km" for `10km to mi`), so echo the typed text instead — the badges still name both units.
+        // A conversion's echo drops its target, so echo the typed text; the badges name both.
         if let complete = evaluate(
-            tokenQuery(prefixTokens), now: now, calendar: calendar, currency: currency) {
+            tokenQuery(prefixTokens), now: now, calendar: calendar, currency: currency)
+        {
             return replacingExpression(complete, with: prettyExpression(query))
         }
 
@@ -241,9 +242,7 @@ enum CalcEngine {
 
     // MARK: - Number bases
 
-    /// `255 to hex`, `0xff to decimal`, `0b1010 to binary`, `2*128 to hex` — value expression,
-    /// connector, target; mirrors how `CalcUnits.parseConversion` allows an expression on the left
-    /// (`2*5 km to mi`) rather than only a bare literal.
+    /// `255 to hex`, `2*128 to hex`: an expression on the left, like `CalcUnits.parseConversion`.
     private static func baseConversion(_ tokens: [CalcToken], query: String) -> CalcResult? {
         guard tokens.count >= 3, CalcUnits.isConnector(tokens[tokens.count - 2]),
             case .ident(let target) = tokens[tokens.count - 1]
@@ -259,12 +258,14 @@ enum CalcEngine {
             sourceBadge = baseName(forRadix: radix)
             sourceText = literalText
         } else if valueTokens.count == 1, let value = decimalLiteral(valueTokens[0]),
-            value >= 0, value.rounded() == value, value <= 9_007_199_254_740_992 {
+            value >= 0, value.rounded() == value, value <= 9_007_199_254_740_992
+        {
             source = UInt64(value)
             sourceBadge = "Decimal"
             sourceText = literalText
         } else if let value = CalcParser.evaluate(valueTokens),
-            value >= 0, value.rounded() == value, value <= 9_007_199_254_740_992 {
+            value >= 0, value.rounded() == value, value <= 9_007_199_254_740_992
+        {
             source = UInt64(value)
             sourceBadge = "Decimal"
             sourceText = CalcFormatter.grouped(String(source))
@@ -315,7 +316,7 @@ enum CalcEngine {
         }
     }
 
-    /// Light cleanup of the typed expression for the card: collapse whitespace and use pretty operator glyphs, otherwise keep what the user wrote.
+    /// Card cleanup: collapse whitespace and prettify operators, else keep what the user wrote.
     private static func prettyExpression(_ query: String) -> String {
         query.split(whereSeparator: \.isWhitespace).joined(separator: " ")
             .replacingOccurrences(of: "*", with: "×")

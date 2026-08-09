@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Actions menu content for a launcher app, shown bottom-right on right-click or from the Actions pill.
+/// Actions menu for a launcher app, from right-click or the Actions pill.
 @MainActor
 enum AppActionsMenu {
     static func content(

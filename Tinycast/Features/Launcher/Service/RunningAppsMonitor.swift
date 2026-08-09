@@ -1,6 +1,6 @@
 import AppKit
 
-/// Tracks running apps for the launcher's running indicator, updating live from NSWorkspace launch/terminate notifications.
+/// Tracks running apps for the launcher's indicator, live from NSWorkspace.
 @MainActor
 @Observable
 final class RunningAppsMonitor {
@@ -21,13 +21,13 @@ final class RunningAppsMonitor {
         }
     }
 
-    /// True when the entry's bundle is currently running — drives the row's running dot and the Quit action.
+    /// True while the entry's bundle runs; drives the running dot and the Quit action.
     func isRunning(_ app: AppEntry) -> Bool {
         guard let bundleID = app.bundleID else { return false }
         return runningBundleIDs.contains(bundleID)
     }
 
-    /// Launch/terminate fire for helpers and agents the launcher never lists, so republish only on a real change — an unconditional assign would invalidate every observer for nothing.
+    /// Helpers and agents fire these too, so republish only on a real change.
     private func refresh() {
         let next = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         guard next != runningBundleIDs else { return }

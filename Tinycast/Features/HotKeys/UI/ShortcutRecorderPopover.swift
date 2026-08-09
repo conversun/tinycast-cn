@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Bounds of the open recorder, so an ancestor outside the pane's `ScrollView` can draw the callout.
+/// Bounds of the open recorder, so an ancestor outside the `ScrollView` can draw it.
 struct ShortcutRecorderAnchorKey: PreferenceKey {
     static let defaultValue: Anchor<CGRect>? = nil
 
@@ -9,7 +9,7 @@ struct ShortcutRecorderAnchorKey: PreferenceKey {
     }
 }
 
-/// The recording callout above the recorder field: what to press, what's held, or what's in the way.
+/// The callout above the field: what to press, what is held, or what is in the way.
 struct ShortcutRecorderPopover: View {
     let placement: CalloutPlacement
 
@@ -49,7 +49,8 @@ struct ShortcutRecorderPopover: View {
         .padding(.vertical, Theme.Spacing.sm)
         .padding(placement.caretEdge == .top ? .top : .bottom, Theme.Size.calloutCaretHeight)
         .frame(
-            width: Theme.Size.shortcutPopover.width, height: Theme.Size.shortcutPopover.height)
+            width: Theme.Size.shortcutPopover.width, height: Theme.Size.shortcutPopover.height
+        )
         // Stock glass owns its elevation, as in `PopoverMenu` — no hand-tuned shadow.
         .glassEffect(
             .regular, in: CalloutShape(caretEdge: placement.caretEdge, caretX: placement.caretX))
@@ -59,10 +60,8 @@ struct ShortcutRecorderPopover: View {
         if let conflict = capture.conflict {
             return State(caps: conflict.binding.keycaps, label: conflict.owner, tint: .orange)
         }
-        let hyper = KeyShortcut.hyperDisplay()
         let held = KeyShortcut.collapsedModifierSymbols(
-            from: capture.heldModifiers, hyperKey: hyper.hyperKey,
-            replacesGlyph: hyper.replacesGlyph, includesShift: hyper.includesShift)
+            from: capture.heldModifiers, hyperChord: KeyShortcut.displayedHyperChord())
         guard held.isEmpty else { return State(caps: held, label: "Add a key") }
         return State(
             caps: [DoubleTapModifier.option.glyph, "A"], label: "Type a shortcut", isExample: true)
@@ -82,7 +81,7 @@ private struct ShortcutRecorderPopoverHost: ViewModifier {
                     callout(field: proxy[anchor], in: proxy.size)
                 }
             }
-            // Informational: clicks fall through to the capture session's mouse monitor, which closes it.
+            // Informational: clicks fall through to the session's mouse monitor, which closes.
             .allowsHitTesting(false)
             .animation(.easeOut(duration: 0.14), value: hotKeys.recordingAction)
         }

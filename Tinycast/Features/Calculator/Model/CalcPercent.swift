@@ -1,6 +1,6 @@
 import Foundation
 
-/// Natural-language percentage phrasings the arithmetic parser doesn't cover: `20% off 500` (a discount) and `50 as % of 200` (a ratio). Foundation-only so `Tools/calc-test.swift` compiles it with the rest of the engine. `X% of Y` and `Y + X%` already fall out of the `of`/percent operators, so they aren't handled here.
+/// Percentage phrasings the arithmetic parser misses: `20% off 500`, `50 as % of 200`.
 enum CalcPercent {
     static func evaluate(_ tokens: [CalcToken], query: String) -> CalcResult? {
         parseOff(tokens, query: query) ?? parseAsPercentOf(tokens, query: query)

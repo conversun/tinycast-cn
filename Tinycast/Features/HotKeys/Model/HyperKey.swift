@@ -1,7 +1,7 @@
 import Carbon.HIToolbox
 import CoreGraphics
 
-/// The physical key remapped to the Hyper chord (⌃⌥⇧⌘). String raw values are the `AppSettings` persistence format (renaming a case is a migration; a removed case decodes to `.none`); `allCases` is the picker order. F-keys were dropped — top-row media functions fire below the tap, so F1-as-Hyper still dimmed the display.
+/// The physical key remapped to the Hyper chord. See docs/features/hotkeys.md#the-hyper-key.
 enum HyperKeyPhysicalKey: String, CaseIterable, Identifiable, Sendable {
     case none
     case capsLock
@@ -35,18 +35,18 @@ enum HyperKeyPhysicalKey: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// The keycode the tap watches: Caps Lock is HID-remapped to F18 while it serves as Hyper (see `CapsLockRemap`), so the tap intercepts F18 in its place.
+    /// The keycode the tap watches; Caps Lock is HID-remapped to F18 while it serves as Hyper.
     var tapKeyCode: Int? {
         self == .capsLock ? kVK_F18 : keyCode
     }
 
-    /// Whether the tap sees presses as keyDown/keyUp (Caps Lock via F18) or as `flagsChanged` transitions (the real modifier keys).
+    /// Whether presses arrive as keyDown/keyUp (Caps Lock via F18) or as `flagsChanged`.
     var tapUsesKeyEvents: Bool { self == .capsLock }
 
     /// Keys that do something on their own when not remapped — these get the Quick Press row.
     var hasOriginalFunction: Bool { self == .capsLock }
 
-    /// The generic `CGEventFlags` bit this key contributes, so the tap can strip it when the key sits outside the synthetic Hyper set.
+    /// The generic flag this key contributes, so the tap can strip it when outside the set.
     var ownFlag: CGEventFlags? {
         switch self {
         case .none: return nil

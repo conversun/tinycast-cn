@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Section label above a group of rows, shared by every palette list so they use one identical header + row layout.
+/// Section label above a group of rows, shared by every palette list.
 struct SectionHeader: View {
     let title: String
-    /// The list's first header hugs the top; every later header gets `sectionSpacing` above it, which reads as bottom padding on the section that just ended.
+    /// The first header hugs the top; later ones get spacing above, reading as below.
     var isFirst = false
     var body: some View {
         Text(title.localizedUI)

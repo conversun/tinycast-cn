@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Right-click handler used as an `.overlay` whose `hitTest` claims only right-mouse events (left-clicks pass through), so the actions popover can anchor to a fixed point instead of the cursor.
+/// An overlay claiming only right-mouse events, so the popover anchors to a fixed point.
 struct RightClickCatcher: NSViewRepresentable {
     let action: () -> Void
 
@@ -31,7 +31,7 @@ struct RightClickCatcher: NSViewRepresentable {
     }
 }
 
-/// Location-reporting variant for grid containers: one catcher serves every cell, delivering the click point in top-left (SwiftUI-local) coordinates for hit-testing math.
+/// Location-reporting variant: one catcher serves every cell in a grid.
 struct RightClickLocationCatcher: NSViewRepresentable {
     let action: (CGPoint) -> Void
 

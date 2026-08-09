@@ -7,8 +7,10 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     private unowned let core: AppCore
     private var panel: PalettePanel?
     private(set) var previousApp: NSRunningApplication?
+    /// Our key window at summon time, so hiding hands focus back to Settings, not a stale app.
+    private weak var previousOwnWindow: NSWindow?
     private var popToRootTimer: Timer?
-    /// Left/top edge of the panel, resolved once per show and reused across compact↔expanded resizes so both states share an exact top edge (only the height changes). Cleared on hide so the next summon re-resolves for the current screen.
+    /// The session anchor, resolved once per show. See docs/features/palette.md#window-placement.
     private var anchor: (x: CGFloat, topEdgeY: CGFloat)?
 
     init(core: AppCore) {
@@ -19,26 +21,31 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
 
     func show() {
         Signposts.interval("PaletteWindowController.show") {
-            // Ignore ourselves as the "previous" app (e.g. summoned while Settings/About/Onboarding is frontmost) so paste/focus-restore always targets the user's real app, never Tinycast's own field.
+            // Summoned over one of our own windows: there is no external paste or focus target.
             let frontmost = NSWorkspace.shared.frontmostApplication
-            if frontmost?.processIdentifier != NSRunningApplication.current.processIdentifier {
+            if frontmost?.processIdentifier == NSRunningApplication.current.processIdentifier {
+                previousApp = nil
+                // Never the palette itself: a mode switch re-shows it while it already holds key.
+                if let key = NSApp.keyWindow, key !== panel { previousOwnWindow = key }
+            } else {
                 previousApp = frontmost
+                previousOwnWindow = nil
             }
-            // Resolve the name/icon path once per summon rather than per render; reading `previousApp` (not `frontmost`) keeps the label naming the same app paste will actually target.
+            // Once per summon, and from `previousApp`, so the label names the paste target.
             core.palette.pasteTarget = PasteTarget(app: previousApp)
             let panel = ensurePanel()
-            // Open disarmed: the pointer may already sit over a row, but nothing should be highlighted until the user actually moves it.
+            // Open disarmed: a pointer already over a row must not highlight it.
             core.palette.hoverHighlightArmed = false
-            // Re-resolve the anchor for wherever the user is summoning now, then hold it for the whole session so compact↔expanded resizes never move the window.
+            // Re-resolve the anchor now, then hold it so resizes never move the window.
             anchor = nil
-            // Size + place the panel to the current collapsed state before ordering front, so a compact summon never flashes at full size.
+            // Size and place before ordering front, so a compact summon never flashes.
             positionPanel(panel, collapsed: core.paletteCoordinator.paletteIsCollapsed)
-            // Flush the hosting view's first-mount layout while still off-screen, so the one-time safe-area settle of the `safeAreaInset` header doesn't nudge the search placeholder on the first visible frame.
+            // Flush first-mount layout off-screen, so the safe-area settle isn't visible.
             panel.contentView?.layoutSubtreeIfNeeded()
-            // The `.nonactivatingPanel` takes key focus without activating the app, so summoning the palette never raises the app's Settings/onboarding windows behind it.
+            // Non-activating, so summoning never raises our own aux windows behind it.
             panel.makeKeyAndOrderFront(nil)
             panel.orderFrontRegardless()
-            // A never-activated login-item process can drop the first key request before the window is registered with the window server; re-assert next turn once it is (same pattern as AuxWindowController).
+            // A never-activated login item can drop the first key request, so re-assert.
             DispatchQueue.main.async { [weak panel] in
                 guard let panel, panel.isVisible, !panel.isKeyWindow else { return }
                 panel.makeKeyAndOrderFront(nil)
@@ -48,15 +55,21 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
 
     func hide(restoreFocus: Bool) {
         panel?.orderOut(nil)
-        // Drop the session anchor so the next summon re-resolves for the screen the user is on then.
+        // Drop the anchor, so the next summon re-resolves for the screen in use then.
         anchor = nil
-        // Drop the multi-MB clipboard preview bitmaps now the window is gone, so idle RAM returns near baseline (row thumbnails stay cached).
+        // Drop the multi-MB preview bitmaps, so idle RAM returns near baseline.
         ImageThumbnail.purgePreviews()
         schedulePopToRoot()
-        if restoreFocus { previousApp?.activate() }
+        guard restoreFocus else { return }
+        // Our own window first: it is still open, and activating another app would bury it.
+        if let own = previousOwnWindow, own.isVisible {
+            own.makeKeyAndOrderFront(nil)
+        } else {
+            previousApp?.activate()
+        }
     }
 
-    /// Pop to Root Search: reset immediately (also releases heavy sub-screens — a fully scrolled emoji grid is ~2k realized views), or keep state and reset after the configured delay unless a reopen consumes it first.
+    /// Pop to Root Search: reset now, or after the delay unless a reopen consumes it.
     private func schedulePopToRoot() {
         popToRootTimer?.invalidate()
         let timeout = core.settings.popToRootTimeout
@@ -64,7 +77,8 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             core.palette.prepare(mode: .launcher)
             return
         }
-        popToRootTimer = Timer.scheduledTimer(withTimeInterval: timeout.interval, repeats: false) { [weak self] _ in
+        popToRootTimer = Timer.scheduledTimer(withTimeInterval: timeout.interval, repeats: false) {
+            [weak self] _ in
             MainActor.assumeIsolated {
                 self?.popToRootTimer = nil
                 self?.core.palette.prepare(mode: .launcher)
@@ -72,7 +86,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// True when a hidden palette still holds pre-close state (pending pop-to-root); consuming cancels the reset either way — the caller decides whether to restore or re-prepare.
+    /// True while a hidden palette still holds pre-close state; consuming cancels the reset.
     func consumePreservedState() -> Bool {
         guard let timer = popToRootTimer else { return false }
         timer.invalidate()
@@ -80,7 +94,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         return true
     }
 
-    /// Paste into the previously focused app while leaving the palette frontmost (keystroke delivered straight to that app's process).
+    /// Paste into the previous app while the palette stays frontmost.
     @discardableResult
     func pasteKeepingWindowOpen(_ item: ClipboardItem, store: ClipboardStore) -> Bool {
         Paster.pasteInPlace(item, store: store, into: previousApp)
@@ -99,7 +113,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         hide(restoreFocus: false)
     }
 
-    /// Re-bump focusToken a turn after the panel becomes key: on the first-ever show this fires mid-mount, before the SwiftUI tree has registered its onChange, so a synchronous bump is silently lost.
+    /// Re-bump a turn later: on the first show a synchronous bump lands before `onChange`.
     func windowDidBecomeKey(_ notification: Notification) {
         DispatchQueue.main.async { [weak self] in
             self?.core.palette.focusToken = UUID()
@@ -130,14 +144,14 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         let panel = PalettePanel(rootView: root)
         panel.delegate = self
         panel.paletteState = core.palette
-        // Backspace in an already-empty search backs out of a sub-screen to a fresh root launcher; `prepare` clears state and re-focuses the field.
+        // Backspace in an empty search backs out of a sub-screen to a fresh root.
         panel.onBareBackspace = { [weak self] in
             guard let core = self?.core, core.palette.mode != .launcher, core.palette.query.isEmpty
             else { return false }
-            // In the argument form it steps back through the answers first, so a typo in the second
-            // of three fields costs one keypress rather than the whole flow.
+            // The argument form steps back through the answers first, one key per field.
             if core.palette.mode == .quicklinkArguments,
-                let previous = core.quicklinkArguments.retreat() {
+                let previous = core.quicklinkArguments.retreat()
+            {
                 core.palette.query = previous
                 core.palette.selection = 0
                 return true
@@ -145,7 +159,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             core.palette.prepare(mode: .launcher)
             return true
         }
-        // The field editor swallows some `⌘` chords (e.g. `⌘,`) before SwiftUI `.onKeyPress` can fire, and `LSUIElement` apps have no main menu for `⌘W` or `⌘Esc`. Handle them at the panel level.
+        // Handled at the panel: the field editor or a missing main menu eats these first.
         panel.onCommandShortcut = { [weak self] event in
             guard let self, !event.isARepeat,
                 event.modifierFlags.intersection([.command, .option, .control, .shift]) == .command
@@ -155,11 +169,11 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
                 self.core.palette.prepare(mode: .launcher)
                 return true
             }
-            // `⌘,` and `⌘W` are character chords like the rest of the palette's (⌘K, ⌘P): matching their QWERTY key codes would fire the wrong action on Dvorak, where the two are transposed.
+            // Character chords, not key codes: Dvorak transposes the two.
             guard let character = event.charactersIgnoringModifiers?.lowercased() else { return false }
             switch character {
             case ",":
-                self.core.paletteCoordinator.showSettings()
+                self.core.settingsCoordinator.showSettings()
                 return true
             case "w":
                 self.core.paletteCoordinator.hidePalette()
@@ -172,13 +186,13 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         return panel
     }
 
-    /// Resize the panel to the given collapsed state, keeping the top edge anchored. Applied even while hidden (e.g. compact toggled in Settings) so the window is already correctly sized before the next show — otherwise the list would mount at the stale size and open scrolled up.
+    /// Resize to the given state, top edge anchored; applied even while hidden.
     func applyCollapsed(_ collapsed: Bool) {
         guard let panel else { return }
         positionPanel(panel, collapsed: collapsed)
     }
 
-    /// Size the panel to compact/expanded height (width fixed) and place it against the session anchor so its top edge stays put and the list grows downward. Resize is instant (no animation, matching Raycast).
+    /// Size to height and place against the session anchor, so the list grows downward.
     private func positionPanel(_ panel: NSPanel, collapsed: Bool) {
         guard let anchor = resolveAnchor() else { return }
         let height = collapsed ? Theme.Size.compactHeight : Theme.Size.panelHeight
@@ -187,15 +201,15 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         panel.setFrame(frame, display: true)
     }
 
-    /// The display to anchor to. `NSScreen.main` is the *key window's* screen, which an accessory app driving a non-activating panel never has — it resolves to the menu-bar display, not the one the user is working on.
+    /// The display to anchor to; `NSScreen.main` would give the menu-bar one instead.
     private func targetScreen() -> NSScreen? {
         guard core.settings.openOnCursorScreen else { return NSScreen.main }
         let mouse = NSEvent.mouseLocation
-        // NSMouseInRect, not `contains`: a mouse location falls in the half-open interval `(minY, maxY]`, so `contains` hands a pointer on a display's topmost row to the display stacked above it.
+        // NSMouseInRect, not `contains`: the topmost row otherwise reads as the display above.
         return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
     }
 
-    /// The current session's anchor, resolved from the target screen on first use and cached until hide — so compact and expanded placements can never read a different `visibleFrame`.
+    /// The session anchor, cached until hide so both placements read one `visibleFrame`.
     private func resolveAnchor() -> (x: CGFloat, topEdgeY: CGFloat)? {
         if let anchor { return anchor }
         guard let screen = targetScreen() else { return nil }

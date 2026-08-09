@@ -11,7 +11,7 @@ extension DialogTone {
     }
 }
 
-/// A Tinycast dialog: the palette's surface recipe (scrim over vibrancy, clipped last) at dialog size, with glass only on the buttons.
+/// A dialog: the palette's surface recipe at dialog size, glass only on the buttons.
 struct DialogView: View {
     let request: DialogRequest
     let onChoose: (Int) -> Void
@@ -58,7 +58,7 @@ struct DialogView: View {
         .panelEntrance()
     }
 
-    /// Cancel renders leading per macOS convention; `onChoose(index)` still dispatches against the original order, so callers ignore display position.
+    /// Cancel renders leading; `onChoose` still dispatches against the original order.
     private var visualOrder: [Int] {
         request.actions.indices.sorted { rank(of: $0) < rank(of: $1) }
     }
@@ -67,7 +67,7 @@ struct DialogView: View {
         request.actions[index].role == .cancel ? 0 : 1
     }
 
-    /// Only the two keys the panel actually handles are advertised, so a hover tooltip can't drift from the behavior.
+    /// Only the two keys the panel handles are advertised, so a tooltip can't drift.
     private func keyCap(for index: Int) -> String? {
         if index == request.defaultIndex { return "↵" }
         if index == request.cancelIndex { return "esc" }

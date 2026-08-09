@@ -2,13 +2,13 @@ import Foundation
 
 struct CustomCommand: Codable, Hashable, Identifiable, Sendable {
     static let entryIDPrefix = "custom-command:"
-    /// One glyph for every custom command — launcher row, Settings row and its dialogs, so they read as the same thing.
+    /// One glyph for every custom command, so every surface reads as the same thing.
     static let sfSymbol = "terminal"
 
     let id: UUID
     var name: String
     var command: String
-    /// Sources the user's shell config so aliases, functions and `PATH` resolve; opt-in because a heavy `.zshrc` costs far more than the command itself.
+    /// Sources the shell config so aliases resolve; opt-in, a heavy one costing more.
     var loadsShellEnvironment: Bool
     var requiresConfirmation: Bool
     var showsConfirmation: Bool
@@ -76,7 +76,7 @@ final class CustomCommandStore {
         CustomCommand.id(fromEntryID: entryID).flatMap(command)
     }
 
-    // Takes a whole draft rather than a parameter per field so adding an option doesn't churn every call site.
+    // Takes a whole draft, so adding an option doesn't churn every call site.
     @discardableResult
     func add(_ draft: CustomCommand) throws -> CustomCommand {
         let value = try validated(draft)
@@ -101,7 +101,7 @@ final class CustomCommandStore {
         return removed
     }
 
-    /// Replaces the complete set during native-backup import, dropping invalid and duplicate records from hand-edited files.
+    /// Replaces the whole set on backup import, dropping invalid and duplicate records.
     @discardableResult
     func replace(with newCommands: [CustomCommand]) -> Int {
         let updated = Self.sanitized(newCommands)

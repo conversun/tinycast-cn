@@ -1,6 +1,6 @@
 import Foundation
 
-/// Enumerates the System Settings panes (the `.appex` bundles behind each) into launchable `AppEntry` values, off the main actor inside `AppIndex.scan()`.
+/// Enumerates the System Settings panes into launchable entries, off the main actor.
 enum SettingsPaneScanner {
     private static let extensionsDir = URL(
         fileURLWithPath: "/System/Library/ExtensionKit/Extensions")
@@ -59,7 +59,7 @@ enum SettingsPaneScanner {
         return ns as? String == settingsExtensionPoint
     }
 
-    /// Override table → localized loctable name → Info.plist names, returning `nil` (skip the pane) when nothing usable is found.
+    /// Overrides, then loctable, then Info.plist; nil skips the pane entirely.
     private static func displayName(
         appexURL: URL, info: [String: Any], bundleID: String
     ) -> String? {
@@ -69,7 +69,7 @@ enum SettingsPaneScanner {
             ?? (info["CFBundleName"] as? String)?.usableName
     }
 
-    /// Localized `CFBundleDisplayName` from `InfoPlist.loctable` (keyed by locale), trying the user's preferred languages then English.
+    /// Localized name from `InfoPlist.loctable`, preferred languages first, then English.
     private static func loctableName(appexURL: URL) -> String? {
         let url = appexURL.appendingPathComponent("Contents/Resources/InfoPlist.loctable")
         guard let table = plist(at: url) else { return nil }

@@ -1,7 +1,7 @@
 import Carbon.HIToolbox
 import Foundation
 
-/// Validates the plain Raycast values `RaycastV1Decoder` returns against Tinycast's domain types. Shares no mapper with `RaycastImportV2`: the two formats have almost no shape in common, so a merged mapper would branch at every field.
+/// Validates the decoder's raw values against Tinycast's domain types.
 enum RaycastImportV1 {
     static func read(_ raw: Data, passphrase: String) throws -> RaycastImport.Result {
         let payload = try RaycastV1Decoder.payload(
@@ -21,7 +21,7 @@ enum RaycastImportV1 {
             missingImages: payload.missingImages)
     }
 
-    /// A Carbon key code here, unlike v2's `"caps_lock"` string; nothing ever maps to `.none`, since an export without a Hyper key must not clear one the user already configured.
+    /// A Carbon key code, unlike v2's string; nothing maps to `.none`, so none is cleared.
     private static let hyperKeys: [Int: HyperKeyPhysicalKey] = [
         kVK_CapsLock: .capsLock,
         kVK_RightControl: .rightControl,
@@ -34,7 +34,7 @@ enum RaycastImportV1 {
         var data = SettingsBackup.SettingsData()
         var mapped = false
 
-        // Exact-match only: a Raycast timeout outside Tinycast's option set is skipped, not clamped.
+        // Exact-match only: a timeout outside our option set is skipped, not clamped.
         if let secs = payload.popToRootTimeout, let timeout = PopToRootTimeout(rawValue: secs) {
             data.popToRootSeconds = timeout.rawValue
             mapped = true
@@ -43,7 +43,7 @@ enum RaycastImportV1 {
             data.emojiSkinTone = tone
             mapped = true
         }
-        // A disabled Hyper key carries no physical key to import, but its shift preference still applies.
+        // A disabled Hyper key has no physical key, but its shift preference applies.
         if let hyperKey = payload.hyperKey {
             if hyperKey.enabled, let key = hyperKeys[hyperKey.keyCode] {
                 data.hyperKey = key.rawValue
@@ -54,11 +54,7 @@ enum RaycastImportV1 {
                 mapped = true
             }
         }
-        if let useIcon = payload.useHyperKeyIcon {
-            data.hyperKeyReplacesGlyph = useIcon
-            mapped = true
-        }
-        // Raycast's window mode is a string ("compact"/"default"/…); Tinycast only has the compact toggle.
+        // Raycast's window mode is a string; we only have the compact toggle.
         if let mode = payload.windowMode {
             data.compactMode = (mode == "compact")
             mapped = true

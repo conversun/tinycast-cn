@@ -8,7 +8,7 @@ struct CalcHistoryEntry: Identifiable, Codable, Hashable, Sendable {
     let createdAt: Date
 }
 
-/// Persists recent calculations as a capped JSON file under `~/Library/Caches/<bundle-id>/`, alongside `ClipboardStore`'s data so `brew uninstall --zap` removes it too.
+/// A capped JSON file in Caches, beside `ClipboardStore` so `brew uninstall --zap` gets it too.
 @MainActor
 @Observable
 final class CalculatorHistoryStore {
@@ -32,7 +32,8 @@ final class CalculatorHistoryStore {
         fileURL = AppPaths.caches().appendingPathComponent("calculator-history.json")
 
         if let data = try? Data(contentsOf: fileURL),
-            let decoded = try? JSONDecoder().decode([CalcHistoryEntry].self, from: data) {
+            let decoded = try? JSONDecoder().decode([CalcHistoryEntry].self, from: data)
+        {
             entries = decoded
         } else {
             entries = []

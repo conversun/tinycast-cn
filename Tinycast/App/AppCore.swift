@@ -28,10 +28,11 @@ final class AppCore {
     let frequentEmoji = FrequentEmojiStore()
     let runningApps = RunningAppsMonitor()
     let palette = PaletteState()
+    let activationPolicy = ActivationPolicy()
     let uninstall = UninstallSession()
     let quicklinkArguments = QuicklinkArgumentSession()
 
-    /// Set when a quicklink editor should open as the Settings window appears; the pane consumes it.
+    /// Set when a quicklink editor should open with Settings; the pane consumes it.
     var pendingQuicklinkEdit: QuicklinkEditRequest?
 
     @ObservationIgnored private(set) lazy var snippetExpansion = SnippetExpansionCoordinator(
@@ -42,29 +43,40 @@ final class AppCore {
         store: quicklinks, argumentSession: quicklinkArguments, settings: settings,
         appIndex: appIndex, injector: snippetTextInjector, hotKeys: hotKeys, favorites: favorites,
         visibility: visibility, ranking: launcherRanking, windowController: windowController,
+        paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
         clipboardHistory: { [unowned self] in self.snippetExpansion.clipboardHistoryForExpansion() },
         core: self)
 
     @ObservationIgnored private(set) lazy var paletteCoordinator = PaletteCoordinator(
         palette: palette, settings: settings, appIndex: appIndex,
-        windowController: windowController, core: self)
+        windowController: windowController)
+    /// Its own window and lifecycle: neither coordinator shows or closes the other's surface.
+    @ObservationIgnored private(set) lazy var settingsCoordinator = SettingsCoordinator(core: self)
+    @ObservationIgnored private(set) lazy var onboardingCoordinator = OnboardingCoordinator(
+        core: self)
     @ObservationIgnored private(set) lazy var systemActionCoordinator = SystemActionCoordinator(
         paletteCoordinator: paletteCoordinator, core: self)
     @ObservationIgnored private(set) lazy var uninstallCoordinator = UninstallCoordinator(
         session: uninstall, palette: palette, paletteCoordinator: paletteCoordinator,
         appIndex: appIndex, runningApps: runningApps, hotKeys: hotKeys, favorites: favorites,
         visibility: visibility, ranking: launcherRanking, core: self)
+    @ObservationIgnored private(set) lazy var windowCommandCoordinator = WindowCommandCoordinator(
+        settings: settings, paletteCoordinator: paletteCoordinator, windowMover: windowMover)
     @ObservationIgnored private(set) lazy var customCommandCoordinator = CustomCommandCoordinator(
         store: customCommands, settings: settings, appIndex: appIndex,
-        paletteCoordinator: paletteCoordinator, hotKeys: hotKeys, favorites: favorites,
-        visibility: visibility, ranking: launcherRanking, core: self)
+        paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
+        hotKeys: hotKeys, favorites: favorites, visibility: visibility,
+        ranking: launcherRanking, core: self)
 
     @ObservationIgnored private(set) lazy var launcherCoordinator = LauncherCoordinator(
         ranking: launcherRanking, windowController: windowController,
         paletteCoordinator: paletteCoordinator,
+        settingsCoordinator: settingsCoordinator,
         customCommandCoordinator: customCommandCoordinator,
         systemActionCoordinator: systemActionCoordinator,
-        quicklinkCoordinator: quicklinkCoordinator, snippetExpansion: snippetExpansion, core: self)
+        quicklinkCoordinator: quicklinkCoordinator,
+        windowCommandCoordinator: windowCommandCoordinator,
+        snippetExpansion: snippetExpansion, core: self)
     @ObservationIgnored private(set) lazy var clipboardCoordinator = ClipboardCoordinator(
         clipboardStore: clipboardStore, palette: palette, windowController: windowController,
         paletteCoordinator: paletteCoordinator)
@@ -76,7 +88,7 @@ final class AppCore {
 
     @ObservationIgnored private lazy var windowController = PaletteWindowController(core: self)
     @ObservationIgnored private lazy var messageHUD = MessageHUDController(settings: settings)
-    /// Every confirmation, failure report and value prompt in the app; it also guards against a held hotkey stacking dialogs.
+    /// Every confirmation, report and prompt; it also stops a held hotkey stacking them.
     private let dialogs = DialogController()
     private let healthTicker = HealthTicker()
 
@@ -96,10 +108,10 @@ final class AppCore {
 
     func start() {
         Signposts.interval("AppCore.start") {
-            // AppKit's default tooltip delay is ~2–3s; shorten it (in ms) so the compact-bar favorite tooltips appear promptly. Registration domain — never overrides a user default.
+            // Shorten AppKit's ~2–3s tooltip delay; registration domain, so a user default wins.
             UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
             NSApp.setActivationPolicy(.accessory)
-            // Force dark: the Liquid Glass material is tuned for a deep dark surface and renders washed-out in Light mode.
+            // Force dark: the Liquid Glass material is tuned for a deep dark surface.
             NSApp.appearance = NSAppearance(named: .darkAqua)
 
             clipboardStore.maxAge = settings.clipboardRetention.maxAge
@@ -116,9 +128,7 @@ final class AppCore {
             quicklinks.onChange = { [weak self] _ in
                 self?.quicklinkCoordinator.applyQuicklinksPresence()
             }
-            // Loaded even while the feature is off, and before `hotKeys.start`: its stale-binding prune
-            // reads this list, so an unloaded store would look like "every quicklink was deleted" and
-            // throw away the user's shortcuts. The library is small, so this is one short read.
+            // Before `hotKeys.start` even when off: the prune reads it. docs/features/quicklinks.md
             quicklinks.load()
             quicklinkCoordinator.applyQuicklinksPresence()
             Task { await appIndex.refresh() }
@@ -138,13 +148,16 @@ final class AppCore {
             hotKeys.onRunSystemAction = { [weak self] id in
                 self?.systemActionCoordinator.runSystemAction(id: id)
             }
-            hotKeys.onRunWindowCommand = { [weak self] id in self?.runWindowCommand(id: id) }
+            hotKeys.onRunWindowCommand = { [weak self] id in
+                self?.windowCommandCoordinator.runWindowCommand(id: id)
+            }
             hotKeys.onOpenQuicklink = { [weak self] id in
                 self?.quicklinkCoordinator.openQuicklink(id: id)
             }
             hotKeys.displayName = { [weak self] action in self?.hotKeyDisplayName(for: action) }
-            KeyShortcut.hyperDisplay = { [settings] in
-                (settings.hyperKey, settings.hyperKeyReplacesGlyph, settings.hyperKeyIncludesShift)
+            KeyShortcut.displayedHyperChord = { [settings] in
+                guard settings.hyperKey != .none else { return nil }
+                return KeyShortcut.hyperChord(includesShift: settings.hyperKeyIncludesShift)
             }
             SystemActionRunner.onAsyncFailure = { [weak self] id, failure in
                 self?.systemActionCoordinator.presentSystemActionFailure(id: id, failure: failure)
@@ -152,7 +165,7 @@ final class AppCore {
             hotKeys.start(
                 customCommandIDs: Set(customCommands.commands.map(\.id)),
                 quicklinkIDs: Set(quicklinks.quicklinks.map(\.id)))
-            // Deliberately keeps running while `hotKeys.recordingAction` pauses Carbon: the recorder relies on the tap's rewritten flags to capture Hyper shortcuts.
+            // Keeps running while Carbon pauses: the recorder needs its rewritten flags.
             hyperKeyTap.start(settings: settings)
 
             snippetsStore.onSnapshot = { [weak self] snapshot in
@@ -160,7 +173,7 @@ final class AppCore {
                 self.snippetExpansion.applySnippetsLauncherPresence()
                 self.snippetListener.update(snapshot.records)
             }
-            // Off out of the box, so a user who never enables snippets pays for no load, no watcher and no tap.
+            // Off out of the box, so an unused feature costs no load, watcher or tap.
             if settings.snippetsEnabled {
                 Task { await snippetsStore.start() }
                 snippetExpansion.startSnippetKeywordListener()
@@ -168,12 +181,19 @@ final class AppCore {
 
             observeFeatureSwitches()
 
-            // First launch has no palette hotkey bound and shows nothing but the menu-bar icon; guide the user once. Marker is written at show-time so it stays one-time even if they Cmd-Q mid-flow.
+            // First launch binds no hotkey, so guide once; the marker is written at show-time.
             if !OnboardingState.hasOnboarded {
                 OnboardingState.markShown()
-                paletteCoordinator.showOnboarding()
+                onboardingCoordinator.showOnboarding()
             }
         }
+    }
+
+    /// Clicking the Dock icon: raise whichever window is already open, else summon the launcher.
+    func handleReopen() {
+        if settingsCoordinator.focusExisting() { return }
+        if onboardingCoordinator.focusExisting() { return }
+        paletteCoordinator.showPalette(mode: .launcher, restoreAnyMode: true)
     }
 
     /// The store-backed half of the conflict message; `HotKeyManager` names the catalogs itself.
@@ -194,7 +214,7 @@ final class AppCore {
     }
 
     func prepareForTermination() {
-        // Caps Lock first: its HID remap is the only teardown that outlives the process, so nothing else may come before it.
+        // Caps Lock first: its remap is the one teardown that outlives the process.
         hyperKeyTap.prepareForTermination()
         snippetTextInjector.prepareForTermination()
         snippetListener.stop()
@@ -204,19 +224,24 @@ final class AppCore {
     // MARK: - Feature switches
 
     private func observeFeatureSwitches() {
-        track({
-            _ = $0.windowManagementEnabled
-            _ = $0.windowManagementShowInLauncher
-        }, reproject: { $0.applyWindowCommandsPresence() })
-        track({
-            _ = $0.customCommandsEnabled
-            _ = $0.customCommandsShowInLauncher
-        }, reproject: { $0.customCommandCoordinator.applyCustomCommandsPresence() })
-        track({
-            _ = $0.quicklinksEnabled
-            _ = $0.quicklinksShowInLauncher
-        }, reproject: { $0.quicklinkCoordinator.applyQuicklinksPresence() })
+        track(
+            {
+                _ = $0.windowManagementEnabled
+                _ = $0.windowManagementShowInLauncher
+            }, reproject: { $0.applyWindowCommandsPresence() })
+        track(
+            {
+                _ = $0.customCommandsEnabled
+                _ = $0.customCommandsShowInLauncher
+            }, reproject: { $0.customCommandCoordinator.applyCustomCommandsPresence() })
+        track(
+            {
+                _ = $0.quicklinksEnabled
+                _ = $0.quicklinksShowInLauncher
+            }, reproject: { $0.quicklinkCoordinator.applyQuicklinksPresence() })
         track({ _ = $0.snippetsEnabled }, reproject: { $0.snippetExpansion.applySnippetsEnabled() })
+        // Not a feature switch, but the same re-projection: a combo has the chord's ⇧ bit baked in.
+        track({ _ = $0.hyperKeyIncludesShift }, reproject: { $0.applyHyperChord() })
         track(
             { _ = $0.snippetsShowInLauncher },
             reproject: { $0.snippetExpansion.applySnippetsLauncherPresence() })
@@ -238,58 +263,24 @@ final class AppCore {
         }
     }
 
+    /// Without a Hyper key the chord means nothing, so a literal ⌃⌥⌘ combo is left as recorded.
+    private func applyHyperChord() {
+        guard settings.hyperKey != .none else { return }
+        hotKeys.retargetHyperBindings(includesShift: settings.hyperKeyIncludesShift)
+    }
+
     private func applyWindowCommandsPresence() {
         let visible = settings.windowManagementEnabled && settings.windowManagementShowInLauncher
         appIndex.setWindowCommandsVisible(visible)
     }
 
-    // MARK: - Palette control
-
-    func showPalette(mode: PaletteMode, restoreAnyMode: Bool = false) {
-        paletteCoordinator.showPalette(mode: mode, restoreAnyMode: restoreAnyMode)
-    }
-
-    func hidePalette(restoreFocus: Bool = true) {
-        paletteCoordinator.hidePalette(restoreFocus: restoreFocus)
-    }
-
-    func handleReopen() {
-        paletteCoordinator.handleReopen()
-    }
-
-    func showSettings(tab: SettingsTab = .general) {
-        paletteCoordinator.showSettings(tab: tab)
-    }
-
-    // MARK: - Window commands
-
-    /// The one funnel for both palette activation and a command's global hotkey, so the feature switch
-    /// can't be bypassed by either — a shortcut stays registered while the feature is off and must move
-    /// nothing.
-    ///
-    /// The command acts on the app the user was in, so the palette hands focus back before dispatching,
-    /// the same dance the paste path does. Focus is restored rather than dropped: the window being moved
-    /// is the one they want to keep working in.
-    func runWindowCommand(id: WindowCommand.ID) {
-        guard settings.windowManagementEnabled else { return }
-        let target = paletteCoordinator.targetApp
-        if paletteCoordinator.isVisible { hidePalette(restoreFocus: true) }
-        windowMover.perform(
-            id, target: target, gap: CGFloat(settings.windowGap),
-            cycleOnRepeat: settings.windowCycleOnRepeat)
-    }
-
-    // MARK: - Dialogs
-    //
-    // Routed through `AppCore` so `dialogs` stays the single owner; flows outside the palette (the backup
-    // actions) reach the same dialogs instead of falling back to an `NSAlert`.
+    // MARK: - Dialogs, routed here so `dialogs` stays the single owner
 
     func showNotice(title: String, message: String, symbol: String, tone: DialogTone) async {
         await dialogs.notice(title: title, message: message, symbol: symbol, tone: tone)
     }
 
-    /// `tone` is what the dialog looks like; `confirmRole` is what the confirm button looks like. They
-    /// are separate on purpose — a red-glyph security warning can still carry a plain white button.
+    /// `tone` styles the glyph, `confirmRole` the button; separate on purpose.
     func confirm(
         title: String, message: String, symbol: String, confirmTitle: String,
         tone: DialogTone = .danger, confirmRole: DialogAction.Role = .destructive
@@ -300,7 +291,9 @@ final class AppCore {
     }
 
     /// A failure with one usable second option; `true` when the user takes it.
-    func reportFailure(title: String, message: String, symbol: String, recovery: String?) async
+    func reportFailure(
+        title: String, message: String, symbol: String, recovery: String?
+    ) async
         -> Bool
     {
         await dialogs.reportFailure(

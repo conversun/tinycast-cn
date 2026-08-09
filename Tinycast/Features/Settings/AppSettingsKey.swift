@@ -1,0 +1,30 @@
+import Foundation
+
+/// The UserDefaults keys `AppSettings` owns; `CaseIterable` so the backup harness enumerates them.
+enum AppSettingsKey: String, CaseIterable {
+    // Every raw value is spelled out so renaming a case can never rename a persisted key.
+    case clipboardRetention = "clipboardRetentionDays"
+    case clipboardDisabledApps = "clipboardDisabledApps"
+    case hyperKey = "hyperKeyPhysicalKey"
+    case hyperKeyIncludesShift = "hyperKeyIncludesShift"
+    case hyperKeyQuickPress = "hyperKeyQuickPress"
+    case emojiSkinTone = "emojiSkinTone"
+    case popToRootTimeout = "popToRootTimeout"
+    case compactMode = "compactMode"
+    case showFavoritesInCompactMode = "showFavoritesInCompactMode"
+    case searchScopes = "launcherSearchScopes"
+    case openOnCursorScreen = "openOnCursorScreen"
+    case customCommandsEnabled = "customCommandsEnabled"
+    case customCommandsShowInLauncher = "customCommandsShowInLauncher"
+    case snippetsEnabled = "snippetsEnabled"
+    case snippetsShowInLauncher = "snippetsShowInLauncher"
+    case windowManagementEnabled = "windowManagementEnabled"
+    case windowManagementShowInLauncher = "windowManagementShowInLauncher"
+    case windowGap = "windowManagementGap"
+    case windowCycleOnRepeat = "windowManagementCycleOnRepeat"
+    case quicklinksEnabled = "quicklinksEnabled"
+    case quicklinksShowInLauncher = "quicklinksShowInLauncher"
+    case quicklinkOpensNewWindow = "quicklinkOpensNewWindow"
+    case quicklinkSelectionFallback = "quicklinkSelectionFallback"
+    case quicklinkConfirmsBeforeDelete = "quicklinkConfirmsBeforeDelete"
+}

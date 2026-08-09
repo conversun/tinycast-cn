@@ -1,6 +1,6 @@
 import Foundation
 
-/// RAII handle for a block-based `NotificationCenter` observation (dropping the token removes the observer), owned here so the thread-safe `removeObserver` runs from a nonisolated `deinit` a `@MainActor` class couldn't reach under Swift 6.
+/// RAII handle for a block observation, so `removeObserver` can run in a nonisolated deinit.
 final class NotificationToken {
     private let center: NotificationCenter
     private let token: any NSObjectProtocol

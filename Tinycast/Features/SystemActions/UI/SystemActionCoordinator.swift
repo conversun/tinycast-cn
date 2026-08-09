@@ -1,6 +1,6 @@
 import AppKit
 
-/// Owns system actions: the one dispatch funnel, its confirmation gates, and the feedback they draw.
+/// The one dispatch funnel for system actions, its gates and their feedback.
 @MainActor
 final class SystemActionCoordinator {
     private let paletteCoordinator: PaletteCoordinator
@@ -13,11 +13,7 @@ final class SystemActionCoordinator {
         self.core = core
     }
 
-    /// The one funnel for both palette activation and an action's global hotkey, so the confirmation
-    /// gate can't be bypassed by either — nor by a favorite slot or the compact bar.
-    ///
-    /// Some actions target the app the user was in (Hide Others, Quit All), so the palette hands back the
-    /// app it displaced; a hotkey pressed with the palette closed targets whatever is frontmost.
+    /// The one funnel for every activation route, so no gate can be bypassed.
     func runSystemAction(id: SystemAction.ID) {
         let target = paletteCoordinator.targetApp
         if paletteCoordinator.isVisible { paletteCoordinator.hidePalette(restoreFocus: false) }
@@ -61,7 +57,7 @@ final class SystemActionCoordinator {
         }
     }
 
-    /// Actions that change the output level or mute state; macOS only draws its own HUD for real media keys, so these get Tinycast's.
+    /// Level and mute actions; macOS draws its HUD only for real media keys.
     private static let showsVolumeFeedback: Set<SystemAction.ID> = [
         .setVolume, .volumeUp, .volumeDown, .toggleMute,
         .volume0, .volume25, .volume50, .volume75, .volume100
@@ -91,7 +87,7 @@ final class SystemActionCoordinator {
         }
     }
 
-    /// Quit All: the one action whose blast radius reaches outside Tinycast, so it confirms first. The target list is resolved once and both counted and terminated, so the set the user approves is the set that quits.
+    /// Quit All confirms first, and the resolved list is both counted and terminated.
     private func quitAllApps() async {
         let targets = AppLauncher.quitAllTargets()
         guard !targets.isEmpty,

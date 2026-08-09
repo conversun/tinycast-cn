@@ -2,7 +2,7 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// First-launch wizard: set the palette shortcut, offer Accessibility + launch-at-login, offer a Raycast import, then drop into the launcher. Re-runnable from Settings. Reuses the app's own controls (`ShortcutRecorder`, `SettingsCard`, `BackupActions`) so it looks and behaves like the rest of Tinycast.
+/// The first-launch wizard, built from the app's own controls; re-runnable from Settings.
 struct OnboardingView: View {
     @State private var step = 0
     @State private var model = OnboardingModel()
@@ -14,7 +14,7 @@ struct OnboardingView: View {
     private let refreshTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private static let lastStep = 3
-    /// Fixed AppKit-owned size, chosen to fit the tallest onboarding step.
+    /// Fixed content size, raised over upstream's 400 because the translated steps run taller.
     static let windowSize = CGSize(width: 520, height: 458)
 
     var body: some View {
@@ -32,7 +32,7 @@ struct OnboardingView: View {
                 colors: [Color.white.opacity(0.04), Color.clear],
                 startPoint: .top, endPoint: .center)
         )
-        // Extend under the transparent titlebar (top padding clears the traffic lights) so the window height equals the fixed content height.
+        // Extend under the titlebar, so window height equals the fixed content height.
         .ignoresSafeArea()
         // Onboarding's shortcut step has a recorder too, and it isn't inside a `SettingsPane`.
         .shortcutRecorderPopoverHost()
@@ -132,16 +132,16 @@ struct OnboardingView: View {
     private var shortcutStep: some View {
         @Bindable var settings = settings
         return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SettingsCard {
-                SettingsRow(
+            OnboardingCard {
+                OnboardingRow(
                     title: "App Launcher",
                     subtitle: "Press this shortcut to open Tinycast.",
                     systemImage: "magnifyingglass", tint: .blue
                 ) {
                     ShortcutRecorder(action: .togglePalette)
                 }
-                SettingsDivider()
-                SettingsRow(
+                OnboardingDivider()
+                OnboardingRow(
                     title: "Launch at login",
                     subtitle: "Start Tinycast automatically when you log in.",
                     systemImage: "power", tint: .green
@@ -156,8 +156,8 @@ struct OnboardingView: View {
 
     private var accessibilityStep: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SettingsCard {
-                SettingsRow(
+            OnboardingCard {
+                OnboardingRow(
                     title: "Accessibility",
                     subtitle:
                         "Allows pasting clipboard items and expanded snippets into active apps.",
@@ -172,16 +172,16 @@ struct OnboardingView: View {
 
     private var raycastStep: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SettingsCard {
-                SettingsRow(
+            OnboardingCard {
+                OnboardingRow(
                     title: "Raycast Export",
                     subtitle: model.fileSubtitle,
                     systemImage: "doc.badge.gearshape", tint: .orange
                 ) {
                     Button("Choose…") { model.chooseFile() }.controlSize(.small)
                 }
-                SettingsDivider()
-                SettingsRow(
+                OnboardingDivider()
+                OnboardingRow(
                     title: "Passphrase",
                     subtitle: "The password you set when exporting from Raycast.",
                     systemImage: "key", tint: .gray
@@ -189,7 +189,7 @@ struct OnboardingView: View {
                     SecureField("Passphrase", text: $model.passphrase)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 150)
-                        .onSubmit { model.run() }
+                        .onSubmit { model.run(core: core) }
                 }
             }
             RaycastImportSelection(selection: $model.selection, format: model.format)
@@ -235,7 +235,8 @@ struct OnboardingView: View {
                         .foregroundStyle(.secondary)
                 }
                 if step == 2 && model.importing {
-                    Button {} label: {
+                    Button {
+                    } label: {
                         HStack(spacing: Theme.Spacing.sm) {
                             ProgressView().controlSize(.small)
                             Text("Importing…")
@@ -284,9 +285,9 @@ struct OnboardingView: View {
         case 1 where !accessibilityTrusted:
             Permissions.openAccessibilitySettings()
         case 2 where !model.didImport:
-            model.run()
+            model.run(core: core)
         case Self.lastStep:
-            core.paletteCoordinator.finishOnboarding()
+            core.onboardingCoordinator.finishOnboarding()
         default:
             advance()
         }
@@ -339,18 +340,19 @@ struct OnboardingView: View {
             Capsule().fill((accessibilityTrusted ? Color.green : Color.orange).opacity(0.14)))
     }
 
-    // Read the bundled .icns directly: `NSApp.applicationIconImage` is the generic placeholder until LaunchServices registers the app (it hasn't when run from `build/`).
+    // Read the bundle directly: the app icon is generic until LaunchServices registers.
     private static let appIcon: NSImage = {
         if let name = Bundle.main.infoDictionary?["CFBundleIconFile"] as? String,
             let url = Bundle.main.url(forResource: name, withExtension: "icns"),
-            let image = NSImage(contentsOf: url) {
+            let image = NSImage(contentsOf: url)
+        {
             return image
         }
         return NSApp.applicationIconImage
     }()
 }
 
-/// Owns the Raycast import step's state and the async import call, kept off the view so lifetimes are explicit and the body stays declarative.
+/// The import step's state and async call, off the view so the body stays declarative.
 @MainActor
 @Observable
 final class OnboardingModel {
@@ -386,7 +388,7 @@ final class OnboardingModel {
         status = nil
     }
 
-    func run() {
+    func run(core: AppCore) {
         guard canImport, let file else { return }
         importing = true
         status = nil
@@ -394,7 +396,7 @@ final class OnboardingModel {
             defer { importing = false }
             do {
                 let outcome = try await BackupActions.importRaycast(
-                    file: file, passphrase: passphrase, options: selection)
+                    core: core, file: file, passphrase: passphrase, options: selection)
                 status = .success(BackupActions.raycastSummaryText(outcome))
                 passphrase = ""
             } catch {

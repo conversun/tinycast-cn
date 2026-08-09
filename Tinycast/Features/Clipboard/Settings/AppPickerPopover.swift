@@ -1,8 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Searchable list of installed apps, drawn from the launcher's own index. Shared by the clipboard
-/// pane's exclusion list and by the two places a quicklink chooses an app to open with.
+/// Searchable list of installed apps, drawn from the launcher's own index.
 struct AppPickerPopover: View {
     /// Bundle IDs to leave out — the ones already chosen.
     var excluded: Set<String> = []
@@ -40,7 +39,7 @@ struct AppPickerPopover: View {
                 .padding(Theme.Spacing.sm)
             }
         }
-        .frame(width: 280, height: 320)
+        .frame(width: 220, height: 240)
     }
 
     private func row(title: String, icon: NSImage?, action: @escaping () -> Void) -> some View {
@@ -68,8 +67,7 @@ struct AppPickerPopover: View {
     }
 }
 
-/// Resolves a stored bundle ID to something showable: the launcher index first, then LaunchServices,
-/// then a placeholder for an app that has since been uninstalled.
+/// Bundle ID → something showable: the index, then LaunchServices, then a placeholder.
 @MainActor
 enum AppPresentation {
     static func resolve(bundleID: String, in appIndex: AppIndex) -> (name: String, icon: NSImage) {

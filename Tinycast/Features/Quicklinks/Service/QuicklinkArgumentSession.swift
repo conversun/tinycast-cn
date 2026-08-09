@@ -1,11 +1,6 @@
 import Foundation
 
-/// The quicklink waiting on its `{argument}` values, and how far through them the user is.
-///
-/// Arguments are collected one at a time because the palette has exactly one text field; the field
-/// *is* the current argument's input, which is also why ↵ can open as soon as the last one is typed.
-/// The expansion context is captured once, before the first prompt, so `{clipboard}`, `{selection}`
-/// and `{date}` can't drift while the form is open.
+/// The quicklink waiting on its `{argument}` values. docs/features/quicklinks.md
 @MainActor
 @Observable
 final class QuicklinkArgumentSession {
@@ -31,7 +26,7 @@ final class QuicklinkArgumentSession {
     /// The options to choose from, or empty when the argument takes free text.
     var options: [String] { current?.options ?? [] }
 
-    /// True when submitting opens the quicklink rather than advancing — what the ↵ pill announces.
+    /// True when submitting opens rather than advances, which is what the ↵ pill announces.
     var isLastArgument: Bool {
         guard let request else { return false }
         return request.index == request.arguments.count - 1
@@ -56,8 +51,7 @@ final class QuicklinkArgumentSession {
             values: [:], index: 0)
     }
 
-    /// Records `value` for the current argument. Returns the complete set once the last one is
-    /// filled, or nil while more remain.
+    /// Records `value`, returning the complete set once the last argument is filled.
     func submit(_ value: String) -> [String: String]? {
         guard var request, let argument = current else { return nil }
         request.values[argument.name] = value
@@ -67,8 +61,7 @@ final class QuicklinkArgumentSession {
         return request.values
     }
 
-    /// Steps back to the previous argument, returning the value it already held so the field can be
-    /// refilled. False when there is nothing to step back to.
+    /// Steps back, returning the held value so the field refills; false at the start.
     func retreat() -> String? {
         guard var request, request.index > 0 else { return nil }
         request.index -= 1

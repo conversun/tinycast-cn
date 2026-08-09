@@ -11,7 +11,7 @@ enum Paster {
     /// Shorter: no activation to wait on, only the pasteboard write reaching the target's process.
     private static let directPostDelay: TimeInterval = 0.05
 
-    /// Write the item onto the pasteboard and paste it into `previousApp` via a synthetic ⌘V, activating that app so the keystroke lands there. Returns whether content was written (and thus promoted).
+    /// Write the item and paste it into `previousApp`, activating it so ⌘V lands there.
     @MainActor @discardableResult
     static func paste(
         _ item: ClipboardItem, store: ClipboardStore, previousApp: NSRunningApplication?
@@ -24,13 +24,13 @@ enum Paster {
         return true
     }
 
-    /// Put the item on the pasteboard without pasting; the internal marker keeps our poller from re-capturing it.
+    /// Put the item on the pasteboard without pasting; the marker stops re-capture.
     @MainActor @discardableResult
     static func copy(_ item: ClipboardItem, store: ClipboardStore) -> Bool {
         write(item, store: store)
     }
 
-    /// Put a plain string on the pasteboard *without* the internal marker, so a copied calculator answer flows into clipboard history like any other copy.
+    /// Put a string on the pasteboard unmarked, so it enters history like any other copy.
     @MainActor
     static func copyPlainText(_ text: String) {
         let pb = NSPasteboard.general
@@ -39,7 +39,7 @@ enum Paster {
         pb.setString(text, forType: .string)
     }
 
-    /// String counterpart of `paste(_:store:previousApp:)` — marker-stamped so pasted text doesn't re-enter clipboard history.
+    /// String counterpart of `paste`, marker-stamped so the text doesn't re-enter history.
     @MainActor
     static func pasteString(_ text: String, previousApp: NSRunningApplication?) {
         writeString(text)
@@ -55,7 +55,7 @@ enum Paster {
         writeString(text)
     }
 
-    /// String counterpart of `pasteInPlace(_:store:into:)` — ⌘V delivered to the target's process, palette stays frontmost.
+    /// String counterpart of `pasteInPlace`; the palette stays frontmost.
     @MainActor
     static func pasteStringInPlace(_ text: String, into app: NSRunningApplication?) {
         writeString(text)
@@ -74,7 +74,7 @@ enum Paster {
         pb.setData(Data(), forType: ClipboardManager.internalType)
     }
 
-    /// Paste into `app` *without* activating it (⌘V delivered straight to its process), leaving Tinycast frontmost so the palette stays open. Returns whether content was written (and thus promoted).
+    /// Paste into `app` without activating it, so the palette stays open.
     @MainActor @discardableResult
     static func pasteInPlace(
         _ item: ClipboardItem, store: ClipboardStore, into app: NSRunningApplication?
@@ -88,7 +88,7 @@ enum Paster {
         return true
     }
 
-    /// Returns whether content was actually written; if the item's text/image is gone, the pasteboard is left untouched (never cleared to empty) and the caller skips the paste.
+    /// Whether anything was written; a vanished item leaves the pasteboard untouched.
     @MainActor @discardableResult
     private static func write(_ item: ClipboardItem, store: ClipboardStore) -> Bool {
         let pb = NSPasteboard.general
@@ -107,12 +107,12 @@ enum Paster {
             pb.setData(data, forType: .png)
         }
         pb.setData(Data(), forType: ClipboardManager.internalType)
-        // Whatever lands back on the pasteboard becomes the most recent history entry (Raycast-style); the poller skips marked writes, so this is the only promotion point.
+        // The poller skips marked writes, so this is the only promotion point.
         store.promote(item)
         return true
     }
 
-    /// Synthesize ⌘V — delivered to `pid` alone when given, otherwise through the system tap to whatever is frontmost. Shared with `SnippetTextInjector`, which pastes long snippet text the same way.
+    /// Synthesize ⌘V, to `pid` alone when given, else through the system tap.
     @MainActor
     static func postCommandV(toPid pid: pid_t? = nil) {
         guard Permissions.ensureAccessibility() else { return }
@@ -120,7 +120,8 @@ enum Paster {
 
         let v = CGKeyCode(kVK_ANSI_V)
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: v, keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: v, keyDown: false) else { return }
+            let up = CGEvent(keyboardEventSource: source, virtualKey: v, keyDown: false)
+        else { return }
 
         down.flags = .maskCommand
         up.flags = .maskCommand

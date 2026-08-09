@@ -136,9 +136,10 @@ final class SnippetsStore {
             } catch let error as SnippetRepository.RepositoryError {
                 return RepositoryResult.failure(error)
             } catch {
-                return RepositoryResult.failure(.io(
-                    fileURL: repository.snippetsDirectory,
-                    message: error.localizedDescription))
+                return RepositoryResult.failure(
+                    .io(
+                        fileURL: repository.snippetsDirectory,
+                        message: error.localizedDescription))
             }
         }.value
 
@@ -165,9 +166,10 @@ final class SnippetsStore {
             } catch let error as SnippetRepository.RepositoryError {
                 return RepositoryResult.failure(error)
             } catch {
-                return RepositoryResult.failure(.io(
-                    fileURL: repository.snippetsDirectory,
-                    message: error.localizedDescription))
+                return RepositoryResult.failure(
+                    .io(
+                        fileURL: repository.snippetsDirectory,
+                        message: error.localizedDescription))
             }
         }.value
 
@@ -182,14 +184,16 @@ final class SnippetsStore {
     }
 
     private func publishLocal(records: [StoredSnippet]) {
-        apply(SnippetRepository.Snapshot(
-            records: records.sorted(by: recordOrder),
-            issues: issues))
+        apply(
+            SnippetRepository.Snapshot(
+                records: records.sorted(by: recordOrder),
+                issues: issues))
     }
 
     private func apply(_ snapshot: SnippetRepository.Snapshot) {
         guard isStarted else { return }
-        let isUnchanged = state == .ready
+        let isUnchanged =
+            state == .ready
             && snippets == snapshot.records
             && issues == snapshot.issues
         if !isUnchanged {
@@ -240,7 +244,7 @@ final class SnippetsStore {
             changed = armFileWatcher(path: path) || changed
         }
 
-        // Retry whenever anything we wanted is still unwatched — a failed file watcher is as blinding as a missing directory watcher.
+        // Retry while anything is unwatched; a failed file watcher blinds us like a missing one.
         if directoryWatcher == nil || desiredPaths.contains(where: { fileWatchers[$0] == nil }) {
             scheduleWatcherRetry()
         }

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Owns all global shortcut bindings: persistence, registration with the two engines (`HotKeyCenter` for combos, `DoubleTapMonitor` for double-tapped modifiers), conflict lookup, and dispatch.
+/// Owns every binding: persistence, registration with both engines, conflicts and dispatch.
 @MainActor
 @Observable
 final class HotKeyManager {
@@ -14,7 +14,7 @@ final class HotKeyManager {
     /// Names what only the stores know; the fixed catalogs resolve here. Set in `AppCore.start()`.
     var displayName: ((HotKeyAction) -> String?)?
 
-    /// The recorder currently capturing keystrokes, or `nil`; keeping this as plain app state makes recorders glitch-free, and any active recorder pauses both engines so the shortcut being typed can't fire the binding it's replacing. Setting it also starts/stops `capture`.
+    /// The recorder currently capturing, which also pauses both engines.
     var recordingAction: HotKeyAction? {
         didSet {
             guard recordingAction != oldValue else { return }
@@ -47,6 +47,7 @@ final class HotKeyManager {
     private let boundQuicklinkKey = "boundQuicklinkIDs"
 
     func start(customCommandIDs: Set<UUID>, quicklinkIDs: Set<UUID>) {
+        LegacyHotKeyRecords.adopt(candidateActions, decoder: decoder, encoder: encoder)
         prune(key: boundCustomCommandKey, live: customCommandIDs) { .customCommand(id: $0) }
         prune(key: boundQuicklinkKey, live: quicklinkIDs) { .quicklink(id: $0) }
         // After the prunes, so a dropped record can't survive in memory this session.
@@ -63,7 +64,7 @@ final class HotKeyManager {
         syncDoubleTaps()
     }
 
-    /// Bundle IDs that currently have a per-app hotkey — lets `start()` know which records to load and lets launcher rows show keycaps.
+    /// Bundle IDs holding a per-app hotkey, so `start()` knows which records to load.
     var boundBundleIDs: [String] {
         UserDefaults.standard.stringArray(forKey: boundKey) ?? []
     }
@@ -82,7 +83,7 @@ final class HotKeyManager {
     func binding(for action: HotKeyAction) -> HotKeyBinding? { bindings[action] }
 
     private func storedBinding(for action: HotKeyAction) -> HotKeyBinding? {
-        // The stored value is a JSON *string* (a legacy package format); anything else reads as unbound.
+        // The stored value is a JSON string; anything else reads as unbound.
         guard
             let json = UserDefaults.standard.string(forKey: action.defaultsKey),
             let data = json.data(using: .utf8)
@@ -90,19 +91,20 @@ final class HotKeyManager {
         return try? decoder.decode(HotKeyBinding.self, from: data)
     }
 
-    /// Persists or clears the binding and swaps live registration; the `bindings` mutation notifies.
+    /// Persists or clears the binding and swaps live registration.
     func setBinding(_ binding: HotKeyBinding?, for action: HotKeyAction) {
         let previous = bindings[action]
         if let binding,
             let data = try? encoder.encode(binding),
-            let json = String(data: data, encoding: .utf8) {
+            let json = String(data: data, encoding: .utf8)
+        {
             bindings[action] = binding
             UserDefaults.standard.set(json, forKey: action.defaultsKey)
         } else {
             bindings[action] = nil
             UserDefaults.standard.removeObject(forKey: action.defaultsKey)
         }
-        // Unregister unconditionally: the previous binding may have been a combo even when the new one isn't.
+        // Unregister unconditionally: the previous binding may have been a combo.
         center.unregister(id: action.defaultsKey)
         register(action)
 
@@ -129,7 +131,20 @@ final class HotKeyManager {
         }
     }
 
-    /// The display name of whatever else `binding` is bound to (or `nil` if free), driving the recorder's "Used by …" message. Comparing whole bindings means double-taps get conflict detection on the same terms as combos — two actions can never claim the same modifier.
+    /// Include Shift redefines the chord, and a stored combo has the old one baked in.
+    func retargetHyperBindings(includesShift: Bool) {
+        for action in candidateActions {
+            guard let shortcut = bindings[action]?.shortcut else { continue }
+            let retargeted = shortcut.retargetingHyper(includesShift: includesShift)
+            guard retargeted != shortcut else { continue }
+            let binding = HotKeyBinding.combo(retargeted)
+            // Skip a collision rather than clobber it: the second registration would fail silently.
+            guard conflictOwner(of: binding, excluding: action) == nil else { continue }
+            setBinding(binding, for: action)
+        }
+    }
+
+    /// What else holds `binding`, or nil. Whole-binding comparison covers both kinds alike.
     func conflictOwner(of binding: HotKeyBinding, excluding action: HotKeyAction) -> String? {
         for candidate in candidateActions
         where candidate != action && self.binding(for: candidate) == binding {
@@ -138,7 +153,7 @@ final class HotKeyManager {
         return nil
     }
 
-    /// Every action that could currently hold a binding — the search space for conflicts and for rebuilding the double-tap map.
+    /// Every action that could hold a binding: the search space for conflicts and the map.
     private var candidateActions: [HotKeyAction] {
         if let candidateActionsCache { return candidateActionsCache }
         var actions: [HotKeyAction] = [.togglePalette, .toggleClipboard, .toggleEmoji]
@@ -173,7 +188,7 @@ final class HotKeyManager {
         }
     }
 
-    /// Hands a combo to Carbon; a double-tap needs no per-action registration — `syncDoubleTaps` rebuilds the whole modifier map instead.
+    /// Hands a combo to Carbon; a double-tap has no per-action registration to make.
     private func register(_ action: HotKeyAction) {
         guard let shortcut = binding(for: action)?.shortcut else { return }
         center.register(id: action.defaultsKey, shortcut: shortcut) { [weak self] in
@@ -181,7 +196,7 @@ final class HotKeyManager {
         }
     }
 
-    /// Rebuilt wholesale rather than patched, so the map can't drift from what's on disk. Conflict detection keeps it one action per modifier.
+    /// Rebuilt wholesale, so the map can't drift from what is on disk.
     private func syncDoubleTaps() {
         doubleTaps = [:]
         for action in candidateActions {
@@ -206,9 +221,6 @@ final class HotKeyManager {
     }
 
     // MARK: - UUID-keyed indexes
-    //
-    // Custom commands and quicklinks are bound per item rather than per fixed catalog entry, so each
-    // needs an index of the UUIDs that currently hold a binding for `start()` to re-register.
 
     private func boundIDs(key: String) -> [UUID] {
         (UserDefaults.standard.stringArray(forKey: key) ?? []).compactMap(UUID.init(uuidString:))
@@ -220,7 +232,7 @@ final class HotKeyManager {
         persist(set, key: key)
     }
 
-    /// Drops bindings whose item no longer exists — a record deleted while Tinycast wasn't running.
+    /// Drops bindings whose item is gone, deleted while Tinycast wasn't running.
     private func prune(key: String, live: Set<UUID>, action: (UUID) -> HotKeyAction) {
         let stored = Set(boundIDs(key: key))
         for id in stored.subtracting(live) {

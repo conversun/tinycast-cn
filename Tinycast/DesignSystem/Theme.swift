@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Central design tokens for the palette UI (dark design system per `docs/ui.md`; the app forces `.darkAqua`, so colors are literal white/black alphas).
+/// Central design tokens; the app forces `.darkAqua`, so colours are literal alphas.
 enum Theme {
     enum Spacing {
         static let xxs: CGFloat = 2
@@ -12,9 +12,9 @@ enum Theme {
         static let xxl: CGFloat = 20
         /// Calculator answer card's roomier vertical breathing room.
         static let xxxl: CGFloat = 28
-        /// Gap under a category header before its first row; shared by every palette list's `SectionHeader` (launcher, clipboard, emoji, calculator history).
+        /// Gap under a category header, shared by every palette list's `SectionHeader`.
         static let sectionHeaderBottom: CGFloat = 4
-        /// Space above a category header (every header except the list's first), which reads as bottom padding closing the previous section — shared by every palette list.
+        /// Space above every header but the first, reading as the previous section's close.
         static let sectionSpacing: CGFloat = 12
     }
 
@@ -25,7 +25,7 @@ enum Theme {
         /// Hover highlight behind a popover menu row.
         static let menuRow: CGFloat = 10
         static let menuPanel: CGFloat = 16
-        /// Tinycast's own dialog / HUD surface, sized between `menuPanel` and `panel`, so a dialog reads as a smaller sibling of the palette rather than a second palette.
+        /// The dialog and HUD surface, so a dialog reads as a sibling of the palette.
         static let dialog: CGFloat = 20
         static let thumbnail: CGFloat = 6
         static let card: CGFloat = 10
@@ -37,12 +37,12 @@ enum Theme {
     enum Size {
         static let panelWidth: CGFloat = 750
         static let panelHeight: CGFloat = 475
-        /// Fraction of the active screen's visible height between the top of the visible area and the palette's top edge; the window grows downward from this edge (Spotlight-style upper placement).
+        /// Fraction of visible height above the palette's top edge; it grows downward.
         static let paletteTopMarginFraction: CGFloat = 0.18
         static let headerHeight: CGFloat = 44
-        /// Fixed slot for the header leading glyph (search / back chevron / mode icon) so the search field starts at the same x in every mode — glyphs have different intrinsic widths (chevron 14, magnifyingglass 22). Sized to the magnifyingglass so the launcher spacing is unchanged.
+        /// Fixed slot for the header glyph, so the field starts at one x in every mode.
         static let headerIconSlot: CGFloat = 22
-        /// Vertical breathing room above the search row — constant across compact/expanded so the bar never shifts when typing flips the state; also the compact bar's symmetric top/bottom slack.
+        /// Room above the search row, constant so typing never shifts the bar.
         static let headerPadding: CGFloat = 10
         /// Collapsed compact bar: the search row centered in symmetric `headerPadding` slack.
         static let compactHeight: CGFloat = headerHeight + headerPadding * 2
@@ -55,9 +55,7 @@ enum Theme {
         static let shortcutRecorder: CGFloat = 120
         /// One text line in the recorder callout.
         static let shortcutPopoverLine: CGFloat = 14
-        /// Summed from the bands the body lays out, so placement needs no measuring. The width is
-        /// load-bearing: it must stay under twice a recorder's inset from the pane edge, or the
-        /// callout clamps and the caret stops being centred. `Tools/callout-test.swift` pins that.
+        /// Summed from the laid-out bands; the width is pinned by `callout-test`.
         static let shortcutPopover = CGSize(
             width: 132,
             height: Spacing.sm * 2 + heroKeyCap + Spacing.sm + shortcutPopoverLine + Spacing.sm
@@ -66,7 +64,7 @@ enum Theme {
         static let calloutCaretWidth: CGFloat = 15
         static let calloutCaretHeight: CGFloat = 7
         static let calloutCaretTip: CGFloat = 2.5
-        /// Keycaps: `compact` for a hint, `keyCap` as standard, `hero` where the cap is the content.
+        /// Keycaps: `compact` hints, `keyCap` is standard, `hero` where the cap is content.
         static let compactKeyCap: CGFloat = 15
         static let heroKeyCap: CGFloat = 22
         static let menuButton: CGFloat = 36
@@ -75,25 +73,27 @@ enum Theme {
         static let clipboardListWidth: CGFloat = 290
         static let emojiCell: CGFloat = 56
         static let menuWidth: CGFloat = 276
-        /// Square slot for a popover-menu row's leading glyph. 20 (not the 16 the artwork suggests) because an `IconCache` app icon only paints ~85% of its canvas: at 20 its visible artwork is 17pt, matching the 17–18pt a `.body` SF Symbol renders at, so symbol and app-icon rows read the same size.
+        /// A menu row's glyph slot, sized so symbol and app-icon rows read the same.
         static let menuIcon: CGFloat = 20
-        /// Settings window: sidebar column width and the small icon used in setting rows.
-        static let settingsSidebar: CGFloat = 184
+        /// Opening size and the resize floor; tall enough that the sidebar's rows never scroll.
+        static let settingsWindow = CGSize(width: 860, height: 700)
+        /// Settings sidebar: a fixed column, wide enough for "Window Management".
+        static let settingsSidebar: CGFloat = 215
+        /// The narrowest the pane column may get before a grouped row's control starts colliding.
+        static let settingsDetailMinimum: CGFloat = 420
         static let settingsRowIcon: CGFloat = 20
-        /// Little state indicator dot next to a settings row title (Hyper Key active/needs-permission).
-        static let statusDot: CGFloat = 6
         /// Settings editor modals (Custom Commands, Snippets): fixed width, intrinsic height.
         static let editorSheetWidth: CGFloat = 480
-        /// The multi-line text box inside those modals (shell command, snippet template) — it scrolls internally rather than growing the sheet.
+        /// The multi-line box inside those modals; it scrolls rather than grows the sheet.
         static let editorTextHeight: CGFloat = 120
-        /// Field column in the snippet argument prompt. At or below 220 the alert keeps its natural 260pt width, so its buttons sit exactly where every other alert's do.
+        /// The argument prompt's field column, kept under the alert's natural width.
         static let argumentPromptWidth: CGFloat = 220
-        /// Confirmation HUD: it sizes to its message, up to this ceiling, and sits this far above the bottom of the screen.
+        /// The confirmation HUD's width ceiling, and its distance above the screen bottom.
         static let hudMaxWidth: CGFloat = 420
         static let hudEdgeOffset: CGFloat = 48
         /// Tinycast's own dialog: fixed width, height measured from the SwiftUI content.
         static let dialogWidth: CGFloat = 420
-        /// Leading glyph on a dialog, larger than a row icon because it carries the subject the dialog is about.
+        /// A dialog's leading glyph, larger than a row icon: it carries the subject.
         static let dialogIcon: CGFloat = 32
         /// Transient volume HUD shown after any volume or mute command.
         static let hudWidth: CGFloat = 200
@@ -101,18 +101,15 @@ enum Theme {
         /// Volume slider geometry, shared by the Set Volume dialog and the HUD's read-only bar.
         static let volumeTrackHeight: CGFloat = 6
         static let volumeKnob: CGFloat = 16
-        /// Fixed slot for the level readout, so the track can't resize as the number runs 0% → 100%.
-        /// Sized to the widest string it ever holds — "Muted" at 36pt in `rowTrailing` — and no wider,
-        /// since the slack is subtracted straight off the track.
+        /// Fixed slot for the level readout, sized to the widest string it ever holds.
         static let volumeReadout: CGFloat = 38
     }
 
     enum Duration {
-        /// How long each HUD stays on screen. A sentence needs reading time; a level only needs a glance.
+        /// How long each HUD stays up; a sentence needs longer than a level does.
         static let messageHUD: TimeInterval = 2.4
         static let volumeHUD: TimeInterval = 1.6
-        /// How any borderless surface — dialog or HUD — arrives and leaves. The exit is shorter so a
-        /// confirmed action doesn't feel held up.
+        /// How a borderless surface arrives and leaves; the exit is shorter, so it feels quick.
         static let enter: TimeInterval = 0.18
         static let exit: TimeInterval = 0.12
         /// Fade-in/out for a hover `Tooltip`.
@@ -141,9 +138,9 @@ enum Theme {
     enum Colors {
         /// Black opacity of the panel's surface tint over the behind-window material.
         static let panelDimming: CGFloat = 0.4
-        /// Selection fill: a soft neutral translucent layer shared by launcher and clipboard so both lists look identical.
+        /// Selection fill, shared by every list so they look identical.
         static let selection = Color.white.opacity(0.10)
-        /// Mouse hover — a fainter layer that follows the cursor, visually distinct from selection.
+        /// Mouse hover: a fainter layer, visually distinct from selection.
         static let rowHover = Color.white.opacity(0.05)
         static let menuHover = Color.white.opacity(0.10)
         static let separator = Color.white.opacity(0.10)
@@ -153,14 +150,14 @@ enum Theme {
         static let border = Color.white.opacity(0.20)
         static let textSecondary = Color.white.opacity(0.60)
         static let textTertiary = Color.white.opacity(0.40)
-        /// Settings grouped "card": a faint raised surface whose hairline border doubles as the inset row divider.
+        /// The Settings card: a faint surface whose border doubles as the row divider.
         static let cardFill = Color.white.opacity(0.05)
         static let cardStroke = Color.white.opacity(0.10)
-        /// Whitish tint layered into the Liquid Glass floating controls (action group + menu circle) so the glass reads frosted rather than clear.
+        /// Tint layered into the floating controls, so the glass reads frosted, not clear.
         static let glassFrost = Color.white.opacity(0.05)
         /// The violet of the app mark, used only to tint the About support callout.
         static let brand = Color(red: 0.525, green: 0.231, blue: 1.0)
-        /// Destructive tint: a destructive button's label, and the leading glyph of a `.danger` dialog.
+        /// Destructive tint: a destructive label, and a `.danger` dialog's glyph.
         static let destructive = Color.red
         /// Success tint: the leading glyph of a `.success` dialog.
         static let success = Color.green
@@ -168,7 +165,7 @@ enum Theme {
 }
 
 extension View {
-    /// A floating Liquid Glass control surface (action group + menu button), interactive for native lensing with a whitish frost tint so it reads brighter than clear glass.
+    /// A floating glass control surface, frosted so it reads brighter than clear glass.
     func frosted(in shape: some Shape) -> some View {
         glassEffect(.regular.interactive().tint(Theme.Colors.glassFrost), in: shape)
             .tint(.clear)

@@ -14,25 +14,25 @@ Check existing [issues](https://github.com/abue-ammar/tinycast/issues) and
   existing tokens ([`docs/ui.md`](docs/ui.md)). If you genuinely need a new one, justify it in the PR.
 - **No bloat.** Tinycast stays small on purpose — quality over quantity. A clean patch still gets
   declined if the feature isn't worth its weight, so open an issue and settle that before you build.
-- **Never break the Critical Invariants** in [`AGENTS.md`](AGENTS.md).
+- **Never break the Non-negotiables** in [`AGENTS.md`](AGENTS.md).
 
 ## Setup
 
-- macOS 26+, Xcode 26. Do the one-time signing setup ([`docs/signing.md`](docs/signing.md) §1).
+- macOS 26+, Xcode 26. Do the one-time signing setup
+  ([`docs/signing.md`](docs/signing.md) §1).
 - `open Tinycast.xcodeproj` → ⌘R. Debug builds are their own channel (`Tinycast Dev.app`).
 - After editing `project.yml`: `xcodegen generate`, commit the result. No SwiftPM.
 - Details: [`docs/development.md`](docs/development.md). Architecture:
-  [`docs/architecture.md`](docs/architecture.md).
+  [`docs/architecture.md`](docs/architecture.md). Start at [`docs/`](docs/README.md).
 
 ## Before submitting
 
 - **A linked issue that got a green light.** No agreed issue, no merge — unless a maintainer marks
   the PR `typo` or `docs`.
-- Builds clean — no new warnings.
-- The `Tools/` harnesses pass; engine changes come with new cases. CI runs them on the PR as a merge
-  gate. It does **not** build the app, so **build locally** —
-  a PR that doesn't compile still looks green; [`docs/development.md`](docs/development.md#tests) has
-  the commands.
+- The whole bar in [`docs/testing.md`](docs/testing.md#definition-of-done) passes — harnesses, lint,
+  purity, a clean build. Engine changes come with new cases. CI runs the harnesses and lint — it
+  annotates lint violations on your diff — but does **not** build the app, so **build locally**: a PR
+  that doesn't compile still looks green.
 - Leak-tested and memory-measured. Numbers in the PR.
 - You actually used the app, on your path and the ones next to it.
 - Rebased on `main`, squashed into logical commits.
@@ -55,17 +55,17 @@ Check existing [issues](https://github.com/abue-ammar/tinycast/issues) and
 
 ## Code style
 
-Match the surrounding code.
+Read [`AGENTS.md`](AGENTS.md) first — the posture, the Non-negotiables and the naming and comment rules
+are all there, and they apply to a human contributor exactly as they do to an agent.
+[`docs/standards.md`](docs/standards.md) is the full version: architecture, naming, Swift style,
+concurrency and the performance budgets. [`docs/ui.md`](docs/ui.md) before any new view or restyle, and
+[`docs/decisions.md`](docs/decisions.md) before "fixing" something that looks wrong — it may be
+deliberate, and the entry says what would change it.
 
-- Single-line comments only. Comment the _why_, never the _what_.
-- Views stay declarative; logic lives in models and managers.
-- Swift 6 isolation — heavy work off the main actor.
-- [`Core/Theme.swift`](Tinycast/Core/Theme.swift) tokens only. Read [`docs/ui.md`](docs/ui.md) before
-  any new view or restyle. Dark only — no light-mode styling.
-- New long-lived state goes on `AppCore`, wired in `start()`.
-- Networked features ship **off** and consent-gated. Follow `CurrencyRateStore`.
-- Delete dead code. Never hand-edit the generated files.
+Two things that are only about contributing, and so are not in those docs:
+
 - Commit messages imperative: `Add per-app hotkey toggle`.
+- Behaviour you didn't mean to change, didn't change. Say so explicitly in the PR if it did.
 
 ## Bugs
 

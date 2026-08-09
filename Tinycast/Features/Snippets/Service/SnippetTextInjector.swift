@@ -6,7 +6,7 @@ enum SnippetAccessibilityReplacement: Equatable {
     case unavailable
     case rejected
 
-    /// Only an unavailable attempt falls back to synthetic events. A `.rejected` one means the target's text no longer matches what we expected, so it fails closed rather than typing into an unknown position.
+    /// Only `.unavailable` falls back to events; `.rejected` means the text moved, so fail closed.
     var fallsBackToEvents: Bool { self == .unavailable }
 }
 
@@ -30,7 +30,7 @@ final class SnippetDeliveryCompletion {
 final class SnippetTextInjector {
     typealias AutomaticGeneration = UInt
 
-    /// Generous for a responsive app, short enough that a wedged one can't visibly stall a keystroke.
+    /// Generous for a responsive app, short enough that a wedged one can't stall a keystroke.
     private static let accessibilityTimeout: Float = 1
 
     private let clipboardManager: ClipboardManager
@@ -509,7 +509,7 @@ final class SnippetTextInjector {
 
     private func focusedElement(in targetApp: NSRunningApplication) -> AXUIElement? {
         let application = AXUIElementCreateApplication(targetApp.processIdentifier)
-        // A hung target would otherwise stall the main actor for the global default. The timeout is per element and never inherited, so the focused element needs its own.
+        // Per element and never inherited, so the focused element needs its own against a hang.
         AXUIElementSetMessagingTimeout(application, Self.accessibilityTimeout)
         var focusedValue: CFTypeRef?
         guard
@@ -887,8 +887,7 @@ struct PasteboardSnapshot {
                     pasteboardItem.setData(Data(), forType: ClipboardManager.internalType)
                 else { return nil }
             }
-            for value in item.values where index != 0 || firstString == nil || value.type != .string
-            {
+            for value in item.values where index != 0 || firstString == nil || value.type != .string {
                 guard pasteboardItem.setData(value.data, forType: value.type) else { return nil }
             }
             pasteboardItems.append(pasteboardItem)

@@ -87,10 +87,7 @@ jobs:
           git remote add upstream https://github.com/abue-ammar/tinycast.git
           git fetch --no-tags upstream "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
           git merge --no-edit "$UPSTREAM_TAG"
-          swiftc -swift-version 6 Tinycast/Features/Launcher/Model/SearchRelevance.swift \
-            Tinycast/Platform/Pinyin.swift Tools/fuzz-test.swift \
-            -o "$RUNNER_TEMP/fuzz-test"
-          "$RUNNER_TEMP/fuzz-test"
+          ./Scripts/run-tests.sh
           git push origin HEAD:main
           echo "source_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 

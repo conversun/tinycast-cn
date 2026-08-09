@@ -1,8 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// Borderless panel hosting one Tinycast dialog. Keys are intercepted in `sendEvent` rather than
-/// SwiftUI's `onKeyPress` so Esc/↵ work without depending on anything inside the dialog holding focus.
+/// One dialog's panel; keys go through `sendEvent`, so Esc/↵ need no focused subview.
 final class DialogPanel: NSPanel {
     /// What the panel saw, not what it means: how far a step moves is the caller's business.
     enum Key {
@@ -22,7 +21,7 @@ final class DialogPanel: NSPanel {
             defer: false
         )
         isFloatingPanel = true
-        // Above the palette's `.floating`, so a confirmation is never buried under the window that triggered it.
+        // Above the palette, so a confirmation is never buried under its trigger.
         level = .modalPanel
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         isMovableByWindowBackground = false

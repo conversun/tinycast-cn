@@ -7,8 +7,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     case emoji
     case uninstall
     case quicklinks
-    /// Collects a quicklink's `{argument}` values before it opens; the pending request lives on
-    /// `AppCore.quicklinkArguments`, the way `.uninstall`'s target lives on `UninstallSession`.
+    /// Collects a quicklink's `{argument}` values; the request lives on the session.
     case quicklinkArguments
 
     var id: String { rawValue }
@@ -48,7 +47,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// The app a paste will land in, resolved once per palette show so the footer pill and menu rows can name it without re-reading `NSWorkspace` on every render.
+/// The app a paste lands in, resolved once per show so nothing re-reads it per render.
 struct PasteTarget: Equatable {
     let name: String
     /// Bundle path for `IconCache` — nil for a target with no on-disk bundle.

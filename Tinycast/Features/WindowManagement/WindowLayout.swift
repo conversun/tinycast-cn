@@ -1,12 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// Pure window geometry: every frame the window commands produce, with no Accessibility, no `NSScreen`
-/// and no clock — so `Tools/window-command-test.swift` can compile and exercise it standalone.
-///
-/// Everything here works in **AX space**: global coordinates, top-left origin, +Y pointing *down*.
-/// `WindowMover` is the only place that converts to and from Cocoa's bottom-left space. The visible
-/// consequence is that "Top Half" has `minY == visibleFrame.minY`.
+/// Pure geometry, entirely in AX space. See docs/features/window-management.md#coordinate-space.
 enum WindowLayout {
     /// A display, already converted to AX space by the caller.
     struct Screen: Equatable, Sendable {
@@ -16,8 +11,7 @@ enum WindowLayout {
         let visibleFrame: CGRect
     }
 
-    /// Where a window that refused to shrink to its slot sits inside it — a left half stays left-aligned
-    /// rather than centred.
+    /// Where a window that refused to shrink sits in its slot; a left half stays left-aligned.
     struct Anchor: Equatable, Sendable {
         /// `min` is left / top, since +Y points down here.
         enum Axis: Equatable, Sendable { case min, center, max }
@@ -28,10 +22,13 @@ enum WindowLayout {
         static let topLeading = Anchor(horizontal: .min, vertical: .min)
         static let centered = Anchor(horizontal: .center, vertical: .center)
 
-        /// Places `size` inside `slot` per the anchor, used when an app clamped itself larger than the slot.
+        /// Places `size` inside `slot` per the anchor, when an app clamped itself larger.
         func place(_ size: CGSize, in slot: CGRect) -> CGRect {
-            func origin(_ axis: Axis, slotMin: CGFloat, slotLength: CGFloat, length: CGFloat)
-                -> CGFloat {
+            func origin(
+                _ axis: Axis, slotMin: CGFloat, slotLength: CGFloat, length: CGFloat
+            )
+                -> CGFloat
+            {
                 switch axis {
                 case .min: return slotMin
                 case .center: return slotMin + (slotLength - length) / 2
@@ -55,8 +52,7 @@ enum WindowLayout {
         var step: Int
         /// Read only by `.restore`.
         var restoreFrame: CGRect?
-        /// The tile command that last placed this window, when it hasn't been touched since. Lets the
-        /// display moves re-derive that tile exactly on the destination instead of scaling it.
+        /// The tile that last placed this window, so a display move re-derives rather than scales.
         var lastTileCommand: WindowCommand.ID?
 
         init(
@@ -91,9 +87,7 @@ enum WindowLayout {
 
     // MARK: - Entry point
 
-    /// The target placement, or `nil` when there is nothing to apply — an unknown restore point, a
-    /// display move with only one display, a fullscreen command, or degenerate input. `nil` means the
-    /// mover writes nothing at all rather than writing something harmless.
+    /// The target placement, or `nil` when the mover should write nothing at all.
     static func placement(for input: Input) -> Placement? {
         guard let command = WindowCommandCatalog.command(id: input.command),
             command.kind != .fullscreen,
@@ -115,7 +109,7 @@ enum WindowLayout {
             break
         }
 
-        // Non-cycling commands ignore the step entirely, so a stale cycle position can never leak in.
+        // Non-cycling commands ignore the step, so a stale cycle position can't leak in.
         let step = command.cyclesOnRepeat ? normalizedStep(input.step) : 0
 
         if let fractions = tileFractions(input.command, step: step) {
@@ -143,7 +137,7 @@ enum WindowLayout {
                 frame: rounded(Anchor.centered.place(size, in: canvas)), screenID: host.id,
                 anchor: .centered, resizes: true)
 
-        // The cap is what makes this display-independent; 0.6 < 1 keeps it inside the canvas without a clamp.
+        // The cap makes this display-independent; 0.6 < 1 stays inside the canvas unclamped.
         case .reasonableSize:
             let size = CGSize(
                 width: min(canvas.width * reasonableSizeFraction, reasonableSizeMax.width),
@@ -152,8 +146,7 @@ enum WindowLayout {
                 frame: rounded(Anchor.centered.place(size, in: canvas)), screenID: host.id,
                 anchor: .centered, resizes: true)
 
-        // Both keep the untouched axis's position, but clamp it: a window sitting off the display would
-        // otherwise come back full-height and still entirely off-screen.
+        // Both keep the untouched axis, but clamp it, so an off-display window comes back.
         case .maximizeHeight:
             let frame = CGRect(
                 x: current.minX, y: canvas.minY, width: current.width, height: canvas.height)
@@ -192,8 +185,7 @@ enum WindowLayout {
 
     // MARK: - Screens
 
-    /// The display a window lives on: most overlapping area wins, so a window straddling two displays
-    /// belongs to whichever shows more of it. Falls back to the display holding its centre.
+    /// The display a window lives on: most overlapping area wins, else the one holding its centre.
     static func screen(containing frame: CGRect, in screens: [Screen]) -> Screen? {
         guard !screens.isEmpty else { return nil }
         var best: (screen: Screen, area: CGFloat)?
@@ -207,8 +199,7 @@ enum WindowLayout {
         return screens.first { $0.frame.contains(centre) } ?? screens.first
     }
 
-    /// Left-to-right, then top-to-bottom — a stable order independent of however `NSScreen.screens`
-    /// happens to be sorted.
+    /// Left-to-right, then top-to-bottom: stable however `NSScreen.screens` is sorted.
     static func ordered(_ screens: [Screen]) -> [Screen] {
         screens.sorted {
             $0.frame.minX != $1.frame.minX
@@ -216,8 +207,11 @@ enum WindowLayout {
         }
     }
 
-    private static func displayPlacement(_ input: Input, from host: Screen, gap: CGFloat)
-        -> Placement? {
+    private static func displayPlacement(
+        _ input: Input, from host: Screen, gap: CGFloat
+    )
+        -> Placement?
+    {
         let ordered = ordered(input.screens)
         // A single display makes both commands a quiet no-op rather than a pointless re-place.
         guard ordered.count > 1, let index = ordered.firstIndex(where: { $0.id == host.id })
@@ -234,8 +228,7 @@ enum WindowLayout {
     private static func moved(
         _ frame: CGRect, from: Screen, to: Screen, gap: CGFloat, lastTile: WindowCommand.ID?
     ) -> CGRect {
-        // Exactness beats proportion: a window still sitting where a tile command put it re-derives that
-        // same tile on the destination, so thirds and gaps land on the point instead of being scaled.
+        // Exactness beats proportion: an untouched tile re-derives instead of being scaled.
         if let lastTile, let fractions = tileFractions(lastTile, step: 0) {
             return tile(
                 to.visibleFrame, x0: fractions.x0, x1: fractions.x1, y0: fractions.y0,
@@ -244,8 +237,7 @@ enum WindowLayout {
         let source = from.visibleFrame
         let target = to.visibleFrame
         guard source.width > 0, source.height > 0 else { return frame }
-        // Relative to `visibleFrame`, not `frame`: a window tucked against the Dock should land tucked
-        // against the destination's Dock, whatever each display reserves.
+        // Relative to `visibleFrame`, so a window tucked against the Dock lands tucked again.
         let relativeX = (frame.minX - source.minX) / source.width
         let relativeY = (frame.minY - source.minY) / source.height
         let scaled = CGRect(
@@ -263,8 +255,7 @@ enum WindowLayout {
             let host = screen(containing: restoreFrame, in: input.screens)
         else { return nil }
         let overlap = host.visibleFrame.intersection(restoreFrame)
-        // A restore point stranded off every current display (a monitor was unplugged meanwhile) comes
-        // back centred at its old size rather than off-screen where it can't be reached.
+        // A restore point stranded off every display comes back centred, not unreachable.
         let stranded = overlap.isNull || overlap.width < 40 || overlap.height < 40
         let frame =
             stranded
@@ -289,9 +280,7 @@ enum WindowLayout {
     private static let oneThird: CGFloat = 1.0 / 3.0
     private static let twoThirds: CGFloat = 2.0 / 3.0
 
-    /// The fractional bounds of a tile command, or `nil` if the command isn't a tile. `step` only ever
-    /// matters for the four halves, which cycle ½ → ⅓ → ⅔. The vertical cycle has no commands of its
-    /// own — Thirds are horizontal — so it is expressed here as fractions rather than other command IDs.
+    /// Fractional bounds of a tile command, or `nil`; `step` matters only for the four halves.
     private static func tileFractions(_ command: WindowCommand.ID, step: Int) -> Fractions? {
         let cycle: [CGFloat] = [0.5, oneThird, twoThirds]
         let position = cycle[normalizedStep(step)]
@@ -338,8 +327,7 @@ enum WindowLayout {
                 x0: oneThird, x1: 1, y0: 0, y1: 1,
                 anchor: Anchor(horizontal: .max, vertical: .min))
 
-        // Half the screen's area — half its width, full height — so it reads as the family sibling of
-        // Center Third.
+        // Half the screen's area, so it reads as the family sibling of Center Third.
         case .centerHalf:
             return Fractions(
                 x0: 0.25, x1: 0.75, y0: 0, y1: 1,
@@ -350,15 +338,12 @@ enum WindowLayout {
         }
     }
 
-    /// Whether the command places the window on the fractional grid — the ones a display move can
-    /// re-derive exactly on the destination rather than scaling proportionally.
+    /// Whether the command lands on the fractional grid, which a display move can re-derive.
     static func isTileCommand(_ command: WindowCommand.ID) -> Bool {
         tileFractions(command, step: 0) != nil
     }
 
-    /// A tile from fractional bounds of `visible`. An edge sitting on the screen boundary takes the full
-    /// gap, an interior edge takes half — so two adjacent tiles leave exactly `gap` between them and
-    /// every screen edge is inset by `gap`, with no per-family special cases.
+    /// A tile from fractional bounds of `visible`. See docs/features/window-management.md#geometry.
     static func tile(
         _ visible: CGRect, x0: CGFloat, x1: CGFloat, y0: CGFloat, y1: CGFloat, gap: CGFloat
     ) -> CGRect {
@@ -371,8 +356,7 @@ enum WindowLayout {
                 x: left, y: top, width: max(1, right - left), height: max(1, bottom - top)))
     }
 
-    /// The box free-floating commands work in. A centred window has no neighbour to gutter against, so it
-    /// takes the full gap on every side rather than the tile grid's half-gaps.
+    /// The box free-floating commands work in: full gap on every side, not the grid's halves.
     static func canvas(_ visible: CGRect, gap: CGFloat) -> CGRect {
         rounded(visible.insetBy(dx: gap, dy: gap))
     }
@@ -386,15 +370,12 @@ enum WindowLayout {
             height: min(canvas.height, max(150, canvas.height * 0.15)))
     }
 
-    /// Even so that growing and shrinking move each edge by a whole point, which is what makes the two
-    /// commands exactly invertible instead of drifting by a point per round trip.
+    /// Even, so each edge moves a whole point and the two commands stay exactly invertible.
     private static func evenStep(_ dimension: CGFloat) -> CGFloat {
         max(2, (dimension * stepFraction / 2).rounded() * 2)
     }
 
-    /// Grows or shrinks about the centre by a fixed fraction of the *screen*, not of the window. A
-    /// screen-relative step is exactly invertible — `size × 0.95 × 1.05 ≠ size`, so a size-relative one
-    /// would shrink a little on every round trip — and it feels the same at any window size.
+    /// About the centre, by a fraction of the screen. docs/features/window-management.md#geometry
     private static func resized(_ frame: CGRect, in canvas: CGRect, larger: Bool) -> CGRect {
         let direction: CGFloat = larger ? 1 : -1
         let floorSize = minimumSize(in: canvas)
@@ -408,8 +389,11 @@ enum WindowLayout {
         return rounded(clamped(centred, into: canvas))
     }
 
-    private static func nudged(_ frame: CGRect, in canvas: CGRect, command: WindowCommand.ID)
-        -> CGRect {
+    private static func nudged(
+        _ frame: CGRect, in canvas: CGRect, command: WindowCommand.ID
+    )
+        -> CGRect
+    {
         let dx = (canvas.width * stepFraction).rounded()
         let dy = (canvas.height * stepFraction).rounded()
         var moved = frame
@@ -425,8 +409,7 @@ enum WindowLayout {
 
     // MARK: - Primitives
 
-    /// Rounds the four *edges* rather than origin and size: two tiles sharing a fractional boundary
-    /// (480.333 for thirds of 1441) round it identically, so tiles never overlap and never leave a seam.
+    /// Rounds the four edges, so two tiles sharing a boundary round it identically.
     static func rounded(_ rect: CGRect) -> CGRect {
         let minX = rect.minX.rounded()
         let minY = rect.minY.rounded()
@@ -435,15 +418,14 @@ enum WindowLayout {
         return CGRect(x: minX, y: minY, width: max(0, maxX - minX), height: max(0, maxY - minY))
     }
 
-    /// Keeps `frame` inside `box` without resizing it. An oversized window pins its leading edge rather
-    /// than being shoved off the far side.
+    /// Keeps `frame` inside `box` unresized; an oversized window pins its leading edge.
     static func clamped(_ frame: CGRect, into box: CGRect) -> CGRect {
         let x = min(max(frame.minX, box.minX), max(box.minX, box.maxX - frame.width))
         let y = min(max(frame.minY, box.minY), max(box.minY, box.maxY - frame.height))
         return CGRect(x: x, y: y, width: frame.width, height: frame.height)
     }
 
-    /// A gap wider than the screen can carry would produce zero-width tiles, so cap it before any math.
+    /// A gap wider than the screen would produce zero-width tiles, so cap it before any math.
     static func sanitizedGap(_ gap: CGFloat, in visible: CGRect) -> CGFloat {
         guard gap.isFinite, gap > 0, visible.width > 0, visible.height > 0 else { return 0 }
         return min(gap, min(visible.width, visible.height) / 10)

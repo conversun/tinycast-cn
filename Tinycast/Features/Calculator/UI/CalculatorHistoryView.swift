@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// Full-width list of past calculations, mirroring `ClipboardList`'s structure; each row carries both sides of the calculation, so there's no preview pane.
+/// Past calculations, shaped like `ClipboardList`; both sides per row, so no preview pane.
 struct CalculatorHistoryList: View {
     let results: [CalcHistoryEntry]
     let selectedID: CalcHistoryEntry.ID?
-    /// Changes only when the list should scroll (keyboard nav / reset), so mouse selection never yanks the scroll position.
+    /// Changes only when the list should scroll, so mouse selection never yanks the position.
     let scroll: ScrollIntent
-    /// Live answer for a calculation typed into the history search — same card and flat-index-0 contract as the launcher (`LauncherList.calc`).
+    /// Live answer typed into the history search; same flat-index-0 contract as the launcher.
     var calc: CalcResult?
     var calcSelected = false
     var onActivateCalc: () -> Void = {}
@@ -35,12 +35,12 @@ struct CalculatorHistoryList: View {
         calcSelected ? Self.calcRowID : selectedID?.uuidString
     }
 
-    /// Whether the selection sits on flat index 0 — the calc card when present, else the first entry.
+    /// Whether the selection sits on flat index 0: the calc card, else the first entry.
     private var firstRowSelected: Bool {
         calc != nil ? calcSelected : selectedID != nil && selectedID == results.first?.id
     }
 
-    /// Entries are newest-first, so grouping walks and emits a date header whenever the bucket changes (same as the clipboard list); a live calculation pins above them.
+    /// Newest-first, so a date header is emitted whenever the bucket changes.
     private var rows: [Row] {
         var rows: [Row] = []
         if let calc { rows = [.header("Calculator"), .calc(calc)] }
@@ -98,7 +98,7 @@ struct CalculatorHistoryList: View {
                 case .top:
                     proxy.scrollToOrigin()
                 case .follow:
-                    // On the first row, snap to the origin so its section header shows too — a nil anchor won't, since the row is already visible.
+                    // Snap to the origin on the first row so its section header shows too.
                     if firstRowSelected {
                         proxy.scrollToOrigin()
                     } else if let selectedRowID {

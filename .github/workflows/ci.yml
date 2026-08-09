@@ -1,13 +1,15 @@
 name: CI
 
-# The job is a merge gate and runs on PRs and on `main`. There is no xcodebuild step: the full Debug
-# build costs minutes and the release workflow already builds before it ships, so CI keeps to the one
-# check that finishes in about a minute — the Tools/ harnesses (the test suite, since there is no
-# XCTest target; see AGENTS.md).
+# The job is a merge gate. There is no xcodebuild step: the full Debug build costs minutes and the
+# release workflow already builds before it ships, so CI keeps to the two checks that finish in about
+# a minute. Both go through the scripts rather than naming rules or harnesses here, so this file
+# cannot drift from them. See docs/testing.md.
+#
+# PRs only, deliberately. `pull_request` builds the *merge result*, so a push to `main` that came from
+# a green PR would re-test content CI has already seen. Use "Run workflow" for a direct push to main.
 on:
   pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 # A new push supersedes the previous run for the same ref.
 concurrency:
@@ -34,55 +36,15 @@ jobs:
           echo "Using $XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
 
-      - name: Run Tools/ harnesses
+      - name: Run the harnesses
+        run: ./Scripts/run-tests.sh
+
+      # `if: always()` so a failing harness still surfaces the lint annotations in the same run.
+      # Warnings annotate the diff; only lint *errors* fail the job, matching a local run.
+      - name: Lint
+        if: always()
+        env:
+          SWIFTLINT_REPORTER: github-actions-logging
         run: |
-          set -euo pipefail
-          swiftc -swift-version 6 Tinycast/Features/Launcher/Model/SearchRelevance.swift \
-            Tinycast/Platform/Pinyin.swift Tools/fuzz-test.swift \
-            -o /tmp/fuzz-test && /tmp/fuzz-test
-          swiftc -swift-version 6 Tinycast/Features/Launcher/Model/SearchRelevance.swift \
-            Tinycast/Features/Launcher/Model/LauncherRankingStore.swift Tools/ranking-test.swift \
-            -o /tmp/ranking-test && /tmp/ranking-test
-          swiftc Tinycast/Features/Calculator/Model/*.swift Tools/calc-test.swift \
-            -o /tmp/calc-test && /tmp/calc-test
-          swiftc -swift-version 6 Tinycast/Features/Clipboard/Model/ClipboardStore.swift Tools/clipboard-test.swift \
-            -o /tmp/clipboard-test && /tmp/clipboard-test
-          swiftc -swift-version 6 Tinycast/Features/Launcher/Model/SearchScopes.swift Tools/scopes-test.swift \
-            -o /tmp/scopes-test && /tmp/scopes-test
-          swiftc -swift-version 6 Tinycast/Features/Backup/Model/RaycastFormat.swift \
-            Tinycast/Features/Backup/Model/RaycastV1Decoder.swift Tinycast/Features/Backup/Service/Gunzip.swift \
-            Tinycast/Features/Clipboard/Model/ClipboardStore.swift Tools/raycast-test.swift \
-            -o /tmp/raycast-test && /tmp/raycast-test
-          swiftc Tinycast/Features/Emoji/Model/EmojiCatalog.swift Tinycast/Features/Emoji/Model/EmojiGridGeometry.swift \
-            Tinycast/Features/Emoji/Model/EmojiData.generated.swift Tools/emoji-test.swift \
-            -o /tmp/emoji-test && /tmp/emoji-test
-          swiftc -swift-version 6 Tinycast/Features/CustomCommands/Model/CustomCommand.swift \
-            Tinycast/Features/CustomCommands/Service/ShellCommandRunner.swift Tools/custom-command-test.swift \
-            -o /tmp/custom-command-test && /tmp/custom-command-test
-          swiftc -swift-version 6 Tinycast/Platform/NotificationToken.swift \
-            Tinycast/Platform/HealthTicker.swift \
-            Tinycast/Features/Snippets/Model/*.swift Tinycast/Features/Snippets/Service/*.swift \
-            Tools/snippets-test.swift -o /tmp/snippets-test && /tmp/snippets-test
-          swiftc -swift-version 6 Tinycast/Features/HotKeys/Model/DoubleTapModifier.swift \
-            Tinycast/Features/HotKeys/Model/DoubleTapDetector.swift Tools/hotkey-test.swift \
-            -o /tmp/hotkey-test && /tmp/hotkey-test
-          swiftc -swift-version 6 Tinycast/DesignSystem/Theme.swift \
-            Tinycast/Features/HotKeys/UI/CalloutPlacement.swift Tools/callout-test.swift \
-            -o /tmp/callout-test && /tmp/callout-test
-          swiftc -swift-version 6 Tinycast/Features/SystemActions/Model/SystemAction.swift Tools/system-action-test.swift \
-            -o /tmp/system-action-test && /tmp/system-action-test
-          swiftc -swift-version 6 Tinycast/Features/WindowManagement/WindowCommand.swift \
-            Tinycast/Features/WindowManagement/WindowLayout.swift \
-            Tinycast/Features/WindowManagement/WindowActionMemory.swift Tools/window-command-test.swift \
-            -o /tmp/window-command-test && /tmp/window-command-test
-          swiftc -swift-version 6 Tinycast/Features/Uninstall/Model/UninstallTarget.swift \
-            Tinycast/Features/Uninstall/Model/UninstallSearchRoot.swift \
-            Tinycast/Features/Uninstall/Model/UninstallRules.swift \
-            Tinycast/Features/Uninstall/Model/UninstallProtection.swift \
-            Tinycast/Features/Uninstall/Model/UninstallPlan.swift Tools/uninstall-test.swift \
-            -o /tmp/uninstall-test && /tmp/uninstall-test
-          swiftc -swift-version 6 Tinycast/Features/Quicklinks/Model/Quicklink.swift \
-            Tinycast/Features/Quicklinks/Model/QuicklinkDestination.swift \
-            Tinycast/Features/Quicklinks/Model/QuicklinkStore.swift \
-            Tinycast/Features/Quicklinks/Model/QuicklinkArchive.swift Tools/quicklink-test.swift \
-            -o /tmp/quicklink-test && /tmp/quicklink-test
+          command -v swiftlint >/dev/null || brew install swiftlint
+          ./Scripts/lint.sh

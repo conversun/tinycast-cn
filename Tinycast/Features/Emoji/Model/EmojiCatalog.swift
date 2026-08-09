@@ -65,7 +65,7 @@ enum EmojiSkinTone: String, CaseIterable, Identifiable, Sendable {
     var sample: String { EmojiCatalog.applyTone(self, to: "👋") }
 }
 
-/// One emoji or text symbol from the generated dataset; `glyph` is the base (untoned) form and doubles as the ID.
+/// One emoji or symbol; `glyph` is the base (untoned) form and doubles as the ID.
 struct EmojiEntry: Identifiable, Hashable, Sendable {
     let glyph: String
     let name: String
@@ -83,7 +83,7 @@ struct EmojiEntry: Identifiable, Hashable, Sendable {
 }
 
 enum EmojiCatalog {
-    /// Base scalar + tone modifier; VS16 is stripped because the modifier already forces emoji presentation (UTS #51).
+    /// Base scalar + tone modifier; VS16 is stripped, the modifier already forcing emoji (UTS #51).
     static func applyTone(_ tone: EmojiSkinTone, to glyph: String) -> String {
         guard let modifier = tone.modifier else { return glyph }
         var scalars = String.UnicodeScalarView(glyph.unicodeScalars.filter { $0.value != 0xFE0F })
@@ -91,7 +91,7 @@ enum EmojiCatalog {
         return String(scalars)
     }
 
-    /// Parse the generated `glyph|name|category|tone|keywords` records; malformed lines are dropped.
+    /// Parse the generated `glyph|name|category|tone|keywords` records, dropping malformed lines.
     nonisolated static func parse(_ raw: String) -> [EmojiEntry] {
         var result: [EmojiEntry] = []
         result.reserveCapacity(2200)

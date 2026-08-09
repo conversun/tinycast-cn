@@ -3,7 +3,7 @@ import CommonCrypto
 import CryptoKit
 import Foundation
 
-/// A decrypted Raycast 1.x export in Raycast's own names and encodings; validating those against Tinycast's domain types is `RaycastImportV1`'s job, which is what keeps this layer AppKit-free for `Tools/raycast-test.swift`.
+/// A decrypted 1.x export in Raycast's own names; validation is the importer's job.
 struct RaycastV1Payload: Sendable, Equatable {
     struct Hotkey: Sendable, Equatable {
         let carbonKeyCode: Int
@@ -26,7 +26,6 @@ struct RaycastV1Payload: Sendable, Equatable {
     var popToRootTimeout: Int?
     var emojiSkinTone: String?
     var hyperKey: HyperKeyState?
-    var useHyperKeyIcon: Bool?
     var windowMode: String?
     var showFavoritesInCompactMode: Bool?
     var statusBarIsVisible: Bool?
@@ -41,7 +40,7 @@ struct RaycastV1Payload: Sendable, Equatable {
     var missingImages = 0
 }
 
-/// Decrypts a Raycast 1.x `.rayconfig` — a bare `IV(16) ‖ AES-256-CBC(gzip(JSON), PKCS#7)` blob, no header or envelope — and reads it into `RaycastV1Payload`. Full format notes in [raycast-import.md](../../../docs/raycast-import.md).
+/// Decrypts a bare 1.x `.rayconfig` blob. See docs/features/raycast-import.md.
 enum RaycastV1Decoder {
     static func decrypt(_ raw: Data, passphrase: String) throws -> Data {
         guard raw.count >= 32, raw.count % 16 == 0 else { throw RaycastImportError.notRaycastFile }
@@ -50,7 +49,7 @@ enum RaycastV1Decoder {
             key: derivedKey(passphrase: passphrase),
             iv: Data(raw.prefix(ivLength)))
 
-        // A wrong key usually fails PKCS#7 but unpads cleanly roughly 1 in 256 times, so the gzip header is the real check — at offset 0, because the IV is not part of the payload.
+        // PKCS#7 unpads cleanly ~1 in 256 times, so the gzip header is the real check.
         let magic = [UInt8](plaintext.prefix(3))
         guard magic.count == 3, magic[0] == 0x1f, magic[1] == 0x8b, magic[2] == 0x08,
             let json = try? Gunzip.decompress(plaintext)
@@ -71,7 +70,7 @@ enum RaycastV1Decoder {
         return payload
     }
 
-    /// Hyphen-joined modifier names with a trailing Carbon key code (`"Command-32"`, `"Shift-Control-Option-Command-32"`); an unrecognised modifier rejects the whole shortcut, since importing a weaker combo could shadow something else.
+    /// Hyphen-joined modifiers plus a key code; an unknown one rejects the whole shortcut.
     static func hotkey(from string: String?) -> RaycastV1Payload.Hotkey? {
         guard let string else { return nil }
         let parts = string.split(separator: "-")
@@ -94,7 +93,7 @@ enum RaycastV1Decoder {
 
     private static let ivLength = 16
 
-    /// For a 32-byte key `EVP_BytesToKey(SHA-256, salt: none)` is one digest round, and the IV it would derive next is discarded — Raycast writes a random IV into the file instead.
+    /// One digest round for a 32-byte key; the IV it would derive next is discarded.
     private static func derivedKey(passphrase: String) -> Data {
         Data(SHA256.hash(data: Data(passphrase.utf8)))
     }
@@ -130,9 +129,9 @@ enum RaycastV1Decoder {
 
         payload.popToRootTimeout = advanced?["popToRootTimeout"] as? Int
         payload.emojiSkinTone = advanced?["emojiSkinTone"] as? String
-        payload.useHyperKeyIcon = advanced?["useHyperKeyIcon"] as? Bool
         if let state = advanced?["raycast_hyperKey_state"] as? [String: Any],
-            let keyCode = state["keyCode"] as? Int {
+            let keyCode = state["keyCode"] as? Int
+        {
             payload.hyperKey = .init(
                 enabled: state["enabled"] as? Bool ?? true,
                 keyCode: keyCode,
@@ -143,7 +142,7 @@ enum RaycastV1Decoder {
         payload.statusBarIsVisible = appearance?["statusBarIsVisible"] as? Bool
     }
 
-    /// For a `systemApp` entry `key` is already the bundle ID, so — unlike v2, which hides a path inside the command id — nothing here touches the filesystem and a hotkey survives the app being uninstalled.
+    /// `key` is already the bundle ID, so nothing here touches the filesystem.
     private static func readRootSearch(_ json: [String: Any], into payload: inout RaycastV1Payload) {
         let entries =
             (json["builtin_package_rootSearch"] as? [String: Any])?["rootSearch"] as? [[String: Any]]
@@ -167,7 +166,7 @@ enum RaycastV1Decoder {
         }
     }
 
-    /// Only `image` becomes an image clip: a `file` record can be any document and Tinycast has no kind for that, so its label imports as text.
+    /// Only `image` becomes an image clip; a `file` record imports as its label text.
     private static func readClipboard(_ json: [String: Any], into payload: inout RaycastV1Payload) {
         guard let history = json["builtin_package_clipboardHistory"] as? [String: Any] else { return }
         payload.clipboardDisabledApps = history["clipboardHistoryDisabledApplications"] as? [String]
@@ -198,7 +197,7 @@ enum RaycastV1Decoder {
         }
     }
 
-    /// Unverified against a real export (none had favorites pinned), so every plausible entry shape is accepted and anything that isn't clearly a bundle ID is dropped rather than guessed at.
+    /// Unverified against a real export, so anything unclear is dropped, never guessed.
     private static func readFavorites(_ json: [String: Any]) -> [String] {
         let pinned =
             (json["builtin_package_navigation"] as? [String: Any])?["pinnedMenuItems"] as? [Any] ?? []
@@ -210,7 +209,7 @@ enum RaycastV1Decoder {
         }
     }
 
-    /// Unverified against a real export; the field names match what Raycast's snippet provider writes.
+    /// Unverified against a real export; the names match Raycast's snippet provider.
     private static func readSnippets(_ json: [String: Any]) -> [RaycastV1Payload.SnippetRecord] {
         let entries =
             (json["builtin_package_snippets"] as? [String: Any])?["snippets"] as? [[String: Any]] ?? []

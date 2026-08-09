@@ -10,7 +10,7 @@ final class HUDPanel: NSPanel {
             defer: false)
         isOpaque = false
         backgroundColor = .clear
-        // Both HUDs use the palette's surface recipe rather than glass, so neither carries its own elevation.
+        // Both HUDs take the palette's surface recipe, so neither carries elevation.
         hasShadow = true
         level = .floating
         ignoresMouseEvents = true

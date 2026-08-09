@@ -1,18 +1,18 @@
 import SwiftUI
 
-/// A menu row's leading glyph: an SF Symbol, or a real app icon (the paste target) drawn from `IconCache`.
+/// A menu row's leading glyph: a symbol, or a real app icon from `IconCache`.
 enum PopoverMenuIcon: Equatable {
     case symbol(String)
     case file(path: String)
 
-    /// Glyph for a paste row: the target app's own icon when it's known, else the row's generic symbol.
+    /// A paste row's glyph: the target app's icon when known, else a generic symbol.
     static func paste(_ target: PasteTarget?, fallback: String) -> PopoverMenuIcon {
         guard let path = target?.iconPath else { return .symbol(fallback) }
         return .file(path: path)
     }
 }
 
-/// One popover-menu row's data: the render path and the keyboard handlers both address rows through these, so a selection index can drive highlight and activation. Actions are pure — closing the menu is the caller's job (one central `onActivate`).
+/// One menu row; both the render path and the key handlers address rows through these.
 struct PopoverMenuItem {
     let title: String
     let icon: PopoverMenuIcon
@@ -42,13 +42,13 @@ struct PopoverMenuItem {
     }
 }
 
-/// A popover menu's header + rows, built once per feature and consumed by both the render path and `RootPaletteView`'s keyboard handlers.
+/// A menu's header and rows, built once and consumed by render and keyboard alike.
 struct PopoverMenuContent {
     var header: String?
     let items: [PopoverMenuItem]
 }
 
-/// In-window overlay menu (not a system popover), anchored to a bottom corner so it stays clipped inside the palette, with a stock Liquid Glass surface. Data-driven so `selection` can highlight a row for keyboard navigation; `onActivate(index)` is the single path fired by both a click and Return.
+/// An in-window overlay menu, not a system popover, so it clips inside the palette.
 struct PopoverMenu: View {
     var header: String?
     let items: [PopoverMenuItem]
@@ -67,7 +67,7 @@ struct PopoverMenu: View {
                     .padding(.top, Theme.Spacing.xs)
                     .padding(.bottom, Theme.Spacing.xs / 2)
             }
-            // Index-as-id is stable because a menu's rows never reorder while it is open, and the index is what selection/activation address.
+            // Index-as-id is stable: a menu's rows never reorder while it is open.
             ForEach(items.indices, id: \.self) { index in
                 PopoverMenuRow(
                     item: items[index],
@@ -79,24 +79,24 @@ struct PopoverMenu: View {
         }
         .padding(Theme.Spacing.sm)
         .frame(width: Theme.Size.menuWidth)
-        // Tahoe glass carries its own elevation/shadow; a hand-tuned drop shadow on top reads heavy and non-native, so we let the glass own it.
+        // Glass carries its own elevation, so a drop shadow on top reads heavy.
         .glassEffect(
             .regular, in: RoundedRectangle(cornerRadius: Theme.Radius.menuPanel, style: .continuous)
         )
     }
 }
 
-/// A single menu row: leading SF Symbol, label, optional trailing shortcut glyph. Highlight is selection-driven (hover reports up so keyboard and mouse converge on one highlight), so there is never more than one active row.
+/// One menu row; highlight is selection-driven, so only one row is ever active.
 private struct PopoverMenuRow: View {
     let item: PopoverMenuItem
     let selected: Bool
-    /// Fired when the cursor enters the row so the owner can move selection here — keyboard and mouse then share one highlight.
+    /// Fired on enter, so the owner can move selection and share one highlight.
     let onHover: () -> Void
     let onActivate: () -> Void
 
     var body: some View {
         Button(action: onActivate) {
-            // `sm`, not the row-standard `lg`: the 20pt icon slot carries 2–3pt of its own slack around the glyph, so a 10pt gap reads as ~12.
+            // `sm`, not `lg`: the icon slot carries its own slack, so the gap reads wider.
             HStack(spacing: Theme.Spacing.sm) {
                 switch item.icon {
                 case .symbol(let name):
@@ -120,7 +120,7 @@ private struct PopoverMenuRow: View {
                     }
                 }
             }
-            // The icon slot is the tallest element on every row, so it pins one height for rows with and without a shortcut — no explicit minHeight needed.
+            // The icon slot is the tallest element, so it pins one height for every row.
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -135,7 +135,7 @@ private struct PopoverMenuRow: View {
     }
 }
 
-/// App icon for a menu row (mirrors `AppIconView`): seeds from the warm `IconCache` so the paste target paints on the first frame, decoding off-main only on a miss.
+/// A menu row's app icon, seeded warm so the paste target paints on the first frame.
 private struct MenuFileIcon: View {
     let path: String
     @State private var image: NSImage?

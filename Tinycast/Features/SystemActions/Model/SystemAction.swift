@@ -35,9 +35,7 @@ struct SystemAction: Identifiable, Hashable, Sendable {
         case toggleBluetooth = "toggle-bluetooth"
     }
 
-    /// Whether running the action needs a confirmation first, and the copy for it. Every action
-    /// that needs one is destructive, so `AppCore` renders them all the same way and the catalog
-    /// only has to supply the words.
+    /// Whether it confirms first, and the copy; every such action is destructive.
     enum Confirmation: Hashable, Sendable {
         case none
         case required(title: String, message: String)
@@ -50,7 +48,7 @@ struct SystemAction: Identifiable, Hashable, Sendable {
     let sfSymbol: String
     let confirmation: Confirmation
 
-    /// Stable identity for the launcher entry, and with it the persisted favorite, visibility and ranking keys.
+    /// Stable identity for the entry, and with it every persisted key it owns.
     var entryID: String { "system-action:" + id.rawValue }
 }
 
@@ -69,7 +67,7 @@ enum SystemActionCatalog {
     }
 
     static func action(id: SystemAction.ID) -> SystemAction {
-        // Every ID is in `all` by construction, so a miss is a programmer error rather than a runtime case.
+        // Every ID is in `all` by construction, so a miss is a programmer error.
         byID[id]!
     }
 
@@ -137,7 +135,7 @@ enum SystemActionCatalog {
         case .unhideAllApps: return "eye.circle"
         case .quitAllApps: return "xmark.circle"
         case .dismissNotifications: return "bell.slash"
-        // Not an SF Symbol — the logo is a Bluetooth SIG trademark, so this resolves to a bundled asset instead.
+        // Not an SF Symbol: the logo is a trademark, so this is a bundled asset.
         case .toggleBluetooth: return "bluetooth"
         }
     }

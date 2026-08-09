@@ -35,14 +35,14 @@ struct RaycastImportOptions: OptionSet, Sendable {
     ]
 }
 
-/// Which of the two `.rayconfig` wire formats a file uses — the single branch between `RaycastImportV1` and `RaycastImportV2`, which share no mapper because Raycast 1.x and Raycast X export nothing alike.
+/// The one branch between the two readers. See docs/features/raycast-import.md.
 enum RaycastFormat: Sendable, Equatable {
     /// Raycast 1.x: a bare `IV(16) ‖ AES-256-CBC(gzip(JSON), PKCS#7)` blob with no header.
     case v1
     /// Raycast X: gzip → JSON envelope → AES-256-GCM ciphertext under a scrypt key.
     case v2
 
-    /// Decided from the leading bytes alone, so the UI can label a file before a passphrase is typed: only v2 is a gzip stream, and v1's ciphertext can never open with a valid gzip header.
+    /// From the leading bytes alone, so a file is labelled before a passphrase is typed.
     static func detect(_ raw: Data) throws -> RaycastFormat {
         let magic = [UInt8](raw.prefix(3))
         if magic.count == 3, magic[0] == 0x1f, magic[1] == 0x8b, magic[2] == 0x08 { return .v2 }
@@ -58,7 +58,7 @@ enum RaycastFormat: Sendable, Equatable {
         }
     }
 
-    /// Categories the format actually carries; a v1 export has no launch-at-login preference, so offering that checkbox would import nothing.
+    /// Categories the format carries; offering one it lacks would import nothing.
     var supportedOptions: RaycastImportOptions {
         switch self {
         case .v1: return RaycastImportOptions.all.subtracting(.launchAtLogin)

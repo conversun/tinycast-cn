@@ -1,7 +1,6 @@
 import Foundation
 
-/// Decides which directory entries belong to an app. The scanner hands over child *names*, so nothing here touches the filesystem.
-/// Safety-critical: a false positive trashes another app's data, which is why every rule is exact or namespace-anchored, never fuzzy.
+/// Which directory entries belong to an app, from names alone. See docs/features/uninstall.md.
 enum UninstallRules {
     /// Stripped before matching, so `com.foo.Bar.plist` compares as `com.foo.Bar`.
     static let strippedExtensions: Set<String> = [
@@ -11,7 +10,7 @@ enum UninstallRules {
         "component", "wdgt", "dext", "driver"
     ]
 
-    /// The name plus each stripped form. Stripping only adds comparisons, so it can't turn a match into a miss.
+    /// The name plus each stripped form; stripping only adds comparisons, never removes one.
     static func matchableForms(_ name: String) -> [String] {
         var forms = [name]
         var current = name
@@ -26,7 +25,7 @@ enum UninstallRules {
         return forms
     }
 
-    /// `-` counts because vendors name variants that way: `dev.zed.Zed-Preview` is Zed's, unless Zed Preview is itself installed.
+    /// `-` counts: vendors name variants that way, unless the variant is itself installed.
     private static let namespaceSeparators: Set<Character> = [".", "-"]
 
     /// The bundle ID itself, or a namespaced child of it.
@@ -36,7 +35,7 @@ enum UninstallRules {
             let folded = UninstallIdentity.folded(form)
             guard owns(folded, id: id, allowingPrefix: identity.allowsBundleIDPrefixMatch)
             else { return false }
-            // A longer-ID sibling owns its own artifacts, or uninstalling Tinycast would trash the Beta and Dev channels too.
+            // A longer-ID sibling owns its own artifacts, so channels can't claim each other.
             return !identity.otherBundleIDs.contains { other in
                 other.count > id.count && owns(folded, id: other, allowingPrefix: true)
             }
@@ -46,7 +45,7 @@ enum UninstallRules {
     private static func owns(_ folded: String, id: String, allowingPrefix: Bool) -> Bool {
         if folded == id { return true }
         guard allowingPrefix, folded.count > id.count, folded.hasPrefix(id) else { return false }
-        // The separator is what stops `com.apple.SafariTechnologyPreview` reading as a child of `com.apple.Safari`.
+        // The separator stops `com.apple.SafariTechnologyPreview` reading as Safari's child.
         return namespaceSeparators.contains(folded[folded.index(folded.startIndex, offsetBy: id.count)])
     }
 
@@ -57,7 +56,7 @@ enum UninstallRules {
         return target == bundlePath || isDescendant(target, of: bundlePath)
     }
 
-    /// Strips a leading `group.` and/or Team ID. The strict 10-char Team ID shape stops any `something.com.foo.Bar` matching.
+    /// Strips a leading `group.` and/or Team ID; the strict 10-char shape stops false hits.
     static func groupContainerBase(_ component: String) -> String {
         var base = component
         for _ in 0..<2 {
@@ -81,7 +80,7 @@ enum UninstallRules {
         matchesBundleID(groupContainerBase(component), identity: identity)
     }
 
-    /// Exact folded equality only — no prefix, no substring, so "Books" and "Books Reader" can't claim each other.
+    /// Exact folded equality: no prefix, no substring, so "Books" can't claim "Books Reader".
     static func matchesDisplayName(_ component: String, identity: UninstallIdentity) -> Bool {
         guard !identity.names.isEmpty else { return false }
         return matchableForms(component).contains { form in

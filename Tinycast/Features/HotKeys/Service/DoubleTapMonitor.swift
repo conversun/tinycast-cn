@@ -1,7 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// C entry point for the tap (always on the main thread): reduce the `CGEvent` to Sendable scalars, then cross into the actor. Listen-only, so the event is always returned untouched.
+/// C entry point: reduce to Sendable scalars, then cross in. Listen-only, so nothing changes.
 private func doubleTapEventTapCallback(
     proxy: CGEventTapProxy, type: CGEventType, event: CGEvent,
     userInfo: UnsafeMutableRawPointer?
@@ -22,17 +22,17 @@ private func doubleTapEventTapCallback(
     return Unmanaged.passUnretained(event)
 }
 
-/// Watches for a double-tapped lone modifier system-wide and reports the matching action. A third tap is unavoidable: Carbon can't register a modifier-only shortcut, `HyperKeyTap` only exists while a Hyper Key is configured, and the snippet listener must stay compilable by its own harness. This one is listen-only and installs *only* while something is bound to a double-tap.
+/// The listen-only double-tap tap. See docs/features/hotkeys.md#double-tap-modifiers.
 @MainActor
 @Observable
 final class DoubleTapMonitor: HealthCheckable {
-    /// True only while something is bound and the tap can't be created; the recorder surfaces it next to the binding.
+    /// True while something is bound and the tap can't be created; the recorder surfaces it.
     private(set) var needsAccessibility = false
 
-    /// Fired on the second *release* of a bound modifier, so it is already up by the time the action runs.
+    /// Fired on the second release, so the modifier is up by the time the action runs.
     @ObservationIgnored var onDoubleTap: ((DoubleTapModifier) -> Void)?
 
-    /// Set while a recorder is capturing, so editing a binding can't trigger it (mirrors `HotKeyCenter.isPaused`).
+    /// Set while a recorder captures, so editing a binding can't trigger it.
     var isPaused = false {
         didSet {
             guard isPaused != oldValue else { return }
@@ -61,7 +61,7 @@ final class DoubleTapMonitor: HealthCheckable {
         syncTapPresence()
     }
 
-    /// The set of modifiers currently carrying a binding; an empty set tears the tap down, so users who never bind a double-tap pay nothing.
+    /// Modifiers currently carrying a binding; an empty set tears the tap down entirely.
     func update(bound: Set<DoubleTapModifier>) {
         guard bound != self.bound else { return }
         self.bound = bound
@@ -97,7 +97,7 @@ final class DoubleTapMonitor: HealthCheckable {
         return held
     }
 
-    // Never `maskAlphaShift`: it tracks the Caps Lock latch, so it would kill every tap while Caps Lock is on.
+    // Never `maskAlphaShift`: it tracks the latch, killing every tap while Caps Lock is on.
     private static func hasOtherModifiers(in flags: CGEventFlags) -> Bool {
         flags.contains(.maskSecondaryFn)
     }
@@ -106,7 +106,7 @@ final class DoubleTapMonitor: HealthCheckable {
 
     private func installObserversIfNeeded() {
         guard sessionTokens.isEmpty else { return }
-        // Fast user switching: another session owns the keyboard, so stop watching until this one is back.
+        // Fast user switching: another session owns the keyboard, so stop watching.
         let center = NSWorkspace.shared.notificationCenter
         sessionTokens = [
             NotificationToken(
@@ -154,14 +154,14 @@ final class DoubleTapMonitor: HealthCheckable {
         guard
             let port = CGEvent.tapCreate(
                 tap: .cgSessionEventTap,
-                // Appended rather than head-inserted so `HyperKeyTap`'s rewrite lands first: a Hyper-remapped modifier arrives as the full ⌃⌥⇧⌘ chord and correctly reads as "not a lone modifier".
+                // Appended, so `HyperKeyTap`'s rewrite lands first. See docs/features/hotkeys.md.
                 place: .tailAppendEventTap,
                 options: .listenOnly,
                 eventsOfInterest: mask,
                 callback: doubleTapEventTapCallback,
                 userInfo: Unmanaged.passUnretained(self).toOpaque())
         else {
-            // Even a listen-only keyboard tap needs the Accessibility grant; the health timer retries so a binding starts working the moment the user grants it.
+            // Even a listen-only tap needs Accessibility; the health timer retries until granted.
             if !loggedTapFailure {
                 NSLog("Tinycast: Failed to create double-tap event tap")
                 loggedTapFailure = true
@@ -191,13 +191,13 @@ final class DoubleTapMonitor: HealthCheckable {
         }
     }
 
-    /// Called from the callback when the system disables the tap (timeout / user input); any half-tracked press is stale by then.
+    /// Called when the system disables the tap; any half-tracked press is stale by then.
     fileprivate func tapWasDisabled() {
         detector.reset()
         if let tapPort { CGEvent.tapEnable(tap: tapPort, enable: true) }
     }
 
-    /// One-second watchdog while something is bound: retries installation until Accessibility is granted, notices revocation, and revives a system-disabled tap.
+    /// One-second watchdog while something is bound. See docs/features/hotkeys.md#lifecycle.
     func healthCheck() {
         guard !bound.isEmpty, sessionActive else { return }
         if tapPort == nil {

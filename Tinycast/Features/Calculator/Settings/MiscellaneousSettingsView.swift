@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The catch-all pane. Home to currency conversion — the one feature in Tinycast that reaches the
-/// network, which is why it ships off and needs an explicit yes before it can be switched on.
+/// The catch-all pane, home to currency conversion. See docs/features/calculator.md#consent.
 struct MiscellaneousSettingsView: View {
     @Environment(AppCore.self) private var core
     private var currencyRates: CurrencyRateStore { core.currencyRates }
@@ -10,45 +9,26 @@ struct MiscellaneousSettingsView: View {
     @State private var refreshFailed = false
 
     var body: some View {
-        SettingsPane(
-            title: "Miscellaneous",
-            subtitle: "Options that don't belong to a single feature."
-        ) {
-            SettingsCard(header: "Calculator") {
-                SettingsRow(
-                    title: "Currency Conversion",
-                    subtitle: conversionStatus,
-                    systemImage: "dollarsign.arrow.circlepath",
-                    tint: .green,
-                    statusDot: currencyRates.isEnabled ? .green : nil
+        Form {
+            Section {
+                // Not bound to the setting: flipping on opens the sheet, so it springs back.
+                Toggle(
+                    isOn: Binding(
+                        get: { currencyRates.isEnabled },
+                        set: { wantsOn in
+                            if wantsOn {
+                                askingConsent = true
+                            } else {
+                                currencyRates.setEnabled(false)
+                            }
+                        })
                 ) {
-                    // Deliberately not bound straight to the setting: flipping it on only opens the
-                    // consent sheet, so the switch springs back until the user actually accepts.
-                    Toggle(
-                        "",
-                        isOn: Binding(
-                            get: { currencyRates.isEnabled },
-                            set: { wantsOn in
-                                if wantsOn {
-                                    askingConsent = true
-                                } else {
-                                    currencyRates.setEnabled(false)
-                                }
-                            })
-                    )
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                    Text("Currency Conversion")
+                    Text(conversionStatus)
                 }
 
                 if currencyRates.isEnabled {
-                    SettingsDivider()
-                    SettingsRow(
-                        title: "Exchange Rates",
-                        subtitle: ratesStatus,
-                        systemImage: "clock.arrow.circlepath",
-                        tint: .gray
-                    ) {
+                    LabeledContent {
                         Button("Update Now") {
                             refreshing = true
                             Task {
@@ -58,10 +38,16 @@ struct MiscellaneousSettingsView: View {
                             }
                         }
                         .disabled(refreshing)
+                    } label: {
+                        Text("Exchange Rates")
+                        Text(ratesStatus)
                     }
                 }
+            } header: {
+                Text("Calculator")
             }
         }
+        .formStyle(.grouped)
         .sheet(isPresented: $askingConsent) {
             CurrencyConsentSheet(
                 onCancel: { askingConsent = false },
@@ -72,8 +58,7 @@ struct MiscellaneousSettingsView: View {
         }
     }
 
-    /// Carries the off-state promise that used to need its own callout: nothing is contacted until
-    /// the switch is on.
+    /// Carries the off-state promise: nothing is contacted until the switch is on.
     private var conversionStatus: String {
         let examples = "Convert inline — \"100 dollars to yen\", \"€20 to GBP\".".localizedUI
         guard !currencyRates.isEnabled else { return examples }
@@ -97,8 +82,7 @@ struct MiscellaneousSettingsView: View {
     }
 }
 
-/// The consent step. Three facts are the ones that actually decide the answer — who is contacted, how
-/// often, and that nothing personal goes with it — plus the provider link so the claim is checkable.
+/// The consent step: who is contacted, how often, what leaves, and a checkable provider link.
 private struct CurrencyConsentSheet: View {
     let onCancel: () -> Void
     let onAccept: () -> Void

@@ -2,10 +2,10 @@ import AppKit
 import Carbon.HIToolbox
 @preconcurrency import IOKit.hidsystem
 
-// Snapshot the imported mutable C global `mach_task_self_` (process-constant) so actor code never touches the raw global under strict concurrency.
+// Snapshot the mutable C global `mach_task_self_`, so actor code never reads it raw.
 private let machTaskSelf = mach_task_self_
 
-/// C entry point for the event tap (always on the main thread): decode the `CGEvent`, cross into the actor via `assumeIsolated` for a Sendable `Decision`, then apply it out here (`Unmanaged<CGEvent>` isn't Sendable).
+/// C entry point: decode, cross in for a Sendable `Decision`, then apply it out here.
 private func hyperKeyEventTapCallback(
     proxy: CGEventTapProxy, type: CGEventType, event: CGEvent,
     userInfo: UnsafeMutableRawPointer?
@@ -43,14 +43,14 @@ private func hyperKeyEventTapCallback(
     }
 }
 
-/// HID-level remap of Caps Lock → F18 while it's the Hyper key — the caps-lock toggle (LED + latch) happens below every CGEventTap, so the key must stop being Caps Lock at the source (same `UserKeyMapping` as `hidutil`; cleared on unbind/quit, never survives reboot).
+/// HID remap of Caps Lock → F18 while it is Hyper. See docs/features/hotkeys.md#the-hyper-key.
 private enum CapsLockRemap {
     // HID usages: keyboard page 0x07, Caps Lock 0x39, F18 0x6D.
     private static let mappingOn =
         #"{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x70000006D}]}"#
     private static let mappingOff = #"{"UserKeyMapping":[]}"#
 
-    // Serial queue so rapid on→off→on toggles (e.g. switching the Hyper key away from Caps Lock and back) apply hidutil in call order instead of racing as independent detached tasks and leaving the wrong final remap.
+    // Serial, so rapid on→off→on toggles apply in call order rather than racing.
     private static let queue = DispatchQueue(label: "com.tinycast.capslock-remap", qos: .utility)
 
     static func setEnabled(_ enabled: Bool) {
@@ -81,7 +81,7 @@ private enum CapsLockRemap {
     }
 }
 
-/// The Hyper Key engine: a modifying `CGEventTap` turning one physical key (Caps Lock or a right-side modifier) into the ⌃⌥(⇧)⌘ chord system-wide; a separate layer from `HotKeyCenter` (Carbon can't intercept lone keys), with rewritten flags flowing into Carbon matching so existing hotkeys fire from Hyper+key unchanged.
+/// The Hyper Key engine, a modifying tap. See docs/features/hotkeys.md#the-hyper-key.
 @MainActor
 @Observable
 final class HyperKeyTap: HealthCheckable {
@@ -91,17 +91,17 @@ final class HyperKeyTap: HealthCheckable {
         case needsAccessibility
     }
 
-    /// What the tap callback should do with an event, decided on the actor (`asFlagsChanged` converts the type in place, turning remapped Caps Lock F18 key events into modifier transitions downstream).
+    /// What the callback should do, decided on the actor; `asFlagsChanged` converts in place.
     enum Decision: Sendable {
         case pass
         case suppress
         case rewrite(flags: UInt64, keyCode: Int64? = nil, asFlagsChanged: Bool = false)
     }
 
-    /// Marker in `.eventSourceUserData` on events this tap posts, so it never reacts to its own synthetics (FourCC "TYCT", same as `HotKeyCenter`).
+    /// Marker on events this tap posts, so it never reacts to its own synthetics.
     nonisolated static let syntheticTag: Int64 = 0x5459_4354
 
-    /// `NX_DEVICE…KEYMASK` bits (IOLLEvent.h): device-level flags a real modifier press carries alongside its generic mask; the Hyper chord posts the *left* set since some consumers distinguish sides and generic-only flags don't always read as fully pressed.
+    /// Device-level modifier bits from IOLLEvent.h. See docs/features/hotkeys.md#the-hyper-key.
     private enum DeviceFlag {
         static let leftControl: UInt64 = 0x0000_0001
         static let leftShift: UInt64 = 0x0000_0002
@@ -124,7 +124,7 @@ final class HyperKeyTap: HealthCheckable {
 
     @ObservationIgnored weak var healthTicker: HealthTicker?
 
-    /// Mirror of `settings.hyperKey`, updated only by its observer; the toggles (`Include Shift`, `Quick Press`) are read live from `settings` so the tap never acts on a stale copy.
+    /// Mirror of `settings.hyperKey`; the toggles are read live, so nothing goes stale.
     @ObservationIgnored private var key: HyperKeyPhysicalKey = .none
 
     // Hold state machine, written from the tap callback on every keystroke.
@@ -134,7 +134,7 @@ final class HyperKeyTap: HealthCheckable {
     private let clock = ContinuousClock()
     private static let quickPressWindow: Duration = .milliseconds(250)
 
-    // Isolated so teardown can release the main-actor IOKit connection; the tap is an AppCore-owned singleton released on main. The kernel reclaims this at process exit anyway, so this only matters if it's ever recreated.
+    // Isolated so teardown can release the main-actor IOKit connection.
     isolated deinit {
         if hidConnect != IO_OBJECT_NULL { IOServiceClose(hidConnect) }
     }
@@ -144,7 +144,7 @@ final class HyperKeyTap: HealthCheckable {
         applyKey(settings.hyperKey)
         observeKey()
 
-        // Fast user switching: another session owns the keyboard, so drop half-held state and stop rewriting until this session is active again.
+        // Fast user switching: drop half-held state and stop rewriting until we are back.
         let center = NSWorkspace.shared.notificationCenter
         sessionTokens = [
             NotificationToken(
@@ -179,7 +179,7 @@ final class HyperKeyTap: HealthCheckable {
 
     // MARK: - Hyper chord flags
 
-    /// The flags OR'd into every event while Hyper is held: the generic ⌃⌥(⇧)⌘ masks plus the left-side device bits.
+    /// The flags OR'd in while Hyper is held: the generic masks plus left-side device bits.
     private var hyperFlagsRaw: UInt64 {
         var raw =
             CGEventFlags([.maskControl, .maskAlternate, .maskCommand]).rawValue
@@ -190,7 +190,7 @@ final class HyperKeyTap: HealthCheckable {
         return raw
     }
 
-    /// The Hyper key's own flag residue scrubbed from rewritten events: Caps Lock's alpha-shift bit, or (key modifier outside the Hyper set) its generic mask plus both device bits.
+    /// The Hyper key's own flag residue, scrubbed from every rewritten event.
     private var strippedFlagsRaw: UInt64 {
         if key == .capsLock { return CGEventFlags.maskAlphaShift.rawValue }
         guard let own = key.ownFlag, hyperFlagsRaw & own.rawValue == 0 else { return 0 }
@@ -221,7 +221,7 @@ final class HyperKeyTap: HealthCheckable {
         if keyCode == tapCode {
             return decideHyperKeyEvent(type: type, flagsRaw: flagsRaw, isAutorepeat: isAutorepeat)
         }
-        // Fallback before the HID remap takes hold: the key still arrives as Caps Lock, so ride the modifier path (the LED toggles — un-remapped HID behavior, not ours to stop).
+        // Before the remap takes hold the key is still Caps Lock, so ride the modifier path.
         if key == .capsLock, keyCode == kVK_CapsLock, type == .flagsChanged {
             return decideModifierTransition(flagsRaw: flagsRaw, swapKeyCode: true)
         }
@@ -235,7 +235,7 @@ final class HyperKeyTap: HealthCheckable {
         type: CGEventType, flagsRaw: UInt64, isAutorepeat: Bool
     ) -> Decision {
         if key.tapUsesKeyEvents {
-            // Caps Lock (via its F18 remap) arrives as keyDown/keyUp; convert both ends into Left Control flagsChanged transitions so downstream sees the Hyper chord move with the key, not a swallowed press.
+            // F18 arrives as keyDown/keyUp; convert both ends into flagsChanged transitions.
             switch type {
             case .keyDown:
                 if isAutorepeat { return .suppress }
@@ -255,7 +255,7 @@ final class HyperKeyTap: HealthCheckable {
         return decideModifierTransition(flagsRaw: flagsRaw, swapKeyCode: false)
     }
 
-    /// Press/release of a modifier-style Hyper key: flagsChanged doesn't self-describe direction, so use toggle semantics (querying session key state races the release, inverting the state machine and breaking Quick Press); a missed release lingers only until the watchdog or next press.
+    /// docs/features/hotkeys.md#press-tracking-uses-toggle-semantics
     private func decideModifierTransition(flagsRaw: UInt64, swapKeyCode: Bool) -> Decision {
         let keyCode: Int64? = swapKeyCode ? Int64(kVK_Control) : nil
         if !hyperActive {
@@ -282,7 +282,7 @@ final class HyperKeyTap: HealthCheckable {
         guard isQuick else { return }
         let action = settings?.hyperKeyQuickPress ?? .none
         let key = key
-        // Posting events or touching IOKit from inside the tap callback risks re-entrancy; finish the press on the next runloop turn.
+        // Posting or touching IOKit inside the callback risks re-entrancy, so defer a turn.
         Task { @MainActor [weak self] in self?.fireQuickPress(action, for: key) }
     }
 
@@ -311,7 +311,7 @@ final class HyperKeyTap: HealthCheckable {
         let wasCapsLock = key == .capsLock
         key = newKey
         if newKey == .capsLock {
-            // Remapping takes Caps Lock's own function away: unlatch the lock and hand the physical key to the tap as F18.
+            // Remapping takes the key's own function away, so unlatch the lock first.
             setCapsLockState(false)
             CapsLockRemap.setEnabled(true)
         } else if wasCapsLock {
@@ -320,7 +320,7 @@ final class HyperKeyTap: HealthCheckable {
         syncTapPresence()
     }
 
-    /// Called from `applicationWillTerminate`: the HID remap outlives the process, so hand the key back to the system before exiting.
+    /// The HID remap outlives the process, so hand the key back before exiting.
     func prepareForTermination() {
         if key == .capsLock { CapsLockRemap.clearBlocking() }
     }
@@ -353,7 +353,7 @@ final class HyperKeyTap: HealthCheckable {
                 callback: hyperKeyEventTapCallback,
                 userInfo: Unmanaged.passUnretained(self).toOpaque())
         else {
-            // A modifying keyboard tap needs the Accessibility grant; the health timer retries so the dot flips green the moment the user grants it.
+            // A modifying tap needs Accessibility; the health timer retries until granted.
             status = .needsAccessibility
             return
         }
@@ -377,13 +377,13 @@ final class HyperKeyTap: HealthCheckable {
         }
     }
 
-    /// Called from the callback when the system disables the tap (timeout / user input); any half-tracked hold is stale by then.
+    /// Called when the system disables the tap; any half-tracked hold is stale by then.
     fileprivate func reenable() {
         cancelHold()
         if let tapPort { CGEvent.tapEnable(tap: tapPort, enable: true) }
     }
 
-    /// One-second watchdog while a key is configured: retries installation until Accessibility is granted, notices revocation, revives a system-disabled tap, and clears a stuck hold.
+    /// One-second watchdog while a key is configured. See docs/features/hotkeys.md#lifecycle.
     func healthCheck() {
         guard key != .none else { return }
         if tapPort == nil {
@@ -423,7 +423,7 @@ final class HyperKeyTap: HealthCheckable {
         }
     }
 
-    /// The classic IOHIDSystem connection for reading/driving the Caps Lock LED + lock state; used only by the explicit Quick Press toggle and the one-time unlatch.
+    /// The IOHIDSystem connection for the Caps Lock LED and lock state.
     private func hidConnection() -> io_connect_t {
         if hidConnect != IO_OBJECT_NULL { return hidConnect }
         let service = IOServiceGetMatchingService(

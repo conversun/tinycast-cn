@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// Where a callout sits and where its pointer lands. Pure, metrics injected, so `Tools/callout-test.swift` drives it without a window.
+/// Where a callout sits and where its pointer lands; pure, with metrics injected.
 struct CalloutPlacement: Equatable {
     enum CaretEdge: Equatable {
         case top

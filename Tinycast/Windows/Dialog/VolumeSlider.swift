@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Tinycast's own slider, because `NSSlider` would drop an Aqua control onto a surface whose whole vocabulary is white-alpha over vibrancy.
+/// Our own slider: `NSSlider` would drop an Aqua control onto a vibrancy surface.
 struct VolumeSlider: View {
     let state: VolumeState
 
@@ -30,7 +30,7 @@ struct VolumeSlider: View {
                         .offset(x: clamped * travel)
                 }
                 .frame(height: Theme.Size.volumeKnob)
-                // minimumDistance 0 so a plain click jumps the level, matching how a native slider's track behaves.
+                // minimumDistance 0, so a plain click jumps the level like a native track.
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in

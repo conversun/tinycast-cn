@@ -1,6 +1,6 @@
 import Foundation
 
-/// Owns the parsed emoji/symbol catalog: category sections precomputed once at load, search memoized one query deep (the `AppIndex` pattern).
+/// The parsed catalog: sections precomputed at load, search memoized one query deep.
 @MainActor
 @Observable
 final class EmojiIndex {
@@ -40,18 +40,19 @@ final class EmojiIndex {
 
     func entry(for glyph: String) -> EmojiEntry? { byGlyph[glyph] }
 
-    /// Ranked fuzzy matches over names and keywords; empty query returns nothing (the grid shows sections instead).
+    /// Ranked fuzzy matches over names and keywords; an empty query returns nothing.
     func search(_ query: String, limit: Int = 320) -> [EmojiEntry] {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return [] }
         return searchMemo.value(for: SearchKey(query: q, revision: revision)) {
-            // A keyword hit is penalized just under half a tier so an equal-quality name match always outranks it.
+            // Penalized just under half a tier, so an equal-quality name match always wins.
             var scored: [ScoredEntry] = []
             for (order, entry) in entries.enumerated() {
                 let nameScore = FuzzyMatch.score(query: q, candidate: entry.name)
                 var best = nameScore
                 if !entry.keywords.isEmpty,
-                    let keywordScore = FuzzyMatch.score(query: q, candidate: entry.keywords) {
+                    let keywordScore = FuzzyMatch.score(query: q, candidate: entry.keywords)
+                {
                     best = max(best ?? Int.min, keywordScore - 500)
                 }
                 if let best { scored.append(ScoredEntry(entry: entry, score: best, order: order)) }

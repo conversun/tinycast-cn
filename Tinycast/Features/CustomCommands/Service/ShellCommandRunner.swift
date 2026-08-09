@@ -9,11 +9,11 @@ enum ShellCommandOutcome: Sendable, Equatable {
 
 enum ShellCommandRunner {
     private static let stderrLimit = 8 * 1024
-    /// `waitUntilExit` blocks for the whole life of the command, so it runs here rather than on a cooperative-pool thread a `brew upgrade` would hold for minutes. Concurrent so two commands don't queue behind each other.
+    /// `waitUntilExit` blocks, so it stays off the cooperative pool; concurrent, not serial.
     private static let queue = DispatchQueue(
         label: "com.tinycast.shell-command", qos: .userInitiated, attributes: .concurrent)
 
-    /// `loadingShellEnvironment` defaults to the fast path, so a caller that forgets it gets the cheap shell rather than the user's whole config.
+    /// Defaults to the fast path, so forgetting it gets the cheap shell, not the config.
     nonisolated static func run(
         _ command: String, loadingShellEnvironment: Bool = false
     ) async -> ShellCommandOutcome {
@@ -30,14 +30,14 @@ enum ShellCommandRunner {
     ) -> ShellCommandOutcome {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        // zsh only reads `.zshrc` for *interactive* shells, so `-l` alone never sees the user's aliases, functions or `PATH`.
+        // zsh reads `.zshrc` only for interactive shells, so `-l` alone sees no aliases.
         process.arguments = [loadingShellEnvironment ? "-ilc" : "-lc", command]
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-        // Lets a shell config skip slow or interactive sections when Tinycast is the caller: `[[ -n $TINYCAST ]] && return`.
+        // Lets a shell config skip slow sections when Tinycast is the caller.
         process.environment = ProcessInfo.processInfo.environment.merging(["TINYCAST": "1"]) { _, new in
             new
         }
-        // Load-bearing for the interactive shell: a config that prompts reads EOF and moves on instead of hanging forever.
+        // Load-bearing: a config that prompts reads EOF and moves on, never hanging.
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
 
@@ -60,6 +60,7 @@ enum ShellCommandRunner {
         return .success
     }
 
+    /// Immutable, confined to one `execute` on `queue`, and only read after `waitUntilExit`.
     private final class StderrCapture: @unchecked Sendable {
         let url: URL
         let handle: FileHandle

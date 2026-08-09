@@ -13,9 +13,11 @@ final class QuicklinkCoordinator {
     private let visibility: VisibilityStore
     private let ranking: LauncherRankingStore
     private let windowController: PaletteWindowController
+    private let paletteCoordinator: PaletteCoordinator
+    private let settingsCoordinator: SettingsCoordinator
     /// `{clipboard offset=N}` reads the history a snippet expansion does; one owner, one depth.
     private let clipboardHistory: @MainActor () -> [String]
-    /// Palette, Settings, dialog and HUD presentation only — never for state this type owns.
+    /// Dialogs, the HUD, and the `pendingQuicklinkEdit` handoff to the Settings pane.
     private unowned let core: AppCore
 
     /// Carries the menu's default-app override across the quicklink argument prompt.
@@ -32,6 +34,8 @@ final class QuicklinkCoordinator {
         visibility: VisibilityStore,
         ranking: LauncherRankingStore,
         windowController: PaletteWindowController,
+        paletteCoordinator: PaletteCoordinator,
+        settingsCoordinator: SettingsCoordinator,
         clipboardHistory: @escaping @MainActor () -> [String],
         core: AppCore
     ) {
@@ -45,14 +49,15 @@ final class QuicklinkCoordinator {
         self.visibility = visibility
         self.ranking = ranking
         self.windowController = windowController
+        self.paletteCoordinator = paletteCoordinator
+        self.settingsCoordinator = settingsCoordinator
         self.clipboardHistory = clipboardHistory
         self.core = core
     }
 
     // MARK: - Feature presence
 
-    /// The launcher section and the Quicklinks commands move together with the feature switch;
-    /// "show in launcher" hides only the section, leaving the commands reachable.
+    /// The switch moves section and commands together; "show in launcher" hides only the section.
     func applyQuicklinksPresence() {
         let enabled = settings.quicklinksEnabled
         appIndex.setQuicklinks(
@@ -62,17 +67,12 @@ final class QuicklinkCoordinator {
 
     // MARK: - Opening
 
-    /// The one funnel for palette activation, the ⌘K menu and a quicklink's global shortcut, so
-    /// neither the feature switch nor the argument prompt can be bypassed.
-    ///
-    /// `forcingDefaultApp` is the menu's "Open With Default App": it bypasses the saved handler for
-    /// one open without changing what the quicklink is saved as.
+    /// The one funnel for every open, so neither the switch nor the prompt can be bypassed.
     func openQuicklink(id: UUID, forcingDefaultApp: Bool = false) {
         guard settings.quicklinksEnabled, let quicklink = store.quicklink(id: id) else {
             return
         }
-        // With the palette closed a shortcut still reads the selection from whatever is frontmost,
-        // exactly as a system action targets the window a palette launch would have.
+        // With the palette closed a shortcut still reads the selection from the frontmost app.
         let target =
             windowController.isVisible
             ? windowController.previousApp : NSWorkspace.shared.frontmostApplication
@@ -82,8 +82,7 @@ final class QuicklinkCoordinator {
             targetApp: target, clipboardHistory: clipboardHistory())
         var arguments: [SnippetTemplateEngine.MissingArgument] = []
 
-        // An unreadable selection is a missing value, not an empty one: substitute the clipboard, or
-        // collect it through the same prompt the template's own arguments use.
+        // An unreadable selection is missing, not empty: substitute the clipboard, or prompt.
         if context.selection.isEmpty, SnippetTemplateEngine.usesSelection(quicklink.link) {
             switch settings.quicklinkSelectionFallback {
             case .clipboard:
@@ -101,14 +100,14 @@ final class QuicklinkCoordinator {
                 quicklink: quicklink, context: context, encoding: encoding, arguments: arguments)
             pendingQuicklinkForcesDefaultApp = forcingDefaultApp
             // Never `restoreAnyMode`: this screen is always a fresh prompt, never a restored one.
-            core.showPalette(mode: .quicklinkArguments)
+            paletteCoordinator.showPalette(mode: .quicklinkArguments)
             return
         }
         performQuicklinkOpen(
             quicklink, link: expansion.text, forcingDefaultApp: forcingDefaultApp)
     }
 
-    /// `{selection}` promoted to an argument when there is nothing to read and the setting says ask.
+    /// `{selection}` promoted to an argument when unreadable and the setting says ask.
     private static let selectionArgument = SnippetTemplateEngine.MissingArgument(
         name: String(localized: "Selected Text"), options: [])
 
@@ -140,7 +139,7 @@ final class QuicklinkCoordinator {
     private func performQuicklinkOpen(
         _ quicklink: Quicklink, link: String, forcingDefaultApp: Bool
     ) {
-        if windowController.isVisible { core.hidePalette(restoreFocus: false) }
+        if windowController.isVisible { paletteCoordinator.hidePalette(restoreFocus: false) }
         let openWith = forcingDefaultApp ? nil : quicklink.openWithBundleID
         Task {
             do throws(QuicklinkLauncher.Failure) {
@@ -190,8 +189,7 @@ final class QuicklinkCoordinator {
         try store.update(draft)
     }
 
-    /// Confirms unless the user turned the gate off, then deletes and unwinds every reference the
-    /// quicklink owned. `confirming: false` is for the Settings pane, which already asked.
+    /// Deletes and unwinds every reference; `confirming: false` is for the pane, which asked.
     func deleteQuicklink(id: UUID, confirming: Bool = true) async {
         guard let quicklink = store.quicklink(id: id) else { return }
         if confirming, settings.quicklinkConfirmsBeforeDelete {
@@ -202,26 +200,43 @@ final class QuicklinkCoordinator {
                     symbol: quicklink.iconSymbol ?? Quicklink.sfSymbol, confirmTitle: "Delete")
             else { return }
         }
+        // Unwound only once the row is gone: a failed delete must not strand its references.
+        do {
+            try store.remove(id: id)
+        } catch {
+            await core.showNotice(
+                title: "Couldn’t Delete “\(quicklink.name)”", message: error.localizedDescription,
+                symbol: quicklink.iconSymbol ?? Quicklink.sfSymbol, tone: .danger)
+            return
+        }
         removeQuicklinkReferences(ids: [id], entryIDs: [quicklink.entryID])
-        try? store.remove(id: id)
     }
 
     func toggleQuicklinkPinned(id: UUID) {
-        try? store.togglePinned(id: id)
+        do { try store.togglePinned(id: id) } catch { report(error) }
     }
 
     func setQuicklinkShowsInRootSearch(_ shows: Bool, id: UUID) {
-        try? store.setShowsInRootSearch(shows, id: id)
+        do { try store.setShowsInRootSearch(shows, id: id) } catch { report(error) }
     }
 
     func duplicateQuicklink(id: UUID) {
-        _ = try? store.duplicate(id: id)
+        do { _ = try store.duplicate(id: id) } catch { report(error) }
     }
 
-    /// Opens Settings on the Quicklinks pane with the editor showing `quicklink` (nil for a new one).
+    /// Quicklinks are authored data, so a refused write says so rather than reading as a no-op.
+    private func report(_ error: QuicklinkError) {
+        Task {
+            await core.showNotice(
+                title: "Couldn’t Save the Change", message: error.localizedDescription,
+                symbol: Quicklink.sfSymbol, tone: .danger)
+        }
+    }
+
+    /// Opens the Quicklinks pane with the editor showing `quicklink`; nil is a new one.
     func editQuicklink(_ quicklink: Quicklink?) {
         core.pendingQuicklinkEdit = QuicklinkEditRequest(quicklink: quicklink)
-        core.showSettings(tab: .quicklinks)
+        settingsCoordinator.showSettings(tab: .quicklinks)
     }
 
     @discardableResult
@@ -276,7 +291,7 @@ final class QuicklinkCoordinator {
             let incoming = try QuicklinkArchive.decode(Data(contentsOf: url))
             let merge = QuicklinkArchive.merge(incoming, into: store.quicklinks)
             let added = store.append(merge.additions)
-            // Everything the file offered was already here — say so rather than showing "0 imported".
+            // Everything offered was already here, so say so rather than "0 imported".
             guard !added.isEmpty else {
                 await core.showNotice(
                     title: "Nothing to Import",

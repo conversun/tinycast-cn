@@ -1,12 +1,12 @@
 import CoreServices
 import Foundation
 
-/// The aliases macOS itself knows an app by — `iBooks` for Books, `Codex` for ChatGPT — which no Info.plist key exposes.
+/// The aliases macOS knows an app by, which no Info.plist key exposes.
 enum SpotlightNames {
-    /// `MDItem.h` exports a constant for `kMDItemDisplayName` but not for this one, so it's named directly.
+    /// `MDItem.h` exports no constant for this key, so it is named directly.
     private static let attribute = "kMDItemAlternateNames"
 
-    /// Empty when the path isn't indexed — a volume with Spotlight off is a thinner index, never a failure.
+    /// Empty when the path isn't indexed; Spotlight off is a thinner index, not a failure.
     nonisolated static func alternateNames(for url: URL, displayName: String) -> [String] {
         guard let item = MDItemCreateWithURL(nil, url as CFURL),
             let raw = MDItemCopyAttribute(item, attribute as CFString) as? [String]
@@ -15,7 +15,7 @@ enum SpotlightNames {
             raw, displayName: displayName, fileName: url.lastPathComponent)
     }
 
-    /// A Spotlight round trip measured ~0.8 ms per bundle and the scan reruns on every launcher open, so a pass re-reads only bundles whose modification date moved (76 ms cold, 0.2 ms after).
+    /// ~0.8 ms per bundle, so a pass re-reads only bundles whose modification date moved.
     struct Cache: Sendable {
         private struct Entry: Sendable {
             let modified: Date?
@@ -27,7 +27,7 @@ enum SpotlightNames {
 
         init() { previous = [:] }
 
-        /// Only bundles this pass asks about carry forward, so uninstalled apps fall out instead of accumulating.
+        /// Only bundles this pass asks about carry forward, so uninstalled apps fall out.
         init(reusing cache: Cache) { previous = cache.current }
 
         mutating func alternateNames(for url: URL, displayName: String) -> [String] {

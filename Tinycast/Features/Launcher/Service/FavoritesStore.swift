@@ -1,6 +1,6 @@
 import Foundation
 
-/// Persists favorite apps as an ordered list of keys (bundle id, or file path when none), pinned to the top of the launcher when the search is empty.
+/// Favorite apps as an ordered key list, pinned to the top while the search is empty.
 @MainActor
 @Observable
 final class FavoritesStore {

@@ -52,11 +52,11 @@ enum CalcQuantity {
                     display: CalcFormatter.display(value.effective),
                     copyText: CalcFormatter.copyText(value.effective)))
         case .unit(let unit):
-            // A bare `50cm` belongs to the auto-conversion path below; once an operator is involved the
-            // answer stays in the units the user wrote, so `2 * 5kg` is `10 kg`, not `22.05 lb`.
+            // A bare `50cm` auto-converts below; with an operator the typed units are kept.
             if !preserveStandaloneUnit, parser.operationCount == 0, parser.dimensionCount == 1,
                 case .ident(let finalName)? = split.expressionTokens.last,
-                CalcUnits.byName[finalName] != nil {
+                CalcUnits.byName[finalName] != nil
+            {
                 return nil
             }
             guard parser.operationCount > 0 || preserveStandaloneUnit else { return nil }
@@ -192,7 +192,7 @@ enum CalcQuantity {
         return false
     }
 
-    /// Normalized echo for the card's left column: unit symbols, pretty operator glyphs, money in `amount code` order, and signs / parentheses / postfix `%` `!` hugging their operand instead of standing alone as words.
+    /// Normalized echo for the card's left column: symbols, pretty glyphs, `amount code` money.
     private static func expressionText(_ tokens: [CalcToken]) -> String {
         var parts: [String] = []
         parts.reserveCapacity(tokens.count)
@@ -209,10 +209,11 @@ enum CalcQuantity {
 
         var index = 0
         while index < tokens.count {
-            // Money is written sign-first (`$10`), so echo the amount ahead of its code like every other quantity.
+            // Money is written sign-first (`$10`), so echo the amount ahead of its code.
             if case .ident(let name) = tokens[index], CalcUnits.byName[name] == nil,
                 let definition = CalcCurrency.byName[name], index + 1 < tokens.count,
-                let amount = numberValue(tokens[index + 1]) {
+                let amount = numberValue(tokens[index + 1])
+            {
                 add(CalcFormatter.copyText(amount))
                 add(definition.code)
                 index += 2
@@ -328,7 +329,7 @@ private struct QuantityParser {
         return left
     }
 
-    /// An operator, its binding power, the minimum bp for its right operand, and whether it has a token to consume.
+    /// An operator, its binding power, its right operand's minimum, and whether it consumes.
     struct BinaryOp {
         let op: Character
         let bindingPower: Int
@@ -347,7 +348,7 @@ private struct QuantityParser {
         case .op("^"):
             return BinaryOp(op: "^", bindingPower: 30, rightBindingPower: 30, consumesToken: true)
         default:
-            // Juxtaposition against a bracket multiplies (`$5(2)`, `5(2)$`), matching the scalar parser.
+            // Juxtaposition against a bracket multiplies, matching the scalar parser.
             if case .op("(") = current {
                 return BinaryOp(op: "*", bindingPower: 20, rightBindingPower: 21, consumesToken: false)
             }
@@ -407,7 +408,7 @@ private struct QuantityParser {
             if lhs.category == .temperature, lhs.symbol != rhs.symbol {
                 return fail("Cannot combine temperatures with different units.")
             }
-            // Composite notation ("5 feet 3 inches") reads as one quantity in its leading unit; an explicit `+`/`-` answers in the last unit typed.
+            // Composite ("5 feet 3 inches") answers in its leading unit; `+`/`-` in the last.
             if implicit {
                 let converted = CalcQuantity.convertUnit(right.amount, from: rhs, to: lhs)
                 return QuantityValue(
@@ -439,8 +440,7 @@ private struct QuantityParser {
                     ? String(localized: "Cannot add Currency and \(rhs.category.displayName).")
                     : String(localized: "Cannot subtract Currency and \(rhs.category.displayName).")
             )
-        // A bare number takes the unit it is written against ("10kg + 5" is 15 kg). Adjacency stays
-        // silent instead, because there the bare number is a half-typed unit ("1hr 30" → "1hr 30min").
+        // A bare number takes the unit beside it; adjacency stays silent, being a half-typed unit.
         case (.unit, .scalar), (.currency, .scalar):
             guard !implicit else { return nil }
             return QuantityValue(

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Row icon that decodes off the main thread (mirrors `ImageThumbnail`), so surfacing new apps while typing never rasterizes on-main during render. Warm icons seed synchronously so there's no placeholder flash on re-open.
+/// Row icon decoding off the main thread; warm icons seed synchronously, so no flash.
 struct AppIconView: View {
     let app: AppEntry
     @State private var image: NSImage?

@@ -1,6 +1,6 @@
 import Foundation
 
-/// A passwordless, human-readable snapshot of Tinycast's configuration. Every field is optional so an import applies only the keys actually present (non-destructive merge): a partial file — or one from Raycast — leaves everything it omits untouched.
+/// A readable configuration snapshot; every field is optional, so an import merges.
 struct SettingsBackup: Codable {
     var version = 4
     var settings: SettingsData?
@@ -11,15 +11,15 @@ struct SettingsBackup: Codable {
     var hiddenLauncherItems: [String]?
     var hiddenLauncherKinds: [String]?
 
-    /// Enum-backed settings are stored by raw value so the JSON stays legible and forward-compatible (an unknown value is ignored on import rather than failing the whole decode).
+    /// Enums store by raw value, so an unknown one is ignored rather than failing.
     struct SettingsData: Codable {
+        // Adding a field here means adding it to SettingsBackupCoverage too, or the harness fails.
         var clipboardRetentionDays: Int?
         var clipboardDisabledApps: [String]?
         var launchAtLogin: Bool?
         var hyperKey: String?
         var hyperKeyIncludesShift: Bool?
         var hyperKeyQuickPress: String?
-        var hyperKeyReplacesGlyph: Bool?
         var emojiSkinTone: String?
         var showInMenuBar: Bool?
         var popToRootSeconds: Int?
@@ -27,12 +27,11 @@ struct SettingsBackup: Codable {
         var showFavoritesInCompactMode: Bool?
         var searchScopes: [String]?
         var openOnCursorScreen: Bool?
-        // `snippetsEnabled` is deliberately absent: it doubles as keyword-expansion consent, and an import must not enable keystroke listening.
+        // `snippetsEnabled` is absent: an import must not enable keystroke listening.
         var customCommandsEnabled: Bool?
         var customCommandsShowInLauncher: Bool?
         var snippetsShowInLauncher: Bool?
-        // Safe to carry, unlike `snippetsEnabled`: this grants no permission class of its own — window
-        // commands reuse the Accessibility grant paste already prompts for.
+        // Safe to carry: it grants no permission class paste doesn't already prompt for.
         var windowManagementEnabled: Bool?
         var windowManagementShowInLauncher: Bool?
         var windowGap: Int?
@@ -45,7 +44,7 @@ struct SettingsBackup: Codable {
         var quicklinkConfirmsBeforeDelete: Bool?
     }
 
-    /// `HotKeyBinding` encodes a combo in the legacy `KeyShortcut` shape, so files written before double-tap bindings existed import unchanged. The reverse doesn't hold: a file containing a double-tap can't be read by a pre-double-tap build, which is what the `version` bump records.
+    /// Combos keep the legacy shape, so older files import. docs/features/hotkeys.md#persistence
     struct HotkeyBackup: Codable {
         var togglePalette: HotKeyBinding?
         var toggleClipboard: HotKeyBinding?
@@ -73,7 +72,7 @@ struct SettingsBackup: Codable {
 
 @MainActor
 extension SettingsBackup {
-    static func gather(from core: AppCore = .shared) -> SettingsBackup {
+    static func gather(from core: AppCore) -> SettingsBackup {
         let s = core.settings
         var backup = SettingsBackup()
         backup.settings = SettingsData(
@@ -83,7 +82,6 @@ extension SettingsBackup {
             hyperKey: s.hyperKey.rawValue,
             hyperKeyIncludesShift: s.hyperKeyIncludesShift,
             hyperKeyQuickPress: s.hyperKeyQuickPress.rawValue,
-            hyperKeyReplacesGlyph: s.hyperKeyReplacesGlyph,
             emojiSkinTone: s.emojiSkinTone.rawValue,
             showInMenuBar: UserDefaults.standard.object(forKey: SettingsKey.showInMenuBar) as? Bool
                 ?? true,
@@ -145,7 +143,7 @@ extension SettingsBackup {
     }
 
     @discardableResult
-    func apply(to core: AppCore = .shared) -> ApplySummary {
+    func apply(to core: AppCore) -> ApplySummary {
         var summary = ApplySummary()
         if let s = settings { summary.settingsFields = applySettings(s, to: core) }
         if let customCommands {
@@ -174,8 +172,7 @@ extension SettingsBackup {
         var count = 0
         if let days = s.clipboardRetentionDays, let retention = ClipboardRetention(rawValue: days) {
             settings.clipboardRetention = retention
-            core.clipboardStore.maxAge = retention.maxAge
-            core.clipboardStore.enforceLimits()
+            core.clipboardCoordinator.applyRetention(retention)
             count += 1
         }
         if let apps = s.clipboardDisabledApps {
@@ -196,10 +193,6 @@ extension SettingsBackup {
         }
         if let raw = s.hyperKeyQuickPress, let quick = HyperKeyQuickPress(rawValue: raw) {
             settings.hyperKeyQuickPress = quick
-            count += 1
-        }
-        if let flag = s.hyperKeyReplacesGlyph {
-            settings.hyperKeyReplacesGlyph = flag
             count += 1
         }
         if let raw = s.emojiSkinTone, let tone = EmojiSkinTone(rawValue: raw) {
@@ -230,7 +223,7 @@ extension SettingsBackup {
             settings.openOnCursorScreen = flag
             count += 1
         }
-        // Writing through AppSettings is enough: AppCore's sinks re-project launcher presence and the snippets store.
+        // Writing through AppSettings is enough; AppCore's sinks re-project the rest.
         if let flag = s.customCommandsEnabled {
             settings.customCommandsEnabled = flag
             count += 1
@@ -272,7 +265,8 @@ extension SettingsBackup {
             count += 1
         }
         if let raw = s.quicklinkSelectionFallback,
-            let fallback = QuicklinkSelectionFallback(rawValue: raw) {
+            let fallback = QuicklinkSelectionFallback(rawValue: raw)
+        {
             settings.quicklinkSelectionFallback = fallback
             count += 1
         }
@@ -286,7 +280,7 @@ extension SettingsBackup {
     private func applyHotkeys(_ hotkeys: HotkeyBackup, to core: AppCore) -> Int {
         let hk = core.hotKeys
         var count = 0
-        // Skip a binding already claimed by an earlier-applied (or existing) action: two actions on the same combo would make Carbon's second RegisterEventHotKey fail with eventHotKeyExistsErr, silently killing that shortcut, and two on the same double-tap modifier would leave the winner arbitrary. The recorder does this check interactively; imports must too.
+        // Skip an already-claimed binding: the second registration would silently fail.
         func apply(_ binding: HotKeyBinding, _ action: HotKeyAction) {
             guard hk.conflictOwner(of: binding, excluding: action) == nil else { return }
             hk.setBinding(binding, for: action)

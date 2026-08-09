@@ -30,7 +30,7 @@ struct UninstallList: View {
                         )
                         .id(candidate.id)
                         .contentShape(Rectangle())
-                        // Simultaneous, so the single-click select never waits on the double-click timeout.
+                        // Simultaneous, so single-click select never waits on the double-click.
                         .onTapGesture { onSelect(candidate) }
                         .simultaneousGesture(
                             TapGesture(count: 2).onEnded {
@@ -87,7 +87,7 @@ private struct UninstallRow: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.lg) {
-            // Smaller glyph, same `rowIcon` slot as every other list, so titles line up at one x and switching modes doesn't jog the column.
+            // Smaller glyph, same `rowIcon` slot, so titles line up at one x across modes.
             SymbolImage(name: glyph, size: Theme.Size.checkbox)
                 .foregroundStyle(candidate.isLocked ? Theme.Colors.textTertiary : .primary)
                 .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
@@ -111,7 +111,7 @@ private struct UninstallRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: Theme.Spacing.md)
-            Text(candidate.size.formatted)
+            Text(candidate.size?.formatted ?? "")
                 .font(Theme.Typography.rowTrailing)
                 .foregroundStyle(.secondary)
             FileIconView(path: candidate.path)

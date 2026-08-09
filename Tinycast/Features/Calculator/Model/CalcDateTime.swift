@@ -1,16 +1,15 @@
 import Foundation
 
-/// Natural-language date/time calculations for the launcher card, kept Foundation-only so `Tools/calc-test.swift` compiles it standalone. `now`/`calendar` are injected so the tests can assert exact strings against a fixed clock. Four grammars:
-///   A. duration until a moment — `hrs till 9am`, `days till 9april`
-///   B. duration since a past moment — `days since 9jul`, `hrs since noon`
-///   C. a moment ± a duration — `today + 3 weeks`, `now + 90 min`
-///   D. difference between two moments — `jul 4 - today`
+/// Natural-language date/time for the card. Four grammars; see docs/features/calculator.md.
 enum CalcDateTime {
-    /// Which occurrence of a bare, recurring date/time a phrase resolves to: the upcoming one (`till`) or the most recent past one (`since`). Absolute dates ignore it.
+    /// Which occurrence of a bare, recurring date/time a phrase resolves to.
     private enum MomentBias { case future, past }
 
-    static func evaluate(_ raw: String, now: Date = Date(), calendar: Calendar = .current)
-        -> CalcResult? {
+    static func evaluate(
+        _ raw: String, now: Date = Date(), calendar: Calendar = .current
+    )
+        -> CalcResult?
+    {
         let echo = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let query = echo.lowercased()
         guard !query.isEmpty else { return nil }
@@ -36,8 +35,11 @@ enum CalcDateTime {
 
     // MARK: - Grammar A: duration until a moment
 
-    private static func parseUntil(_ query: String, echo: String, now: Date, calendar: Calendar)
-        -> CalcResult? {
+    private static func parseUntil(
+        _ query: String, echo: String, now: Date, calendar: Calendar
+    )
+        -> CalcResult?
+    {
         guard let connector = [" until ", " till ", " til "].first(where: query.contains) else {
             return nil
         }
@@ -82,8 +84,11 @@ enum CalcDateTime {
 
     // MARK: - Grammar B: duration since a past moment
 
-    private static func parseSince(_ query: String, echo: String, now: Date, calendar: Calendar)
-        -> CalcResult? {
+    private static func parseSince(
+        _ query: String, echo: String, now: Date, calendar: Calendar
+    )
+        -> CalcResult?
+    {
         let parts = query.components(separatedBy: " since ")
         guard parts.count == 2,
             let unit = durationUnit(parts[0]),
@@ -128,7 +133,7 @@ enum CalcDateTime {
     private static func parseArithmetic(
         _ query: String, echo: String, now: Date, calendar: Calendar
     ) -> CalcResult? {
-        // Split on the earliest space-surrounded operator; unspaced dashes (ISO dates, times) stay intact.
+        // Split on the earliest spaced operator; unspaced dashes (ISO dates, times) stay intact.
         let plus = query.range(of: " + ")
         let minus = query.range(of: " - ")
         let (opRange, op): (Range<String.Index>, Character)
@@ -161,7 +166,7 @@ enum CalcDateTime {
                 payload: .value(display: display, copyText: display))
         }
 
-        // D: moment − moment → a whole-day difference. A real date subtraction always names a month/weekday/keyword; two letter-free operands (`5/2 - 1/2`) are equally valid as arithmetic, so defer to the calculator rather than silently reading them as dates.
+        // D: moment − moment. Two letter-free operands (`5/2 - 1/2`) belong to the calculator.
         guard op == "-",
             left.contains(where: \.isLetter) || right.contains(where: \.isLetter),
             let other = parseMoment(right, now: now, calendar: calendar)
@@ -185,7 +190,7 @@ enum CalcDateTime {
 
     private struct Moment {
         let date: Date
-        /// True when the phrase named a clock time ("9am", "now"); false for a bare date, so callers know whether to show a time badge.
+        /// True when the phrase named a clock time ("9am", "now") — drives the time badge.
         let hasTime: Bool
     }
 
@@ -262,7 +267,7 @@ enum CalcDateTime {
         return nil
     }
 
-    /// A lone numeric atom that carries its own separators: `14:00`, `2027-04-09`, `9/4`, `9/4/2027`.
+    /// A lone numeric atom carrying its own separators: `14:00`, `2027-04-09`, `9/4`, `9/4/2027`.
     private static func parseDateAtom(
         _ atom: String, now: Date, calendar: Calendar, bias: MomentBias
     ) -> Moment? {
@@ -285,7 +290,8 @@ enum CalcDateTime {
                     month: month, day: day, now: now, calendar: calendar, bias: bias)
             }
             if parts.count == 3, let month = Int(parts[0]), let day = Int(parts[1]),
-                let year = Int(parts[2]), let date = makeDate(fullYear(year), month, day, calendar) {
+                let year = Int(parts[2]), let date = makeDate(fullYear(year), month, day, calendar)
+            {
                 return Moment(date: date, hasTime: false)
             }
         }
@@ -310,7 +316,7 @@ enum CalcDateTime {
         return Moment(date: date, hasTime: true)
     }
 
-    /// The given day of `month`: with `.future` bias the upcoming occurrence (this year if still ahead, else next), with `.past` the most recent one (this year if already passed, else last) — matching the "upcoming"/"since" readings of a bare date.
+    /// The given day of `month`, resolved to the upcoming or most recent year by `bias`.
     private static func monthDayMoment(
         month: Int, day: Int, now: Date, calendar: Calendar, bias: MomentBias = .future
     ) -> Moment? {
@@ -405,8 +411,11 @@ enum CalcDateTime {
 
     // MARK: - Formatting
 
-    private static func momentString(_ date: Date, hasTime: Bool, now: Date, calendar: Calendar)
-        -> String {
+    private static func momentString(
+        _ date: Date, hasTime: Bool, now: Date, calendar: Calendar
+    )
+        -> String
+    {
         let day = dateString(date, now: now, calendar: calendar)
         return hasTime ? "\(day) at \(timeString(date, calendar: calendar))" : day
     }
@@ -426,7 +435,7 @@ enum CalcDateTime {
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
-        // Follow the injected calendar's locale so weekday/month names match the user's language; the test clock pins en_US for deterministic assertions.
+        // Follow the injected calendar's locale so weekday/month names match the user's language.
         formatter.locale = calendar.locale ?? Locale(identifier: "en_US")
         formatter.dateFormat = pattern
         return formatter.string(from: date)
@@ -434,7 +443,7 @@ enum CalcDateTime {
 
     // MARK: - Low-level helpers
 
-    /// Split into letter-runs and number-runs (":", "/", "-", "." stay inside a number-run), so `9april` → ["9","april"] and `2027-04-09` stays whole.
+    /// Split into letter-runs and number-runs; ":", "/", "-", "." stay inside a number-run.
     private static func atomize(_ text: String) -> [String] {
         var atoms: [String] = []
         var current = ""
@@ -481,8 +490,11 @@ enum CalcDateTime {
         return (hour, 0)
     }
 
-    private static func makeDate(_ year: Int, _ month: Int, _ day: Int, _ calendar: Calendar)
-        -> Date? {
+    private static func makeDate(
+        _ year: Int, _ month: Int, _ day: Int, _ calendar: Calendar
+    )
+        -> Date?
+    {
         guard (1...12).contains(month), (1...31).contains(day) else { return nil }
         var components = DateComponents()
         components.year = year
@@ -499,7 +511,7 @@ enum CalcDateTime {
         calendar.date(byAdding: .day, value: days, to: date)
     }
 
-    /// Expand a 2-digit year the way most date pickers do (00–68 → 2000s, 69–99 → 1900s); 4-digit years pass through.
+    /// Expand a 2-digit year the way date pickers do; 4-digit years pass through.
     private static func fullYear(_ year: Int) -> Int {
         if year >= 100 { return year }
         return year <= 68 ? 2000 + year : 1900 + year

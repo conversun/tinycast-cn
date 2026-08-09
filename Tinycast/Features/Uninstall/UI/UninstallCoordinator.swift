@@ -39,10 +39,10 @@ final class UninstallCoordinator {
         self.core = core
     }
 
-    /// The palette is already up when this runs, so it swaps the sub-screen in place rather than re-showing the window.
+    /// The palette is already up, so this swaps the sub-screen rather than re-showing it.
     func beginUninstall(_ app: AppEntry) {
         guard app.kind == .application else { return }
-        // What stops a name or a shared bundle-ID namespace being misattributed; see `UninstallIdentity`.
+        // What stops a name or a shared bundle-ID namespace being misattributed.
         let others = appIndex.apps.filter { $0.kind == .application && $0.id != app.id }
         session.begin(
             app: app, otherAppNames: others.map(\.name),
@@ -50,14 +50,14 @@ final class UninstallCoordinator {
         palette.prepare(mode: .uninstall)
     }
 
-    /// The one funnel for the screen's ↵ and its Actions row, so neither can skip the confirmation.
+    /// The one funnel for the screen's ↵ and Actions row, so neither skips the confirmation.
     func performUninstall() {
         guard let app = session.app, let plan = session.plan, session.canConfirm else { return }
         let items = session.selectedCandidates
         guard !items.isEmpty else { return }
         Task {
             let running = plan.isTargetRunning || runningApps.isRunning(app)
-            let size = MeasuredSize(bytes: items.reduce(0) { $0 + $1.size.bytes }).formatted
+            let size = MeasuredSize(bytes: items.reduce(0) { $0 + ($1.size?.bytes ?? 0) }).formatted
             let count = items.count == 1
                 ? String(localized: "1 item") : String(localized: "\(items.count) items")
             guard
@@ -98,7 +98,7 @@ final class UninstallCoordinator {
     func showUninstallItemInfo(_ candidate: UninstallCandidate) {
         paletteCoordinator.hidePalette(restoreFocus: false)
         Task {
-            guard !AppLauncher.showInfoInFinder(candidate.url) else { return }
+            guard await !AppLauncher.showInfoInFinder(candidate.url) else { return }
             await core.showNotice(
                 title: String(localized: "Couldn’t Open Get Info"),
                 message: String(

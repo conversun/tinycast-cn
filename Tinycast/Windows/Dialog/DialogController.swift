@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Tinycast's own dialogs. `NSAlert` is never used: its nested run loop lets Carbon hotkeys stack dialogs.
+/// Tinycast's own dialogs; `NSAlert`'s nested run loop would let hotkeys stack them.
 @MainActor
 final class DialogController: NSObject, NSWindowDelegate {
     private var panel: DialogPanel?
@@ -28,9 +28,12 @@ final class DialogController: NSObject, NSWindowDelegate {
         _ = await present(request)
     }
 
-    /// Something already went wrong, as opposed to `confirm`'s "about to happen". True if the user took the recovery action.
-    func reportFailure(title: String, message: String, symbol: String, recovery: String?) async
-        -> Bool {
+    /// Something already went wrong, unlike `confirm`; true if recovery was taken.
+    func reportFailure(
+        title: String, message: String, symbol: String, recovery: String?
+    ) async
+        -> Bool
+    {
         var actions = [DialogAction(title: "OK", role: .cancel)]
         if let recovery { actions.append(DialogAction(title: recovery)) }
         // ↵ lands on the recovery action when there is one to take, not on the OK dismissal.
@@ -56,7 +59,7 @@ final class DialogController: NSObject, NSWindowDelegate {
     }
 
     private func present(_ request: DialogRequest) async -> Int {
-        // A held hotkey must not stack dialogs, so the extra request resolves as a dismissal. Keyed on the continuation, not the panel, so one still fading out doesn't swallow the next.
+        // Keyed on the continuation, so a panel still fading can't swallow the next.
         guard continuation == nil else { return request.cancelIndex }
         return await withCheckedContinuation { continuation in
             self.continuation = continuation
@@ -80,7 +83,7 @@ final class DialogController: NSObject, NSWindowDelegate {
             }
             self.panel = panel
             place(panel)
-            // Non-activating like the palette: takes key focus without pulling the user out of whatever they were in.
+            // Non-activating like the palette: key focus without pulling the user out.
             panel.fadeIn(duration: Theme.Duration.enter) {
                 panel.makeKeyAndOrderFront(nil)
                 panel.orderFrontRegardless()
@@ -88,7 +91,7 @@ final class DialogController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Resumes the caller before the panel finishes fading, so confirming Restart isn't held up by an animation.
+    /// Resumes before the fade finishes, so a confirmation isn't held up by animation.
     private func finish(_ index: Int) {
         guard let continuation else { return }
         self.continuation = nil
@@ -102,7 +105,7 @@ final class DialogController: NSObject, NSWindowDelegate {
 
     private func hostingView(_ view: some View, width: CGFloat, minHeight: CGFloat) -> NSView {
         let hosting = NSHostingView(rootView: AnyView(view))
-        // Measure at the fixed width first: the message wraps, so the height is only knowable once the width is pinned.
+        // Measure at the fixed width first: the message wraps, so height follows width.
         hosting.setFrameSize(NSSize(width: width, height: minHeight))
         let fitted = hosting.fittingSize
         hosting.setFrameSize(NSSize(width: width, height: max(fitted.height, minHeight)))
@@ -118,7 +121,7 @@ final class DialogController: NSObject, NSWindowDelegate {
                 y: visible.midY - size.height / 2 + visible.height * Self.centerLift))
     }
 
-    /// Optical centering: a dialog placed on the exact vertical middle reads low, the same reason the palette sits above center.
+    /// Optical centering: an exactly centred dialog reads low, as the palette would.
     private static let centerLift: CGFloat = 0.08
 
     // MARK: - NSWindowDelegate

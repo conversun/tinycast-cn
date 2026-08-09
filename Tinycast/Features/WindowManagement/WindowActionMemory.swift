@@ -1,12 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// What Tinycast remembers about each window it has moved: the frame to restore, the frame it was left
-/// at, and where it sits in a size cycle.
-///
-/// Cycling and Restore both reduce to one question — *has the user moved this window themselves since
-/// our last action?* — so both are answered here. Generic over the key so this stays Foundation-only:
-/// the app keys by `AXUIElement`, `Tools/window-command-test.swift` keys by `Int`.
+/// What Tinycast remembers per moved window. docs/features/window-management.md#cycling-and-restore
 struct WindowActionMemory<Key: Hashable> {
     struct Record: Equatable, Sendable {
         /// Where the window was before Tinycast first touched it.
@@ -24,20 +19,18 @@ struct WindowActionMemory<Key: Hashable> {
         var step: Int
         /// The frame `commit` should persist as this window's restore point.
         var restoreFrame: CGRect
-        /// False the first time we see a window: there is nothing to go back to yet, so a Restore press
-        /// must do nothing rather than "restore" it to where it already is.
+        /// False on first sight: there is nothing to go back to, so Restore must do nothing.
         var canRestore: Bool
         /// Set only when the window still sits exactly where a tile command left it.
         var lastTileCommand: WindowCommand.ID?
     }
 
-    /// Point tolerance for "is this still the frame we left it at" — loose enough for subpixel drift,
-    /// tight enough that a deliberate drag always registers.
+    /// Tolerance for "still the frame we left it at": subpixel drift in, a real drag out.
     static var tolerance: CGFloat { 2 }
 
     /// Bounded so a long session over many windows can't grow this without limit.
     var capacity: Int
-    /// When set, a cycle that has gone cold restarts from the half instead of continuing mid-sequence.
+    /// When set, a cold cycle restarts from the half rather than continuing mid-sequence.
     var cycleTimeout: TimeInterval?
 
     private var records: [Key: Record] = [:]
@@ -53,22 +46,18 @@ struct WindowActionMemory<Key: Hashable> {
 
     func record(for key: Key) -> Record? { records[key] }
 
-    /// Resolves the cycle step and restore point for a press. Pure — `commit` performs the write, once
-    /// the mover knows what actually landed.
+    /// Resolves the cycle step and restore point; `commit` writes once the mover knows what landed.
     func decide(
         key: Key, command: WindowCommand.ID, currentFrame: CGRect, currentScreenID: Int,
         cycleEnabled: Bool, now: Date
     ) -> Decision {
-        // First time we've seen this window: capture where it was, so Restore works even for windows
-        // Tinycast has never moved.
+        // First sight: capture where it was, so Restore works for a never-moved window.
         guard let record = records[key] else {
             return Decision(
                 step: 0, restoreFrame: currentFrame, canRestore: false, lastTileCommand: nil)
         }
 
-        // Compare against the frame we *observed*, never the one we asked for: Terminal resizes in whole
-        // character cells and never lands exactly on target, so comparing against the target would read
-        // as "the user moved it" on every single press and break cycling and Restore for such apps.
+        // Against the observed frame, never the requested one. docs/features/window-management.md
         guard approximatelyEqual(currentFrame, record.appliedFrame) else {
             return Decision(
                 step: 0, restoreFrame: currentFrame, canRestore: true, lastTileCommand: nil)
@@ -97,9 +86,7 @@ struct WindowActionMemory<Key: Hashable> {
         touch(key)
     }
 
-    /// Breaks the size-cycle chain while keeping the restore point — what a fullscreen toggle needs,
-    /// since macOS restores the pre-fullscreen frame itself but the user's original frame is still the
-    /// right Restore target.
+    /// Breaks the cycle chain while keeping the restore point, which is what fullscreen needs.
     mutating func forgetCycle(key: Key) {
         guard var record = records[key] else { return }
         record.step = 0

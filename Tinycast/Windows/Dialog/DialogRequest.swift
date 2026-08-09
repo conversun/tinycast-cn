@@ -1,6 +1,6 @@
 import Foundation
 
-/// One button. Role decides the label's color; severity lives in `DialogTone`, so a neutral dialog can still carry a destructive button.
+/// One button; role decides its colour, severity living separately in `DialogTone`.
 struct DialogAction {
     enum Role {
         case standard
@@ -12,8 +12,7 @@ struct DialogAction {
     var role: Role = .standard
 }
 
-/// How serious a dialog is. Tints the leading glyph and the pill HUD's status dot; it never picks an
-/// icon — that always comes from the subject the dialog is about.
+/// How serious a dialog is; it tints the glyph but never picks one. See docs/ui.md.
 enum DialogTone: Sendable {
     case neutral
     case success
@@ -29,7 +28,7 @@ struct DialogRequest {
     var actions: [DialogAction]
     /// The button ↵ fires, normally the primary action.
     var defaultIndex: Int
-    /// Resolved when the dialog goes away without a choice: Esc, or losing key status to a click elsewhere.
+    /// Resolved when the dialog goes without a choice: Esc, or losing key status.
     var cancelIndex: Int
     /// Set only by the Set Volume prompt; the slider binds to it and the caller reads the result.
     var volume: VolumeState?

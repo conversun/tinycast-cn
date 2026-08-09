@@ -9,19 +9,19 @@ final class PaletteState {
     var selection: Int = 0
     /// Changes every time the palette is shown so the search field can re-focus.
     var focusToken = UUID()
-    /// Changes only when `prepare` resets the palette, so the lists snap their scroll to the top even when query/mode were already at their defaults (`focusToken` can't serve: it bumps on every reopen, which must preserve a within-timeout scroll).
+    /// Bumped only by `prepare`, so lists snap to the top even when nothing else changed.
     var resetToken = UUID()
-    /// Changes when an action reorders the list under the selection (pinning a clip lifts it into the Pinned section), so the list scrolls the highlight back into view.
+    /// Bumped when an action reorders the list, so the highlight scrolls back into view.
     var followToken = UUID()
-    /// Set by the compact bar's "…" overflow to expand into the full launcher without a query; cleared on every `prepare`.
+    /// Set by the compact bar's overflow to expand without a query; cleared by `prepare`.
     var forceExpanded = false
-    /// The app a paste would land in, mirrored from `PaletteWindowController.previousApp` on every show. Deliberately *not* cleared by `prepare` — pop-to-root resets the screen, not the paste target.
+    /// The paste target, mirrored on every show; `prepare` resets the screen, not this.
     var pasteTarget: PasteTarget?
-    /// Gates the mouse-hover highlight: true only while the pointer is physically moving (armed on `.mouseMoved`, disarmed on any `.keyDown` in `PalettePanel.sendEvent`). Untracked — read at hover time, never drives a re-render.
+    /// True only while the pointer physically moves; untracked, so it never re-renders.
     @ObservationIgnored var hoverHighlightArmed = false
-    /// True while a footer popover menu (⌘K Actions or the app menu) is open, so `PalettePanel.sendEvent` swallows text-editing keystrokes the field editor would otherwise consume — the query must stay frozen while a menu owns the keyboard (matches Raycast). Untracked — read at event time, mirrored from the view's menu state.
+    /// True while a footer menu is open. See docs/features/palette.md#menu-open-input-freeze.
     @ObservationIgnored var menuOpen = false { didSet { onMenuOpenChanged?(menuOpen) } }
-    /// Fired when `menuOpen` flips so `PalettePanel` can hide/show the search field's caret while it keeps first-responder status (no focus swap, so the placeholder never reflows).
+    /// Fired when `menuOpen` flips, so the panel can hide the caret without a focus swap.
     @ObservationIgnored var onMenuOpenChanged: ((Bool) -> Void)?
 
     func prepare(mode: PaletteMode) {
