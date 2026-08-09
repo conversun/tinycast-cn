@@ -132,8 +132,50 @@ jobs:
         run: |
           PRERELEASE_FLAG=()
           if [ "$PRERELEASE" = "true" ]; then PRERELEASE_FLAG=(--prerelease); fi
+          # printf, not a heredoc: a heredoc body would have to sit at column 0 and break the
+          # YAML block scalar. %s for the backticks keeps the shell from running the fences.
+          BT='```'
+          printf '%s\n\n%ssh\nbrew trust --tap conversun/tinycast-cn\nbrew tap conversun/tinycast-cn\nbrew install --cask tinycast-cn\n%s\n\n%s\n\n%ssh\nxattr -dr com.apple.quarantine "/Applications/Tinycast.app"\n%s\n\n%s\n' \
+            '**推荐通过 Homebrew 安装** —— 安装和更新时会自动清除 quarantine 标记，不用手动跑任何命令：' \
+            "$BT" "$BT" \
+            '直接下载 DMG 的话，本构建是自签名的，macOS 会拦下它，需要清除一次隔离标记：' \
+            "$BT" "$BT" \
+            "基于上游 [${UPSTREAM_TAG}](https://github.com/abue-ammar/tinycast/releases/tag/${UPSTREAM_TAG}) 同步构建。" \
+            > "$RUNNER_TEMP/notes.md"
           gh release create "v${VERSION}" "dist/Tinycast-CN-${VERSION}.dmg" \
             --target "$SOURCE_COMMIT" \
             --title "Tinycast CN ${VERSION}" \
-            --notes "Chinese-optimized build synced from [${UPSTREAM_TAG}](https://github.com/abue-ammar/tinycast/releases/tag/${UPSTREAM_TAG})." \
+            --notes-file "$RUNNER_TEMP/notes.md" \
             "${PRERELEASE_FLAG[@]}"
+
+      # A deploy key on the tap, not a PAT: write access to exactly one repo and nothing else.
+      - name: Update Homebrew cask
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ -z "${TAP_DEPLOY_KEY}" ]; then
+            echo "::warning::HOMEBREW_TAP_DEPLOY_KEY not set — skipping the cask bump."
+            exit 0
+          fi
+          SHA="$(shasum -a 256 "dist/Tinycast-CN-${VERSION}.dmg" | awk '{print $1}')"
+          KEY="$RUNNER_TEMP/tap_key"
+          printf '%s\n' "$TAP_DEPLOY_KEY" > "$KEY"
+          chmod 600 "$KEY"
+          export GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          git clone --depth 1 git@github.com:conversun/homebrew-tinycast-cn.git tap
+          CASK_FILE="tap/Casks/tinycast-cn.rb"
+          # Anchored so the sha256 inside a comment or URL can never be the one rewritten.
+          sed -i '' -E "s|^  version \".*\"|  version \"${VERSION}\"|" "$CASK_FILE"
+          sed -i '' -E "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" "$CASK_FILE"
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/tinycast-cn.rb
+          if git diff --cached --quiet; then
+            echo "Cask already at ${VERSION}."
+          else
+            git commit -m "tinycast-cn ${VERSION}"
+            git push
+          fi
+          rm -f "$KEY"
