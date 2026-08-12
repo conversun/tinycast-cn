@@ -120,16 +120,18 @@ struct FileSearchSessionTests {
     }
 
     static func policyChangeDiscardsStaleResults() async {
-        let probe = FileSearchProbe()
+        let probe = FileSearchProbe(pausing: "report")
         let session = makeSession(probe: probe, debounce: .milliseconds(10))
         session.search("report")
-        try? await Task.sleep(for: .milliseconds(30))
+        let firstStarted = await probe.waitUntilPaused()
+        expect(firstStarted, "the search under the old rules starts")
+        guard firstStarted else { return }
         session.apply(scopes: FileSearchScope.defaultScopes, ignorePatterns: ["*.log"])
-        try? await Task.sleep(for: .milliseconds(90))
 
         expect(
             session.state == .idle && session.results.isEmpty,
             "a result found under the old rules never publishes")
+        await probe.resumePausedSearch()
         session.search("report")
         await waitUntil { session.state == .ready }
         let snapshot = await probe.snapshot()
