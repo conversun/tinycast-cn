@@ -35,6 +35,13 @@ struct ClipboardScreen: PaletteScreen {
         return true
     }
 
+    /// ⌥↵ — the palette stays up, so a run of entries goes over without re-summoning it.
+    func pasteKeepingWindowOpen(at selection: Int) -> Bool {
+        guard let item = item(at: selection) else { return false }
+        core.clipboardCoordinator.pasteKeepingWindowOpen(item)
+        return true
+    }
+
     /// ⌘P — mirrors the Actions menu row; pinning lifts the row into the Pinned section.
     func pin(at selection: Int) -> Bool {
         guard let item = item(at: selection) else { return false }
@@ -42,10 +49,15 @@ struct ClipboardScreen: PaletteScreen {
         return true
     }
 
-    /// ⌘⌫ — the screen owns the chord whether or not a row sits under the selection.
+    /// ⌘⌫ / ⌃X — the screen owns the chord whether or not a row sits under the selection.
     func delete(at selection: Int) {
         guard let item = item(at: selection) else { return }
         store.remove(item)
+    }
+
+    /// ⌃⇧X — mirrors the Actions row, confirmation included; pinned entries go with the rest.
+    func deleteAll() {
+        Task { await core.clipboardCoordinator.deleteAllClips() }
     }
 
     /// Follow a row the store moved; with a query typed the highlight stays put.
@@ -124,7 +136,8 @@ enum ClipboardActionsMenu {
                 core.clipboardCoordinator.copyToClipboard(item)
             },
             PopoverMenuItem(
-                title: "Paste & Keep Window Open", icon: .paste(target, fallback: "macwindow")
+                title: "Paste and Keep Window Open", icon: .paste(target, fallback: "macwindow"),
+                shortcut: "⌥↵"
             ) {
                 core.clipboardCoordinator.pasteKeepingWindowOpen(item)
             }
@@ -147,14 +160,17 @@ enum ClipboardActionsMenu {
                 })
         }
         items.append(
-            PopoverMenuItem(title: "Delete Entry", systemImage: "trash", isDestructive: true) {
+            PopoverMenuItem(
+                title: "Delete Entry", systemImage: "trash", shortcut: "⌃X", isDestructive: true
+            ) {
                 store.remove(item)
             })
         items.append(
             PopoverMenuItem(
-                title: "Delete All Entries", systemImage: "trash.fill", isDestructive: true
+                title: "Delete All Entries", systemImage: "trash", shortcut: "⌃⇧X",
+                isDestructive: true
             ) {
-                store.clearAll()
+                Task { await core.clipboardCoordinator.deleteAllClips() }
             })
         return PopoverMenuContent(header: headerText(item), items: items)
     }

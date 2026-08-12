@@ -114,6 +114,7 @@ struct EmojiGridView: View {
                                 row: row, selection: selection, tone: tone,
                                 onSelect: onSelect, onActivate: onActivate, onActions: onActions
                             )
+                            .selectionFrame(item.id == selectedRowID)
                         }
                     }
                 }
@@ -125,20 +126,9 @@ struct EmojiGridView: View {
             }
             .edgeDissolve()
             .thinScrollbar()
-            .onChange(of: scroll) { _, scroll in
-                switch scroll.kind {
-                case .top:
-                    proxy.scrollToOrigin()
-                case .follow:
-                    guard let selectedRowID else { return }
-                    // Snap to the origin on the first row so its header shows too.
-                    if selectedRowID == firstRowID {
-                        proxy.scrollToOrigin()
-                    } else {
-                        proxy.reveal(selectedRowID)
-                    }
-                }
-            }
+            // Snap to the origin on the first grid row so its header shows too.
+            .scrollFollowsSelection(
+                scroll, row: selectedRowID, atOrigin: selectedRowID == firstRowID, proxy: proxy)
         }
     }
 }
@@ -202,6 +192,7 @@ private struct EmojiGridRowView: View {
                 hoveredColumn = nil
             }
         }
+        .onChange(of: palette.hoverDisarmToken) { hoveredColumn = nil }
     }
 
     /// Point → column; exact, as cells split the width evenly. Trailing slots resolve to nil.

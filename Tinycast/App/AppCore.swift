@@ -28,6 +28,7 @@ final class AppCore {
     let frequentEmoji = FrequentEmojiStore()
     let runningApps = RunningAppsMonitor()
     let palette = PaletteState()
+    let fileSearch = FileSearchSession()
     let activationPolicy = ActivationPolicy()
     let uninstall = UninstallSession()
     let quicklinkArguments = QuicklinkArgumentSession()
@@ -49,6 +50,7 @@ final class AppCore {
 
     @ObservationIgnored private(set) lazy var paletteCoordinator = PaletteCoordinator(
         palette: palette, settings: settings, appIndex: appIndex,
+        fileSearch: fileSearch,
         windowController: windowController)
     /// Its own window and lifecycle: neither coordinator shows or closes the other's surface.
     @ObservationIgnored private(set) lazy var settingsCoordinator = SettingsCoordinator(core: self)
@@ -76,15 +78,18 @@ final class AppCore {
         systemActionCoordinator: systemActionCoordinator,
         quicklinkCoordinator: quicklinkCoordinator,
         windowCommandCoordinator: windowCommandCoordinator,
-        snippetExpansion: snippetExpansion, core: self)
+        snippetExpansion: snippetExpansion, fileSearchCoordinator: fileSearchCoordinator, core: self)
     @ObservationIgnored private(set) lazy var clipboardCoordinator = ClipboardCoordinator(
         clipboardStore: clipboardStore, palette: palette, windowController: windowController,
-        paletteCoordinator: paletteCoordinator)
+        paletteCoordinator: paletteCoordinator, core: self)
     @ObservationIgnored private(set) lazy var emojiCoordinator = EmojiCoordinator(
         frequentEmoji: frequentEmoji, settings: settings, windowController: windowController,
         paletteCoordinator: paletteCoordinator)
     @ObservationIgnored private(set) lazy var calculatorCoordinator = CalculatorCoordinator(
-        calcHistory: calcHistory, paletteCoordinator: paletteCoordinator)
+        calcHistory: calcHistory, paletteCoordinator: paletteCoordinator, core: self)
+    @ObservationIgnored private(set) lazy var fileSearchCoordinator = FileSearchCoordinator(
+        settings: settings, appIndex: appIndex, session: fileSearch, palette: palette,
+        paletteCoordinator: paletteCoordinator, core: self)
 
     @ObservationIgnored private lazy var windowController = PaletteWindowController(core: self)
     @ObservationIgnored private lazy var messageHUD = MessageHUDController(settings: settings)
@@ -120,6 +125,8 @@ final class AppCore {
             clipboardManager.start()
 
             appIndex.start(settings: settings)
+            fileSearchCoordinator.applyEnabled()
+            fileSearchCoordinator.applyPolicy()
             customCommands.onChange = { [weak self] _ in
                 self?.customCommandCoordinator.applyCustomCommandsPresence()
             }
@@ -142,6 +149,7 @@ final class AppCore {
             hotKeys.onTogglePalette = { [weak self] in self?.paletteCoordinator.togglePalette() }
             hotKeys.onToggleClipboard = { [weak self] in self?.paletteCoordinator.toggleClipboard() }
             hotKeys.onToggleEmoji = { [weak self] in self?.paletteCoordinator.toggleEmoji() }
+            hotKeys.onSearchFiles = { [weak self] in self?.fileSearchCoordinator.show() }
             hotKeys.onRunCustomCommand = { [weak self] id in
                 self?.customCommandCoordinator.runCustomCommand(id: id)
             }
@@ -208,7 +216,8 @@ final class AppCore {
             return customCommands.command(id: id)?.name
         case .quicklink(let id):
             return quicklinks.quicklink(id: id)?.name
-        case .togglePalette, .toggleClipboard, .toggleEmoji, .systemAction, .windowCommand:
+        case .togglePalette, .toggleClipboard, .toggleEmoji, .searchFiles, .systemAction,
+            .windowCommand:
             return nil
         }
     }
@@ -239,6 +248,12 @@ final class AppCore {
                 _ = $0.quicklinksEnabled
                 _ = $0.quicklinksShowInLauncher
             }, reproject: { $0.quicklinkCoordinator.applyQuicklinksPresence() })
+        track({ _ = $0.fileSearchEnabled }, reproject: { $0.fileSearchCoordinator.applyEnabled() })
+        track(
+            {
+                _ = $0.fileSearchScopes
+                _ = $0.fileSearchIgnorePatterns
+            }, reproject: { $0.fileSearchCoordinator.applyPolicy() })
         track({ _ = $0.snippetsEnabled }, reproject: { $0.snippetExpansion.applySnippetsEnabled() })
         // Not a feature switch, but the same re-projection: a combo has the chord's ⇧ bit baked in.
         track({ _ = $0.hyperKeyIncludesShift }, reproject: { $0.applyHyperChord() })

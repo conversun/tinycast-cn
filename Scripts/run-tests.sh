@@ -64,6 +64,12 @@ run() {
 
 L=Tinycast/Features/Launcher/Model
 run fuzz-test              $L/SearchRelevance.swift Tinycast/Platform/Pinyin.swift
+run file-search-test       $L/SearchRelevance.swift \
+                           Tinycast/Features/FileSearch/Model/*.swift
+run file-search-session-test Tinycast/Platform/Signposts.swift \
+                             $L/SearchRelevance.swift \
+                             Tinycast/Features/FileSearch/Model/*.swift \
+                             Tinycast/Features/FileSearch/Service/*.swift
 run ranking-test           $L/SearchRelevance.swift $L/LauncherRankingStore.swift
 run scopes-test            $L/SearchScopes.swift
 run calc-test              Tinycast/Features/Calculator/Model/*.swift
@@ -73,12 +79,20 @@ run emoji-test             Tinycast/Features/Emoji/Model/EmojiCatalog.swift \
                            Tinycast/Features/Emoji/Model/EmojiData.generated.swift
 run palette-selection-test Tinycast/Features/PaletteRowIndex.swift \
                            Tinycast/Features/Emoji/Model/EmojiGridGeometry.swift
+run palette-placement-test Tinycast/DesignSystem/Theme.swift \
+                           Tinycast/Palette/PalettePlacement.swift
+run scroll-reveal-test     Tinycast/DesignSystem/Scrolling/SelectionReveal.swift
+run hover-arming-test      Tinycast/Palette/HoverArming.swift \
+                           Tinycast/Palette/PaletteState.swift \
+                           Tinycast/Palette/PaletteMode.swift \
+                           Tinycast/Features/Quicklinks/Model/Quicklink.swift
 run hotkey-test            Tinycast/Features/HotKeys/Model/DoubleTapModifier.swift \
                            Tinycast/Features/HotKeys/Model/DoubleTapDetector.swift \
                            Tinycast/Features/HotKeys/Model/HyperKey.swift \
                            Tinycast/Features/HotKeys/Service/KeyShortcut.swift
 run callout-test           Tinycast/DesignSystem/Theme.swift \
                            Tinycast/Features/HotKeys/UI/CalloutPlacement.swift
+run icon-cache-test        Tinycast/Platform/Images/IconCache.swift
 run system-action-test     Tinycast/Features/SystemActions/Model/SystemAction.swift
 run volume-test            Tinycast/Features/SystemActions/Model/VolumeLevel.swift
 run window-command-test    Tinycast/Features/WindowManagement/WindowCommand.swift \

@@ -5,6 +5,7 @@ enum CommandID: String, CaseIterable, Sendable {
     case calculatorHistory = "command:calculator-history"
     case clipboardHistory = "command:clipboard-history"
     case searchEmoji = "command:search-emoji"
+    case searchFiles = "command:search-files"
     case createQuicklink = "command:create-quicklink"
     case searchQuicklinks = "command:search-quicklinks"
     case importQuicklinks = "command:import-quicklinks"
@@ -21,6 +22,7 @@ enum CommandID: String, CaseIterable, Sendable {
         case .calculatorHistory: return String(localized: "Calculator History")
         case .clipboardHistory: return String(localized: "Clipboard History")
         case .searchEmoji: return String(localized: "Search Emoji & Symbols")
+        case .searchFiles: return String(localized: "Search Files")
         case .createQuicklink: return String(localized: "Create Quicklink")
         case .searchQuicklinks: return String(localized: "Search Quicklinks")
         case .importQuicklinks: return String(localized: "Import Quicklinks")
@@ -39,6 +41,7 @@ enum CommandID: String, CaseIterable, Sendable {
         case .calculatorHistory: return "plus.forwardslash.minus"
         case .clipboardHistory: return "doc.on.clipboard"
         case .searchEmoji: return "face.smiling"
+        case .searchFiles: return "doc.text.magnifyingglass"
         case .createQuicklink: return "link.badge.plus"
         case .searchQuicklinks: return Quicklink.sfSymbol
         case .importQuicklinks: return "square.and.arrow.down"
@@ -76,5 +79,10 @@ enum CommandCatalog {
 
     static func command(for entry: AppEntry) -> CommandID? {
         CommandID(rawValue: entry.id)
+    }
+
+    /// From the catalog, not `AppIndex`: a disabled feature's command is absent from the index.
+    static func entry(for command: CommandID) -> AppEntry? {
+        all.first { $0.id == command.rawValue }
     }
 }

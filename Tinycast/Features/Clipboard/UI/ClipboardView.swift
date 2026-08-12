@@ -56,6 +56,7 @@ struct ClipboardList: View {
                                 item: item, selected: item.id == selectedID,
                                 imageURL: store.imageURL(for: item)
                             )
+                            .selectionFrame(item.id == selectedID)
                             .contentShape(Rectangle())
                             // Simultaneous gestures, and the light catcher: `.contextMenu` stalls.
                             .onTapGesture { onSelect(item) }
@@ -77,19 +78,9 @@ struct ClipboardList: View {
             }
             .edgeDissolve()
             .thinScrollbar()
-            .onChange(of: scroll) { _, scroll in
-                switch scroll.kind {
-                case .top:
-                    proxy.scrollToOrigin()
-                case .follow:
-                    // Snap to the origin on the first row so its section header shows too.
-                    if firstRowSelected {
-                        proxy.scrollToOrigin()
-                    } else if let selectedID {
-                        proxy.reveal(selectedID.uuidString)
-                    }
-                }
-            }
+            // Snap to the origin on the first row so its section header shows too.
+            .scrollFollowsSelection(
+                scroll, row: selectedID?.uuidString, atOrigin: firstRowSelected, proxy: proxy)
         }
     }
 }

@@ -56,12 +56,46 @@ final class PalettePanel: NSPanel {
         editor.updateInsertionPointStateAndRestartTimer(!hidden)
     }
 
+    /// Every event either mechanism sets a cursor on, so neither gets the last word.
+    private static let cursorEvents: Set<NSEvent.EventType> = [
+        .mouseMoved, .mouseEntered, .mouseExited, .cursorUpdate,
+        .leftMouseDown, .leftMouseUp, .leftMouseDragged
+    ]
+
+    /// Two AppKit mechanisms disagree over the field — SwiftUI's clip view claims the arrow for
+    /// the whole window as a cursor rect, the field editor claims the I-beam from its tracking
+    /// area — so the panel settles it from the field's own frame, after `super` has had its say.
+    private func applyCursorPolicy(for event: NSEvent) {
+        guard Self.cursorEvents.contains(event.type) else { return }
+        // Outset: the field editor AppKit installs is a point taller than the field it serves.
+        let text = searchFieldRect.insetBy(dx: -Self.fieldEditorSlack, dy: -Self.fieldEditorSlack)
+        let cursor: NSCursor =
+            text.contains(convertPoint(fromScreen: NSEvent.mouseLocation)) ? .iBeam : .arrow
+        guard NSCursor.current !== cursor else { return }
+        cursor.set()
+    }
+
+    /// docs/features/palette.md: a 24pt editor in a 23pt field, so its I-beam overhangs.
+    private static let fieldEditorSlack: CGFloat = 2
+
+    /// SwiftUI reports the field top-left down; AppKit reads the window bottom-left up.
+    private var searchFieldRect: CGRect {
+        guard let frame = paletteState?.searchFieldFrame, !frame.isEmpty,
+            let height = contentView?.bounds.height
+        else { return .zero }
+        return CGRect(
+            x: frame.minX, y: height - frame.maxY, width: frame.width, height: frame.height)
+    }
+
     override func sendEvent(_ event: NSEvent) {
         switch event.type {
-        case .mouseMoved: paletteState?.hoverHighlightArmed = true
-        case .keyDown: paletteState?.hoverHighlightArmed = false
+        case .mouseMoved: paletteState?.notePointerMoved(to: NSEvent.mouseLocation)
+        // Keys and scrolling both slide rows under the pointer without it choosing any of them.
+        case .keyDown, .scrollWheel:
+            paletteState?.disarmHoverHighlight(pointerAt: NSEvent.mouseLocation)
         default: break
         }
+        defer { applyCursorPolicy(for: event) }
         // Before every other rule, so the arrows' own policies apply to the chords too.
         if event.type == .keyDown, let arrow = Self.emacsArrow(for: event) {
             sendEvent(arrow)

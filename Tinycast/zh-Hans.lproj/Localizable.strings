@@ -814,3 +814,29 @@
 "Features" = "功能";
 "Advanced" = "高级";
 "Forward" = "前进";
+
+/* Upstream v0.9.1 → v0.9.4: File Search and palette interaction. */
+"Search Files" = "搜索文件";
+"File Search" = "文件搜索";
+"Search files and folders…" = "搜索文件和文件夹…";
+"Enable File Search" = "启用文件搜索";
+"Find files and folders through the system Spotlight index, only on demand." = "仅在需要时通过系统 Spotlight 索引查找文件和文件夹。";
+"Show %@ in launcher" = "在启动器中显示%@";
+"The shortcut works even when the command is hidden from the launcher." = "即使该命令在启动器中隐藏，快捷键仍然有效。";
+"Add a folder to search." = "添加要搜索的文件夹。";
+"Your home folder expands to its visible folders and cloud drives, never to its Library. An empty list searches nothing." = "主文件夹将展开为其中的可见文件夹和云盘，但不会包含“资源库”。列表为空时不搜索任何位置。";
+"Choose folders to include when searching for files." = "选择搜索文件时要包含的文件夹。";
+"Add pattern…" = "添加模式…";
+"Ignore Patterns" = "忽略模式";
+"A pattern without a slash matches any file or folder name, like *.tmp or node_modules; one with a slash matches the whole path, like **/[Cc]ache/**. The built-in patterns always apply." = "不含斜杠的模式会匹配任意文件或文件夹名称，例如 *.tmp 或 node_modules；含斜杠的模式会匹配完整路径，例如 **/[Cc]ache/**。内置模式始终生效。";
+"Type to search files and folders" = "输入内容以搜索文件和文件夹";
+"File search is unavailable" = "文件搜索不可用";
+"No files found" = "未找到文件";
+"Searching files…" = "正在搜索文件…";
+"Open File" = "打开文件";
+"Drag to reposition" = "拖动以重新定位";
+"Grab the thin strip just above the search field to move the launcher out of the way." = "拖动搜索栏上方的窄条，将启动器移到合适的位置。";
+"Clear calculation history?" = "清除计算历史？";
+"Every past calculation goes. This can't be undone." = "所有历史计算都将被清除，且无法撤销。";
+"Every entry goes, pinned ones included. This can't be undone." = "所有条目（包括已固定条目）都将被清除，且无法撤销。";
+"Paste and Keep Window Open" = "粘贴并保持窗口打开";

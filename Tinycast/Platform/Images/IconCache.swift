@@ -1,4 +1,18 @@
 import AppKit
+import Synchronization
+
+struct IconCacheGeneration {
+    private(set) var value = 0
+
+    mutating func invalidate() {
+        value &+= 1
+    }
+
+    func publish<Value>(_ item: Value, capturedAt generation: Int, store: (Value) -> Void) -> Value {
+        if value == generation { store(item) }
+        return item
+    }
+}
 
 /// App icons by path, downsampled and byte-bounded, so rows don't re-hit `NSWorkspace`.
 enum IconCache {
@@ -14,6 +28,14 @@ enum IconCache {
         return cache
     }()
 
+    // One 200-row result set fits; unlike launcher icons, these are discarded with the list.
+    private static let fittedCache: Cache = {
+        let cache = Cache()
+        cache.totalCostLimit = 8 * 1024 * 1024
+        return cache
+    }()
+    private static let fittedGeneration = Mutex(IconCacheGeneration())
+
     /// Cache-only lookups (never decode) so a row can paint an already-warm icon on the same frame.
     static func cached(forFile path: String) -> NSImage? { cache.object(forKey: path as NSString) }
     static func cachedSymbol(named name: String) -> NSImage? {
@@ -21,7 +43,15 @@ enum IconCache {
     }
 
     /// A freshly-decoded, thereafter-immutable `NSImage` is safe to move across the actor boundary.
-    private struct Decoded: @unchecked Sendable { let image: NSImage? }
+    private struct Decoded: @unchecked Sendable {
+        let image: NSImage?
+        let cost: Int
+
+        init(image: NSImage?, cost: Int = 0) {
+            self.image = image
+            self.cost = cost
+        }
+    }
 
     /// Returns the decode directly, so a purge mid-decode can't strand a placeholder.
     static func loadAsync(forFile path: String) async -> NSImage? {
@@ -97,23 +127,40 @@ enum IconCache {
 
     /// Cache-only lookup for `loadFittedAsync`.
     static func cachedFitted(forFile path: String) -> NSImage? {
-        cache.object(forKey: fittedKey(path))
+        fittedCache.object(forKey: fittedKey(path))
     }
 
     /// Like `loadAsync`, normalized so every file type paints to the same visual size.
     static func loadFittedAsync(forFile path: String) async -> NSImage? {
         if let cached = cachedFitted(forFile: path) { return cached }
-        return await Task.detached(priority: .userInitiated) { () -> Decoded in
-            guard FileManager.default.fileExists(atPath: path) else { return Decoded(image: nil) }
-            return Decoded(image: fittedIcon(forFile: path))
-        }.value.image
+        let generation = fittedGeneration.withLock { $0.value }
+        let decoded = await Task.detached(
+            priority: .userInitiated,
+            operation: { () -> Decoded in
+                guard FileManager.default.fileExists(atPath: path) else {
+                    return Decoded(image: nil)
+                }
+                return fittedIcon(forFile: path)
+            }
+        ).value
+        guard let image = decoded.image, !Task.isCancelled else { return nil }
+        return fittedGeneration.withLock { current in
+            current.publish(image, capturedAt: generation) { image in
+                fittedCache.setObject(image, forKey: fittedKey(path), cost: decoded.cost)
+            }
+        }
+    }
+
+    static func purgeFitted() {
+        fittedGeneration.withLock { generation in
+            generation.invalidate()
+            fittedCache.removeAllObjects()
+        }
     }
 
     private static func fittedKey(_ path: String) -> NSString { ("fit:" + path) as NSString }
 
-    private static func fittedIcon(forFile path: String) -> NSImage {
-        let key = fittedKey(path)
-        if let cached = cache.object(forKey: key) { return cached }
+    private static func fittedIcon(forFile path: String) -> Decoded {
         let source = NSWorkspace.shared.icon(forFile: path)
         // Solving `side * extent == displayPixel * artworkExtent` leaves an app icon as-is.
         let extent = paintedExtent(source) ?? artworkExtent
@@ -121,8 +168,7 @@ enum IconCache {
         let inset = (displayPixel - side) / 2
         let (icon, cost) = rasterized(
             source, into: NSRect(x: inset, y: inset, width: side, height: side))
-        cache.setObject(icon, forKey: key, cost: cost)
-        return icon
+        return Decoded(image: icon, cost: cost)
     }
 
     /// The artwork's larger dimension, measured at 2×: a 1× grid over-reads the extent.

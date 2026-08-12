@@ -39,7 +39,7 @@ struct EmojiScreen: PaletteScreen {
         return true
     }
 
-    /// ⌥↵, the one chord that leaves the palette up, so emoji can be pasted in a run.
+    /// ⌥↵ — the palette stays up, so a run of emoji goes over without re-summoning it.
     func pasteKeepingWindowOpen(at selection: Int) -> Bool {
         guard let entry = entry(at: selection) else { return false }
         core.emojiCoordinator.pasteEmojiKeepingWindowOpen(entry)
@@ -112,7 +112,8 @@ enum EmojiActionsMenu {
                     core.emojiCoordinator.copyEmoji(entry)
                 },
                 PopoverMenuItem(
-                    title: "Paste & Keep Window Open", icon: .paste(target, fallback: "macwindow")
+                    title: "Paste and Keep Window Open",
+                    icon: .paste(target, fallback: "macwindow"), shortcut: "⌥↵"
                 ) {
                     core.emojiCoordinator.pasteEmojiKeepingWindowOpen(entry)
                 }

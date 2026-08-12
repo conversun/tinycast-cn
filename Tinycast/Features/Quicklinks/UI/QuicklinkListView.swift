@@ -55,6 +55,7 @@ struct QuicklinkList: View {
                             QuicklinkRow(
                                 quicklink: quicklink, selected: quicklink.id == selectedID
                             )
+                            .selectionFrame(quicklink.id == selectedID)
                             .contentShape(Rectangle())
                             .onTapGesture { onSelect(quicklink) }
                             .simultaneousGesture(
@@ -75,18 +76,8 @@ struct QuicklinkList: View {
             }
             .edgeDissolve()
             .thinScrollbar()
-            .onChange(of: scroll) { _, scroll in
-                switch scroll.kind {
-                case .top:
-                    proxy.scrollToOrigin()
-                case .follow:
-                    if firstRowSelected {
-                        proxy.scrollToOrigin()
-                    } else if let selectedID {
-                        proxy.reveal(selectedID.uuidString)
-                    }
-                }
-            }
+            .scrollFollowsSelection(
+                scroll, row: selectedID?.uuidString, atOrigin: firstRowSelected, proxy: proxy)
         }
     }
 }

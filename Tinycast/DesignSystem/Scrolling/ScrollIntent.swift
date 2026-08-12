@@ -21,6 +21,7 @@ extension View {
             Color.clear.frame(height: 0).id(ScrollOrigin.id)
         }
     }
+
 }
 
 private enum ScrollOrigin {
@@ -31,10 +32,5 @@ extension ScrollViewProxy {
     /// Restores the exact resting offset; needs `scrollOriginAnchor()` on the content.
     func scrollToOrigin() {
         scrollTo(ScrollOrigin.id, anchor: .top)
-    }
-
-    /// Minimal scroll-to-visible, so the list stays put as the selection walks it.
-    func reveal(_ id: String) {
-        scrollTo(id, anchor: nil)
     }
 }

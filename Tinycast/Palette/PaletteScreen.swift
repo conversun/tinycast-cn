@@ -19,6 +19,8 @@ enum PaletteAxis {
     func activate(at selection: Int)
     /// ⌘↵. False when the selection has no secondary action, leaving the key unhandled.
     func secondary(at selection: Int) -> Bool
+    /// ⌥↵. False on every screen with nothing to paste, which is most of them.
+    func pasteKeepingWindowOpen(at selection: Int) -> Bool
     /// The selection an arrow key lands on, or nil to leave the key to the palette's own default.
     func move(_ delta: Int, axis: PaletteAxis, from selection: Int) -> Int?
     @ViewBuilder func body(selection: Int, scroll: ScrollIntent) -> AnyView
@@ -26,5 +28,6 @@ enum PaletteAxis {
 
 extension PaletteScreen {
     func hasPrimaryAction(at selection: Int) -> Bool { true }
+    func pasteKeepingWindowOpen(at selection: Int) -> Bool { false }
     func move(_ delta: Int, axis: PaletteAxis, from selection: Int) -> Int? { nil }
 }

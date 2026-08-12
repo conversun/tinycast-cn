@@ -29,6 +29,7 @@ struct UninstallList: View {
                             onToggle: { onToggle(candidate) }
                         )
                         .id(candidate.id)
+                        .selectionFrame(candidate.id == selectedID)
                         .contentShape(Rectangle())
                         // Simultaneous, so single-click select never waits on the double-click.
                         .onTapGesture { onSelect(candidate) }
@@ -49,20 +50,11 @@ struct UninstallList: View {
             }
             .edgeDissolve()
             .thinScrollbar()
-            .onChange(of: scroll) { _, scroll in
-                switch scroll.kind {
-                case .top:
-                    proxy.scrollToOrigin()
-                case .follow:
-                    // On the first row, snap to the origin so the summary header shows too.
-                    if firstRowSelected {
-                        proxy.scrollToOrigin()
-                    } else if let selectedID {
-                        proxy.reveal(selectedID)
-                    }
-                }
-            }
+            // On the first row, snap to the origin so the summary header shows too.
+            .scrollFollowsSelection(
+                scroll, row: selectedID, atOrigin: firstRowSelected, proxy: proxy)
         }
+        .onDisappear { IconCache.purgeFitted() }
     }
 }
 

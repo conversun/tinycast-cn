@@ -10,8 +10,21 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     /// Our key window at summon time, so hiding hands focus back to Settings, not a stale app.
     private weak var previousOwnWindow: NSWindow?
     private var popToRootTimer: Timer?
-    /// The session anchor, resolved once per show. See docs/features/palette.md#window-placement.
-    private var anchor: (x: CGFloat, topEdgeY: CGFloat)?
+    /// The session anchor — the panel's top-left, resolved once per show, the top edge being the
+    /// one that must not drift. See docs/features/palette.md#window-placement.
+    private var anchor: CGPoint?
+    /// Live only between mouse-down and mouse-up on a drag handle; nil means a move was ours.
+    private var drag: DragSession?
+    private let dropGuides = PaletteDropGuideController()
+
+    /// What a drag in flight needs: where home is, and whether releasing now would land there.
+    private struct DragSession {
+        var home: CGPoint
+        var screenFrame: CGRect
+        var armed = false
+        /// The guides wait for this, so a click that never moves the panel doesn't flash them.
+        var moved = false
+    }
 
     init(core: AppCore) {
         self.core = core
@@ -35,7 +48,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             core.palette.pasteTarget = PasteTarget(app: previousApp)
             let panel = ensurePanel()
             // Open disarmed: a pointer already over a row must not highlight it.
-            core.palette.hoverHighlightArmed = false
+            core.palette.disarmHoverHighlight(pointerAt: NSEvent.mouseLocation)
             // Re-resolve the anchor now, then hold it so resizes never move the window.
             anchor = nil
             // Size and place before ordering front, so a compact summon never flashes.
@@ -57,8 +70,12 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         panel?.orderOut(nil)
         // Drop the anchor, so the next summon re-resolves for the screen in use then.
         anchor = nil
+        // The guides must never outlive the panel they point at.
+        drag = nil
+        dropGuides.hide()
         // Drop the multi-MB preview bitmaps, so idle RAM returns near baseline.
         ImageThumbnail.purgePreviews()
+        IconCache.purgeFitted()
         schedulePopToRoot()
         guard restoreFocus else { return }
         // Our own window first: it is still open, and activating another app would bury it.
@@ -110,7 +127,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     /// Dismiss when the palette loses key status (click-away, ⌘-Tab, app switch).
     func windowDidResignKey(_ notification: Notification) {
         guard isVisible else { return }
-        hide(restoreFocus: false)
+        core.paletteCoordinator.hidePalette(restoreFocus: false)
     }
 
     /// Re-bump a turn later: on the first show a synchronous bump lands before `onChange`.
@@ -118,6 +135,59 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in
             self?.core.palette.focusToken = UUID()
         }
+    }
+
+    /// A drag re-anchors the session, so the next resize grows from where the user left it.
+    func windowDidMove(_ notification: Notification) {
+        guard let panel else { return }
+        let moved = CGPoint(x: panel.frame.minX, y: panel.frame.maxY)
+        anchor = moved
+        guard drag != nil else { return }
+        trackDrag(to: moved)
+    }
+
+    // MARK: - Dragging
+
+    /// A drag handle took the mouse down. Nothing shows yet — the guides wait for a real move.
+    func beginDrag() {
+        guard let screen = panel?.screen ?? targetScreen() else { return }
+        drag = DragSession(home: defaultAnchor(on: screen), screenFrame: screen.frame)
+    }
+
+    /// Release: snap home and forget the stored position, or remember where it was dropped.
+    func endDrag() {
+        let session = drag
+        // Cleared before the snap, so `positionPanel`'s own move isn't read as more dragging.
+        drag = nil
+        dropGuides.hide()
+        guard let panel, let session, session.moved else { return }
+        guard session.armed else {
+            core.settings.palettePosition = anchor
+            return
+        }
+        anchor = session.home
+        positionPanel(panel, collapsed: core.paletteCoordinator.paletteIsCollapsed)
+        core.settings.palettePosition = nil
+    }
+
+    /// Keep the guides on the panel's screen, armed only while a release would snap it home.
+    private func trackDrag(to moved: CGPoint) {
+        guard var session = drag else { return }
+        if let screen = panel?.screen, screen.frame != session.screenFrame {
+            session.screenFrame = screen.frame
+            session.home = defaultAnchor(on: screen)
+        }
+        session.armed = PalettePlacement.isSnapping(
+            moved, to: session.home, within: Theme.Size.paletteSnapDistance)
+        if session.moved {
+            dropGuides.move(home: session.home, screenFrame: session.screenFrame)
+            dropGuides.setArmed(session.armed)
+        } else {
+            session.moved = true
+            dropGuides.show(
+                home: session.home, screenFrame: session.screenFrame, armed: session.armed)
+        }
+        drag = session
     }
 
     // MARK: - Private
@@ -136,6 +206,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             .environment(core.currencyRates)
             .environment(core.emojiIndex)
             .environment(core.frequentEmoji)
+            .environment(core.fileSearch)
             .environment(core.runningApps)
             .environment(core.hotKeys)
             .environment(core.uninstall)
@@ -197,7 +268,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         guard let anchor = resolveAnchor() else { return }
         let height = collapsed ? Theme.Size.compactHeight : Theme.Size.panelHeight
         let frame = NSRect(
-            x: anchor.x, y: anchor.topEdgeY - height, width: Theme.Size.panelWidth, height: height)
+            x: anchor.x, y: anchor.y - height, width: Theme.Size.panelWidth, height: height)
         panel.setFrame(frame, display: true)
     }
 
@@ -209,16 +280,29 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
     }
 
-    /// The session anchor, cached until hide so both placements read one `visibleFrame`.
-    private func resolveAnchor() -> (x: CGFloat, topEdgeY: CGFloat)? {
+    /// The session anchor, cached until hide so both placements read one `visibleFrame`. A
+    /// remembered drag outranks the display setting; the default is what it falls back to.
+    private func resolveAnchor() -> CGPoint? {
         if let anchor { return anchor }
-        guard let screen = targetScreen() else { return nil }
-        let visible = screen.visibleFrame
-        let resolved = (
-            x: visible.midX - Theme.Size.panelWidth / 2,
-            topEdgeY: visible.maxY - visible.height * Theme.Size.paletteTopMarginFraction
-        )
+        let resolved = restoredAnchor() ?? targetScreen().map(defaultAnchor(on:))
         anchor = resolved
         return resolved
+    }
+
+    /// Where the last drag left it, unless no display still shows enough of the bar to grab.
+    private func restoredAnchor() -> CGPoint? {
+        guard let stored = core.settings.palettePosition else { return nil }
+        return PalettePlacement.restored(
+            stored,
+            graspable: CGSize(width: Theme.Size.panelWidth, height: Theme.Size.compactHeight),
+            visibleFrames: NSScreen.screens.map(\.visibleFrame),
+            minimumVisible: Theme.Size.paletteMinimumVisible)
+    }
+
+    /// The untouched placement on one display; the summon path and the drop guides share it.
+    private func defaultAnchor(on screen: NSScreen) -> CGPoint {
+        PalettePlacement.defaultAnchor(
+            in: screen.visibleFrame, width: Theme.Size.panelWidth,
+            topMarginFraction: Theme.Size.paletteTopMarginFraction)
     }
 }

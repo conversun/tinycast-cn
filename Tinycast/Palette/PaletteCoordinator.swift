@@ -6,17 +6,20 @@ final class PaletteCoordinator {
     private let palette: PaletteState
     private let settings: AppSettings
     private let appIndex: AppIndex
+    private let fileSearch: FileSearchSession
     private let windowController: PaletteWindowController
 
     init(
         palette: PaletteState,
         settings: AppSettings,
         appIndex: AppIndex,
+        fileSearch: FileSearchSession,
         windowController: PaletteWindowController
     ) {
         self.palette = palette
         self.settings = settings
         self.appIndex = appIndex
+        self.fileSearch = fileSearch
         self.windowController = windowController
     }
 
@@ -61,11 +64,13 @@ final class PaletteCoordinator {
             palette.prepare(mode: mode)
         }
         windowController.show()
+        if palette.mode == .fileSearch { fileSearch.search(palette.query) }
         // Re-scan on open so an app uninstalled since the last scan drops out of the launcher.
         if palette.mode == .launcher { Task { await appIndex.refresh() } }
     }
 
     func hidePalette(restoreFocus: Bool = true) {
+        fileSearch.cancel()
         windowController.hide(restoreFocus: restoreFocus)
     }
 
@@ -85,5 +90,16 @@ final class PaletteCoordinator {
     /// Resize the panel to the current collapsed state, when it flips while open.
     func syncPaletteSize() {
         windowController.applyCollapsed(paletteIsCollapsed)
+    }
+
+    // MARK: - Dragging
+
+    /// Bracket one drag gesture; the handle tracks it from mouse-down to mouse-up itself.
+    func beginPaletteDrag() {
+        windowController.beginDrag()
+    }
+
+    func endPaletteDrag() {
+        windowController.endDrag()
     }
 }

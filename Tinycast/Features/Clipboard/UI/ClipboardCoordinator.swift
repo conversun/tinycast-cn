@@ -7,17 +7,21 @@ final class ClipboardCoordinator {
     private let palette: PaletteState
     private let windowController: PaletteWindowController
     private let paletteCoordinator: PaletteCoordinator
+    /// Dialogs, for the one action here that can't be undone.
+    private unowned let core: AppCore
 
     init(
         clipboardStore: ClipboardStore,
         palette: PaletteState,
         windowController: PaletteWindowController,
-        paletteCoordinator: PaletteCoordinator
+        paletteCoordinator: PaletteCoordinator,
+        core: AppCore
     ) {
         self.clipboardStore = clipboardStore
         self.palette = palette
         self.windowController = windowController
         self.paletteCoordinator = paletteCoordinator
+        self.core = core
     }
 
     /// The setting names an age, the store enforces it; a shortened window culls straight away.
@@ -39,6 +43,17 @@ final class ClipboardCoordinator {
         if windowController.pasteKeepingWindowOpen(item, store: clipboardStore) {
             selectClip(item)
         }
+    }
+
+    /// Both the ⌃⇧X chord and the menu row land here, so neither can skip the confirmation.
+    func deleteAllClips() async {
+        guard
+            await core.confirm(
+                title: "Clear clipboard history?",
+                message: "Every entry goes, pinned ones included. This can't be undone.",
+                symbol: PaletteMode.clipboard.systemImage, confirmTitle: "Clear History")
+        else { return }
+        clipboardStore.clearAll()
     }
 
     func copyToClipboard(_ item: ClipboardItem) {

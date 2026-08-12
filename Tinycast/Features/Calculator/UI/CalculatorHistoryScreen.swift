@@ -80,10 +80,15 @@ struct CalculatorHistoryScreen: PaletteScreen {
         return true
     }
 
-    /// ⌘⌫ — the screen owns the chord, but the inline card can't be deleted.
+    /// ⌘⌫ / ⌃X — the screen owns the chord, but the inline card can't be deleted.
     func delete(at selection: Int) {
         guard let entry = entry(at: selection) else { return }
         history.remove(entry)
+    }
+
+    /// ⌃⇧X — mirrors the Actions row, confirmation included; the live inline card isn't history.
+    func deleteAll() {
+        Task { await core.calculatorCoordinator.deleteAllHistory() }
     }
 
     func body(selection: Int, scroll: ScrollIntent) -> AnyView {
@@ -145,13 +150,16 @@ enum CalcHistoryActionsMenu {
                 ) {
                     core.calculatorCoordinator.copyHistoryExpression(entry)
                 },
-                PopoverMenuItem(title: "Delete Entry", systemImage: "trash", isDestructive: true) {
+                PopoverMenuItem(
+                    title: "Delete Entry", systemImage: "trash", shortcut: "⌃X", isDestructive: true
+                ) {
                     calcHistory.remove(entry)
                 },
                 PopoverMenuItem(
-                    title: "Delete All Entries", systemImage: "trash.fill", isDestructive: true
+                    title: "Delete All Entries", systemImage: "trash", shortcut: "⌃⇧X",
+                    isDestructive: true
                 ) {
-                    calcHistory.clearAll()
+                    Task { await core.calculatorCoordinator.deleteAllHistory() }
                 }
             ]
         )

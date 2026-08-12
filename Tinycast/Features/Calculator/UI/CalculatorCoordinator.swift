@@ -5,10 +5,26 @@ import AppKit
 final class CalculatorCoordinator {
     private let calcHistory: CalculatorHistoryStore
     private let paletteCoordinator: PaletteCoordinator
+    /// Dialogs, for the one action here that can't be undone.
+    private unowned let core: AppCore
 
-    init(calcHistory: CalculatorHistoryStore, paletteCoordinator: PaletteCoordinator) {
+    init(
+        calcHistory: CalculatorHistoryStore, paletteCoordinator: PaletteCoordinator, core: AppCore
+    ) {
         self.calcHistory = calcHistory
         self.paletteCoordinator = paletteCoordinator
+        self.core = core
+    }
+
+    /// Both the ⌃⇧X chord and the menu row land here, so neither can skip the confirmation.
+    func deleteAllHistory() async {
+        guard
+            await core.confirm(
+                title: "Clear calculation history?",
+                message: "Every past calculation goes. This can't be undone.",
+                symbol: PaletteMode.calculatorHistory.systemImage, confirmTitle: "Clear History")
+        else { return }
+        calcHistory.clearAll()
     }
 
     /// Enter on the inline calculator card: copy the answer, remember the calculation, dismiss.

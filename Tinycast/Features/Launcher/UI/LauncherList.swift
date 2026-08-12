@@ -87,6 +87,7 @@ struct LauncherList: View {
                                         .onTapGesture(perform: onActivateCalc)
                                         .onRightClick(perform: onCalcActions)
                                         .padding(.bottom, Theme.Spacing.xs)
+                                        .selectionFrame(calcSelected)
                                 case .app(let app):
                                     AppRow(
                                         app: app,
@@ -96,6 +97,7 @@ struct LauncherList: View {
                                     .contentShape(Rectangle())
                                     .onTapGesture { onActivate(app) }
                                     .onRightClick { onActions(app) }
+                                    .selectionFrame(app.id == selectedID)
                                 }
                             }
                         }
@@ -107,19 +109,9 @@ struct LauncherList: View {
                     }
                     .edgeDissolve()
                     .thinScrollbar()
-                    .onChange(of: scroll) { _, scroll in
-                        switch scroll.kind {
-                        case .top:
-                            proxy.scrollToOrigin()
-                        case .follow:
-                            // Snap to the origin on the first row so its header shows too.
-                            if firstRowSelected {
-                                proxy.scrollToOrigin()
-                            } else if let selectedRowID {
-                                proxy.reveal(selectedRowID)
-                            }
-                        }
-                    }
+                    // Snap to the origin on the first row so its header shows too.
+                    .scrollFollowsSelection(
+                        scroll, row: selectedRowID, atOrigin: firstRowSelected, proxy: proxy)
                 }
             }
         }

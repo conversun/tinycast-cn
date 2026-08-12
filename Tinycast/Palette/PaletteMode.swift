@@ -5,6 +5,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     case clipboard
     case calculatorHistory
     case emoji
+    case fileSearch
     case uninstall
     case quicklinks
     /// Collects a quicklink's `{argument}` values; the request lives on the session.
@@ -17,6 +18,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .clipboard: return String(localized: "Clipboard")
         case .calculatorHistory: return String(localized: "Calculator History")
         case .emoji: return String(localized: "Emoji & Symbols")
+        case .fileSearch: return String(localized: "Search Files")
         case .uninstall: return String(localized: "Uninstall Application")
         case .quicklinks: return String(localized: "Quicklinks")
         case .quicklinkArguments: return String(localized: "Open Quicklink")
@@ -28,6 +30,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .clipboard: return "doc.on.doc"
         case .calculatorHistory: return "plus.forwardslash.minus"
         case .emoji: return "face.smiling"
+        case .fileSearch: return "doc.text.magnifyingglass"
         case .uninstall: return "trash"
         case .quicklinks, .quicklinkArguments: return Quicklink.sfSymbol
         }
@@ -39,6 +42,7 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .calculatorHistory:
             return String(localized: "Do math, convert units, or search your past calculations…")
         case .emoji: return String(localized: "Search emoji and symbols…")
+        case .fileSearch: return String(localized: "Search files and folders…")
         case .uninstall: return String(localized: "Filter files and folders by name…")
         case .quicklinks: return String(localized: "Search quicklinks…")
         // Replaced by the pending argument's name; only reached if the session vanished mid-render.

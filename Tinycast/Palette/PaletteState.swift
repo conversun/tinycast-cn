@@ -17,8 +17,15 @@ final class PaletteState {
     var forceExpanded = false
     /// The paste target, mirrored on every show; `prepare` resets the screen, not this.
     var pasteTarget: PasteTarget?
-    /// True only while the pointer physically moves; untracked, so it never re-renders.
-    @ObservationIgnored var hoverHighlightArmed = false
+    /// True only once the pointer has moved of its own accord; untracked, so it never re-renders.
+    @ObservationIgnored private(set) var hoverHighlightArmed = false
+    /// Bumped when the highlight drops, so a lit row clears even though the pointer never left it.
+    private(set) var hoverDisarmToken = UUID()
+    /// Where the pointer stood when the list last moved on its own; movement is measured from here.
+    @ObservationIgnored private var hoverAnchor: CGPoint = .zero
+    /// The search field's frame, published by the view that owns it. The panel's cursor policy
+    /// is a containment test against this: hit-testing a rebuilding hierarchy misses the field.
+    @ObservationIgnored var searchFieldFrame: CGRect = .zero
     /// True while a footer menu is open. See docs/features/palette.md#menu-open-input-freeze.
     @ObservationIgnored var menuOpen = false { didSet { onMenuOpenChanged?(menuOpen) } }
     /// Fired when `menuOpen` flips, so the panel can hide the caret without a focus swap.
@@ -29,9 +36,30 @@ final class PaletteState {
         query = ""
         selection = 0
         forceExpanded = false
-        hoverHighlightArmed = false
+        dropHoverHighlight()
         menuOpen = false
         focusToken = UUID()
         resetToken = UUID()
+    }
+
+    /// The pointer moved, which re-lights the highlight once it has cleared the arming slop.
+    func notePointerMoved(to location: CGPoint) {
+        guard !hoverHighlightArmed, HoverArming.isDeliberate(location, from: hoverAnchor) else {
+            return
+        }
+        hoverHighlightArmed = true
+    }
+
+    /// Keys and scrolling move the list themselves, so the highlight drops and movement is then
+    /// measured from where the pointer stands now — drift under it is not a new choice of row.
+    func disarmHoverHighlight(pointerAt location: CGPoint) {
+        hoverAnchor = location
+        dropHoverHighlight()
+    }
+
+    private func dropHoverHighlight() {
+        guard hoverHighlightArmed else { return }
+        hoverHighlightArmed = false
+        hoverDisarmToken = UUID()
     }
 }
