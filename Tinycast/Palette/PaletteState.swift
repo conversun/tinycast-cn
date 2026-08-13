@@ -6,6 +6,8 @@ import Foundation
 final class PaletteState {
     var mode: PaletteMode = .launcher
     var query: String = ""
+    /// Never observed: invalidating the field while text is marked breaks the composition.
+    @ObservationIgnored private(set) var searchHasMarkedText = false
     var selection: Int = 0
     /// Changes every time the palette is shown so the search field can re-focus.
     var focusToken = UUID()
@@ -30,16 +32,26 @@ final class PaletteState {
     @ObservationIgnored var menuOpen = false { didSet { onMenuOpenChanged?(menuOpen) } }
     /// Fired when `menuOpen` flips, so the panel can hide the caret without a focus swap.
     @ObservationIgnored var onMenuOpenChanged: ((Bool) -> Void)?
+    @ObservationIgnored var onSearchMarkedTextChanged: ((Bool) -> Void)?
+
+    var showsSearchPlaceholder: Bool { query.isEmpty && !searchHasMarkedText }
 
     func prepare(mode: PaletteMode) {
         self.mode = mode
         query = ""
+        setSearchHasMarkedText(false)
         selection = 0
         forceExpanded = false
         dropHoverHighlight()
         menuOpen = false
         focusToken = UUID()
         resetToken = UUID()
+    }
+
+    func setSearchHasMarkedText(_ hasMarkedText: Bool) {
+        guard searchHasMarkedText != hasMarkedText else { return }
+        searchHasMarkedText = hasMarkedText
+        onSearchMarkedTextChanged?(hasMarkedText)
     }
 
     /// The pointer moved, which re-lights the highlight once it has cleared the arming slop.

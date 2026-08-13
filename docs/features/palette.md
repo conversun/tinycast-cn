@@ -164,6 +164,13 @@ caret still draws over it, and it carries `allowsHitTesting(false)` so clicking 
 lands the caret. `PaletteMode.placeholder` is still the one source of the strings; the field takes an
 explicit `accessibilityLabel` because the prompt used to supply it.
 
+An input method keeps uncommitted text in the AppKit field editor rather than the SwiftUI binding.
+`PalettePanel` samples `hasMarkedText()` after each key event, and the placeholder is visible only when
+the query is empty and no marked text exists. That state stays outside Observation and updates only the
+placeholder child: invalidating the `TextField` while text is marked makes SwiftUI reconcile its empty
+binding over the composition. A bare Backspace reaches the input method first while it has marked text,
+even on a sub-screen where an actually empty field would otherwise back out.
+
 This is the same class of bug as the freeze below — both come from the cell/field-editor swap.
 
 ## The panel settles the pointer itself

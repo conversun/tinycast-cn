@@ -56,6 +56,16 @@ final class PalettePanel: NSPanel {
         editor.updateInsertionPointStateAndRestartTimer(!hidden)
     }
 
+    static func searchHasMarkedText(in responder: NSResponder?) -> Bool {
+        (responder as? NSTextView)?.hasMarkedText() == true
+    }
+
+    private func synchronizeSearchCompositionState() {
+        let hasMarkedText = Self.searchHasMarkedText(in: firstResponder)
+        guard paletteState?.searchHasMarkedText != hasMarkedText else { return }
+        paletteState?.setSearchHasMarkedText(hasMarkedText)
+    }
+
     /// Every event either mechanism sets a cursor on, so neither gets the last word.
     private static let cursorEvents: Set<NSEvent.EventType> = [
         .mouseMoved, .mouseEntered, .mouseExited, .cursorUpdate,
@@ -112,6 +122,7 @@ final class PalettePanel: NSPanel {
         if event.type == .keyDown,
             Int(event.keyCode) == kVK_Delete,
             event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
+            !Self.searchHasMarkedText(in: firstResponder),
             onBareBackspace?() == true
         {
             return
@@ -124,6 +135,7 @@ final class PalettePanel: NSPanel {
             return
         }
         super.sendEvent(event)
+        if event.type == .keyDown { synchronizeSearchCompositionState() }
     }
     init<Content: View>(rootView: Content) {
         super.init(

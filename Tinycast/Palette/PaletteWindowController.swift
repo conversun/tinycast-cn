@@ -68,6 +68,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
 
     func hide(restoreFocus: Bool) {
         panel?.orderOut(nil)
+        core.palette.setSearchHasMarkedText(false)
         // Drop the anchor, so the next summon re-resolves for the screen in use then.
         anchor = nil
         // The guides must never outlive the panel they point at.

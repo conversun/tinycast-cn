@@ -435,14 +435,7 @@ struct RootPaletteView: View {
             // Fills the row's height, so there's no gap above it for topDragStrip to meet.
             .frame(maxHeight: .infinity)
             .background(alignment: .leading) {
-                if vm.query.isEmpty {
-                    Text(searchPrompt)
-                        .font(Theme.Typography.searchField)
-                        .foregroundStyle(Theme.Colors.textTertiary)
-                        .lineLimit(1)
-                        // Never a click target: tapping the placeholder must still land the caret.
-                        .allowsHitTesting(false)
-                }
+                SearchPlaceholder(state: vm, prompt: searchPrompt)
             }
             // The prompt used to carry this; without it the field would be unlabelled.
             .accessibilityLabel(Text(searchPrompt))
@@ -599,6 +592,31 @@ struct RootPaletteView: View {
         guard !isCollapsed else { return }
         let screen = screen
         screen.activate(at: selection(in: screen))
+    }
+}
+
+private struct SearchPlaceholder: View {
+    let state: PaletteState
+    let prompt: String
+    @State private var hasMarkedText = false
+
+    var body: some View {
+        Group {
+            if state.query.isEmpty, !hasMarkedText {
+                Text(prompt)
+                    .font(Theme.Typography.searchField)
+                    .foregroundStyle(Theme.Colors.textTertiary)
+                    .lineLimit(1)
+                    .allowsHitTesting(false)
+            }
+        }
+        .onAppear {
+            hasMarkedText = state.searchHasMarkedText
+            state.onSearchMarkedTextChanged = { hasMarkedText = $0 }
+        }
+        .onDisappear {
+            state.onSearchMarkedTextChanged = nil
+        }
     }
 }
 
