@@ -840,3 +840,16 @@
 "Every past calculation goes. This can't be undone." = "所有历史计算都将被清除，且无法撤销。";
 "Every entry goes, pinned ones included. This can't be undone." = "所有条目（包括已固定条目）都将被清除，且无法撤销。";
 "Paste and Keep Window Open" = "粘贴并保持窗口打开";
+
+/* Upstream v0.9.4 → 0.9.5 dev: Raycast extensions and the clipboard type filter. */
+"Extension" = "扩展";
+"Search…" = "搜索…";
+"All Types" = "全部类型";
+"Text Only" = "仅文本";
+"Images Only" = "仅图片";
+"Links Only" = "仅链接";
+"Emails Only" = "仅邮箱";
+"No text in clipboard history" = "剪贴板历史中没有文本";
+"No images in clipboard history" = "剪贴板历史中没有图片";
+"No links in clipboard history" = "剪贴板历史中没有链接";
+"No email addresses in clipboard history" = "剪贴板历史中没有邮箱地址";

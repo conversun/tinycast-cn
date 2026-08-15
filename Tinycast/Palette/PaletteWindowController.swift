@@ -213,6 +213,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             .environment(core.uninstall)
             .environment(core.quicklinks)
             .environment(core.quicklinkArguments)
+            .environment(core.extensions)
         let panel = PalettePanel(rootView: root)
         panel.delegate = self
         panel.paletteState = core.palette
@@ -246,6 +247,10 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             switch character {
             case ",":
                 self.core.settingsCoordinator.showSettings()
+                return true
+            // Pin. Swallowed on every screen, since ⌘. only ever means cancel to a search field.
+            case ".":
+                self.core.palette.notePinChord()
                 return true
             case "w":
                 self.core.paletteCoordinator.hidePalette()

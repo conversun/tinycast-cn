@@ -65,7 +65,12 @@ If a change touches anything in the right column, the harness on the left is man
 | `uninstall-test` | all five pure files in `Uninstall/Model/` |
 | `quicklink-test` | all four files in `Quicklinks/Model/` |
 | `snippets-test` | all of `Snippets/Model/` and `Snippets/Service/`, plus `Platform/HealthTicker.swift` |
-| `raycast-test` | `Backup/Model/RaycastFormat.swift`, `RaycastV1Decoder.swift`, `Service/Gunzip.swift` |
+| `raycast-test` | `Backup/Model/RaycastFormat.swift`, `RaycastV1Decoder.swift`, `Platform/Compression/Zlib.swift` |
+| `symbols-test` | `Extensions/Service/SymbolCatalog.swift`, against this machine's CoreGlyphs |
+| `ext-store-test` | `Extensions/Model/` — the registry model and both registry APIs' parsers |
+| `ext-test` | the extension runtime end to end — boots a real bundle in JavaScriptCore and renders it |
+| `ext-icon-test` | `Extensions/Service/ExtensionIconCache.swift` — artwork sizing and its fallback |
+| `entry-icon-test` | `EntryIcon` — that each case draws, caches and prints apart from the others |
 | `settings-backup-test` | `Settings/AppSettingsKey.swift`, `Backup/Model/SettingsBackupCoverage.swift` |
 
 A harness that passed before a change passes after it. There is no "I'll fix it next commit" and no
@@ -202,7 +207,7 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 - A copy appears at the top within about a second; an image copy records a thumbnail
 - Search is correct both under and over three characters
-- ⌘P pins and the highlight follows the row into Pinned; ⌘⌫ deletes; ⌘↵ copies without pasting
+- ⌘. pins and the highlight follows the row into Pinned; ⌘⌫ deletes; ⌘↵ copies without pasting
 - ⌃X deletes the selected entry and ⌃⇧X clears the history, from the list and from an open ⌘K menu
 - ⌃⇧X asks first, through Tinycast's own dialog; Cancel and Esc both leave every entry in place
 - ↵ pastes into the previous app; ⌥↵ pastes without closing the palette
@@ -274,8 +279,11 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 - `2+2` shows a card; ↵ copies and records to history; unit and date conversions work
 - In Calculator History, ⌃X deletes a row and ⌃⇧X clears the history behind a confirmation
-- With currency conversion **off**, a currency query produces no card and **no network request**
-- Turning it on shows the consent sheet, naming the provider, first
+- A currency query answers from the cached snapshot; with the cache cleared and no network it reports
+  rates unavailable rather than guessing
+- A bare amount (`1 usd`) answers in the Mac's region currency, and follows a change to
+  System Settings ▸ General ▸ Language & Region without a relaunch — and nothing prompts for location
+- A crypto query (`1 btc`, `0.5 sol to eur`) answers, and `1 usd to btc` stays in plain notation
 
 ### System actions and window management
 
