@@ -26,10 +26,15 @@ struct ExtensionStoreSheet: View {
     private var searchingSummary: String {
         let on = registries.filter(\.isEnabled)
         guard !on.isEmpty else {
-            return "No registries are enabled. Turn one on under Install → Where to search."
+            return String(
+                localized:
+                    "No registries are enabled. Turn one on under Install → Where to search.")
         }
-        let names = on.map(\.name).joined(separator: ", ")
-        return "Searching \(names). Store extensions install as they are; a repository is built first."
+        let names = on.map { $0.name.localizedUI }.joined(separator: ", ")
+        return String(
+            localized:
+                "Searching \(names). Store extensions install as they are; a repository is built first."
+        )
     }
 
     var body: some View {
@@ -37,7 +42,9 @@ struct ExtensionStoreSheet: View {
             header
             // The same borderless field the panes use, rather than a bordered capsule of its own.
             SettingsFilterField(prompt: "Search extensions…", query: $query)
-            content
+            GeometryReader { _ in
+                content
+            }
             // The list scrolls right up to the footer without it, cutting the last row mid-sentence.
             Divider()
             footer
@@ -82,7 +89,7 @@ struct ExtensionStoreSheet: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if results.isEmpty && searched {
-            placeholder("Nothing matches “\(query)”.")
+            placeholder(String(localized: "Nothing matches “\(query)”."))
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -265,8 +272,11 @@ private struct StoreRow: View {
                             .background(Theme.Colors.controlSurface, in: .capsule)
                             .foregroundStyle(.secondary)
                             .help(
-                                "This registry serves source. Installing runs your package manager "
-                                    + "and the extension's build script.")
+                                String(localized: "This registry serves source.") + " "
+                                    + String(
+                                        localized:
+                                            "Installing runs your package manager and the extension's build script."
+                                    ))
                     }
                 }
                 if !listing.summary.isEmpty {

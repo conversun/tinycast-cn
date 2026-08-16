@@ -235,13 +235,14 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
 
         var errorDescription: String? {
             switch self {
-            case .unknownCommand(let id): return "No installed extension provides '\(id)'."
+            case .unknownCommand(let id):
+                return String(localized: "No installed extension provides '\(id)'.")
             case .unsupported(let reason): return reason
             case .notBuilt(let name):
-                return "\(name) has no built bundle — reinstall the extension."
+                return String(localized: "\(name) has no built bundle — reinstall the extension.")
             case .missingPreferences(let schemas):
                 let names = schemas.map(\.displayTitle).joined(separator: ", ")
-                return "This command needs its preferences set first: \(names)."
+                return String(localized: "This command needs its preferences set first: \(names).")
             }
         }
     }
@@ -480,12 +481,12 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
             return
         }
         let panel = NSAlert()
-        panel.messageText = "Open With"
+        panel.messageText = String(localized: "Open With")
         panel.informativeText = target.lastPathComponent
         for candidate in candidates.prefix(4) {
             panel.addButton(withTitle: candidate.deletingPathExtension().lastPathComponent)
         }
-        panel.addButton(withTitle: "Cancel")
+        panel.addButton(withTitle: String(localized: "Cancel"))
         let response = panel.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
         guard response >= 0, response < min(candidates.count, 4) else { return }
         NSWorkspace.shared.open(

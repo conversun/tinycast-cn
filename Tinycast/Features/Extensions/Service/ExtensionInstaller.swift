@@ -11,10 +11,11 @@ struct ExtensionInstaller: Sendable {
 
         var message: String {
             switch self {
-            case .downloading: return "Downloading…"
-            case .installingDependencies(let manager): return "Installing dependencies with \(manager)…"
-            case .building: return "Building…"
-            case .installing: return "Installing…"
+            case .downloading: return String(localized: "Downloading…")
+            case .installingDependencies(let manager):
+                return String(localized: "Installing dependencies with \(manager)…")
+            case .building: return String(localized: "Building…")
+            case .installing: return String(localized: "Installing…")
             }
         }
     }
@@ -153,7 +154,7 @@ struct ExtensionInstaller: Sendable {
         var trimmedOutput: String {
             let lines = output.split(separator: "\n").suffix(6)
             let text = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            return text.isEmpty ? "no output" : text
+            return text.isEmpty ? String(localized: "no output") : text
         }
     }
 
@@ -204,7 +205,8 @@ struct ExtensionInstaller: Sendable {
                 process.terminate()
                 guard state.claim() else { return }
                 continuation.resume(
-                    returning: CommandResult(status: -1, output: "timed out after 5 minutes"))
+                    returning: CommandResult(
+                        status: -1, output: String(localized: "timed out after 5 minutes")))
             }
         }
     }

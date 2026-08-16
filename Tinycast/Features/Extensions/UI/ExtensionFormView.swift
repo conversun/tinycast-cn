@@ -106,7 +106,7 @@ struct ExtensionFormView: View {
 
         default:
             labelled(field) {
-                Text("\(field.type) isn't supported yet")
+                Text(String(localized: "\(field.type) isn't supported yet"))
                     .font(Theme.Typography.rowTrailing)
                     .foregroundStyle(.secondary)
             }

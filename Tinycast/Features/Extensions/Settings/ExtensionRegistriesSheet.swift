@@ -37,8 +37,14 @@ struct ExtensionRegistriesSheet: View {
                     Text("Raycast Store")
                 } footer: {
                     Text(
-                        "Prebuilt extensions, through the endpoint the store's own site searches. "
-                            + "Not an official API, so a GitHub registry is the fallback if it changes."
+                        String(
+                            localized:
+                                """
+                                Prebuilt extensions, through the endpoint the store's own site \
+                                searches. Not an official API, so a GitHub registry is the fallback \
+                                if it changes.
+                                """
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -63,10 +69,15 @@ struct ExtensionRegistriesSheet: View {
                     Text("GitHub Registries")
                 } footer: {
                     Text(
-                        "A repository with one folder per extension, laid out like "
-                            + "raycast/extensions. These serve source, so installing one builds it "
-                            + "here — dependencies first, with the package manager above. Add a "
-                            + "registry only if you trust who publishes it."
+                        String(
+                            localized:
+                                """
+                                A repository with one folder per extension, laid out like \
+                                raycast/extensions. These serve source, so installing one builds it \
+                                here — dependencies first, with the package manager above. Add a \
+                                registry only if you trust who publishes it.
+                                """
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -106,7 +117,9 @@ struct ExtensionRegistriesSheet: View {
         } trailing: {
             Toggle("", isOn: binding(for: registry))
                 .labelsHidden()
-                .help(registry.isEnabled ? "Searched" : "Not searched")
+                .help(
+                    registry.isEnabled
+                        ? String(localized: "Searched") : String(localized: "Not searched"))
             if !registry.isBuiltIn {
                 Button {
                     settings.extensionRegistries.removeAll { $0.id == registry.id }
@@ -116,7 +129,7 @@ struct ExtensionRegistriesSheet: View {
                 }
                 .buttonStyle(.plain)
                 .help("Remove Registry")
-                .accessibilityLabel("Remove \(registry.name)")
+                .accessibilityLabel(String(localized: "Remove \(registry.name)"))
             }
         }
     }
@@ -141,12 +154,15 @@ struct ExtensionRegistriesSheet: View {
         let chosen = settings.extensionPackageManager
         guard let resolved = chosen.resolve() else {
             return chosen == .automatic
-                ? "None found on this Mac. Install pnpm, npm, Yarn or Bun to use a source registry."
-                : "\(chosen.title) isn't installed on this Mac."
+                ? String(
+                    localized:
+                        "None found on this Mac. Install pnpm, npm, Yarn or Bun to use a source registry."
+                )
+                : String(localized: "\(chosen.title) isn't installed on this Mac.")
         }
         return chosen == .automatic
-            ? "Found \(resolved.manager.title) at \(resolved.url.path)."
-            : "Found at \(resolved.url.path)."
+            ? String(localized: "Found \(resolved.manager.title) at \(resolved.url.path).")
+            : String(localized: "Found at \(resolved.url.path).")
     }
 
     @ViewBuilder
@@ -196,8 +212,13 @@ struct RegistryEditorSheet: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text("Add Registry").font(.title2.weight(.bold))
                 Text(
-                    "A GitHub repository holding one folder per extension, laid out like "
-                        + "raycast/extensions."
+                    String(
+                        localized:
+                            """
+                            A GitHub repository holding one folder per extension, laid out like \
+                            raycast/extensions.
+                            """
+                    )
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -212,9 +233,12 @@ struct RegistryEditorSheet: View {
 
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Name").font(.callout.weight(.medium))
-                TextField("", text: $name, prompt: Text(parsed?.name ?? "Optional"))
-                    .textFieldStyle(.roundedBorder)
-                    .pointerStyle(.horizontalText)
+                TextField(
+                    "", text: $name,
+                    prompt: Text(parsed?.name ?? String(localized: "Optional"))
+                )
+                .textFieldStyle(.roundedBorder)
+                .pointerStyle(.horizontalText)
             }
 
             if let parsed {
@@ -230,8 +254,13 @@ struct RegistryEditorSheet: View {
             }
 
             Text(
-                "Extensions from a repository are source: installing one runs your package manager "
-                    + "and the extension's own build script on this Mac."
+                String(
+                    localized:
+                        """
+                        Extensions from a repository are source: installing one runs your package \
+                        manager and the extension's own build script on this Mac.
+                        """
+                )
             )
             .font(.caption)
             .foregroundStyle(.secondary)

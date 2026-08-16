@@ -50,8 +50,10 @@ struct ExtensionCommandView: View {
                     EmptyResults(text: "Nothing to show")
                 } else {
                     ExtensionFailureView(
-                        message:
-                            "This command renders \(type), which Tinycast doesn't support yet. See docs/extensions.md."
+                        message: String(
+                            localized:
+                                "This command renders \(type), which Tinycast doesn't support yet. See docs/extensions.md."
+                        )
                     )
                 }
             }

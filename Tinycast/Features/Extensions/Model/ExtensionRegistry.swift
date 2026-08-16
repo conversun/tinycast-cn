@@ -54,8 +54,10 @@ struct ExtensionRegistry: Codable, Identifiable, Hashable, Sendable {
     /// Said under a heading that already names the kind, so it carries what differs between rows.
     var subtitle: String {
         switch kind {
-        case .raycastStore: return "Installs without Node or a package manager."
-        case .github: return "\(owner)/\(repository) at \(ref)"
+        case .raycastStore:
+            return String(localized: "Installs without Node or a package manager.")
+        case .github:
+            return String(localized: "\(owner)/\(repository) at \(ref)")
         }
     }
 
@@ -125,9 +127,13 @@ struct ExtensionListing: Identifiable, Hashable, Sendable {
     var subtitle: String {
         var parts: [String] = []
         if !author.isEmpty { parts.append(author) }
-        parts.append("\(commandCount) command\(commandCount == 1 ? "" : "s")")
+        parts.append(
+            commandCount == 1
+                ? String(localized: "1 command")
+                : String(localized: "\(commandCount) commands"))
         if let downloadCount, downloadCount > 0 {
-            parts.append("\(ExtensionListing.abbreviate(downloadCount)) installs")
+            parts.append(
+                String(localized: "\(ExtensionListing.abbreviate(downloadCount)) installs"))
         }
         return parts.joined(separator: " · ")
     }

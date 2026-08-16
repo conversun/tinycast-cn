@@ -204,23 +204,30 @@ enum ExtensionStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .malformedResponse:
-            return "The registry answered with something this version doesn't understand."
+            return String(
+                localized: "The registry answered with something this version doesn't understand.")
         case .registryRejected(let message):
             return message
         case .downloadFailed(let reason):
-            return "Download failed: \(reason)"
+            return String(localized: "Download failed: \(reason)")
         case .noPackageManager:
-            return
-                "This extension is source that has to be built, and no package manager was found. "
-                + "Install pnpm, npm, Yarn or Bun, or pick one in Advanced."
+            return String(
+                localized:
+                    "This extension is source that has to be built, and no package manager was found."
+            ) + " "
+                + String(
+                    localized: "Install pnpm, npm, Yarn or Bun, or pick one in Advanced.")
         case .noNode:
-            return
-                "This extension is source that has to be built, and Node wasn't found. Install "
-                + "Node.js, or install this extension from the Raycast Store instead."
+            return String(
+                localized: "This extension is source that has to be built, and Node wasn't found.")
+                + " "
+                + String(
+                    localized:
+                        "Install Node.js, or install this extension from the Raycast Store instead.")
         case .buildFailed(let output):
-            return "The extension didn't build: \(output)"
+            return String(localized: "The extension didn't build: \(output)")
         case .notAnExtension:
-            return "That download didn't contain a Raycast extension."
+            return String(localized: "That download didn't contain a Raycast extension.")
         }
     }
 }

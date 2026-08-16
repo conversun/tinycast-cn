@@ -50,9 +50,10 @@ final class ExtensionRuntime: @unchecked Sendable {
         var errorDescription: String? {
             switch self {
             case .runtimeResourceMissing:
-                return "RaycastRuntime.generated.js is missing from the app bundle."
+                return String(
+                    localized: "RaycastRuntime.generated.js is missing from the app bundle.")
             case .bootFailed(let message):
-                return "The extension runtime failed to start: \(message)"
+                return String(localized: "The extension runtime failed to start: \(message)")
             }
         }
     }
@@ -310,9 +311,9 @@ final class ExtensionRuntime: @unchecked Sendable {
     // MARK: - JSON helpers
 
     private static func describe(_ exception: JSValue?) -> String {
-        guard let exception else { return "unknown JavaScript error" }
+        guard let exception else { return String(localized: "unknown JavaScript error") }
         let stack = exception.objectForKeyedSubscript("stack")?.toString()
-        let message = exception.toString() ?? "JavaScript error"
+        let message = exception.toString() ?? String(localized: "JavaScript error")
         if let stack, !stack.isEmpty, stack != "undefined" { return "\(message)\n\(stack)" }
         return message
     }
