@@ -117,12 +117,11 @@ struct AppEntry: Identifiable, Hashable, Sendable {
 
     var kindLabel: String { labelOverride ?? kind.descriptor.label }
 
-    /// The hotkey action for this entry, or nil for built-ins and unaddressable bundles.
+    /// The hotkey action for this entry, or nil when the entry has no addressable action.
     var hotKeyAction: HotKeyAction? {
         switch kind {
         case .command:
-            // Search Files is the one built-in with its own action; the rest open from the launcher.
-            return CommandCatalog.command(for: self) == .searchFiles ? .searchFiles : nil
+            return CommandCatalog.command(for: self)?.hotKeyAction
         case .application:
             return bundleID.map { .app(bundleID: $0) }
         case .systemSettings:
@@ -221,9 +220,8 @@ final class AppIndex {
     private var windowCommandEntries: [AppEntry] = []
     private var quicklinkEntries: [AppEntry] = []
     private var extensionEntries: [AppEntry] = []
-    private var commandEntries: [AppEntry]
-    private var quicklinkCommandsVisible = false
-    private var fileSearchCommandVisible = false
+    /// The catalog's commands a disabled feature hides; the Commands slice is recomputed from it.
+    private var hiddenCommands: Set<CommandID> = []
     private var alternateNameCache = SpotlightNames.Cache()
     private var paneCache: SettingsPaneScanner.Cache?
     private var isRefreshing = false
@@ -234,8 +232,22 @@ final class AppIndex {
 
     init(ranking: LauncherRankingStore) {
         self.ranking = ranking
-        commandEntries = Self.projectedCommandEntries(
-            quicklinksVisible: false, fileSearchVisible: false)
+    }
+
+    /// The always-relevant built-ins, plus whatever a disabled feature has not hidden.
+    private var commandEntries: [AppEntry] {
+        CommandCatalog.all.filter {
+            guard let command = CommandCatalog.command(for: $0) else { return true }
+            return !hiddenCommands.contains(command)
+        }
+    }
+
+    /// A feature's commands leave the Commands slice when the feature is off; `visible` restores them.
+    func setCommandsVisible(_ commands: Set<CommandID>, _ visible: Bool) {
+        let updated = visible ? hiddenCommands.subtracting(commands) : hiddenCommands.union(commands)
+        guard updated != hiddenCommands else { return }
+        hiddenCommands = updated
+        publishEntries()
     }
 
     /// Replaces the command slice without rescanning, so Settings edits land at once.
@@ -252,8 +264,8 @@ final class AppIndex {
         publishEntries()
     }
 
-    /// Replaces the quicklink slice and its built-ins together, so a toggle can't split them.
-    func setQuicklinks(_ quicklinks: [Quicklink], commandsVisible: Bool) {
+    /// Replaces the quicklink slice; a toggle can't split its entries from their section.
+    func setQuicklinks(_ quicklinks: [Quicklink]) {
         let entries =
             quicklinks
             .filter(\.showsInRootSearch)
@@ -266,22 +278,8 @@ final class AppIndex {
                     symbolName: quicklink.iconSymbol
                         ?? QuicklinkDestination.detect(quicklink.link)?.defaultSymbol)
             }
-        let commands = Self.projectedCommandEntries(
-            quicklinksVisible: commandsVisible, fileSearchVisible: fileSearchCommandVisible)
-        guard entries != quicklinkEntries || commands != commandEntries else { return }
+        guard entries != quicklinkEntries else { return }
         quicklinkEntries = entries
-        quicklinkCommandsVisible = commandsVisible
-        commandEntries = commands
-        publishEntries()
-    }
-
-    /// Shows or hides Search Files without disturbing another feature's built-in commands.
-    func setFileSearchCommandVisible(_ visible: Bool) {
-        let commands = Self.projectedCommandEntries(
-            quicklinksVisible: quicklinkCommandsVisible, fileSearchVisible: visible)
-        guard commands != commandEntries else { return }
-        fileSearchCommandVisible = visible
-        commandEntries = commands
         publishEntries()
     }
 
@@ -413,17 +411,6 @@ final class AppIndex {
         guard updated != apps else { return }
         apps = updated
         entriesRevision &+= 1
-    }
-
-    private static func projectedCommandEntries(
-        quicklinksVisible: Bool, fileSearchVisible: Bool
-    ) -> [AppEntry] {
-        CommandCatalog.all.filter { entry in
-            guard let command = CommandCatalog.command(for: entry) else { return true }
-            if command.isQuicklinkCommand { return quicklinksVisible }
-            if command == .searchFiles { return fileSearchVisible }
-            return true
-        }
     }
 
     /// Ranked matches. Empty query returns the full alphabetical list.

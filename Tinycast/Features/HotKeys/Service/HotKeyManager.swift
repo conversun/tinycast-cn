@@ -7,6 +7,9 @@ final class HotKeyManager {
     var onTogglePalette: (() -> Void)?
     var onToggleClipboard: (() -> Void)?
     var onToggleEmoji: (() -> Void)?
+    var onShowNotes: (() -> Void)?
+    var onCreateNote: (() -> Void)?
+    var onSearchNotes: (() -> Void)?
     var onSearchFiles: (() -> Void)?
     var onRunCustomCommand: ((UUID) -> Void)?
     var onRunSystemAction: ((SystemAction.ID) -> Void)?
@@ -135,8 +138,8 @@ final class HotKeyManager {
             var set = Set(boundExtensionCommandEntryIDs)
             if binding == nil { set.remove(entryID) } else { set.insert(entryID) }
             UserDefaults.standard.set(Array(set), forKey: boundExtensionCommandKey)
-        case .togglePalette, .toggleClipboard, .toggleEmoji, .searchFiles, .systemAction,
-            .windowCommand:
+        case .togglePalette, .toggleClipboard, .toggleEmoji, .showNotes, .createNote, .searchNotes,
+            .searchFiles, .systemAction, .windowCommand:
             break
         }
         candidateActionsCache = nil
@@ -171,9 +174,7 @@ final class HotKeyManager {
     /// Every action that could hold a binding: the search space for conflicts and the map.
     private var candidateActions: [HotKeyAction] {
         if let candidateActionsCache { return candidateActionsCache }
-        var actions: [HotKeyAction] = [
-            .togglePalette, .toggleClipboard, .toggleEmoji, .searchFiles
-        ]
+        var actions = HotKeyAction.builtInActions
         actions += boundBundleIDs.map { .app(bundleID: $0) }
         actions += boundPaneBundleIDs.map { .settingsPane(bundleID: $0) }
         actions += boundCustomCommandIDs.map { .customCommand(id: $0) }
@@ -190,9 +191,15 @@ final class HotKeyManager {
         case .togglePalette:
             return "App Launcher"
         case .toggleClipboard:
-            return "Clipboard History"
+            return CommandID.clipboardHistory.name
         case .toggleEmoji:
-            return "Emoji & Symbols"
+            return CommandID.searchEmoji.name
+        case .showNotes:
+            return CommandID.showNotes.name
+        case .createNote:
+            return CommandID.createNote.name
+        case .searchNotes:
+            return CommandID.searchNotes.name
         case .searchFiles:
             return CommandID.searchFiles.name
         case .app(let bundleID), .settingsPane(let bundleID):
@@ -233,6 +240,9 @@ final class HotKeyManager {
         case .togglePalette: onTogglePalette?()
         case .toggleClipboard: onToggleClipboard?()
         case .toggleEmoji: onToggleEmoji?()
+        case .showNotes: onShowNotes?()
+        case .createNote: onCreateNote?()
+        case .searchNotes: onSearchNotes?()
         case .searchFiles: onSearchFiles?()
         case .app(let bundleID): AppLauncher.toggle(bundleID: bundleID)
         case .settingsPane(let bundleID): AppLauncher.openSettingsPane(bundleID: bundleID)

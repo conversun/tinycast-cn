@@ -37,6 +37,23 @@ enum Theme {
     enum Size {
         static let panelWidth: CGFloat = 750
         static let panelHeight: CGFloat = 475
+        /// Opening size on a first run and the floor: below it the title bar's own parts collide.
+        static let noteWindow = CGSize(width: 440, height: 180)
+        static let noteEditorInset: CGFloat = 16
+        /// Shorter than the horizontal inset, so the first line sits close under the title bar.
+        static let noteEditorTopInset: CGFloat = 6
+        static let noteSearchHeight: CGFloat = 34
+        /// The switcher popover, sized independently of a note window that can be 180pt tall.
+        static let noteSwitcher = CGSize(width: 300, height: 240)
+        static let noteSwitcherEmptyHeight: CGFloat = 96
+        static let noteSwitcherDrop: CGFloat = 56
+        static let noteFooterHeight: CGFloat = 28
+        /// Holds the launcher's 36-point action capsule with the same margin its own bar gives it.
+        static let noteTitlebar: CGFloat = 52
+        /// Symmetric, so the title stays centred on the window while clearing lights and capsule.
+        static let noteTitleInset: CGFloat = 120
+        /// Nine points crowds the palette's 26-point corner, so Notes seats its lights further in.
+        static let noteTrafficLightInset: CGFloat = 20
         /// Fraction of visible height above the palette's top edge; it grows downward.
         static let paletteTopMarginFraction: CGFloat = 0.18
         static let headerHeight: CGFloat = 44
@@ -77,6 +94,8 @@ enum Theme {
         static let compactKeyCap: CGFloat = 15
         static let heroKeyCap: CGFloat = 22
         static let menuButton: CGFloat = 36
+        static let noteGlyph: CGFloat = 16
+        static let noteEmptyGlyph: CGFloat = 28
         /// The uninstall list's leading checkbox / lock glyph.
         static let checkbox: CGFloat = 16
         static let clipboardListWidth: CGFloat = 290
@@ -153,6 +172,7 @@ enum Theme {
         static let menuRow = Font.body
         static let menuShortcut = Font.callout
         static let menuIcon = Font.body
+        static let noteTitle = Font.headline
     }
 
     enum Colors {
@@ -170,6 +190,7 @@ enum Theme {
         static let border = Color.white.opacity(0.20)
         static let textSecondary = Color.white.opacity(0.60)
         static let textTertiary = Color.white.opacity(0.40)
+        static let noteText = Color.white.opacity(0.90)
         /// The Settings card: a faint surface whose border doubles as the row divider.
         static let cardFill = Color.white.opacity(0.05)
         static let cardStroke = Color.white.opacity(0.10)

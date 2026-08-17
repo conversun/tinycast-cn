@@ -32,6 +32,7 @@ final class AppCore {
     let activationPolicy = ActivationPolicy()
     let uninstall = UninstallSession()
     let quicklinkArguments = QuicklinkArgumentSession()
+    let notesStore: NotesStore
     let extensions: ExtensionManager
 
     /// Set when a quicklink editor should open with Settings; the pane consumes it.
@@ -73,6 +74,11 @@ final class AppCore {
         paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
         hotKeys: hotKeys, favorites: favorites, visibility: visibility,
         ranking: launcherRanking, core: self)
+    @ObservationIgnored private(set) lazy var notesCoordinator = NotesCoordinator(
+        store: notesStore,
+        settings: settings,
+        appIndex: appIndex,
+        core: self)
 
     @ObservationIgnored private(set) lazy var launcherCoordinator = LauncherCoordinator(
         ranking: launcherRanking, windowController: windowController,
@@ -83,7 +89,8 @@ final class AppCore {
         quicklinkCoordinator: quicklinkCoordinator,
         windowCommandCoordinator: windowCommandCoordinator,
         snippetExpansion: snippetExpansion, fileSearchCoordinator: fileSearchCoordinator,
-        extensionCoordinator: extensionCoordinator, core: self)
+        notesCoordinator: notesCoordinator, extensionCoordinator: extensionCoordinator,
+        core: self)
     @ObservationIgnored private(set) lazy var clipboardCoordinator = ClipboardCoordinator(
         clipboardStore: clipboardStore, palette: palette, windowController: windowController,
         paletteCoordinator: paletteCoordinator, core: self)
@@ -115,6 +122,14 @@ final class AppCore {
         snippetTextInjector = SnippetTextInjector(
             clipboardManager: clipboardManager,
             settings: settings)
+        let noteSelectionKey = "notesActiveFileName"
+        notesStore = NotesStore(
+            repository: NotesRepository(
+                applicationSupportDirectory: AppPaths.applicationSupport()),
+            loadSelection: {
+                UserDefaults.standard.string(forKey: noteSelectionKey).map(NoteID.init(rawValue:))
+            },
+            saveSelection: { UserDefaults.standard.set($0?.rawValue, forKey: noteSelectionKey) })
     }
 
     func start() {
@@ -135,6 +150,7 @@ final class AppCore {
             extensionCoordinator.applyEnabled()
             fileSearchCoordinator.applyEnabled()
             fileSearchCoordinator.applyPolicy()
+            notesCoordinator.applyEnabled()
             customCommands.onChange = { [weak self] _ in
                 self?.customCommandCoordinator.applyCustomCommandsPresence()
             }
@@ -157,6 +173,9 @@ final class AppCore {
             hotKeys.onTogglePalette = { [weak self] in self?.paletteCoordinator.togglePalette() }
             hotKeys.onToggleClipboard = { [weak self] in self?.paletteCoordinator.toggleClipboard() }
             hotKeys.onToggleEmoji = { [weak self] in self?.paletteCoordinator.toggleEmoji() }
+            hotKeys.onShowNotes = { [weak self] in self?.notesCoordinator.show() }
+            hotKeys.onCreateNote = { [weak self] in self?.notesCoordinator.createNote() }
+            hotKeys.onSearchNotes = { [weak self] in self?.notesCoordinator.searchNotes() }
             hotKeys.onSearchFiles = { [weak self] in self?.fileSearchCoordinator.show() }
             hotKeys.onRunCustomCommand = { [weak self] id in
                 self?.customCommandCoordinator.runCustomCommand(id: id)
@@ -233,9 +252,13 @@ final class AppCore {
         case .extensionCommand(let entryID):
             return appIndex.apps.first { $0.kind == .extensionCommand && $0.id == entryID }?.name
         case .togglePalette, .toggleClipboard, .toggleEmoji, .searchFiles, .systemAction,
-            .windowCommand:
+            .showNotes, .createNote, .searchNotes, .windowCommand:
             return nil
         }
+    }
+
+    func flushNotesForTermination() async {
+        await notesCoordinator.prepareForTermination()
     }
 
     func prepareForTermination() {
@@ -265,6 +288,7 @@ final class AppCore {
                 _ = $0.quicklinksShowInLauncher
             }, reproject: { $0.quicklinkCoordinator.applyQuicklinksPresence() })
         track({ _ = $0.fileSearchEnabled }, reproject: { $0.fileSearchCoordinator.applyEnabled() })
+        track({ _ = $0.notesEnabled }, reproject: { $0.notesCoordinator.applyEnabled() })
         track(
             {
                 _ = $0.fileSearchScopes
@@ -313,7 +337,7 @@ final class AppCore {
 
     /// `tone` styles the glyph, `confirmRole` the button; separate on purpose.
     func confirm(
-        title: String, message: String?, symbol: String, confirmTitle: String,
+        title: String, message: String?, symbol: String?, confirmTitle: String,
         tone: DialogTone = .danger, confirmRole: DialogAction.Role = .destructive,
         dismissTitle: String = "Cancel"
     ) async -> Bool {

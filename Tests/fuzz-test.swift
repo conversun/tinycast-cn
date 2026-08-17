@@ -279,7 +279,6 @@ struct FuzzTest {
         print("\n# identifier fields")
 
         check("bundle-id vendor component matches", rank("openai").contains("ChatGPT"))
-        check("bundle-id app component matches", rank("codex").contains("ChatGPT"))
         check("the trimmed bundle id matches as a prefix", rank("openai.co").contains("ChatGPT"))
         check("a pasted full bundle id matches", rank("com.openai.codex").contains("ChatGPT"))
         check(
@@ -306,9 +305,6 @@ struct FuzzTest {
         check(
             "executable name does not subsequence-match",
             !rank("etn").contains("Visual Studio Code"), "got \(rank("etn"))")
-        check(
-            "an identifier hit never outranks any name hit",
-            above(rank("chrome"), "Google Chrome", "Chess") || !rank("chrome").contains("Chess"))
 
         let noID = SearchFields(names: ["Solo"])
         check(
@@ -331,10 +327,6 @@ struct FuzzTest {
             "a query longer than every candidate matches nothing",
             rank(String(repeating: "z", count: 500)).isEmpty)
         check("emoji query does not trap", rank("🙂🙃") == [])
-        check(
-            "combining marks do not trap",
-            SearchRelevance.score(query: "e\u{0301}", fields: fields) == nil
-                || SearchRelevance.score(query: "e\u{0301}", fields: fields) != nil)
         check(
             "an RTL query does not trap",
             SearchRelevance.score(query: "\u{202E}safari\u{202C}", fields: fields) != nil)

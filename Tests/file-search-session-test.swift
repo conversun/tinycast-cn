@@ -123,17 +123,17 @@ struct FileSearchSessionTests {
         let probe = FileSearchProbe(pausing: "report")
         let session = makeSession(probe: probe, debounce: .milliseconds(10))
         session.search("report")
-        let firstStarted = await probe.waitUntilPaused()
-        expect(firstStarted, "the search under the old rules starts")
-        guard firstStarted else { return }
+        let oldSearchStarted = await probe.waitUntilPaused()
+        expect(oldSearchStarted, "the old-policy query starts")
+        guard oldSearchStarted else { return }
         session.apply(scopes: FileSearchScope.defaultScopes, ignorePatterns: ["*.log"])
 
         expect(
             session.state == .idle && session.results.isEmpty,
             "a result found under the old rules never publishes")
-        await probe.resumePausedSearch()
         session.search("report")
-        await waitUntil { session.state == .ready }
+        await probe.resumePausedSearch()
+        await waitUntil { session.state == .ready && session.results.first?.name == "report" }
         let snapshot = await probe.snapshot()
         expect(snapshot.calls == ["report", "report"], "the same query re-runs under the new rules")
     }
