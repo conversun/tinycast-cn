@@ -22,23 +22,23 @@ enum CommandID: String, CaseIterable, Sendable {
 
     var name: String {
         switch self {
-        case .calculatorHistory: return "Calculator History"
-        case .clipboardHistory: return "Clipboard History"
-        case .searchEmoji: return "Search Emoji & Symbols"
-        case .searchFiles: return "Search Files"
-        case .showNotes: return "Show Notes"
-        case .createNote: return "Create Note"
-        case .searchNotes: return "Search Notes"
-        case .createQuicklink: return "Create Quicklink"
-        case .searchQuicklinks: return "Search Quicklinks"
-        case .importQuicklinks: return "Import Quicklinks"
-        case .exportQuicklinks: return "Export Quicklinks"
-        case .exportSettings: return "Export Settings"
-        case .importSettings: return "Import Settings"
-        case .importFromRaycast: return "Import from Raycast"
-        case .settings: return "Settings"
-        case .about: return "About Tinycast"
-        case .quit: return "Quit Tinycast"
+        case .calculatorHistory: return String(localized: "Calculator History")
+        case .clipboardHistory: return String(localized: "Clipboard History")
+        case .searchEmoji: return String(localized: "Search Emoji & Symbols")
+        case .searchFiles: return String(localized: "Search Files")
+        case .showNotes: return String(localized: "Show Notes")
+        case .createNote: return String(localized: "Create Note")
+        case .searchNotes: return String(localized: "Search Notes")
+        case .createQuicklink: return String(localized: "Create Quicklink")
+        case .searchQuicklinks: return String(localized: "Search Quicklinks")
+        case .importQuicklinks: return String(localized: "Import Quicklinks")
+        case .exportQuicklinks: return String(localized: "Export Quicklinks")
+        case .exportSettings: return String(localized: "Export Settings")
+        case .importSettings: return String(localized: "Import Settings")
+        case .importFromRaycast: return String(localized: "Import from Raycast")
+        case .settings: return String(localized: "Settings")
+        case .about: return String(localized: "About Tinycast")
+        case .quit: return String(localized: "Quit Tinycast")
         }
     }
 

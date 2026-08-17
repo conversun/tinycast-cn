@@ -72,7 +72,7 @@ struct NoteSwitcherView: View {
                     size: Theme.Size.noteGlyph
                 )
                 .foregroundStyle(Theme.Colors.textSecondary)
-                Text(notes.isSearching ? "Searching notes…" : "No notes found")
+                Text(notes.isSearching ? String(localized: "Searching notes…") : String(localized: "No notes found"))
                     .foregroundStyle(Theme.Colors.textSecondary)
             }
             .frame(maxWidth: .infinity)
@@ -167,8 +167,14 @@ private struct NoteSwitcherRow: View {
             }
             Spacer(minLength: Theme.Spacing.md)
             if !editing, selected || hovered {
-                rowButton(title: "Rename \(summary.title)", symbol: "pencil", action: onBeginRename)
-                rowButton(title: "Move \(summary.title) to Trash", symbol: "trash", action: onTrash)
+                rowButton(
+                    title: String(localized: "Rename \(summary.title)"),
+                    symbol: "pencil",
+                    action: onBeginRename)
+                rowButton(
+                    title: String(localized: "Move \(summary.title) to Trash"),
+                    symbol: "trash",
+                    action: onTrash)
                     .foregroundStyle(Theme.Colors.destructive)
             }
         }

@@ -124,7 +124,7 @@ private struct NoteTitlebarActions: View {
         BarButton(action: perform) {
             SymbolImage(name: symbol, size: Theme.Size.noteGlyph)
         }
-        .accessibilityLabel(label)
-        .help(help)
+        .accessibilityLabel(label.localizedUI)
+        .help(help.localizedUI)
     }
 }

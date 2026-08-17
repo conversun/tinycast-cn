@@ -21,7 +21,7 @@ final class NotesStore {
     var activeTitle: String {
         summaries.first(where: { $0.id == activeID })?.title
             ?? activeID.map { URL(fileURLWithPath: $0.rawValue).deletingPathExtension().lastPathComponent }
-            ?? "Notes"
+            ?? String(localized: "Notes")
     }
     var activeFileURL: URL? { activeID.map(repository.fileURL(for:)) }
     let notesDirectory: URL
