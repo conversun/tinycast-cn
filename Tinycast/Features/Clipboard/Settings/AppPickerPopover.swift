@@ -71,6 +71,7 @@ struct AppPickerPopover: View {
 @MainActor
 enum AppPresentation {
     static func resolve(bundleID: String, in appIndex: AppIndex) -> (name: String, icon: NSImage) {
+        IconCache.observeStyle()
         if let app = appIndex.apps.first(where: { $0.bundleID == bundleID }) {
             return (app.name, app.icon)
         }

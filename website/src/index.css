@@ -1,50 +1,159 @@
 @import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+@source "../node_modules/fumadocs-ui/dist/**/*.js";
 
 /*
  * Tinycast design tokens — the single source of truth for the site.
  * Components must only use sizes, colors, and shadows defined here; Tailwind's
  * default text scale is disabled below so an off-scale size can't slip in.
+ *
+ * Token names are semantic, not literal: `canvas` is near-black in Dark and
+ * near-white in Light. The app holds the same rule — Dark is the frozen
+ * baseline and Light restates it with the ink inverted, so a dark value here
+ * is the literal the dark-only build shipped.
  */
-@theme {
-  /* ── Colors ──────────────────────────────────────────────────────────── */
-  --color-void-black: #040506; /* page canvas */
-  --color-ink: #07080a; /* card surface */
-  --color-obsidian: #111214; /* recessed wells (inputs, command lines) */
-  --color-graphite: #1b1c1e; /* badge fill */
-  --color-smoke: #6a6b6c; /* muted text */
-  --color-ash: #9c9c9d; /* secondary text */
-  --color-mist: #e6e6e6; /* the one filled-action surface */
-  --color-iron: #454647; /* text on mist */
-  --color-border: #363739; /* hairline borders */
-  --color-border-strong: #54555a; /* hovered borders */
 
-  /* Tinycast brand — violet mark from the app icon, cyan as its counter-tone. */
+/* ── Theme ramps ───────────────────────────────────────────────────────────
+   Light is the bare :root so an unstyled first paint is never a dark flash.
+   Dark is applied by next-themes via .dark on <html>. */
+:root {
+  --tc-canvas: #fbfbfc;
+  --tc-surface: #ffffff;
+  --tc-well: #f1f2f4;
+  --tc-badge: #e9eaec;
+  --tc-fg: #0b0c0e;
+  --tc-fg-muted: #55575c;
+  --tc-fg-subtle: #83858a;
+  --tc-action: #16181c;
+  --tc-action-fg: #f7f7f8;
+  --tc-border: #dcdde0;
+  --tc-border-strong: #b9bbc0;
+  /* The base every alpha overlay is mixed from — ink on light, light on ink. */
+  --tc-tint: 0 0 0;
+
+  /* Elevation is an inset ramp, never a drop shadow. Light mixes black at the
+     same stops Dark mixes white, so the pressed-key feel survives the flip. */
+  --tc-key:
+    rgb(0 0 0 / 0.02) 0px 1px 0px 0px inset, rgb(0 0 0 / 0.11) 0px 0px 0px 1px,
+    rgb(0 0 0 / 0.05) 0px -1px 0px 0px inset;
+  --tc-key-hover:
+    rgb(0 0 0 / 0.04) 0px 1px 0px 0px inset, rgb(0 0 0 / 0.18) 0px 0px 0px 1px,
+    rgb(0 0 0 / 0.07) 0px -1px 0px 0px inset;
+  --tc-highlight: rgb(0 0 0 / 0.06) 0px 1px 0px 0px inset;
+  --tc-keycap:
+    rgb(255 255 255 / 0.9) 0px 1px 0px 0px inset,
+    rgb(0 0 0 / 0.14) 0px 0px 0px 1px, rgb(0 0 0 / 0.09) 0px -1px 0px 0px inset;
+  --tc-cta:
+    rgb(0 0 0 / 0.04) 0px 7px 3px 0px, rgb(0 0 0 / 0.12) 0px 4px 4px 0px;
+  --tc-window:
+    rgb(0 0 0 / 0.04) 0px 1px 0px 0px inset, rgb(0 0 0 / 0.12) 0px 0px 0px 1px,
+    rgb(0 0 0 / 0.14) 0px 4px 40px 8px, rgb(0 0 0 / 0.1) 0px 0px 0px 0.5px;
+
+  /* The hero bloom reads as tint on a light ground, not haze. */
+  --tc-glow-violet: 0.16;
+  --tc-glow-cyan: 0.1;
+
+  /* Keycaps carry the brand tint rather than the surface ramp, so a shortcut
+     is findable when skimming a wall of prose. */
+  --tc-kbd-fg: #5b12bd;
+  --tc-kbd-bg: rgb(134 59 255 / 0.12);
+}
+
+.dark {
+  --tc-canvas: #040506;
+  --tc-surface: #07080a;
+  --tc-well: #111214;
+  --tc-badge: #1b1c1e;
+  --tc-fg: #ffffff;
+  --tc-fg-muted: #9c9c9d;
+  --tc-fg-subtle: #6a6b6c;
+  --tc-action: #e6e6e6;
+  --tc-action-fg: #454647;
+  --tc-border: #363739;
+  --tc-border-strong: #54555a;
+  --tc-tint: 255 255 255;
+
+  /* Frozen: these are the literals the dark-only build shipped. */
+  --tc-key:
+    rgb(255 255 255 / 0.05) 0px 1px 0px 0px inset,
+    rgb(255 255 255 / 0.14) 0px 0px 0px 1px,
+    rgb(0 0 0 / 0.2) 0px -1px 0px 0px inset;
+  --tc-key-hover:
+    rgb(255 255 255 / 0.08) 0px 1px 0px 0px inset,
+    rgb(255 255 255 / 0.22) 0px 0px 0px 1px,
+    rgb(0 0 0 / 0.25) 0px -1px 0px 0px inset;
+  --tc-highlight: rgb(255 255 255 / 0.08) 0px 1px 0px 0px inset;
+  --tc-keycap:
+    rgb(255 255 255 / 0.08) 0px 1px 0px 0px inset,
+    rgb(0 0 0 / 0.4) 0px -1px 0px 0px inset;
+  --tc-cta:
+    rgb(0 0 0 / 0.03) 0px 7px 3px 0px, rgb(0 0 0 / 0.25) 0px 4px 4px 0px;
+  --tc-window:
+    rgb(255 255 255 / 0.05) 0px 1px 0px 0px inset,
+    rgb(255 255 255 / 0.14) 0px 0px 0px 1px, rgb(0 0 0 / 0.4) 0px 4px 40px 8px,
+    rgb(0 0 0 / 0.8) 0px 0px 0px 0.5px;
+
+  --tc-glow-violet: 0.32;
+  --tc-glow-cyan: 0.16;
+
+  --tc-kbd-fg: #d9c6ff;
+  --tc-kbd-bg: rgb(168 117 255 / 0.2);
+}
+
+@theme inline {
+  /* ── Colors ──────────────────────────────────────────────────────────── */
+  --color-canvas: var(--tc-canvas); /* page canvas */
+  --color-surface: var(--tc-surface); /* card surface */
+  --color-well: var(--tc-well); /* recessed wells (inputs, command lines) */
+  --color-badge: var(--tc-badge); /* badge fill */
+  --color-fg: var(--tc-fg); /* primary text, headings */
+  --color-fg-muted: var(--tc-fg-muted); /* secondary text */
+  --color-fg-subtle: var(--tc-fg-subtle); /* muted text */
+  --color-action: var(--tc-action); /* the one filled-action surface */
+  --color-action-fg: var(--tc-action-fg); /* text on action */
+  --color-border: var(--tc-border); /* hairline borders */
+  --color-border-strong: var(--tc-border-strong); /* hovered borders */
+  --color-kbd: var(--tc-kbd-fg); /* keycap glyph */
+  --color-kbd-bg: var(--tc-kbd-bg); /* keycap fill */
+  /* Alpha overlays mix from this, so `bg-tint/5` inverts with the theme. */
+  --color-tint: rgb(var(--tc-tint));
+
+  /* Tinycast brand — violet mark from the app icon, cyan as its counter-tone.
+     Literal in both themes: they carry identity, not elevation. */
   --color-violet: #863bff;
   --color-violet-bright: #a875ff;
   --color-violet-deep: #7e14ff;
   --color-cyan: #47bfff;
 
   /* ── Typography ──────────────────────────────────────────────────────── */
-  /* The "* Fallback" families are metric-matched to the web fonts (see the
-     @font-face block below), so the first-paint fallback occupies the exact
-     same space and the swap to the real font causes zero layout shift. */
+  /* Supplied by next/font in app/layout.tsx, which self-hosts each face and
+     generates its own metric-matched fallback — so no @font-face here. */
   --font-sans:
-    "Inter Variable", "Inter Variable Fallback", ui-sans-serif, system-ui,
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    var(--font-geist), ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono:
-    "Geist Mono Variable", "Geist Mono Variable Fallback", ui-monospace,
-    SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, monospace;
 
-  /* Type scale — every size on the site, with its line-height and tracking
-     baked in. `text-sm`, `text-base`, etc. are disabled: use these roles. */
-  --text-*: initial;
+  /* Named roles for the marketing page, added *alongside* Tailwind's default
+     scale rather than replacing it. Resetting the namespace also deletes
+     `text-sm`, `text-xs` and friends, which Fumadocs' entire UI is built on —
+     doing that left the docs with no typography at all. Use the roles below in
+     our own components; the defaults exist for the docs theme. */
 
   --text-eyebrow: 0.6875rem; /* 11px — mono uppercase section labels */
   --text-eyebrow--line-height: 1;
   --text-eyebrow--letter-spacing: 0.14em;
 
-  --text-caption: 0.75rem; /* 12px — mono metadata, badges, keycaps */
+  --text-caption: 0.75rem; /* 12px — mono metadata, badges */
   --text-caption--line-height: 1.5;
+
+  /* Relative on purpose: a keycap sits in body copy, table cells and list
+     items, so it has to track whatever text surrounds it. */
+  --text-key: 0.9em;
+  --text-key--line-height: 1.4;
 
   --text-small: 0.8125rem; /* 13px — nav links, buttons, hints, commands */
   --text-small--line-height: 1.5;
@@ -75,58 +184,20 @@
      cleanly onto them (p-4 = 16px, p-6 = 24px, rounded-2xl = 16px, …). */
 
   /* ── Shadows ─────────────────────────────────────────────────────────── */
-  /* Only these; Tailwind's default shadow scale is disabled. */
-  --shadow-*: initial;
+  /* Added to the default scale, not replacing it — see the note on type above:
+     Fumadocs' popovers and dialogs rely on `shadow-lg` and `shadow-md`. */
 
   /* Signature: the 'keyboard key' surface — pressed, tactile, no drop shadow. */
-  --shadow-key:
-    rgb(255 255 255 / 0.05) 0px 1px 0px 0px inset,
-    rgb(255 255 255 / 0.14) 0px 0px 0px 1px,
-    rgb(0 0 0 / 0.2) 0px -1px 0px 0px inset;
-  --shadow-key-hover:
-    rgb(255 255 255 / 0.08) 0px 1px 0px 0px inset,
-    rgb(255 255 255 / 0.22) 0px 0px 0px 1px,
-    rgb(0 0 0 / 0.25) 0px -1px 0px 0px inset;
-
+  --shadow-key: var(--tc-key);
+  --shadow-key-hover: var(--tc-key-hover);
   /* A single inset top highlight — icon chips and other small raised surfaces. */
-  --shadow-highlight: rgb(255 255 255 / 0.08) 0px 1px 0px 0px inset;
-
-  /* Physical keycap for <Kbd>: top highlight plus a hard bottom edge. */
-  --shadow-keycap:
-    rgb(255 255 255 / 0.08) 0px 1px 0px 0px inset,
-    rgb(0 0 0 / 0.4) 0px -1px 0px 0px inset;
-
+  --shadow-highlight: var(--tc-highlight);
+  /* A pressed chip — the "comes across" and ethos value pills. */
+  --shadow-keycap: var(--tc-keycap);
   /* Lift under the neutral filled CTA. */
-  --shadow-cta:
-    rgb(0 0 0 / 0.03) 0px 7px 3px 0px, rgb(0 0 0 / 0.25) 0px 4px 4px 0px;
-
+  --shadow-cta: var(--tc-cta);
   /* The app screenshot: key treatment plus a deep ambient drop. */
-  --shadow-window:
-    rgb(255 255 255 / 0.05) 0px 1px 0px 0px inset,
-    rgb(255 255 255 / 0.14) 0px 0px 0px 1px, rgb(0 0 0 / 0.4) 0px 4px 40px 8px,
-    rgb(0 0 0 / 0.8) 0px 0px 0px 0.5px;
-}
-
-/* Metric-matched fallback fonts — the fallback renders at first paint sized to
-   match the real web font exactly, so swapping in Inter / Geist Mono shifts
-   nothing (zero CLS). Override values are computed, not guessed. Regenerate via
-   @capsizecss/core `createFontStack([{ ...metrics, familyName }, systemFont])`
-   if the web fonts ever change. */
-@font-face {
-  font-family: "Inter Variable Fallback";
-  src: local("Arial"), local("ArialMT");
-  ascent-override: 90.4365%;
-  descent-override: 22.518%;
-  line-gap-override: 0%;
-  size-adjust: 107.1194%;
-}
-
-@font-face {
-  font-family: "Geist Mono Variable Fallback";
-  src: local("Courier New"), local("CourierNewPSMT");
-  ascent-override: 100.5164%;
-  descent-override: 29.5048%;
-  size-adjust: 99.9837%;
+  --shadow-window: var(--tc-window);
 }
 
 @layer base {
@@ -134,13 +205,13 @@
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
     /* Reserve the scrollbar space always, so locking scroll (e.g. when the
-       lightbox opens) doesn't shift the page. */
+       lightbox or the search dialog opens) doesn't shift the page. */
     scrollbar-gutter: stable;
   }
 
   body {
-    background-color: var(--color-void-black);
-    color: var(--color-ash);
+    background-color: var(--color-canvas);
+    color: var(--color-fg-muted);
     font-family: var(--font-sans);
     font-feature-settings: "calt", "kern", "liga", "ss03";
     -webkit-font-smoothing: antialiased;
@@ -148,9 +219,20 @@
     overflow-x: hidden;
   }
 
+  /* Radix's scroll lock measures the scrollbar and adds an equal margin to the
+     body while a dialog is open. `scrollbar-gutter: stable` above already holds
+     that space open, so the compensation lands on top of it and slides the page
+     sideways on every ⌘K. Prefixed with `html` purely to out-specify the
+     `!important` rule it injects at runtime. */
+  html body[data-scroll-locked] {
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+    --removed-body-scroll-bar-size: 0px !important;
+  }
+
   ::selection {
     background-color: color-mix(in srgb, var(--color-violet) 40%, transparent);
-    color: var(--color-white);
+    color: var(--color-fg);
   }
 
   :focus-visible {
@@ -162,7 +244,7 @@
   h1,
   h2,
   h3 {
-    color: var(--color-white);
+    color: var(--color-fg);
     text-wrap: balance;
   }
 
@@ -173,19 +255,20 @@
 }
 
 /* Lightbox (yet-another-react-lightbox) — tint its dark chrome to match the
-   page. YARL's own classes are namespaced (yarl__), so nothing here leaks. */
+   page. YARL's own classes are namespaced (yarl__), so nothing here leaks.
+   It stays dark in both themes: a lightbox is a darkroom, and the media in it
+   is app screenshots that read best against ink. */
 .yarl__root {
-  /* Opaque, so page content behind the lightbox never shows through. */
-  --yarl__color_backdrop: var(--color-void-black);
-  --yarl__color_button: var(--color-ash);
-  --yarl__color_button_active: var(--color-white);
+  --yarl__color_backdrop: #040506;
+  --yarl__color_button: #9c9c9d;
+  --yarl__color_button_active: #ffffff;
   /* No scrim behind the title/caption — just text over the image. */
   --yarl__slide_captions_container_background: transparent;
   --yarl__slide_description_text_align: center;
-  --yarl__thumbnails_container_background_color: var(--color-void-black);
-  --yarl__thumbnails_thumbnail_background: var(--color-ink);
-  --yarl__thumbnails_thumbnail_border_color: var(--color-border);
-  --yarl__thumbnails_thumbnail_active_border_color: var(--color-violet-bright);
+  --yarl__thumbnails_container_background_color: #040506;
+  --yarl__thumbnails_thumbnail_background: #07080a;
+  --yarl__thumbnails_thumbnail_border_color: #363739;
+  --yarl__thumbnails_thumbnail_active_border_color: #a875ff;
 }
 
 /* The page gutter: 16px on mobile, 24px from the sm breakpoint up. */
@@ -218,7 +301,11 @@
     filter: blur(110px);
     background: radial-gradient(
       closest-side,
-      color-mix(in srgb, var(--color-violet) 32%, transparent),
+      color-mix(
+        in srgb,
+        var(--color-violet) calc(var(--tc-glow-violet) * 100%),
+        transparent
+      ),
       color-mix(in srgb, var(--color-violet-deep) 10%, transparent),
       transparent
     );
@@ -232,7 +319,11 @@
     filter: blur(100px);
     background: radial-gradient(
       closest-side,
-      color-mix(in srgb, var(--color-cyan) 16%, transparent),
+      color-mix(
+        in srgb,
+        var(--color-cyan) calc(var(--tc-glow-cyan) * 100%),
+        transparent
+      ),
       transparent
     );
   }
@@ -244,7 +335,7 @@
     background: linear-gradient(
       to bottom,
       transparent,
-      var(--color-void-black) 78%
+      var(--color-canvas) 78%
     );
   }
 
@@ -270,6 +361,45 @@
     transition-delay: 0.08s;
   }
 
+  /* A keyboard key. One complete rule rather than a stack of utilities: the
+     prose theme puts a border and a fixed 13px font-size on `kbd` and `code`,
+     so anything partial ends up fighting it. The element carries `not-prose`
+     alongside this class, which is typography's own opt-out, so none of that
+     applies and these values are the whole story.
+
+     inline-block, not inline-flex: an inline-block keeps the baseline of the
+     text inside it, so the cap lines up with the surrounding sentence on its
+     own. Centring with flex throws that baseline away and needs a
+     vertical-align nudge that is wrong at every other font size.
+
+     The font is the UI sans stack on purpose. ⌘ ⇧ ⌥ ⌃ ⌫ ⎋ ⇥ exist in the
+     system UI font on every platform and in no monospace face, so asking for
+     mono here is what left some keys blank or drawn tiny. */
+  .tc-key {
+    display: inline-block;
+    min-width: 1.55em;
+    padding: 0.28em 0.4em;
+    border-radius: 0.35em;
+    background-color: var(--tc-kbd-bg);
+    color: var(--tc-kbd-fg);
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI Symbol",
+      "Noto Sans Symbols 2",
+      sans-serif;
+    font-size: 0.85em;
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .tc-key + .tc-key {
+    margin-inline-start: 0.25em;
+  }
+
   /* Scroll-triggered rise — driven by the <Reveal> component. */
   .reveal {
     opacity: 0;
@@ -285,6 +415,28 @@
   }
 }
 
+/* Point Fumadocs' own palette at the Tinycast tokens, so the docs and the
+   marketing page are one design rather than two that happen to sit together. */
+:root,
+.dark {
+  --color-fd-background: var(--tc-canvas);
+  --color-fd-foreground: var(--tc-fg);
+  --color-fd-muted: var(--tc-well);
+  --color-fd-muted-foreground: var(--tc-fg-muted);
+  --color-fd-popover: var(--tc-surface);
+  --color-fd-popover-foreground: var(--tc-fg);
+  --color-fd-card: var(--tc-surface);
+  --color-fd-card-foreground: var(--tc-fg);
+  --color-fd-border: var(--tc-border);
+  --color-fd-primary: var(--color-violet);
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: var(--tc-well);
+  --color-fd-secondary-foreground: var(--tc-fg);
+  --color-fd-accent: var(--tc-well);
+  --color-fd-accent-foreground: var(--tc-fg);
+  --color-fd-ring: var(--color-violet-bright);
+}
+
 /* Load-in and ambient motion — all gated on prefers-reduced-motion below. */
 @keyframes rise {
   from {
@@ -297,24 +449,9 @@
   }
 }
 
-@keyframes caret {
-  0%,
-  45% {
-    opacity: 1;
-  }
-  55%,
-  100% {
-    opacity: 0;
-  }
-}
-
 .rise {
   opacity: 0;
   animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.caret {
-  animation: caret 1.1s steps(1) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

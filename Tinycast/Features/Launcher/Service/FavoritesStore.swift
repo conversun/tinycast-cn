@@ -22,8 +22,7 @@ final class FavoritesStore {
     /// Replace the whole favorites list at once (used when importing a settings backup).
     func replace(keys newKeys: [String]) {
         keys = newKeys
-        revision &+= 1
-        defaults.set(keys, forKey: key)
+        commit()
     }
 
     func remove(keys removedKeys: Set<String>) {
@@ -31,8 +30,7 @@ final class FavoritesStore {
         let updated = keys.filter { !removedKeys.contains($0) }
         guard updated != keys else { return }
         keys = updated
-        revision &+= 1
-        defaults.set(keys, forKey: key)
+        commit()
     }
 
     func toggle(_ app: AppEntry) {
@@ -42,6 +40,20 @@ final class FavoritesStore {
         } else {
             keys.append(k)
         }
+        commit()
+    }
+
+    /// Exchange two favorites' stored positions. The caller picks the pair from the visible order,
+    /// so keys for hidden or unindexed entries keep their slots.
+    func exchange(_ first: String, with second: String) {
+        guard let a = keys.firstIndex(of: first), let b = keys.firstIndex(of: second), a != b else {
+            return
+        }
+        keys.swapAt(a, b)
+        commit()
+    }
+
+    private func commit() {
         revision &+= 1
         defaults.set(keys, forKey: key)
     }

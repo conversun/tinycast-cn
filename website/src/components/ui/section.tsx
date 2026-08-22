@@ -33,7 +33,9 @@ export function Section({
               </p>
             )}
             {title && <h2 className="text-heading">{title}</h2>}
-            {intro && <p className="mt-4 text-body-lg text-ash">{intro}</p>}
+            {intro && (
+              <p className="mt-4 text-body-lg text-fg-muted">{intro}</p>
+            )}
           </header>
         </Reveal>
       )}

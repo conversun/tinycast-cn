@@ -136,11 +136,14 @@ private struct FileIconView: View {
                 Image(nsImage: image).resizable()
             } else {
                 RoundedRectangle(cornerRadius: Theme.Radius.thumbnail, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
+                    .fill(Theme.Colors.iconPlaceholder)
             }
         }
-        .task(id: path) {
-            guard image == nil else { return }
+        .task(id: IconRequest(path)) {
+            if let warm = IconCache.cachedFitted(forFile: path) {
+                image = warm
+                return
+            }
             image = await IconCache.loadFittedAsync(forFile: path)
         }
     }

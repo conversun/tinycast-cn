@@ -32,7 +32,7 @@ enum SearchScopes {
         return paths.map(abbreviate).filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 
-    /// Every `.app` the scopes point at. Flat: a nested folder needs its own scope.
+    /// Every `.app` the scopes point at. One subfolder deep; deeper nesting needs its own scope.
     static func appBundles(in scopes: [String]) -> [URL] {
         let fm = FileManager.default
         var result: [URL] = []
@@ -42,12 +42,28 @@ enum SearchScopes {
                 if fm.fileExists(atPath: url.path) { result.append(url) }
                 continue
             }
-            guard
-                let items = try? fm.contentsOfDirectory(
-                    at: url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
-                )
-            else { continue }
-            result.append(contentsOf: items.filter { $0.pathExtension == "app" })
+            result.append(contentsOf: appBundles(under: url, subfolderDepth: 1))
+        }
+        return result
+    }
+
+    /// `.app` is a leaf here — never descended into, only real subfolders recurse.
+    private static func appBundles(under url: URL, subfolderDepth: Int) -> [URL] {
+        guard
+            let items = try? FileManager.default.contentsOfDirectory(
+                at: url, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
+            )
+        else { return [] }
+
+        var result: [URL] = []
+        for item in items {
+            if item.pathExtension == "app" {
+                result.append(item)
+            } else if subfolderDepth > 0,
+                (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+            {
+                result.append(contentsOf: appBundles(under: item, subfolderDepth: subfolderDepth - 1))
+            }
         }
         return result
     }

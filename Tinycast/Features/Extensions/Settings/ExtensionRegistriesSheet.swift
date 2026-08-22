@@ -11,6 +11,9 @@ struct ExtensionRegistriesSheet: View {
 
     @Environment(AppCore.self) private var core
     @State private var addingRegistry = false
+    /// Mirrors `extensionCustomSearchPaths`, joined with `:`; only written back on a real edit, so a
+    /// live round trip through the setting can't strip the trailing separator mid-keystroke.
+    @State private var customSearchPathsText = ""
 
     private var settings: AppSettings { core.settings }
 
@@ -64,6 +67,7 @@ struct ExtensionRegistriesSheet: View {
                     // source, and only source has to be built.
                     if !gitHubRegistries.isEmpty {
                         buildingRow
+                        customSearchPathsRow
                     }
                 } header: {
                     Text("GitHub Registries")
@@ -93,7 +97,10 @@ struct ExtensionRegistriesSheet: View {
             }
             .padding(Theme.Spacing.xxl)
         }
-        .frame(width: Theme.Size.editorSheetWidth, height: 560)
+        .frame(width: Theme.Size.editorSheetWidth, height: 600)
+        .onAppear {
+            customSearchPathsText = settings.extensionCustomSearchPaths.joined(separator: ":")
+        }
         .sheet(isPresented: $addingRegistry) {
             RegistryEditorSheet(
                 onAdd: { registry in
@@ -152,7 +159,8 @@ struct ExtensionRegistriesSheet: View {
 
     private var packageManagerDetail: String {
         let chosen = settings.extensionPackageManager
-        guard let resolved = chosen.resolve() else {
+        let additionalSearchPaths = settings.extensionCustomSearchPaths
+        guard let resolved = chosen.resolve(additionalSearchPaths: additionalSearchPaths) else {
             return chosen == .automatic
                 ? String(
                     localized:
@@ -163,6 +171,46 @@ struct ExtensionRegistriesSheet: View {
         return chosen == .automatic
             ? String(localized: "Found \(resolved.manager.title) at \(resolved.url.path).")
             : String(localized: "Found at \(resolved.url.path).")
+    }
+
+    /// Extra PATH folders Tinycast checks before its built-in list — for a package manager or Node
+    /// install it wouldn't otherwise find, such as a mise or Nix shim directory. The explanation runs
+    /// as its own wrapping line rather than a `SettingsRow` subtitle, which truncates mid-word instead
+    /// of wrapping — unreadable for anything longer than a few words.
+    private var customSearchPathsRow: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            SettingsRow(title: "Custom search paths") {
+                Image(systemName: "folder.badge.gearshape")
+                    .foregroundStyle(.secondary)
+            } trailing: {
+                TextField(
+                    "", text: $customSearchPathsText,
+                    prompt: Text("~/.local/share/mise/shims")
+                )
+                .textFieldStyle(.roundedBorder)
+                .labelsHidden()
+                .pointerStyle(.horizontalText)
+                .frame(width: 220)
+                .onChange(of: customSearchPathsText) { _, value in
+                    settings.extensionCustomSearchPaths = Self.parseSearchPaths(value)
+                }
+            }
+            Text(
+                "Colon-separated, like PATH — checked before Homebrew and the rest. For mise: "
+                    + "~/.local/share/mise/shims. For Nix (Home Manager): "
+                    + "/etc/profiles/per-user/<you>/home-path/bin."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// Splits on `:`, the same separator PATH itself uses, dropping anything blank in between.
+    private static func parseSearchPaths(_ text: String) -> [String] {
+        text.split(separator: ":", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 
     @ViewBuilder

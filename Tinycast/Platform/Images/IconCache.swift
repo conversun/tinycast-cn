@@ -14,6 +14,27 @@ struct IconCacheGeneration {
     }
 }
 
+/// SwiftUI tracks any `@Observable` read in `body`, so carrying this in an id is the subscription.
+@MainActor
+@Observable
+final class IconStyleSignal {
+    private(set) var generation = 0
+
+    fileprivate func bump() { generation &+= 1 }
+}
+
+/// A view's own icon key plus the generation. Building one in `body` is what subscribes the view.
+struct IconRequest<Key: Hashable>: Hashable {
+    let key: Key
+    let generation: Int
+
+    @MainActor
+    init(_ key: Key) {
+        self.key = key
+        self.generation = IconCache.style.generation
+    }
+}
+
 /// A tile's fill and the key naming it, so `IconCache` needn't know who chose the colour.
 struct SymbolTint: Hashable, Sendable {
     let key: String
@@ -52,13 +73,69 @@ enum IconCache {
     private static let fittedGeneration = Mutex(IconCacheGeneration())
 
     /// Cache-only lookups (never decode) so a row can paint an already-warm icon on the same frame.
-    static func cached(forFile path: String) -> NSImage? { cache.object(forKey: path as NSString) }
+    static func cached(forFile path: String) -> NSImage? { cache.object(forKey: fileKey(path)) }
     static func cachedSymbol(named name: String, tint: SymbolTint? = nil) -> NSImage? {
         cache.object(forKey: symbolKey(name, tint))
     }
 
+    /// Tiles rasterize off-main, where a dynamic `NSColor` resolves wrong, so carry the surface.
+    private static let darkSurface = Mutex(true)
+
+    /// Only a real change invalidates: most `effectiveAppearance` notifications do not move it.
+    @MainActor static func setDarkSurface(_ isDark: Bool) {
+        let changed = darkSurface.withLock { surface -> Bool in
+            defer { surface = isDark }
+            return surface != isDark
+        }
+        if changed { invalidateStyled() }
+    }
+
+    /// Global rather than injected: a missed injection in a menu or list would be silent staleness.
+    @MainActor static let style = IconStyleSignal()
+
+    /// The same count, readable off-main because every cache key carries it.
+    private static let styleGeneration = Mutex(0)
+
+    /// For icons resolved synchronously in `body`: the read *is* the subscription, so not a no-op.
+    @MainActor static func observeStyle() { _ = style.generation }
+
+    /// A surface or icon-style move stales every bitmap; the generation in each key fixes it.
+    @MainActor static func invalidateStyled() {
+        styleGeneration.withLock { $0 &+= 1 }
+        cache.removeAllObjects()
+        purgeFitted()
+        style.bump()
+    }
+
+    /// macOS restyles `NSWorkspace`'s images in place, so these bytes are the only proof it landed.
+    static func styleFingerprint() -> Data? {
+        let side = 32
+        guard
+            let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8,
+                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                bytesPerRow: 0, bitsPerPixel: 0),
+            let ctx = NSGraphicsContext(bitmapImageRep: rep)
+        else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = ctx
+        NSWorkspace.shared.icon(forFile: styleProbePath)
+            .draw(in: NSRect(x: 0, y: 0, width: side, height: side))
+        NSGraphicsContext.restoreGraphicsState()
+        guard let bytes = rep.bitmapData else { return nil }
+        return Data(bytes: bytes, count: rep.bytesPerRow * rep.pixelsHigh)
+    }
+
+    private static let styleProbePath = "/System/Library/CoreServices/Finder.app"
+
+    /// In every key, so an in-flight decode writes somewhere unreachable instead of repopulating.
+    private static func key(_ body: String) -> NSString {
+        "\(styleGeneration.withLock { $0 }):\(body)" as NSString
+    }
+
     private static func symbolKey(_ name: String, _ tint: SymbolTint?) -> NSString {
-        "symbol:\(tint?.key ?? "plain"):\(name)" as NSString
+        let surface = darkSurface.withLock { $0 } ? "dark" : "light"
+        return key("symbol:\(surface):\(tint?.key ?? "plain"):\(name)")
     }
 
     /// A freshly-decoded, thereafter-immutable `NSImage` is safe to move across the actor boundary.
@@ -88,7 +165,7 @@ enum IconCache {
     }
 
     static func icon(forFile path: String) -> NSImage {
-        let key = path as NSString
+        let key = fileKey(path)
         if let cached = cache.object(forKey: key) { return cached }
         let (icon, cost) = downsampled(NSWorkspace.shared.icon(forFile: path))
         cache.setObject(icon, forKey: key, cost: cost)
@@ -101,13 +178,16 @@ enum IconCache {
         if let cached = cache.object(forKey: key) { return cached }
 
         let side = displayPixel
+        let isDark = darkSurface.withLock { $0 }
+        let plainInk: CGFloat = isDark ? 1 : 0
         let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
             // Tile inset mirrors the margin macOS app icons carry inside their canvas.
             let tile = NSRect(x: 0, y: 0, width: side, height: side).insetBy(dx: 4, dy: 4)
-            (tint?.color ?? NSColor.white.withAlphaComponent(0.09)).setFill()
+            (tint?.color ?? .srgbInk(plainInk, alpha: 0.09)).setFill()
             NSBezierPath(roundedRect: tile, xRadius: 9, yRadius: 9).fill()
 
-            let ink = tint == nil ? NSColor.white.withAlphaComponent(0.85) : NSColor.white
+            // A tinted tile keeps white ink in both appearances; the tint carries the contrast.
+            let ink = tint == nil ? NSColor.srgbInk(plainInk, alpha: 0.85) : .white
             guard let symbol = glyph(named: name, tint: ink)
             else { return true }
             let size = symbol.size
@@ -177,7 +257,7 @@ enum IconCache {
     }
 
     private static func artworkKey(_ path: String, _ extent: CGFloat) -> NSString {
-        "artwork:\(extent):\(path)" as NSString
+        key("artwork:\(extent):\(path)")
     }
 
     // MARK: - Drawing an `EntryIcon`
@@ -244,7 +324,8 @@ enum IconCache {
         }
     }
 
-    private static func fittedKey(_ path: String) -> NSString { ("fit:" + path) as NSString }
+    private static func fileKey(_ path: String) -> NSString { key("file:" + path) }
+    private static func fittedKey(_ path: String) -> NSString { key("fit:" + path) }
 
     private static func fittedIcon(forFile path: String) -> Decoded {
         let (icon, cost) = fittedToArtwork(NSWorkspace.shared.icon(forFile: path))

@@ -111,13 +111,20 @@ struct ExtensionListing: Identifiable, Hashable, Sendable {
     let title: String
     let summary: String
     let author: String
-    let iconURL: URL?
+    /// A store may ship one artwork per appearance; a GitHub manifest names a single icon.
+    let lightIconURL: URL?
+    let darkIconURL: URL?
     let commandCount: Int
     /// Nil where a registry doesn't count downloads, which is every GitHub one.
     let downloadCount: Int?
     let registryID: UUID
     let registryName: String
     let source: Source
+
+    /// Either side stands in for a missing other, so a one-artwork listing still draws.
+    func iconURL(isDark: Bool) -> URL? {
+        isDark ? (darkIconURL ?? lightIconURL) : (lightIconURL ?? darkIconURL)
+    }
 
     var needsBuild: Bool {
         if case .githubFolder = source { return true }

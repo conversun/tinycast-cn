@@ -19,6 +19,11 @@ The command palette is a borderless floating `NSPanel` hosting SwiftUI; see
   instead; resigning shifts the text a point or two.
 - **Focus restoration is load-bearing.** Paste targets the recorded `previousApp` and requires the
   Accessibility permission (`Permissions.ensureAccessibility()`).
+- **Input-source switching is a palette session.** The source active at summon time is captured before
+  the panel becomes key, the configured source is applied through `PalettePanel.fieldEditorContext`, and
+  the captured source is restored on hide and on termination — but only when the palette is still on the
+  source it applied, so a switch made since, by the user or another app, stands. Never applied globally:
+  the panel does not activate, so a global switch would land on whichever app is still frontmost.
 
 ## Summoning
 
@@ -31,9 +36,14 @@ The command palette is a borderless floating `NSPanel` hosting SwiftUI; see
                                             · records previousApp (the paste / focus target)
                                             · resolves PasteTarget once per summon
                                             · resolves the screen anchor once per summon
+                                            · captures the input source to restore, once per summon
                                             · positions, lays out off-screen, orders front
                                                               ↓
                                                     RootPaletteView.body
+                                            · focuses the search field
+                                                              ↓
+                                            PalettePanel.makeFirstResponder
+                                            · applies the configured source to the field editor
 ```
 
 Everything resolved "once per summon" is resolved there deliberately, not per render. `AppCore` holds
@@ -152,18 +162,21 @@ reason the Settings window autosaves its frame instead ([backup.md](backup.md)).
 Which display an *unremembered* palette anchors to depends on the **Follow the cursor across displays**
 setting (`AppSettings.openOnCursorScreen`, on by default):
 
-- **On** — the screen holding `NSEvent.mouseLocation`, i.e. the display under the pointer.
-- **Off** — `NSScreen.main`.
+- **On** — `NSScreen.underCursor`: the screen holding `NSEvent.mouseLocation`, i.e. the display under
+  the pointer.
+- **Off** — `NSScreen.primary`: the screen at the global origin, i.e. the one with the menu bar.
 
-`NSScreen.main` alone can't implement the follow-the-cursor case: it is documented as the _key window's_
-screen, and an accessory app driving a non-activating panel has no key window on the display the user is
-looking at, so `main` resolves to the menu-bar display regardless of where the pointer is.
+**Neither case may use `NSScreen.main`**, which is documented as the screen of the window with keyboard
+focus — the frontmost app's, wherever the user last clicked. It therefore follows the user across
+displays, which is the wrong answer for both settings and made the off case do exactly what turning it
+off was meant to stop ([#270](https://github.com/abue-ammar/tinycast/issues/270)). The menu-bar display
+is the one whose `frame.origin` is `.zero`, which is what `primary` looks for.
 
-The hit test is `NSMouseInRect(mouse, screen.frame, false)`, **not** `CGRect.contains`. A mouse location
-is the CoreGraphics cursor position flipped about the primary display's height, so a screen's rows land
-in the half-open interval `(minY, maxY]`: the topmost row is exactly `maxY`, which `contains` excludes,
-while that same value is the `minY` of the display stacked above. `contains` would therefore hand a
-pointer parked at the top of one display to its neighbour. `NSMouseInRect` exists for precisely this.
+The cursor hit test is `NSMouseInRect(mouse, screen.frame, false)`, **not** `CGRect.contains`. A mouse
+location is the CoreGraphics cursor position flipped about the primary display's height, so a screen's
+rows land in the half-open interval `(minY, maxY]`: the topmost row is exactly `maxY`, which `contains`
+excludes, while that same value is the `minY` of the display stacked above. `contains` would therefore
+hand a pointer parked at the top of one display to its neighbour. `NSMouseInRect` exists for this.
 
 ## The placeholder is Tinycast's, not the field's
 
@@ -183,14 +196,27 @@ caret still draws over it, and it carries `allowsHitTesting(false)` so clicking 
 lands the caret. `PaletteMode.placeholder` is still the one source of the strings; the field takes an
 explicit `accessibilityLabel` because the prompt used to supply it.
 
-An input method keeps uncommitted text in the AppKit field editor rather than the SwiftUI binding.
-`PalettePanel` samples `hasMarkedText()` after each key event, and the placeholder is visible only when
-the query is empty and no marked text exists. That state stays outside Observation and updates only the
-placeholder child: invalidating the `TextField` while text is marked makes SwiftUI reconcile its empty
-binding over the composition. A bare Backspace reaches the input method first while it has marked text,
-even on a sub-screen where an actually empty field would otherwise back out.
+A bare Backspace reaches the input method first while it has marked text, even on a sub-screen where
+an actually empty field would otherwise back out.
 
 This is the same class of bug as the freeze below — both come from the cell/field-editor swap.
+
+### IME composition
+
+A hand-drawn placeholder has one cost the real prompt does not. An IME composes into the field
+editor's own storage, so the bound `query` stays empty for the whole romanisation and the placeholder
+would sit under the in-flight pinyin. `PalettePanel` publishes the editor's `hasMarkedText()` as
+`PaletteState.isComposing`, and the placeholder is gated on `query.isEmpty && !isComposing`.
+
+The observation follows first responder, since SwiftUI hands the window's one field editor to
+whichever field holds focus, and it watches `NSTextView.didChangeSelectionNotification`. Measured,
+that is the **only** notification a marked-text change posts: `NSText.didChangeNotification` fires on
+the commit alone, which is the whole composition too late.
+
+`trackComposition()` re-reads the editor rather than assuming, and `windowDidBecomeKey` calls it as
+well as `makeFirstResponder`: a key transition can commit or drop marked text without posting
+anything, and a re-summon inside the Pop to Root window skips `prepare(mode:)` and never moves first
+responder, so neither of the other two paths would fire.
 
 ## The panel settles the pointer itself
 
@@ -230,6 +256,9 @@ filter (`.topTrailing`, hung under its header button). `menuContent` resolves th
 `PopoverMenuContent`, which is what lets ↑/↓, plain ↵, Esc and the click-away catcher serve every
 menu without knowing which is up. Every open path goes through `open(_:highlighting:)` and states
 where the highlight starts: the first row, except the type filter, which opens on the active filter.
+
+Every row closes the menu behind it — `activateMenuItem` is the one path, and a row that reorders the
+list under itself (Move Favorite Up/Down) is no exception, so no row ever runs against a rebuilt menu.
 
 ## Menu-open input freeze
 

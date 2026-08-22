@@ -4,4 +4,5 @@ export const values = [
   "Local by design",
   "No account, no sign-in",
   "Zero telemetry",
+  "One permission, asked once",
 ] as const;

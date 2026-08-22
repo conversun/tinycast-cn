@@ -207,7 +207,7 @@ private struct ExtensionTextArea: View {
             .frame(maxWidth: 420, minHeight: 72, maxHeight: 140)
             .background(
                 RoundedRectangle(cornerRadius: Theme.Radius.menu, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
+                    .fill(Theme.Colors.iconPlaceholder)
             )
             .onAppear { text = node.string("value") ?? "" }
             .onChange(of: node.string("value") ?? "") { _, incoming in
@@ -222,6 +222,7 @@ private struct ExtensionTextArea: View {
 
 /// `Form.TagPicker` — multi-select over its items, rendered as toggleable chips.
 private struct ExtensionTagPicker: View {
+    @Environment(\.isDarkAppearance) private var isDark
     let node: RenderNode
     let assetsPath: String?
     let onChange: (RenderNode, Any) -> Void
@@ -239,7 +240,8 @@ private struct ExtensionTagPicker: View {
                     HStack(spacing: 3) {
                         if let icon = item.props["icon"] {
                             ExtensionIconView(
-                                resolved: ExtensionImage.resolve(icon, assetsPath: assetsPath),
+                                resolved: ExtensionImage.resolve(
+                                    icon, assetsPath: assetsPath, isDark: isDark),
                                 size: 12)
                         }
                         Text(item.string("title") ?? value).font(Theme.Typography.rowTrailing)
@@ -247,11 +249,11 @@ private struct ExtensionTagPicker: View {
                     .padding(.horizontal, Theme.Spacing.sm)
                     .padding(.vertical, 3)
                     .background(
-                        Capsule().fill(isOn ? Theme.Colors.selection : Color.white.opacity(0.05))
+                        Capsule().fill(isOn ? Theme.Colors.selection : ExtensionColors.tagFill)
                     )
                     .overlay(
                         Capsule().stroke(
-                            isOn ? Color.white.opacity(0.3) : .clear, lineWidth: 1)
+                            isOn ? ExtensionColors.tagSelectedStroke : .clear, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)

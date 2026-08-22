@@ -1,10 +1,15 @@
-import type { ReactNode } from "react";
+import type { ComponentProps } from "react";
+import { cn } from "../../lib/cn";
 
-// A single keycap — the tactile motif that runs through the whole page.
-export function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="inline-flex min-w-5 items-center justify-center rounded-md bg-white/5 px-1.5 py-0.5 font-mono text-caption leading-none text-ash shadow-keycap">
-      {children}
-    </kbd>
-  );
+/**
+ * A keyboard key or chord.
+ *
+ * `not-prose` is the typography plugin's own opt-out. Without it the prose
+ * theme puts a border and a fixed 13px font-size on `kbd`, and every override
+ * fights that rule instead of replacing it.
+ *
+ * All of the styling lives in the `.tc-key` rule in index.css.
+ */
+export function Kbd({ className, ...props }: ComponentProps<"kbd">) {
+  return <kbd className={cn("not-prose tc-key", className)} {...props} />;
 }

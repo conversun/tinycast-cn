@@ -1,7 +1,7 @@
 import AppKit
 
 struct AppEntry: Identifiable, Hashable, Sendable {
-    enum Kind: String, Sendable {
+    enum Kind: String, CaseIterable, Sendable {
         case application
         case systemSettings
         case command
@@ -164,10 +164,27 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         }
     }
 
-    var icon: NSImage { IconCache.icon(for: iconSource, fileURL: url) }
+    /// Main-actor because it subscribes the calling view; every caller is a `body`.
+    @MainActor var icon: NSImage {
+        IconCache.observeStyle()
+        return IconCache.icon(for: iconSource, fileURL: url)
+    }
 
     /// Icon identity for a row's async load: re-skinning changes the glyph while `id` stays put.
     var iconKey: String { "\(id)|\(iconSource)" }
+}
+
+extension AppEntry.Kind {
+    /// The descriptors' own words, lowercased once, so a keystroke costs a lookup and not a scan.
+    private static let byCategoryName: [String: AppEntry.Kind] = allCases.reduce(into: [:]) {
+        $0[$1.descriptor.sectionTitle.lowercased()] = $1
+        $0[$1.descriptor.label.lowercased()] = $1
+    }
+
+    /// The category a query names outright. Exact only — a prefix would take a word from an entry.
+    static func named(by query: String) -> AppEntry.Kind? {
+        byCategoryName[query.trimmingCharacters(in: .whitespaces).lowercased()]
+    }
 }
 
 @MainActor
@@ -181,12 +198,14 @@ final class AppIndex {
         let query: String
         let entriesRevision: Int
         let rankingRevision: Int
+        let aliasRevision: Int
     }
 
     private struct ResultsKey: Equatable {
         let query: String
         let entriesRevision: Int
         let rankingRevision: Int
+        let aliasRevision: Int
         let visibilityRevision: Int
         let favoritesRevision: Int
     }
@@ -228,10 +247,12 @@ final class AppIndex {
     /// Set when a refresh lands mid-scan, so a scope edit is never silently dropped.
     private var refreshPending = false
     private let ranking: LauncherRankingStore
+    private let aliases: AliasStore
     private var settings: AppSettings?
 
-    init(ranking: LauncherRankingStore) {
+    init(ranking: LauncherRankingStore, aliases: AliasStore) {
         self.ranking = ranking
+        self.aliases = aliases
     }
 
     /// The always-relevant built-ins, plus whatever a disabled feature has not hidden.
@@ -413,13 +434,23 @@ final class AppIndex {
         entriesRevision &+= 1
     }
 
-    /// Ranked matches. Empty query returns the full alphabetical list.
+    /// Ranked matches, or a whole category when the query names one. Empty returns the full list.
     func matches(_ query: String, limit: Int = 200) -> [AppEntry] {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return apps }
         let key = MatchKey(
-            query: q, entriesRevision: entriesRevision, rankingRevision: ranking.revision)
-        return matchMemo.value(for: key) { rank(q, limit: limit) }
+            query: q, entriesRevision: entriesRevision, rankingRevision: ranking.revision,
+            aliasRevision: aliases.revision)
+        return matchMemo.value(for: key) {
+            guard let kind = AppEntry.Kind.named(by: q) else { return rank(q, limit: limit) }
+            return categoryListing(kind, query: q)
+        }
+    }
+
+    /// A whole category, plus any entry the query names outright — `System Settings` is both. Slice
+    /// order is section order, so filtering alone keeps the sections and the flat selection aligned.
+    private func categoryListing(_ kind: AppEntry.Kind, query: String) -> [AppEntry] {
+        apps.filter { $0.kind == kind || $0.name.caseInsensitiveCompare(query) == .orderedSame }
     }
 
     /// The launcher's ordered list: ranked matches minus hidden entries, favorites pinned first.
@@ -429,7 +460,8 @@ final class AppIndex {
         let q = query.trimmingCharacters(in: .whitespaces)
         let key = ResultsKey(
             query: q, entriesRevision: entriesRevision, rankingRevision: ranking.revision,
-            visibilityRevision: visibility.revision, favoritesRevision: favorites.revision)
+            aliasRevision: aliases.revision, visibilityRevision: visibility.revision,
+            favoritesRevision: favorites.revision)
         return resultsMemo.value(for: key) {
             // Filtering stays downstream of `matches` so that memo is never keyed on hidden state.
             let base = matches(q).filter(visibility.isVisible)
@@ -443,8 +475,10 @@ final class AppIndex {
         Signposts.interval("AppIndex.rank") {
             let learned = ranking.boosts(query: q)
             let scored = apps.compactMap { app -> (AppEntry, Int)? in
+                var fields = app.searchFields
+                fields.userAlias = aliases.alias(for: app.preferenceKey)
                 // Base relevance is the strongest field; the boost is added blind to it.
-                guard let score = SearchRelevance.score(query: q, fields: app.searchFields) else {
+                guard let score = SearchRelevance.score(query: q, fields: fields) else {
                     return nil
                 }
                 return (app, score + (learned[app.preferenceKey] ?? 0))

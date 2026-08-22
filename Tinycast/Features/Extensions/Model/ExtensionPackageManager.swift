@@ -55,7 +55,9 @@ enum ExtensionPackageManager: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Where to look, for a GUI app inheriting none of a shell's PATH: Homebrew, Volta, asdf, fnm, nvm.
+    /// Where to look, for a GUI app inheriting none of a shell's PATH: Homebrew, Volta, asdf, fnm, nvm,
+    /// mise. A version manager too obscure or too machine-specific to hardcode (Nix among them) is what
+    /// `extensionCustomSearchPaths` is for.
     static let searchPaths: [String] = [
         "/opt/homebrew/bin",
         "/usr/local/bin",
@@ -64,6 +66,7 @@ enum ExtensionPackageManager: String, CaseIterable, Identifiable, Sendable {
         NSHomeDirectory() + "/.volta/bin",
         NSHomeDirectory() + "/.bun/bin",
         NSHomeDirectory() + "/.asdf/shims",
+        NSHomeDirectory() + "/.local/share/mise/shims",
         NSHomeDirectory() + "/.local/share/fnm/aliases/default/bin",
         NSHomeDirectory() + "/.nvm/versions/node/current/bin",
         NSHomeDirectory() + "/.yarn/bin",
@@ -71,14 +74,21 @@ enum ExtensionPackageManager: String, CaseIterable, Identifiable, Sendable {
     ]
 
     /// The executable, or nil when it isn't installed. `automatic` resolves to the first one found.
-    func resolve(in fileManager: FileManager = .default) -> (manager: ExtensionPackageManager, url: URL)? {
+    /// `additionalSearchPaths` is checked first, so a user-supplied folder can win over a built-in one.
+    func resolve(
+        in fileManager: FileManager = .default, additionalSearchPaths: [String] = []
+    ) -> (manager: ExtensionPackageManager, url: URL)? {
         guard self != .automatic else {
             for candidate in Self.preferenceOrder {
-                if let found = candidate.resolve(in: fileManager) { return found }
+                if let found = candidate.resolve(
+                    in: fileManager, additionalSearchPaths: additionalSearchPaths)
+                {
+                    return found
+                }
             }
             return nil
         }
-        for directory in Self.searchPaths {
+        for directory in additionalSearchPaths + Self.searchPaths {
             let candidate = URL(fileURLWithPath: directory).appendingPathComponent(executableName)
             if fileManager.isExecutableFile(atPath: candidate.path) { return (self, candidate) }
         }
@@ -86,8 +96,10 @@ enum ExtensionPackageManager: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// `ray build` runs on Node, and bun is the one manager that doesn't imply it.
-    static func nodeURL(in fileManager: FileManager = .default) -> URL? {
-        for directory in searchPaths {
+    static func nodeURL(
+        in fileManager: FileManager = .default, additionalSearchPaths: [String] = []
+    ) -> URL? {
+        for directory in additionalSearchPaths + searchPaths {
             let candidate = URL(fileURLWithPath: directory).appendingPathComponent("node")
             if fileManager.isExecutableFile(atPath: candidate.path) { return candidate }
         }

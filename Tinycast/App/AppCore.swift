@@ -19,9 +19,13 @@ final class AppCore {
     let hotKeys = HotKeyManager()
     let hyperKeyTap = HyperKeyTap()
     let windowMover = WindowMover()
+    let inputSourceSwitcher = InputSourceSwitcher()
     let settings: AppSettings
+    @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
+    @ObservationIgnored private let iconStyle = IconStyleMonitor()
     let favorites = FavoritesStore()
     let visibility = VisibilityStore()
+    let aliases = AliasStore()
     let calcHistory = CalculatorHistoryStore()
     let currencyRates = CurrencyRateStore()
     let emojiIndex = EmojiIndex()
@@ -45,7 +49,8 @@ final class AppCore {
     @ObservationIgnored private(set) lazy var quicklinkCoordinator = QuicklinkCoordinator(
         store: quicklinks, argumentSession: quicklinkArguments, settings: settings,
         appIndex: appIndex, injector: snippetTextInjector, hotKeys: hotKeys, favorites: favorites,
-        visibility: visibility, ranking: launcherRanking, windowController: windowController,
+        visibility: visibility, ranking: launcherRanking, aliases: aliases,
+        windowController: windowController,
         paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
         clipboardHistory: { [unowned self] in self.snippetExpansion.clipboardHistoryForExpansion() },
         core: self)
@@ -63,7 +68,7 @@ final class AppCore {
     @ObservationIgnored private(set) lazy var uninstallCoordinator = UninstallCoordinator(
         session: uninstall, palette: palette, paletteCoordinator: paletteCoordinator,
         appIndex: appIndex, runningApps: runningApps, hotKeys: hotKeys, favorites: favorites,
-        visibility: visibility, ranking: launcherRanking, core: self)
+        visibility: visibility, ranking: launcherRanking, aliases: aliases, core: self)
     @ObservationIgnored private(set) lazy var extensionCoordinator = ExtensionCoordinator(
         extensions: extensions, palette: palette, paletteCoordinator: paletteCoordinator,
         settingsCoordinator: settingsCoordinator, settings: settings, core: self)
@@ -73,7 +78,7 @@ final class AppCore {
         store: customCommands, settings: settings, appIndex: appIndex,
         paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
         hotKeys: hotKeys, favorites: favorites, visibility: visibility,
-        ranking: launcherRanking, core: self)
+        ranking: launcherRanking, aliases: aliases, core: self)
     @ObservationIgnored private(set) lazy var notesCoordinator = NotesCoordinator(
         store: notesStore,
         settings: settings,
@@ -114,7 +119,7 @@ final class AppCore {
         let settings = AppSettings()
         self.launcherRanking = launcherRanking
         self.settings = settings
-        appIndex = AppIndex(ranking: launcherRanking)
+        appIndex = AppIndex(ranking: launcherRanking, aliases: aliases)
         let clipboardManager = ClipboardManager(store: clipboardStore, settings: settings)
         self.clipboardManager = clipboardManager
         extensions = ExtensionManager(clipboardStore: clipboardStore)
@@ -137,8 +142,8 @@ final class AppCore {
             // Shorten AppKit's ~2–3s tooltip delay; registration domain, so a user default wins.
             UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
             NSApp.setActivationPolicy(.accessory)
-            // Force dark: the Liquid Glass material is tuned for a deep dark surface.
-            NSApp.appearance = NSAppearance(named: .darkAqua)
+            applyAppearance()
+            observeEffectiveAppearance()
 
             clipboardStore.maxAge = settings.clipboardRetention.maxAge
             // Defer the SQLite read + prune off the launch path; the palette fills in later.
@@ -264,6 +269,7 @@ final class AppCore {
     func prepareForTermination() {
         // Caps Lock first: its remap is the one teardown that outlives the process.
         hyperKeyTap.prepareForTermination()
+        inputSourceSwitcher.endSession()
         snippetTextInjector.prepareForTermination()
         snippetListener.stop()
         snippetsStore.stop()
@@ -300,6 +306,21 @@ final class AppCore {
         track(
             { _ = $0.snippetsShowInLauncher },
             reproject: { $0.snippetExpansion.applySnippetsLauncherPresence() })
+        track({ _ = $0.appearance }, reproject: { $0.applyAppearance() })
+    }
+
+    /// `.system` resolves to `nil`, which is what makes AppKit follow macOS without anything polling.
+    private func applyAppearance() {
+        NSApp.appearance = settings.appearance.nsAppearance
+    }
+
+    /// Covers our own assignment and a macOS change alike, which is why `IconCache` is told here
+    /// rather than from `applyAppearance()` — under `.system` that one never fires.
+    private func observeEffectiveAppearance() {
+        // Synchronous on main, so no row can cache a tile under the outgoing appearance's key.
+        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.initial]) { app, _ in
+            MainActor.assumeIsolated { IconCache.setDarkSurface(app.effectiveAppearance.isDark) }
+        }
     }
 
     /// Fires synchronously on main before the write lands, so the task re-arms and re-reads.

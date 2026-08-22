@@ -17,7 +17,7 @@ struct VolumeHUDView: View {
                         Capsule()
                             .fill(Theme.Colors.controlSurface)
                         Capsule()
-                            .fill(Color.white.opacity(state.muted ? 0.35 : 0.85))
+                            .fill(Theme.Colors.textPrimary.opacity(state.muted ? 0.35 : 0.85))
                             .frame(width: geometry.size.width * fill)
                     }
                 }
@@ -34,7 +34,7 @@ struct VolumeHUDView: View {
         .padding(.vertical, Theme.Spacing.xxl)
         .padding(.horizontal, Theme.Spacing.xl)
         .frame(width: Theme.Size.hudWidth, height: Theme.Size.hudHeight)
-        .background(Color.black.opacity(Theme.Colors.panelDimming))
+        .background(Theme.Colors.panelScrim)
         .background(VisualEffectView())
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.dialog, style: .continuous))
         .panelEntrance()

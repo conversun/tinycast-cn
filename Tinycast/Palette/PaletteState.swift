@@ -6,9 +6,9 @@ import Foundation
 final class PaletteState {
     var mode: PaletteMode = .launcher
     var query: String = ""
-    /// Never observed: invalidating the field while text is marked breaks the composition.
-    @ObservationIgnored private(set) var searchHasMarkedText = false
     var selection: Int = 0
+    /// True while an IME holds marked text, which leaves `query` empty. The panel publishes it.
+    var isComposing = false
     /// The clipboard screen's type filter, reset with the rest of the screen state on each summon.
     var clipboardFilter: ClipboardFilter = .all
     /// Changes every time the palette is shown so the search field can re-focus.
@@ -27,6 +27,8 @@ final class PaletteState {
     /// Values typed into the inline argument fields an extension command declares, keyed by
     /// `argumentKey`. Cleared with the rest of the screen.
     var commandArguments: [String: String] = [:]
+    /// True while ⌘ is held, which numbers the favorite rows. The panel is the only writer.
+    private(set) var commandHeld = false
     /// True only once the pointer has moved of its own accord; untracked, so it never re-renders.
     @ObservationIgnored private(set) var hoverHighlightArmed = false
     /// Bumped when the highlight drops, so a lit row clears even though the pointer never left it.
@@ -40,15 +42,12 @@ final class PaletteState {
     @ObservationIgnored var menuOpen = false { didSet { onMenuOpenChanged?(menuOpen) } }
     /// Fired when `menuOpen` flips, so the panel can hide the caret without a focus swap.
     @ObservationIgnored var onMenuOpenChanged: ((Bool) -> Void)?
-    @ObservationIgnored var onSearchMarkedTextChanged: ((Bool) -> Void)?
-
-    var showsSearchPlaceholder: Bool { query.isEmpty && !searchHasMarkedText }
 
     func prepare(mode: PaletteMode) {
         self.mode = mode
         query = ""
-        setSearchHasMarkedText(false)
         selection = 0
+        isComposing = false
         commandArguments = [:]
         clipboardFilter = .all
         forceExpanded = false
@@ -58,12 +57,6 @@ final class PaletteState {
         resetToken = UUID()
     }
 
-    func setSearchHasMarkedText(_ hasMarkedText: Bool) {
-        guard searchHasMarkedText != hasMarkedText else { return }
-        searchHasMarkedText = hasMarkedText
-        onSearchMarkedTextChanged?(hasMarkedText)
-    }
-
     /// U+0001 can't appear in an entry id or an argument name, so the halves stay unambiguous.
     nonisolated static func argumentKey(_ entryID: String, _ name: String) -> String {
         entryID + "\u{1}" + name
@@ -71,6 +64,11 @@ final class PaletteState {
 
     func notePinChord() {
         pinChordToken = UUID()
+    }
+
+    func noteCommandHeld(_ held: Bool) {
+        guard held != commandHeld else { return }
+        commandHeld = held
     }
 
     /// The pointer moved, which re-lights the highlight once it has cleared the arming slop.

@@ -75,6 +75,9 @@ struct ExtensionLaunchContext: Sendable {
     var caches: [String: [String: String]]
     var arguments: [String: String]
     var fallbackText: String?
+    /// Injected rather than read: a `Model/` type owns no environment. A running command keeps what
+    /// it booted with, so an appearance change reaches it on the next launch.
+    var isDarkAppearance: Bool
 
     func jsonString() -> String {
         var environment: [String: Any] = [
@@ -87,7 +90,7 @@ struct ExtensionLaunchContext: Sendable {
             // Extensions gate features on this; report the API level the shim implements.
             "raycastVersion": ExtensionRuntimeVersion.raycastAPI,
             "textSize": "medium",
-            "appearance": "dark",
+            "appearance": isDarkAppearance ? "dark" : "light",
             "launchType": "userInitiated",
             "canAccess": false
         ]

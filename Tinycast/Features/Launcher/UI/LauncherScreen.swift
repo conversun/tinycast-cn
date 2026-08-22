@@ -10,17 +10,25 @@ struct LauncherScreen: PaletteScreen {
     /// Sampled by `openActions`, so the Quit row can't appear or vanish while the menu is up.
     let running: Bool
     let openActions: () -> Void
+    /// Called when an action reorders the list, so the highlight scrolls back into view.
+    let scrollToFollow: () -> Void
 
     /// The one ordered result list; an empty query pins favorites above the ranked matches.
     private let results: [AppEntry]
     private let calc: CalcResult?
+    /// Sections stand in for the ranked Results list, which a typed query collapses to.
+    private let showSections: Bool
+    /// Only the empty query pins favorites — a category shows its sections without one of its own.
+    private let pinsFavorites: Bool
+    /// How many of `results` are the pinned favorites; zero unless the Favorites section is showing.
+    private let favoriteCount: Int
     /// Resolved in `init`: the palette indexes this several times per event, so it can't recompute.
     let rows: [Row]
 
     init(
         appIndex: AppIndex, favorites: FavoritesStore, visibility: VisibilityStore,
         currencyRates: CurrencyRateStore, core: AppCore, vm: PaletteState, running: Bool,
-        openActions: @escaping () -> Void
+        openActions: @escaping () -> Void, scrollToFollow: @escaping () -> Void
     ) {
         self.appIndex = appIndex
         self.favorites = favorites
@@ -29,13 +37,18 @@ struct LauncherScreen: PaletteScreen {
         self.vm = vm
         self.running = running
         self.openActions = openActions
+        self.scrollToFollow = scrollToFollow
 
         let results = appIndex.orderedResults(
             query: vm.query, visibility: visibility, favorites: favorites)
         let calc = CalcMemo.evaluate(vm.query, rates: currencyRates.rates)
         let entries = results.map(Row.entry)
+        let pinsFavorites = vm.query.trimmingCharacters(in: .whitespaces).isEmpty
         self.results = results
         self.calc = calc
+        self.showSections = pinsFavorites || AppEntry.Kind.named(by: vm.query) != nil
+        self.pinsFavorites = pinsFavorites
+        self.favoriteCount = pinsFavorites ? results.prefix(while: favorites.isFavorite).count : 0
         self.rows = calc.map { [.calc($0)] + entries } ?? entries
     }
 
@@ -121,7 +134,8 @@ struct LauncherScreen: PaletteScreen {
             return result.isActionable ? CalcActionsMenu.content(result: result, core: core) : nil
         case .entry(let app):
             return AppActionsMenu.content(
-                app: app, searchQuery: vm.query, core: core, favorites: favorites, running: running,
+                app: app, searchQuery: vm.query, core: core, running: running,
+                favorites: favoriteActions(for: app, at: selection),
                 onResetRanking: {
                     core.launcherCoordinator.resetRanking(for: app)
                     // Reset can move the item; keep the highlight on the item whose action ran.
@@ -159,20 +173,94 @@ struct LauncherScreen: PaletteScreen {
         return true
     }
 
+    /// ⇧⌘F — mirrors the Add/Remove Favorites row. The highlight stays in the Favorites section
+    /// rather than chasing the entry: the top of it on add, the neighbour above the one that left.
+    func toggleFavorite(at selection: Int) -> Bool {
+        guard let app = entry(at: selection) else { return false }
+        let removed = favoriteIndex(of: app)
+        favorites.toggle(app)
+        // A typed query never pins favorites, so nothing moved and the highlight belongs where it is.
+        guard pinsFavorites else { return true }
+        selectFavorite(at: removed.map { $0 - 1 } ?? 0)
+        return true
+    }
+
+    /// ⌘1–⌘9/⌘0 — launch a favorite by position, in either palette size.
+    func launchFavorite(at index: Int) -> Bool {
+        guard let app = pinnedFavorites.dropFirst(index).first else { return false }
+        core.launcherCoordinator.launch(app)
+        return true
+    }
+
+    /// The favorites the chords address and the compact strip draws from. Empty while a query is
+    /// typed, which is also the only state in which the section isn't on screen.
+    private var pinnedFavorites: ArraySlice<AppEntry> { results.prefix(favoriteCount) }
+
+    /// ⌥⌘↑/↓ — swap with the neighbouring favorite; the ends of the section have nowhere to go.
+    func moveFavorite(_ delta: Int, at selection: Int) -> Bool {
+        guard let app = entry(at: selection), let index = favoriteIndex(of: app) else { return false }
+        let target = index + delta
+        guard target >= 0, target < favoriteCount else { return false }
+        favorites.exchange(favorites.key(for: app), with: favorites.key(for: results[target]))
+        follow(app)
+        return true
+    }
+
+    /// The favorites rows the Actions menu offers for an entry; the ends drop the move they can't
+    /// run, and both rows call straight back here so a row can't drift from its chord.
+    private func favoriteActions(
+        for app: AppEntry, at selection: Int
+    )
+        -> AppActionsMenu.FavoriteActions
+    {
+        let index = favoriteIndex(of: app)
+        return AppActionsMenu.FavoriteActions(
+            isFavorite: favorites.isFavorite(app),
+            canMoveUp: index.map { $0 > 0 } ?? false,
+            canMoveDown: index.map { $0 < favoriteCount - 1 } ?? false,
+            toggle: { _ = toggleFavorite(at: selection) },
+            move: { _ = moveFavorite($0, at: selection) })
+    }
+
+    /// Position inside the Favorites section, or nil when the entry isn't reorderable there.
+    private func favoriteIndex(of app: AppEntry) -> Int? {
+        guard let index = results.firstIndex(of: app), index < favoriteCount else { return nil }
+        return index
+    }
+
+    /// The list reorders under an action; keep the highlight and the scroll on the row that moved.
+    private func follow(_ app: AppEntry) {
+        guard let index = reorderedResults().firstIndex(of: app) else { return }
+        select(row: index)
+    }
+
+    /// Highlight a row of the Favorites section, clamped into what the section now holds.
+    private func selectFavorite(at index: Int) {
+        let count = reorderedResults().prefix(while: favorites.isFavorite).count
+        select(row: min(max(index, 0), max(count - 1, 0)))
+    }
+
+    /// Re-read the order the change just invalidated; this warms the key the next render reads.
+    private func reorderedResults() -> [AppEntry] {
+        appIndex.orderedResults(query: vm.query, visibility: visibility, favorites: favorites)
+    }
+
+    private func select(row index: Int) {
+        vm.selection = index + (calc == nil ? 0 : 1)
+        scrollToFollow()
+    }
+
     /// The sample `openActions` takes; only an app row can ever carry a Quit action.
     func isRunning(at selection: Int) -> Bool {
         guard let app = entry(at: selection) else { return false }
         return core.runningApps.isRunning(app)
     }
 
-    /// The compact bar's favorite slots: 5 apps, or 4 plus an overflow that expands.
-    var compactFavoriteSlots: [CompactFavoriteSlot] {
-        let ordered = appIndex.orderedResults(
-            query: "", visibility: visibility, favorites: favorites)
-        let favs = ordered.prefix(while: favorites.isFavorite)
-        if favs.count <= 5 { return favs.map(CompactFavoriteSlot.app) }
-        return favs.prefix(4).map(CompactFavoriteSlot.app) + [.more]
-    }
+    /// The compact bar's icons: the first five favorites. The "…" that follows them is not one.
+    var compactFavorites: [AppEntry] { Array(pinnedFavorites.prefix(5)) }
+
+    /// Whether the compact bar's "…" has anything to reveal.
+    var hasUnshownFavorites: Bool { favoriteCount > compactFavorites.count }
 
     func body(selection: Int, scroll: ScrollIntent) -> AnyView {
         AnyView(content(selection: selection, scroll: scroll))
@@ -180,12 +268,10 @@ struct LauncherScreen: PaletteScreen {
 
     @ViewBuilder
     private func content(selection: Int, scroll: ScrollIntent) -> some View {
-        // Sections stand in for the ranked Results list, which a typed query collapses to.
-        let showSections = vm.query.trimmingCharacters(in: .whitespaces).isEmpty
         LauncherList(
             results: results,
             selectedID: entry(at: selection)?.id,
-            favoriteCount: showSections ? results.prefix(while: favorites.isFavorite).count : 0,
+            favoriteCount: favoriteCount,
             showSections: showSections,
             scroll: scroll,
             calc: calc,

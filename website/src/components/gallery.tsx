@@ -1,22 +1,26 @@
+"use client";
+
 import { Play } from "lucide-react";
+import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useEffect, useState } from "react";
-import Lightbox, { type Slide } from "yet-another-react-lightbox";
-import Captions from "yet-another-react-lightbox/plugins/captions";
-import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails";
-import Video from "yet-another-react-lightbox/plugins/video";
-import "yet-another-react-lightbox/styles.css";
-import "yet-another-react-lightbox/plugins/captions.css";
-import "yet-another-react-lightbox/plugins/thumbnails.css";
+import type { Slide } from "yet-another-react-lightbox";
 import { galleryItems, type GalleryItem } from "../data/gallery";
+import { asset } from "../lib/asset";
 import { Reveal } from "./ui/reveal";
 import { Section } from "./ui/section";
 
-// Everything in `public/` is served under the Vite base path.
-const asset = (name: string) => `${import.meta.env.BASE_URL}${name}`;
+// The lightbox is ~30 KB gzipped and does nothing until a tile is clicked.
+const GalleryLightbox = dynamic(() => import("./gallery-lightbox"));
 
 // The grid thumbnail: an explicit thumb, else a video's poster, else the image.
+// `unoptimized` images keep their src verbatim, so `basePath` has to be added
+// here — next/image only prefixes it when the optimizer is in play.
 const tileImage = (item: GalleryItem) =>
-  asset(item.thumb ?? (item.type === "video" ? (item.poster ?? item.src) : item.src));
+  asset(
+    item.thumb ??
+      (item.type === "video" ? (item.poster ?? item.src) : item.src),
+  );
 
 // One gallery item → one lightbox slide. Images carry title/description for the
 // Captions plugin; videos use the Video plugin's `sources` shape.
@@ -43,9 +47,15 @@ function toSlide(item: GalleryItem): Slide {
 
 export function Gallery() {
   const [index, setIndex] = useState(-1);
-  const slides = galleryItems.map(toSlide);
+  // Once opened, keep it mounted so closing and reopening costs no fetch.
+  const [everOpened, setEverOpened] = useState(false);
 
-  // Lock scroll ourselves instead of via YARL's NoScroll module: YARL pads the
+  function open(i: number) {
+    setEverOpened(true);
+    setIndex(i);
+  }
+
+  // Lock scroll ourselves instead of via the lightbox's own module: it pads the
   // scrollbar width onto <body> and every fixed element (the scroll-top button
   // included, shifting its arrow). `scrollbar-gutter: stable` already reserves
   // that space, so a plain overflow:hidden lock changes no widths — no shift.
@@ -71,16 +81,16 @@ export function Gallery() {
           <Reveal key={`${item.title}-${i}`} delay={i * 60}>
             <button
               type="button"
-              onClick={() => setIndex(i)}
-              className="group flex h-full w-full flex-col gap-3 rounded-2xl bg-ink/40 p-3 text-left shadow-key transition-shadow duration-200 hover:shadow-key-hover"
+              onClick={() => open(i)}
+              className="group flex h-full w-full flex-col gap-3 rounded-2xl bg-surface/40 p-3 text-left shadow-key transition-shadow duration-200 hover:shadow-key-hover"
             >
               <figure className="relative aspect-video w-full overflow-hidden rounded-xl">
-                <img
+                <Image
                   src={tileImage(item)}
                   alt={item.title}
-                  className="block size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                  loading="lazy"
-                  decoding="async"
+                  fill
+                  sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 90vw"
+                  className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                 />
                 {item.type === "video" && (
                   <span className="absolute inset-0 flex items-center justify-center">
@@ -91,37 +101,23 @@ export function Gallery() {
                 )}
               </figure>
               <div className="px-1 pb-1">
-                <h3 className="text-body-lg font-medium text-white">
+                <h3 className="text-body-lg font-medium text-fg">
                   {item.title}
                 </h3>
-                <p className="mt-1 text-body text-ash">{item.caption}</p>
+                <p className="mt-1 text-body text-fg-muted">{item.caption}</p>
               </div>
             </button>
           </Reveal>
         ))}
       </div>
 
-      <Lightbox
-        open={index >= 0}
-        index={index}
-        close={() => setIndex(-1)}
-        slides={slides}
-        plugins={[Video, Captions, Thumbnails]}
-        controller={{ closeOnBackdropClick: true }}
-        noScroll={{ disabled: true }}
-        // Muted autoplay is the only cross-browser-reliable autoplay; the
-        // (now unobstructed) controls let viewers unmute.
-        video={{ autoPlay: true, muted: true, controls: true, playsInline: true }}
-        thumbnails={{
-          position: "bottom",
-          width: 140,
-          height: 90,
-          border: 1,
-          borderRadius: 10,
-          gap: 12,
-          padding: 4,
-        }}
-      />
+      {everOpened && (
+        <GalleryLightbox
+          index={index}
+          slides={galleryItems.map(toSlide)}
+          close={() => setIndex(-1)}
+        />
+      )}
     </Section>
   );
 }

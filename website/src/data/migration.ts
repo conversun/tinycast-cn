@@ -1,33 +1,36 @@
-// Drives the "Switch from Raycast" section. The steps mirror the real import
-// flow (Settings → Backup → Import from Raycast), and `transfers` matches the
-// app's `RaycastImportOptions` exactly — don't add anything the importer can't
-// actually carry over.
+// Drives the "Import your setup" block. The steps mirror the real import flow
+// (Settings → Backup → Raycast Export), and `transfers` matches the app's
+// `RaycastImportOptions` exactly — don't add anything the importer can't carry.
 
 export const migration = {
-  eyebrow: "Coming from Raycast?",
-  title: "Bring everything over in one click.",
+  eyebrow: "Already set up elsewhere?",
+  title: "Bring your setup with you.",
   intro:
-    "Tinycast reads a Raycast export directly. Point it at your .rayconfig file, type your passphrase, and your setup comes across — no redoing shortcuts by hand.",
+    "Tinycast reads a Raycast export directly. Point it at your .rayconfig file, type the passphrase, and pick what comes across — no redoing shortcuts by hand.",
   steps: [
     {
-      title: "Export from Raycast",
-      body: "Raycast → Settings → Advanced → Export, and set a passphrase.",
+      title: "Export what you have",
+      body: "Raycast → Settings → Advanced → Export, and note the passphrase.",
     },
     {
-      title: "Import into Tinycast",
-      body: "Open the palette, run “Import from Raycast,” and choose the file.",
+      title: "Open Settings → Backup",
+      body: "Choose the file. Tinycast reads both export formats and says which one it found.",
     },
     {
       title: "Pick what to bring",
       body: "Keep it all or just the parts you want — then you're set up.",
     },
   ],
-  // Must match RaycastImportOptions in RaycastImport.swift.
+  // Must match RaycastImportOptions in Features/Backup/Model/RaycastFormat.swift.
   transfers: [
     "Shortcuts",
     "Favorites",
     "Clipboard history",
+    "Snippets",
+    "Aliases",
     "Emoji skin tone",
+    "Compact mode",
+    "Pop to root",
     "Launch at login",
     "Menu-bar preference",
   ],

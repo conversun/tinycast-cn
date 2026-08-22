@@ -35,6 +35,7 @@ struct ExtensionDetailBody: View {
 
 /// `Detail.Metadata` — label / link / tag-list / separator rows.
 struct ExtensionMetadataView: View {
+    @Environment(\.isDarkAppearance) private var isDark
     let metadata: RenderNode
     let assetsPath: String?
 
@@ -47,7 +48,8 @@ struct ExtensionMetadataView: View {
                         HStack(spacing: Theme.Spacing.xs) {
                             if let icon = child.props["icon"] {
                                 ExtensionIconView(
-                                    resolved: ExtensionImage.resolve(icon, assetsPath: assetsPath),
+                                    resolved: ExtensionImage.resolve(
+                                        icon, assetsPath: assetsPath, isDark: isDark),
                                     size: 14)
                             }
                             Text(labelText(child))
@@ -98,6 +100,7 @@ struct ExtensionMetadataView: View {
 }
 
 private struct ExtensionTagListView: View {
+    @Environment(\.isDarkAppearance) private var isDark
     let tags: [RenderNode]
     let assetsPath: String?
 
@@ -105,11 +108,13 @@ private struct ExtensionTagListView: View {
         // Wrapping matters here: a metadata tag list is frequently longer than the pane is wide.
         FlowLayout(spacing: Theme.Spacing.xs) {
             ForEach(tags) { tag in
-                let color = ExtensionImage.color(tag.props["color"]) ?? Theme.Colors.textSecondary
+                let color =
+                    ExtensionImage.color(tag.props["color"], isDark: isDark) ?? Theme.Colors.textSecondary
                 HStack(spacing: 3) {
                     if let icon = tag.props["icon"] {
                         ExtensionIconView(
-                            resolved: ExtensionImage.resolve(icon, assetsPath: assetsPath), size: 12)
+                            resolved: ExtensionImage.resolve(icon, assetsPath: assetsPath, isDark: isDark),
+                            size: 12)
                     }
                     Text(tag.string("text") ?? "")
                         .font(Theme.Typography.rowTrailing)
@@ -240,7 +245,7 @@ struct ExtensionMarkdownView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.Radius.menu, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
+                            .fill(ExtensionColors.detailCardFill)
                     )
                     .hideNativeScrollers()
                 case .rule:
@@ -387,7 +392,7 @@ private struct ExtensionMarkdownImage: View {
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.menu, style: .continuous))
             } else {
                 RoundedRectangle(cornerRadius: Theme.Radius.menu, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
+                    .fill(ExtensionColors.detailCardFill)
                     .frame(height: 120)
             }
         }

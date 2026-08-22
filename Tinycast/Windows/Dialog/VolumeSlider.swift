@@ -20,12 +20,12 @@ struct VolumeSlider: View {
                         .fill(Theme.Colors.controlSurface)
                         .frame(height: Theme.Size.volumeTrackHeight)
                     Capsule()
-                        .fill(Color.white.opacity(0.85))
+                        .fill(Theme.Colors.textPrimary.opacity(0.85))
                         .frame(
                             width: Theme.Size.volumeKnob / 2 + clamped * travel,
                             height: Theme.Size.volumeTrackHeight)
                     Circle()
-                        .fill(Color.white)
+                        .fill(Theme.Colors.textPrimary)
                         .frame(width: Theme.Size.volumeKnob, height: Theme.Size.volumeKnob)
                         .offset(x: clamped * travel)
                 }

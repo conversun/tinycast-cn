@@ -64,7 +64,7 @@ private struct FileSearchRow: View {
                     Image(nsImage: image).resizable()
                 } else {
                     RoundedRectangle(cornerRadius: Theme.Radius.thumbnail, style: .continuous)
-                        .fill(Color.white.opacity(0.06))
+                        .fill(Theme.Colors.iconPlaceholder)
                 }
             }
             .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
@@ -89,8 +89,11 @@ private struct FileSearchRow: View {
         .accessibilityLabel(result.name)
         .accessibilityValue(result.parentPath)
         .accessibilityAddTraits(selected ? .isSelected : [])
-        .task(id: result.id) {
-            guard image == nil else { return }
+        .task(id: IconRequest(result.id)) {
+            if let warm = IconCache.cachedFitted(forFile: result.id) {
+                image = warm
+                return
+            }
             image = await IconCache.loadFittedAsync(forFile: result.id)
         }
     }

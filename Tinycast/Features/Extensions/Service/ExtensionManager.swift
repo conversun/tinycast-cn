@@ -185,9 +185,11 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
     /// Progress is reported per step: building from source can take minutes.
     func install(
         listing: ExtensionListing, packageManager: ExtensionPackageManager,
+        additionalSearchPaths: [String] = [],
         onProgress: @Sendable @escaping (ExtensionInstaller.Progress) -> Void
     ) async throws {
-        let installer = ExtensionInstaller(packageManager: packageManager)
+        let installer = ExtensionInstaller(
+            packageManager: packageManager, additionalSearchPaths: additionalSearchPaths)
         try await installer.install(listing, onProgress: onProgress)
         await refresh()
     }
@@ -328,7 +330,8 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
                 extension: owner.manifest.name, schemas: schemas),
             caches: storage.caches(extension: owner.manifest.name),
             arguments: command.completeArguments(arguments),
-            fallbackText: nil)
+            fallbackText: nil,
+            isDarkAppearance: NSApp.effectiveAppearance.isDark)
 
         await runtime.start(
             session: session, code: code, file: bundle, mode: command.mode, context: context)

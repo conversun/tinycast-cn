@@ -66,10 +66,15 @@ on the tap repo. Without the secret the step logs a warning and skips; the relea
 
 ## Website
 
-`.github/workflows/website.yml` builds `website/` (Vite + React + TS) and deploys it to GitHub Pages at
-`https://abue-ammar.github.io/tinycast/` on every push to `main` that touches `website/`. Enable it
-once via **Settings → Pages → Source = GitHub Actions**.
+`.github/workflows/website.yml` builds `website/` (Next.js static export + Tailwind, with Fumadocs for
+the docs section) and deploys it to GitHub Pages at `https://abue-ammar.github.io/tinycast/` on every
+push to `main` that touches `website/`. Enable it once via
+**Settings → Pages → Source = GitHub Actions**.
 
 ```sh
 cd website && npm install && npm run dev     # local preview
 ```
+
+The workflow uploads `website/out` — a Next.js export lands there, not in `dist/`. `public/.nojekyll`
+must stay: GitHub Pages runs Jekyll, which ignores `_`-prefixed directories, so without it every
+asset under `_next/` 404s. See [website/README.md](../website/README.md).

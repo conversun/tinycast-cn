@@ -94,6 +94,26 @@ export default function Command() {
 }
 `;
 
+const fragmentDetailSource = `
+import { List } from "@raycast/api";
+
+export default function Command() {
+  return (
+    <List>
+      <List.Item
+        title="TOTP"
+        detail={
+          <>
+            <List.Item.Detail markdown="30s remaining" />
+            <List.Item.Detail metadata={<List.Item.Detail.Metadata><List.Item.Detail.Metadata.Label title="Code" text="123456" /></List.Item.Detail.Metadata>} />
+          </>
+        }
+      />
+    </List>
+  );
+}
+`;
+
 const formSource = `
 import { Form, ActionPanel, Action } from "@raycast/api";
 
@@ -238,6 +258,12 @@ export async function runFixtures() {
         ]),
       JSON.stringify(kinds),
     );
+  });
+
+  await run("List.Item.Detail split across a Fragment", fragmentDetailSource, "view", async (harness) => {
+    const detail = findNode(harness.state.trees.at(-1), "List.Item").props.detail;
+    check("keeps the markdown from the first sibling", detail.props.markdown === "30s remaining", JSON.stringify(detail.props));
+    check("keeps the metadata from the second sibling", detail.props.metadata?.type === "Detail.Metadata", JSON.stringify(detail.props));
   });
 
   await run("Form fields and submit", formSource, "view", async (harness) => {

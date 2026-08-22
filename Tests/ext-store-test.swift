@@ -113,7 +113,10 @@ struct ExtensionStoreTests {
         check("the author's name wins over the handle", coffee.author == "Max Schmidt")
         check("commands are counted", coffee.commandCount == 2)
         check("downloads are read", coffee.downloadCount == 124_218)
-        check("the icon resolves", coffee.iconURL?.absoluteString == "https://files.raycast.com/icon")
+        let icon = "https://files.raycast.com/icon"
+        check("the icon resolves", coffee.iconURL(isDark: false)?.absoluteString == icon)
+        // The fixture's `dark` is null, so the other side has to stand in for it.
+        check("a missing side falls back", coffee.iconURL(isDark: true)?.absoluteString == icon)
         check("it carries its registry", coffee.registryID == ExtensionRegistry.store.id)
         if case .prebuiltZip(let url) = coffee.source {
             check("the source is the zip", url.absoluteString == "https://example.com/coffee.zip")
@@ -193,7 +196,7 @@ struct ExtensionStoreTests {
         check("source has to be built", listing.needsBuild)
         check(
             "the icon points into the repository",
-            listing.iconURL?.absoluteString
+            listing.iconURL(isDark: true)?.absoluteString
                 == "https://raw.githubusercontent.com/raycast/extensions/main/extensions/coffee/assets/extension-icon.png"
         )
         if case .githubFolder(let owner, _, let path, let ref) = listing.source {

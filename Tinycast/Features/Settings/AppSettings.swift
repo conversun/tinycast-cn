@@ -76,6 +76,11 @@ final class AppSettings {
         didSet { defaults.set(popToRootTimeout.rawValue, forKey: Key.popToRootTimeout.rawValue) }
     }
 
+    /// Follow macOS, or pin Tinycast to one appearance. Applied by `AppCore.applyAppearance()`.
+    var appearance: AppAppearance {
+        didSet { defaults.set(appearance.rawValue, forKey: Key.appearance.rawValue) }
+    }
+
     /// Summon the launcher as a slim search bar that expands into the full list on typing.
     var compactMode: Bool {
         didSet { defaults.set(compactMode, forKey: Key.compactMode.rawValue) }
@@ -92,6 +97,16 @@ final class AppSettings {
     /// Summon the palette on the display under the pointer instead of the one holding the menu bar.
     var openOnCursorScreen: Bool {
         didSet { defaults.set(openOnCursorScreen, forKey: Key.openOnCursorScreen.rawValue) }
+    }
+
+    var autoSwitchInputSourceID: String? {
+        didSet {
+            guard let autoSwitchInputSourceID else {
+                defaults.removeObject(forKey: Key.autoSwitchInputSource.rawValue)
+                return
+            }
+            defaults.set(autoSwitchInputSourceID, forKey: Key.autoSwitchInputSource.rawValue)
+        }
     }
 
     /// Lets the panel be dragged by its top edge; off by default, so most launches never grab it.
@@ -182,6 +197,15 @@ final class AppSettings {
         }
     }
 
+    /// Extra PATH folders searched before the built-in list, for a toolchain in a place Tinycast
+    /// doesn't already know — mise or Nix shims are the common case. Empty means nothing extra.
+    var extensionCustomSearchPaths: [String] {
+        didSet {
+            defaults.set(
+                extensionCustomSearchPaths, forKey: Key.extensionCustomSearchPaths.rawValue)
+        }
+    }
+
     /// Off means fully off: no launcher entries, and a still-registered shortcut moves nothing.
     var windowManagementEnabled: Bool {
         didSet {
@@ -267,6 +291,8 @@ final class AppSettings {
         popToRootTimeout =
             PopToRootTimeout(rawValue: defaults.integer(forKey: Key.popToRootTimeout.rawValue))
             ?? .immediately
+        appearance =
+            defaults.string(forKey: Key.appearance.rawValue).flatMap(AppAppearance.init) ?? .system
         compactMode = defaults.bool(forKey: Key.compactMode.rawValue)
         // Defaults to true, so absence must be distinguished from a stored `false`.
         showFavoritesInCompactMode =
@@ -278,6 +304,7 @@ final class AppSettings {
         openOnCursorScreen =
             defaults.object(forKey: Key.openOnCursorScreen.rawValue) == nil
             || defaults.bool(forKey: Key.openOnCursorScreen.rawValue)
+        autoSwitchInputSourceID = defaults.string(forKey: Key.autoSwitchInputSource.rawValue)
         paletteDraggable = defaults.bool(forKey: Key.paletteDraggable.rawValue)
         // A half-written pair is no position at all, so both coordinates have to be there.
         palettePosition = (defaults.array(forKey: Key.palettePosition.rawValue) as? [Double])
@@ -311,6 +338,8 @@ final class AppSettings {
             defaults.data(forKey: Key.extensionRegistries.rawValue)
             .flatMap { try? JSONDecoder().decode([ExtensionRegistry].self, from: $0) }
             ?? ExtensionRegistry.defaults
+        extensionCustomSearchPaths =
+            defaults.stringArray(forKey: Key.extensionCustomSearchPaths.rawValue) ?? []
         windowManagementEnabled = defaults.bool(forKey: Key.windowManagementEnabled.rawValue)
         windowManagementShowInLauncher =
             defaults.object(forKey: Key.windowManagementShowInLauncher.rawValue) == nil

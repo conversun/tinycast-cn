@@ -1,0 +1,13 @@
+{
+  "title": "Launcher",
+  "pages": [
+    "index",
+    "favorites",
+    "aliases",
+    "system-settings",
+    "system-actions",
+    "commands",
+    "quicklinks",
+    "uninstall"
+  ]
+}

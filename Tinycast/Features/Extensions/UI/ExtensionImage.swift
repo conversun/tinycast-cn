@@ -1,6 +1,12 @@
 import SwiftUI
 
 /// Maps Raycast's `Icon` / `Color` / `Image.ImageLike` values onto what the palette can draw.
+extension EnvironmentValues {
+    /// Derived rather than stored, so a view that reads it re-renders when the appearance flips —
+    /// which is what keeps a `{light, dark}` icon following the surface it is drawn on.
+    var isDarkAppearance: Bool { colorScheme == .dark }
+}
+
 enum ExtensionImage {
     /// A resolved icon: an SF Symbol, a file on disk, a remote URL, or a bare emoji/text glyph.
     enum Source: Equatable {
@@ -17,7 +23,7 @@ enum ExtensionImage {
     }
 
     /// An `ImageLike`: a string, or `{source, tintColor, mask, fallback}` with a themed `source`.
-    static func resolve(_ value: RenderValue?, assetsPath: String?) -> Resolved? {
+    static func resolve(_ value: RenderValue?, assetsPath: String?, isDark: Bool) -> Resolved? {
         guard let value else { return nil }
         switch value {
         case .string(let text):
@@ -28,28 +34,31 @@ enum ExtensionImage {
             if let wrapped = fields["value"]?.objectValue,
                 wrapped["source"] != nil || wrapped["value"] != nil
             {
-                return resolve(.object(wrapped), assetsPath: assetsPath)
+                return resolve(.object(wrapped), assetsPath: assetsPath, isDark: isDark)
             }
             let raw = fields["source"] ?? fields["value"]
-            let text = string(from: raw)
+            let text = string(from: raw, isDark: isDark)
             guard let text, let source = source(from: text, assetsPath: assetsPath) else {
                 // A tinted icon with no usable source still deserves the fallback tile.
                 return nil
             }
             return Resolved(
                 source: source,
-                tint: color(fields["tintColor"]),
+                tint: color(fields["tintColor"], isDark: isDark),
                 isCircular: fields["mask"]?.stringValue == "circle")
         default:
             return nil
         }
     }
 
-    /// `{light, dark}` themed sources collapse to the dark variant — the app is locked to dark.
-    private static func string(from value: RenderValue?) -> String? {
+    /// A `{light, dark}` themed source picks the side the host is rendering, falling back to the
+    /// other when an extension supplies only one.
+    private static func string(from value: RenderValue?, isDark: Bool) -> String? {
         switch value {
         case .string(let text): return text
-        case .object(let fields): return fields["dark"]?.stringValue ?? fields["light"]?.stringValue
+        case .object(let fields):
+            let preferred = fields[isDark ? "dark" : "light"]?.stringValue
+            return preferred ?? fields[isDark ? "light" : "dark"]?.stringValue
         default: return nil
         }
     }
@@ -75,11 +84,11 @@ enum ExtensionImage {
         return text.count <= 4 ? .glyph(text) : nil
     }
 
-    static func color(_ value: RenderValue?) -> Color? {
+    static func color(_ value: RenderValue?, isDark: Bool) -> Color? {
         guard let value else { return nil }
         if let text = value.stringValue { return color(named: text) }
         if let fields = value.objectValue {
-            return color(named: fields["dark"]?.stringValue ?? fields["light"]?.stringValue ?? "")
+            return color(named: string(from: .object(fields), isDark: isDark) ?? "")
         }
         return nil
     }
@@ -325,7 +334,7 @@ struct ExtensionIconView: View {
 
     private var placeholder: some View {
         RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-            .fill(Color.white.opacity(0.06))
+            .fill(Theme.Colors.iconPlaceholder)
     }
 
     private var shape: AnyShape {

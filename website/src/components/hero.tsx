@@ -2,7 +2,6 @@ import { hero, site } from "../data/site";
 import { AppShot } from "./app-shot";
 import { Button } from "./ui/button";
 import { AppleLogo, GitHubLogo } from "./ui/icon";
-import { Kbd } from "./ui/kbd";
 import { MetaStrip } from "./ui/meta-strip";
 
 // The one place the system breaks its own austerity: a soft violet/cyan
@@ -27,21 +26,21 @@ export function Hero() {
       <Atmosphere />
       <div className="container-page flex flex-col items-center text-center">
         <p
-          className="rise font-mono text-eyebrow uppercase text-ash"
+          className="rise font-mono text-eyebrow uppercase text-fg-muted"
           style={{ animationDelay: "0ms" }}
         >
           {hero.eyebrow}
         </p>
 
         <h1
-          className="rise mt-6 max-w-3xl text-display [text-shadow:0_2px_28px_rgb(0_0_0_/0.45)]"
+          className="rise mt-6 max-w-3xl text-display"
           style={{ animationDelay: "80ms" }}
         >
           {hero.headline}
         </h1>
 
         <p
-          className="rise mt-6 max-w-lg text-body-lg text-ash"
+          className="rise mt-6 max-w-lg text-body-lg text-fg-muted"
           style={{ animationDelay: "160ms" }}
         >
           {hero.sub}
@@ -51,7 +50,7 @@ export function Hero() {
           className="rise mt-9 flex flex-wrap items-center justify-center gap-3"
           style={{ animationDelay: "240ms" }}
         >
-          <Button href="#install" className="gap-1">
+          <Button href="/#install" className="gap-1">
             <AppleLogo size={20} />
             Download for Mac
           </Button>
@@ -75,8 +74,10 @@ export function Hero() {
           style={{ animationDelay: "380ms" }}
         >
           <AppShot />
-          <p className="mt-5 flex items-center gap-2 text-small text-smoke">
-            Press <Kbd>⌥</Kbd> <Kbd>Space</Kbd> to summon it from anywhere
+          {/* Tinycast ships no default shortcut — the user records one on first
+              run — so this must not name a specific chord. */}
+          <p className="mt-5 text-small text-fg-subtle">
+            Pick a shortcut on first run, then summon it from anywhere.
           </p>
         </div>
       </div>

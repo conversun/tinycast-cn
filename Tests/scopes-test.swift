@@ -23,24 +23,27 @@ struct ScopesTest {
             try? fm.createDirectory(at: url, withIntermediateDirectories: true)
         }
 
-        // A scope directory with two apps, a non-app sibling, a hidden app, and a nested app.
+        // Two direct apps, a non-app file, a hidden app, one nested app, one two-deep nested app.
         let apps = root.appendingPathComponent("Apps")
         makeDir(apps.appendingPathComponent("Alpha.app"))
         makeDir(apps.appendingPathComponent("Beta.app"))
         makeDir(apps.appendingPathComponent("Notes.txt"))
         makeDir(apps.appendingPathComponent(".Hidden.app"))
-        let nested = apps.appendingPathComponent("Sub")
-        makeDir(nested.appendingPathComponent("Deep.app"))
+        let vendor = apps.appendingPathComponent("Vendor")
+        makeDir(vendor.appendingPathComponent("Nested.app"))
+        let deep = vendor.appendingPathComponent("Deeper")
+        makeDir(deep.appendingPathComponent("TooDeep.app"))
 
         let found = SearchScopes.appBundles(in: [apps.path]).map(\.lastPathComponent)
-        check("direct .app children are indexed", Set(found) == ["Alpha.app", "Beta.app"])
+        check(
+            "direct and one-level-nested .app children are indexed",
+            Set(found) == ["Alpha.app", "Beta.app", "Nested.app"])
         check("non-app children are skipped", !found.contains("Notes.txt"))
         check("hidden bundles are skipped", !found.contains(".Hidden.app"))
-        // Flat by contract: a nested folder is indexed by adding it as its own scope.
-        check("nested bundles are not indexed", !found.contains("Deep.app"))
+        check("bundles nested two levels deep are not indexed", !found.contains("TooDeep.app"))
         check(
-            "a nested folder works as its own scope",
-            SearchScopes.appBundles(in: [nested.path]).map(\.lastPathComponent) == ["Deep.app"])
+            "a deeply nested folder works as its own scope",
+            SearchScopes.appBundles(in: [deep.path]).map(\.lastPathComponent) == ["TooDeep.app"])
 
         // A scope may be a single bundle rather than a directory — that's how Finder ships as a default.
         check(
@@ -52,13 +55,13 @@ struct ScopesTest {
             SearchScopes.appBundles(in: [apps.appendingPathComponent("Gone.app").path]).isEmpty)
         check(
             "a missing directory scope is skipped without failing the rest",
-            SearchScopes.appBundles(in: [root.appendingPathComponent("Nope").path, nested.path])
-                .map(\.lastPathComponent) == ["Deep.app"])
+            SearchScopes.appBundles(in: [root.appendingPathComponent("Nope").path, deep.path])
+                .map(\.lastPathComponent) == ["TooDeep.app"])
 
         check(
             "scopes are scanned in order",
-            SearchScopes.appBundles(in: [nested.path, apps.path]).map(\.lastPathComponent).first
-                == "Deep.app")
+            SearchScopes.appBundles(in: [deep.path, apps.path]).map(\.lastPathComponent).first
+                == "TooDeep.app")
 
         let home = fm.homeDirectoryForCurrentUser.path
         check(

@@ -19,11 +19,11 @@ struct EntryIconView: View {
                 Image(nsImage: image).resizable()
             } else {
                 RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
+                    .fill(Theme.Colors.iconPlaceholder)
             }
         }
         // Keyed on the glyph, not the entry: re-skinning leaves an id untouched.
-        .task(id: source) {
+        .task(id: IconRequest(source)) {
             if let warm = IconCache.cached(source, fileURL: fileURL) {
                 image = warm
                 return

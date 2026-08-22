@@ -10,10 +10,12 @@ enum AppSettingsKey: String, CaseIterable {
     case hyperKeyQuickPress = "hyperKeyQuickPress"
     case emojiSkinTone = "emojiSkinTone"
     case popToRootTimeout = "popToRootTimeout"
+    case appearance = "appearance"
     case compactMode = "compactMode"
     case showFavoritesInCompactMode = "showFavoritesInCompactMode"
     case searchScopes = "launcherSearchScopes"
     case openOnCursorScreen = "openOnCursorScreen"
+    case autoSwitchInputSource = "autoSwitchInputSource"
     case paletteDraggable = "paletteDraggable"
     case palettePosition = "palettePosition"
     case fileSearchEnabled = "fileSearchEnabled"
@@ -37,4 +39,5 @@ enum AppSettingsKey: String, CaseIterable {
     case extensionsShowInLauncher = "extensionsShowInLauncher"
     case extensionPackageManager = "extensionPackageManager"
     case extensionRegistries = "extensionRegistries"
+    case extensionCustomSearchPaths = "extensionCustomSearchPaths"
 }

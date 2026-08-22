@@ -26,11 +26,11 @@ struct AppIconView: View {
                 Image(nsImage: image).resizable()
             } else {
                 RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
+                    .fill(Theme.Colors.iconPlaceholder)
             }
         }
         // Keyed on the icon, not the entry: re-skinning an extension leaves `id` untouched.
-        .task(id: app.iconKey) {
+        .task(id: IconRequest(app.iconKey)) {
             if let warm = Self.cached(app) {
                 image = warm
                 return

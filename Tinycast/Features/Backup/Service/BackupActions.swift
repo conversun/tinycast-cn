@@ -154,6 +154,7 @@ enum BackupActions {
         if s.hiddenItems > 0 {
             parts.append(String(localized: "\(s.hiddenItems) hidden items"))
         }
+        if s.aliases > 0 { parts.append(String(localized: "\(s.aliases) aliases")) }
         if s.customCommands > 0 {
             parts.append(String(localized: "\(s.customCommands) custom commands"))
         }

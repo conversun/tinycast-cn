@@ -24,18 +24,20 @@ struct NotesEditorTests {
             epoch: 1)
         var changes: [String] = []
         let editor = makeEditor(input: input, onSourceChange: { changes.append($0) })
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
 
         check("the editor displays literal Markdown source", editor.textView.string == source)
         check("the plain editor enables native Find", editor.textView.usesFindPanel)
 
         let boldRange = (editor.textView.string as NSString).range(of: "**bold**")
         editor.textView.setSelectedRange(boldRange)
-        editor.textView.copy(nil)
+        copySelection(of: editor.textView, to: pasteboard)
         check(
             "native Copy preserves literal Markdown",
-            NSPasteboard.general.string(forType: .string) == "**bold**")
+            pasteboard.string(forType: .string) == "**bold**")
 
-        editor.textView.cut(nil)
+        cutSelection(of: editor.textView, to: pasteboard)
         check("native Cut publishes one literal source update", changes.count == 1)
         check("native Cut removes the selected source", !editor.textView.string.contains("**bold**"))
         editor.coordinator.editorUndoManager.undo()
@@ -43,12 +45,9 @@ struct NotesEditorTests {
         editor.coordinator.editorUndoManager.redo()
         check("native Redo restores the cut", editor.textView.string == changes.last)
 
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(" [literal](url)", forType: .string)
         let end = (editor.textView.string as NSString).length
         editor.textView.setSelectedRange(NSRange(location: end, length: 0))
-        editor.textView.paste(nil)
+        paste(" [literal](url)", into: editor.textView, from: pasteboard)
         check("native Paste inserts exact source", editor.textView.string.hasSuffix(" [literal](url)"))
 
         let unicode = " 🧑🏽‍💻e\u{301}"
@@ -119,6 +118,26 @@ struct NotesEditorTests {
         check(
             "a stale count cannot be attributed to the replacement note",
             reports.last?.0.id == second.id && reports.last?.1 == 6)
+    }
+
+    /// The primitives `copy:`/`cut:`/`paste:` delegate to; the actions clobber the real clipboard.
+    private static func copySelection(of textView: NSTextView, to pasteboard: NSPasteboard) {
+        let types = textView.writablePasteboardTypes
+        pasteboard.declareTypes(types, owner: nil)
+        _ = textView.writeSelection(to: pasteboard, types: types)
+    }
+
+    private static func cutSelection(of textView: NSTextView, to pasteboard: NSPasteboard) {
+        copySelection(of: textView, to: pasteboard)
+        textView.delete(nil)
+    }
+
+    private static func paste(
+        _ text: String, into textView: NSTextView, from pasteboard: NSPasteboard
+    ) {
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        _ = textView.readSelection(from: pasteboard)
     }
 
     private static func makeEditor(

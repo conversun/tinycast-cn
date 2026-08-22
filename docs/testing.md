@@ -34,6 +34,14 @@ the pure-layer boundary real: a harness that stops *compiling* means AppKit or S
 `Model/` folder, or an effect has leaked into a decision. That is a more common failure than a broken
 assertion, and it is the more important one.
 
+A harness also runs in your own login session against the real system, with no sandbox and no fixture
+world, so it must never mutate state the machine shares with the apps you use. `NSPasteboard.general`
+is the trap: a running Tinycast records every write to it as a genuine copy, so a fixture left there
+lands in clipboard history looking like something the user copied. `notes-editor-test` seeded one on
+every run from #232 onward by calling the native `copy:`/`cut:`/`paste:` actions; it now drives the
+`writeSelection(to:types:)` and `readSelection(from:)` primitives those actions delegate to, against
+`NSPasteboard.withUniqueName()`. Same AppKit path, no shared side effect.
+
 Never join a compile to its run with `&&` in a `set -e` script. `set -e` is specified to ignore a
 failing command in a non-final AND-OR list member, so `swiftc … && /tmp/x` swallows a compile error and
 the script sails on. CI reported success over a harness that had not compiled for twenty-five phases
@@ -55,7 +63,6 @@ If a change touches anything in the right column, the harness on the left is man
 | `emoji-test` | `Emoji/Model/EmojiCatalog.swift`, `EmojiGridGeometry.swift`, the generated data |
 | `palette-selection-test` | `Features/PaletteRowIndex.swift` |
 | `palette-placement-test` | `DesignSystem/Theme.swift`, `Palette/PalettePlacement.swift` |
-| `palette-input-test` | field-editor marked text and palette placeholder visibility |
 | `hotkey-test` | `HotKeys/Model/DoubleTapModifier.swift`, `DoubleTapDetector.swift`, `HyperKey.swift`, `HotKeyAction.swift`, `Service/KeyShortcut.swift`, and the command→action mapping in `Launcher/Model/CommandID.swift` |
 | `callout-test` | `DesignSystem/Theme.swift`, `HotKeys/UI/CalloutPlacement.swift` |
 | `system-action-test` | `SystemActions/Model/SystemAction.swift` |
@@ -190,7 +197,9 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Palette hotkey opens the launcher; pressing it again closes it; Escape closes it; clicking away closes it
 - Reopening focuses the search field with an empty query, in the same position and at the same size
 - Compact mode: typing expands it, and the search bar does **not** shift vertically during the swap
-- With a CJK input source, composing hides the placeholder; cancelling restores it; committing keeps it hidden
+- With a CJK IME: the placeholder clears as soon as composition starts and the composing text never
+  overlaps it; cancelling composition brings the placeholder back, and the list filters only once the
+  candidate is committed — check on a second summon too, where first responder never moved
 - Typing filters instantly; ↑/↓ move the highlight and scroll it into view without yanking the list
 - ⌃N/⌃P move the highlight as ↓/↑ do; ⌃F/⌃B step the emoji grid's selection, and the caret elsewhere
 - The highlight always sits on the row the footer pill describes

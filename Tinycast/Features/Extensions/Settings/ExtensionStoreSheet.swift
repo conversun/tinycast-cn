@@ -230,6 +230,7 @@ struct ExtensionStoreSheet: View {
                 try await core.extensions.install(
                     listing: listing,
                     packageManager: core.settings.extensionPackageManager,
+                    additionalSearchPaths: core.settings.extensionCustomSearchPaths,
                     onProgress: { progress in
                         Task { @MainActor in installing[listing.id] = progress }
                     })
@@ -255,11 +256,14 @@ private struct StoreRow: View {
     let listing: ExtensionListing
     let state: State
     let onInstall: () -> Void
+    @Environment(\.isDarkAppearance) private var isDark
 
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Spacing.lg) {
             ExtensionIconView(
-                resolved: listing.iconURL.map { ExtensionImage.Resolved(source: .remote($0)) },
+                resolved: listing.iconURL(isDark: isDark).map {
+                    ExtensionImage.Resolved(source: .remote($0))
+                },
                 size: 32)
             VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                 HStack(spacing: Theme.Spacing.sm) {

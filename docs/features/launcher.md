@@ -23,10 +23,12 @@ earliest scope wins).
 Settings and persisted as `AppSettings.searchScopes`. A scope is either a directory or a single `.app`
 bundle, stored tilde-abbreviated so the UI reads cleanly and a settings backup stays portable.
 
-Enumeration is **flat** — one `contentsOfDirectory` per scope, no recursion. A nested folder such as
-`/Applications/Adobe` is indexed by adding it as its own scope, which keeps the list honest: what it
-shows is exactly what is scanned. (A one-level nested walk was measured against the flat list over the
-real default set: same 96 apps, same ~0.5 ms once `Bundle()` metadata reads are counted.)
+Enumeration descends **one subfolder deep** — a scope's own `.app` children, plus any inside an
+immediate subfolder, are indexed. That catches vendor-folder installs like
+`/Applications/Blackmagic Design/DaVinci Resolve.app` without the folder needing its own scope
+(#256). The walk stays bounded rather than fully recursive: it never opens an `.app` bundle's own
+`Contents/` tree, because `.app` is treated as a leaf, and a subfolder nested deeper than one level
+still needs its own scope.
 
 The defaults cover `/Applications` and `/System/Applications` plus their `Utilities` folders,
 `/System/Library/CoreServices/Applications`, the cryptex apps under
@@ -51,14 +53,15 @@ format scalars first, since app metadata can contain bidi/zero-width markers bef
 
 ## Searchable fields
 
-An app is matched on four fields kept deliberately separate — flattening them into one string would
+An app is matched on five fields kept deliberately separate — flattening them into one string would
 lose the thing that decides the ranking. `SearchRelevance.score` evaluates each independently and the
 strongest one becomes the entry's base relevance:
 
 | Band | Field                                   | Match strength                                    |
 | ---- | --------------------------------------- | ------------------------------------------------- |
+| 6    | user alias (any entry kind)             | anchored literal — exact / prefix                 |
 | 5    | display name (plus a snippet's keyword) | literal — exact / prefix / word-start / substring |
-| 4    | Spotlight alternate names               | literal                                           |
+| 4    | Spotlight alternate names, plus a user alias's word-start / substring hits | literal |
 | 3    | display name                            | subsequence                                       |
 | 2    | Spotlight alternate names               | subsequence                                       |
 | 1    | bundle identifier                       | literal only                                      |
@@ -87,6 +90,50 @@ query (`cop` ⊂ `com.apple.Photos`), which would change _which_ apps appear rat
 order. For the same reason a bundle id is matched with its leading component stripped
 (`apple.Photos`, not `com.apple.Photos`): `com` alone prefixes almost every installed app. The full id
 still matches exactly, so a pasted identifier resolves.
+
+### Category search
+
+A query that *equals* a category's own name lists that whole category under its section header, in the
+order the section shows when the field is empty. Both words a kind already carries work — the section
+title and the singular label, `Snippets`/`Snippet`, `Window Management`/`Window Command` — read straight
+off `KindDescriptor` by `AppEntry.Kind.named(by:)`, so no category name is written a second time and a
+new `Kind` case gets its category word for free.
+
+**The trigger is exact equality, never a prefix or a fuzzy hit**, because a looser rule would take a word
+away from a real entry: `System Settings` names both a category and an installed application. That one
+collision is answered rather than avoided — an entry whose display name equals the query joins the
+listing, so the app appears under Applications above the panes. Since slice order is section order
+(`publishEntries`), `categoryListing` is a filter with no sort, and the sectioned view stays 1:1 with the
+flat selection. Visibility still applies downstream, and no `limit` does, matching the empty query.
+
+`LauncherScreen` therefore separates the two jobs the empty query used to do at once: `showSections`
+draws the headers, `pinsFavorites` pins the Favorites prefix and hands out the ⌘-digit slots. A category
+listing takes the first only. Opening a row from one also records nothing in `LauncherRankingStore` — a
+category word is not a search for the row that ran, and learning it would rank that row under `s`.
+
+### User aliases
+
+`AliasStore` (`Launcher/Service/`) keeps one user-chosen alias per entry, keyed by `preferenceKey`
+like favorites and learned ranking, so every entry kind — apps, commands, quicklinks, snippets —
+can carry one. An alias is deliberate in a way no vendor field is, so a hit **from its start** —
+exact or prefix — occupies the top band and ranks its entry first. A hit *inside* the alias ranks
+with the Spotlight aliases instead (`term` inside `iterm` must not beat Terminal's own prefix),
+and a subsequence of a short alias would be noise, so it never matches at all. `AppIndex` folds the
+alias into `SearchFields.userAlias` at rank time, keying its memos on the store's revision.
+
+A launcher row shows its entry's alias as a small chip after the name, so what a badge-bearing
+result will answer to is visible without opening anything.
+
+Editing lives in Settings only — an alias is one-time configuration like a shortcut or a
+visibility checkbox, not a per-invocation action, so the ⌘K menu stays out of it. Every pane built
+on `LauncherItemsSection` puts an `AliasField` on each row, dressed like the `ShortcutRecorder`
+beside it; edits store as typed and trim when the field loses focus, and a blank means none. That
+list filters by **membership only**, keeping the index's name order — re-ranking it per keystroke
+would move the row being edited out from under its own field editor.
+
+Aliases ride along in a settings backup (`launcherAliases`), and deleting what an alias points at —
+uninstalling an app, deleting a quicklink or custom command, uninstalling an extension — removes it
+with the entry's other per-entry preferences.
 
 ### Alternate names
 
@@ -155,7 +202,7 @@ Public AppKit, CoreAudio and workspace APIs are preferred. Actions without a sta
 use fixed system tools, Apple Events, Accessibility, or a dynamically resolved Bluetooth power API.
 Those routes run only on explicit activation. Automation, Accessibility or Bluetooth permission is
 requested at first use, and denial produces an alert linking to the relevant System Settings pane.
-Tinycast remains locked to dark appearance even when Toggle System Appearance changes macOS.
+Toggle System Appearance changes macOS; Tinycast follows it only while its own Appearance is System.
 
 Restart, Shut Down, Log Out, Empty Trash and Quit All Applications confirm before execution: ↵ runs
 the action, Escape cancels. Every dialog is Tinycast's own: confirmations, failure reports and the Set
@@ -238,6 +285,55 @@ paths; see the command in `development.md`.
 
 Launcher icons use a persistent 32 MB cost-capped `NSCache`. Fitted file-row icons use a separate
 transient 8 MB cache that is purged when its palette list disappears (`IconCache`).
+
+## Favorites
+
+`FavoritesStore.keys` is the order — the array *is* the ranking, and it only shows while the query is
+empty, where `AppIndex.orderedResults` pins it as a prefix of the results. `LauncherScreen` resolves
+that prefix once in `init` (`favoriteCount`), and the list, the reorder rows and the chord guards all
+read that one number, so the visible section and what a move acts on can't disagree.
+
+The ⌘K menu carries **Add / Remove from Favorites** (⇧⌘F) plus **Move Favorite Up / Down** (⌥⌘↑ /
+⌥⌘↓). A move row is only built in a direction that exists, so the first favorite has no Up row and
+the last has no Down.
+
+**Every one of those rows runs the same call its chord does** — the menu is handed an
+`AppActionsMenu.FavoriteActions` built by `LauncherScreen` and never touches `FavoritesStore` itself.
+A row that mutates the store directly looks identical on screen and then behaves differently from its
+chord, because the store knows nothing about where the highlight should land.
+
+`FavoritesStore.exchange` swaps two stored positions rather than removing and re-inserting. `keys`
+retains entries that `VisibilityStore` hides or that aren't currently indexed — `ordered(_:)` drops
+them with `compactMap` and never prunes them, which is how a favorite survives an unmounted volume —
+so exchanging the two *visible* keys leaves every such key on its own slot.
+
+Both actions re-ask `orderedResults` afterwards and restate `vm.selection` against it; the mutation
+already invalidated the memo, so that call warms the exact key the next render reads. Where the
+highlight lands differs on purpose: a **move** follows the entry, since the point of the action is
+where that entry now sits, while a **toggle** stays with the section rather than chasing an entry
+across the list — the top of Favorites on add, the neighbour above the one that left on remove.
+
+### ⌘-digit slots
+
+`FavoriteSlots` (`Launcher/Model/FavoriteSlots.swift`) is the whole rule: **⌘1…⌘9 then ⌘0 for the
+tenth**, ten digit keys being the physical ceiling — there is no ⌘10. The eleventh favorite is still
+listed and reorderable, and simply has no chord and no number. Three places read that table — the key
+handler, the row's number, the compact tooltip — so none of them can invent an eleventh slot.
+
+Both palette sizes serve the chords from the same prefix, because `paletteIsCollapsed` already
+requires an empty query: **compact implies empty implies `favoriteCount` is the pinned prefix**. That
+is why `LauncherScreen.pinnedFavorites` feeds the strip, the chords and the numbered rows alike,
+rather than the compact bar re-deriving an empty-query order of its own. In compact the strip draws
+the first five; ⌘6–⌘0 still launch favorites it has no room for, and the "…" is a button after them
+rather than a slot, so no favorite loses its digit to the overflow.
+
+Holding ⌘ swaps each numbered row's kind label for its chord. `PalettePanel` publishes the modifier
+into `PaletteState.commandHeld` from `.flagsChanged` and clears it in `resignKey` — not in `prepare`,
+which a re-show that preserves state skips entirely. **`AppRow` observes that flag itself**: reading
+it any higher would attach it to `RootPaletteView`'s body and rebuild the whole palette on every ⌘
+press, where a row-level read re-runs only the handful of rows the `LazyVStack` has realized. The
+digit each row shows is carried on its `Row` case from the section build, so no row searches for its
+own position.
 
 ## Reveal in Finder
 

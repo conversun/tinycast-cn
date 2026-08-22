@@ -1,0 +1,12 @@
+{
+  "pages": [
+    "index",
+    "install",
+    "permissions",
+    "palette",
+    "launcher",
+    "features",
+    "extensions",
+    "reference"
+  ]
+}

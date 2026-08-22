@@ -72,6 +72,7 @@ run file-search-session-test Tinycast/Platform/Signposts.swift \
                              Tinycast/Features/FileSearch/Service/*.swift
 run ranking-test           $L/SearchRelevance.swift $L/LauncherRankingStore.swift
 run scopes-test            $L/SearchScopes.swift
+run favorites-test         $L/FavoriteSlots.swift
 run calc-test              Tinycast/Features/Calculator/Model/*.swift
 run clipboard-test         Tinycast/Features/Clipboard/Model/ClipboardStore.swift \
                            Tinycast/Features/Clipboard/Model/ClipboardFilter.swift
@@ -80,19 +81,16 @@ run emoji-test             Tinycast/Features/Emoji/Model/EmojiCatalog.swift \
                            Tinycast/Features/Emoji/Model/EmojiData.generated.swift
 run palette-selection-test Tinycast/Features/PaletteRowIndex.swift \
                            Tinycast/Features/Emoji/Model/EmojiGridGeometry.swift
-run palette-placement-test Tinycast/DesignSystem/Theme.swift \
+run appearance-test        Tinycast/Platform/Appearance.swift \
+                           Tinycast/DesignSystem/Theme.swift \
+                           Tinycast/Features/Settings/AppAppearance.swift
+run palette-placement-test Tinycast/Platform/Appearance.swift \
+                           Tinycast/DesignSystem/Theme.swift \
                            Tinycast/Palette/PalettePlacement.swift
 run scroll-reveal-test     Tinycast/DesignSystem/Scrolling/SelectionReveal.swift
 run hover-arming-test      Tinycast/Palette/HoverArming.swift \
                            Tinycast/Palette/PaletteState.swift \
                            Tinycast/Palette/PaletteMode.swift \
-                           Tinycast/Features/Clipboard/Model/ClipboardStore.swift \
-                           Tinycast/Features/Clipboard/Model/ClipboardFilter.swift \
-                           Tinycast/Features/Quicklinks/Model/Quicklink.swift
-run palette-input-test     Tinycast/Palette/HoverArming.swift \
-                           Tinycast/Palette/PaletteState.swift \
-                           Tinycast/Palette/PaletteMode.swift \
-                           Tinycast/Palette/PalettePanel.swift \
                            Tinycast/Features/Clipboard/Model/ClipboardStore.swift \
                            Tinycast/Features/Clipboard/Model/ClipboardFilter.swift \
                            Tinycast/Features/Quicklinks/Model/Quicklink.swift
@@ -105,11 +103,15 @@ run hotkey-test            Tinycast/Features/HotKeys/Model/DoubleTapModifier.swi
                            Tinycast/Features/Quicklinks/Model/Quicklink.swift \
                            Tinycast/Features/SystemActions/Model/SystemAction.swift \
                            Tinycast/Features/WindowManagement/WindowCommand.swift
-run callout-test           Tinycast/DesignSystem/Theme.swift \
+run callout-test           Tinycast/Platform/Appearance.swift \
+                           Tinycast/DesignSystem/Theme.swift \
                            Tinycast/Features/HotKeys/UI/CalloutPlacement.swift
-run icon-cache-test        Tinycast/Platform/Images/IconCache.swift
-run entry-icon-test        Tinycast/Platform/Images/IconCache.swift
-run ext-icon-test          Tinycast/Platform/Images/IconCache.swift \
+run icon-cache-test        Tinycast/Platform/Appearance.swift \
+                           Tinycast/Platform/Images/IconCache.swift
+run entry-icon-test        Tinycast/Platform/Appearance.swift \
+                           Tinycast/Platform/Images/IconCache.swift
+run ext-icon-test          Tinycast/Platform/Appearance.swift \
+                           Tinycast/Platform/Images/IconCache.swift \
                            Tinycast/Features/Extensions/Service/ExtensionIconCache.swift
 run system-action-test     Tinycast/Features/SystemActions/Model/SystemAction.swift
 run volume-test            Tinycast/Features/SystemActions/Model/VolumeLevel.swift
@@ -129,6 +131,7 @@ run quicklink-test         Tinycast/Features/Quicklinks/Model/Quicklink.swift \
                            Tinycast/Features/Quicklinks/Model/QuicklinkArchive.swift
 run snippets-test          Tinycast/Platform/NotificationToken.swift \
                            Tinycast/Platform/HealthTicker.swift \
+                           Tinycast/Platform/AccessibilityText.swift \
                            Tinycast/Features/Snippets/Model/*.swift \
                            Tinycast/Features/Snippets/Service/*.swift
 run notes-test             Tinycast/Platform/Signposts.swift \
@@ -136,6 +139,7 @@ run notes-test             Tinycast/Platform/Signposts.swift \
                            Tinycast/Features/Notes/Model/*.swift \
                            Tinycast/Features/Notes/Service/*.swift
 run notes-editor-test      Tinycast/Platform/Signposts.swift \
+                           Tinycast/Platform/Appearance.swift \
                            Tinycast/DesignSystem/Theme.swift \
                            Tinycast/Features/Notes/Model/NoteDocument.swift \
                            Tinycast/Features/Notes/UI/NoteTextView.swift \

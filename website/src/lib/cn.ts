@@ -12,6 +12,7 @@ const twMerge = extendTailwindMerge({
           text: [
             "eyebrow",
             "caption",
+            "key",
             "small",
             "body",
             "body-lg",

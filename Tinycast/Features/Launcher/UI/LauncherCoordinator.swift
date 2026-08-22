@@ -53,7 +53,8 @@ final class LauncherCoordinator {
     func launch(
         _ app: AppEntry, searchQuery: String? = nil, arguments: [String: String] = [:]
     ) {
-        if let searchQuery {
+        // A category listing is not a search for the row that ran; learning it would rank it under "s".
+        if let searchQuery, AppEntry.Kind.named(by: searchQuery) == nil {
             ranking.record(itemKey: app.preferenceKey, query: searchQuery)
         }
         // Commands dispatch before the palette hides: mode-switching commands keep it open.

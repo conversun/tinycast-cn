@@ -27,8 +27,9 @@ Write code as if the platform released yesterday:
   migration scaffolding, no "just in case" fallbacks. The two migrations that exist are scheduled for
   deletion; nothing new may depend on them.
 
-Carbon is the one deliberate exception, and it is a capability gap rather than inertia: nothing modern
-registers a system-wide chord. Full reasoning in [standards.md](docs/standards.md#posture).
+Carbon is a deliberate capability-gap dependency rather than inertia: nothing modern registers a
+system-wide chord, and HIToolbox's TIS APIs remain the public input-source mechanism. Full reasoning in
+[standards.md](docs/standards.md#posture).
 
 ## Where things are
 
@@ -66,8 +67,11 @@ feature's doc, under its own `## Invariants`.
 - **Swift 6 language mode: data-race violations are hard errors.** `@MainActor` is the default,
   cross-actor model types are `Sendable`, and heavy or IO-bound work goes off-main as `nonisolated`
   functions driven by `Task.detached`. Do not add a second actor.
-- **The app is locked to `.darkAqua` globally.** The Liquid Glass material is tuned for a deep dark
-  surface; light mode is not a switch, it is a second design.
+- **Dark is the baseline, and a colour's dark branch is the literal it always was.** `Theme.Colors`
+  resolves per appearance through `ramp`/`adaptive`; every dark value is the `Color.white.opacity(…)`
+  the forced-dark build shipped, restated rather than re-derived. Retune a light branch freely — change
+  a dark one only when the task is to change Dark. `AppAppearance` drives `NSApp.appearance`, and
+  `.system` maps to `nil` so AppKit follows macOS on its own.
 - **Tinycast presents its own dialogs — never `NSAlert`, `NSSlider` or a system popover.** A question
   goes through `DialogController`, a report through a HUD via `HUDPresenter`.
 - **A networked feature fetches on a private `.ephemeral`, `urlCache = nil` session**, never

@@ -156,7 +156,7 @@ private struct MenuFileIcon: View {
             }
         }
         .frame(width: Theme.Size.menuIcon, height: Theme.Size.menuIcon)
-        .task(id: path) {
+        .task(id: IconRequest(path)) {
             guard image == nil else { return }
             image = await IconCache.loadAsync(forFile: path)
         }

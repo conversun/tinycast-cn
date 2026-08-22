@@ -361,6 +361,7 @@ private struct ClipboardInfoSection: View {
 
     /// Name and icon from the recorded bundle ID, via Launch Services and `IconCache`.
     private var source: (name: String, icon: NSImage)? {
+        IconCache.observeStyle()
         guard let bundleID = item.sourceBundleID,
             let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
         else { return nil }

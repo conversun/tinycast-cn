@@ -102,6 +102,23 @@ const hostConfig = {
   getInstanceFromNode: () => null,
 };
 
+/// A `single` slot (`detail`, `actions`, …) expects one element, but a Fragment passed as the prop
+/// (`detail={<><List.Item.Detail markdown={…} /><List.Item.Detail metadata={…} /></>}`) flattens into
+/// several same-typed siblings by the time the reconciler commits — keeping only the first silently
+/// drops the rest. Merge same-typed siblings into one node instead; a heterogeneous fragment falls
+/// back to the first element, matching the prior behaviour.
+function mergeSingleSlot(contents) {
+  if (contents.length === 1) return contents[0];
+  const [first, ...rest] = contents;
+  if (rest.some((node) => node.type !== first.type)) return first;
+  const merged = { id: first.id, type: first.type, props: { ...first.props }, children: [...first.children] };
+  for (const node of rest) {
+    Object.assign(merged.props, node.props);
+    merged.children.push(...node.children);
+  }
+  return merged;
+}
+
 function detach(parent, child) {
   const index = parent.children.indexOf(child);
   if (index >= 0) parent.children.splice(index, 1);
@@ -182,7 +199,7 @@ export class Surface {
         const name = child.props?.name;
         if (!name) continue;
         const contents = child.children.map((entry) => this.serialize(entry)).filter(Boolean);
-        if (contents.length) props[name] = child.props.single ? contents[0] : contents;
+        if (contents.length) props[name] = child.props.single ? mergeSingleSlot(contents) : contents;
         continue;
       }
       const serialized = this.serialize(child);

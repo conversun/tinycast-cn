@@ -72,7 +72,7 @@ the shared primitives and system shims every feature draws on. Neither may depen
 
 `AppCore.shared` (`App/AppCore.swift`) is a `@MainActor` singleton owning every long-lived thing in the
 app: the stores (`AppIndex`, `ClipboardStore`, `SnippetsStore`, `QuicklinkStore`, `CustomCommandStore`,
-`FavoritesStore`, `VisibilityStore`, `LauncherRankingStore`, `CalculatorHistoryStore`,
+`FavoritesStore`, `VisibilityStore`, `AliasStore`, `LauncherRankingStore`, `CalculatorHistoryStore`,
 `CurrencyRateStore`, `FrequentEmojiStore`), the managers and monitors (`ClipboardManager`,
 `HotKeyManager`, `HyperKeyTap`, `RunningAppsMonitor`, `SnippetKeywordListener`), the shared state
 (`AppSettings`, `PaletteState`, `FileSearchSession`, `UninstallSession`,
@@ -124,7 +124,9 @@ imperatively from AppKit.
   `VolumeHUDController` (the level box), both over a shared `HUDPresenter` that owns the
   one-at-a-time, auto-dismiss and fade policy. See [ui.md](ui.md#dialogs--hud).
 
-`NSAlert` is never used, and the app forces `.darkAqua` globally. Both are load-bearing.
+`NSAlert` is never used, and that is load-bearing. Appearance is a setting: `AppCore.applyAppearance()`
+assigns `NSApp.appearance` from `AppSettings.appearance`, and `.system` assigns `nil` so AppKit follows
+macOS by itself. Nothing else in the app sets an appearance.
 
 ## Observation
 
@@ -174,7 +176,8 @@ Tinycast/
   App/              @main, AppDelegate, AppCore — the composition root
   DesignSystem/     Theme (the token source), KeyCapChip, Tooltip, SymbolImage,
                     VisualEffectView, PopoverMenu, SettingsComponents, Scrolling/, Interaction/
-  Platform/         system shims: Permissions, LaunchAtLogin, CursorScreen, AppDisplayName,
+  Platform/         system shims: Permissions, LaunchAtLogin, InputSourceSwitcher, ScreenTarget,
+                    AppDisplayName,
                     NotificationToken, AppPaths, Signposts, HealthTicker, Memo, ActivationPolicy,
                     Images/, Compression/
   Resources/        RaycastRuntime.generated.js, the embedded extension runtime

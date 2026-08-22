@@ -25,10 +25,16 @@ struct ExtensionInstaller: Sendable {
 
     let client: ExtensionStoreClient
     let packageManager: ExtensionPackageManager
+    /// From `extensionCustomSearchPaths`, checked before the built-in list — a mise or Nix shim folder.
+    let additionalSearchPaths: [String]
 
-    init(client: ExtensionStoreClient = ExtensionStoreClient(), packageManager: ExtensionPackageManager) {
+    init(
+        client: ExtensionStoreClient = ExtensionStoreClient(), packageManager: ExtensionPackageManager,
+        additionalSearchPaths: [String] = []
+    ) {
         self.client = client
         self.packageManager = packageManager
+        self.additionalSearchPaths = additionalSearchPaths
     }
 
     /// Copies into place before the workspace goes, which is why it hands back the install, not a path.
@@ -100,10 +106,11 @@ struct ExtensionInstaller: Sendable {
     private func build(
         at source: URL, into output: URL, onProgress: @Sendable @escaping (Progress) -> Void
     ) async throws -> URL {
-        guard let resolved = packageManager.resolve() else {
+        guard let resolved = packageManager.resolve(additionalSearchPaths: additionalSearchPaths) else {
             throw ExtensionStoreError.noPackageManager
         }
-        guard let node = ExtensionPackageManager.nodeURL() else {
+        guard let node = ExtensionPackageManager.nodeURL(additionalSearchPaths: additionalSearchPaths)
+        else {
             throw ExtensionStoreError.noNode
         }
 
@@ -168,7 +175,7 @@ struct ExtensionInstaller: Sendable {
         process.currentDirectoryURL = directory
 
         var environment = ProcessInfo.processInfo.environment
-        var searchPath = ExtensionPackageManager.searchPaths
+        var searchPath = additionalSearchPaths + ExtensionPackageManager.searchPaths
         // Node first: the package manager spawns `ray` off PATH, and a version manager hides Node.
         if let node { searchPath.insert(node.deletingLastPathComponent().path, at: 0) }
         environment["PATH"] = searchPath.joined(separator: ":")

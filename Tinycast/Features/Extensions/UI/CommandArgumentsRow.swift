@@ -95,13 +95,13 @@ private struct ArgumentField: View {
     private var fill: Color {
         if isFocused { return Theme.Colors.selection }
         if hovered { return Theme.Colors.rowHover }
-        return Color.white.opacity(0.045)
+        return ExtensionColors.fieldFill
     }
 
     /// Focus reads as a brighter edge; an unfilled required argument stays amber until it's answered.
     private var stroke: Color {
-        if isFocused { return Color.white.opacity(0.28) }
+        if isFocused { return ExtensionColors.fieldFocusStroke }
         if argument.required && text.isEmpty { return Color.orange.opacity(0.45) }
-        return Color.white.opacity(0.07)
+        return ExtensionColors.fieldStroke
     }
 }

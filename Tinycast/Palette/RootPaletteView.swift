@@ -40,7 +40,8 @@ struct RootPaletteView: View {
             return LauncherScreen(
                 appIndex: appIndex, favorites: favorites, visibility: visibility,
                 currencyRates: currencyRates, core: core, vm: vm, running: selectionIsRunning,
-                openActions: openActions)
+                openActions: openActions,
+                scrollToFollow: { scroll = ScrollIntent(kind: .follow) })
         case .uninstall:
             return UninstallScreen(
                 session: uninstall, core: core, vm: vm, openActions: openActions)
@@ -213,7 +214,7 @@ struct RootPaletteView: View {
         }
         // The window's frame is the size source, so the glass and clip stay matched.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color.black.opacity(Theme.Colors.panelDimming))
+        .background(Theme.Colors.panelScrim)
         .background(VisualEffectView())
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
         // Every show bumps focusToken: refocus search and drop any menu left open.
@@ -265,23 +266,18 @@ struct RootPaletteView: View {
         .onChange(of: core.paletteCoordinator.paletteIsCollapsed) {
             core.paletteCoordinator.syncPaletteSize()
         }
-        // ⌘1–⌘5 launch the compact bar's favorite slots, or expand for the overflow.
-        .onKeyPress(keys: ["1", "2", "3", "4", "5"], phases: .down) { press in
-            guard isCollapsed, settings.showFavoritesInCompactMode,
-                press.modifiers.contains(.command),
-                let digit = press.key.character.wholeNumberValue,
+        // ⌘1–⌘9/⌘0 launch favorites by position, in both palette sizes.
+        .onKeyPress(keys: Self.favoriteSlotKeys, phases: .down) { press in
+            guard press.modifiers.contains(.command),
+                !isCollapsed || settings.showFavoritesInCompactMode,
+                let index = FavoriteSlots.index(for: press.key.character),
                 let launcher = screen as? LauncherScreen
             else { return .ignored }
-            let slots = launcher.compactFavoriteSlots
-            let index = digit - 1
-            guard slots.indices.contains(index) else { return .ignored }
-            switch slots[index] {
-            case .app(let app): core.launcherCoordinator.launch(app)
-            case .more: core.paletteCoordinator.expandFromCompact()
-            }
-            return .handled
+            return launcher.launchFavorite(at: index) ? .handled : .ignored
         }
-        .onKeyPress(.downArrow) {
+        // Repeat included: holding the key must keep stepping, as the bare-key form does by default.
+        .onKeyPress(keys: [.downArrow], phases: [.down, .repeat]) { press in
+            if let reorder = moveFavorite(1, modifiers: press.modifiers) { return reorder }
             if isCollapsed {
                 // The compact bar shows no selection, so Down reveals the list's first row.
                 vm.selection = 0
@@ -295,7 +291,8 @@ struct RootPaletteView: View {
             moveVertically(1)
             return .handled
         }
-        .onKeyPress(.upArrow) {
+        .onKeyPress(keys: [.upArrow], phases: [.down, .repeat]) { press in
+            if let reorder = moveFavorite(-1, modifiers: press.modifiers) { return reorder }
             if isCollapsed { return .ignored }
             if menuOpen {
                 moveMenu(-1)
@@ -403,6 +400,15 @@ struct RootPaletteView: View {
             toggleClipboardFilter()
             return .handled
         }
+        // ⇧⌘F mirrors the Add/Remove Favorites row, closing an open menu the way that row does.
+        .onKeyPress(keys: ["f", "F"], phases: .down) { press in
+            guard press.modifiers.contains(.command), press.modifiers.contains(.shift),
+                !isCollapsed, let launcher = screen as? LauncherScreen
+            else { return .ignored }
+            guard launcher.toggleFavorite(at: selection(in: launcher)) else { return .ignored }
+            if menuOpen { closeMenus() }
+            return .handled
+        }
         // Both cases, Shift uppercasing the key; the compact bar shows no target.
         .onKeyPress(keys: ["q", "Q"], phases: .down) { press in
             guard press.modifiers.contains(.control), press.modifiers.contains(.shift),
@@ -471,11 +477,12 @@ struct RootPaletteView: View {
             if isCollapsed, settings.showFavoritesInCompactMode,
                 let launcher = screen as? LauncherScreen
             {
-                let slots = launcher.compactFavoriteSlots
-                if !slots.isEmpty {
+                let favorites = launcher.compactFavorites
+                if !favorites.isEmpty {
                     headerGutter(width: Theme.Spacing.md)
                     CompactFavoritesRow(
-                        slots: slots,
+                        favorites: favorites,
+                        showsOverflow: launcher.hasUnshownFavorites,
                         onLaunch: { core.launcherCoordinator.launch($0) },
                         onOverflow: { core.paletteCoordinator.expandFromCompact() }
                     )
@@ -526,13 +533,21 @@ struct RootPaletteView: View {
         return TextField("", text: $vm.query)
             .textFieldStyle(.plain)
             .font(Theme.Typography.searchField)
-            .tint(.white)
+            .tint(Theme.Colors.textPrimary)
             .focused($searchFocused)
             .onSubmit(activateSelection)
             // Fills the row's height, so there's no gap above it for topDragStrip to meet.
             .frame(maxHeight: .infinity)
             .background(alignment: .leading) {
-                SearchPlaceholder(state: vm, prompt: searchPrompt)
+                // An IME's marked text leaves `query` empty, so the placeholder would overlap it.
+                if vm.query.isEmpty, !vm.isComposing {
+                    Text(searchPrompt)
+                        .font(Theme.Typography.searchField)
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
+                        // Never a click target: tapping the placeholder must still land the caret.
+                        .allowsHitTesting(false)
+                }
             }
             // The prompt used to carry this; without it the field would be unlabelled.
             .accessibilityLabel(Text(searchPrompt))
@@ -637,6 +652,10 @@ struct RootPaletteView: View {
         withAnimation(Self.menuAnimation) { openMenu = nil }
     }
 
+    /// SwiftUI wants a Set; built once so the palette isn't allocating one per render.
+    private static let favoriteSlotKeys: Set<KeyEquivalent> =
+        Set(FavoriteSlots.digits.map { KeyEquivalent($0) })
+
     /// Inset from the bottom corners, so the menu's own corner isn't clipped.
     private static let menuInset: CGFloat = 8
     private static let menuAnimation: Animation = .easeOut(duration: 0.14)
@@ -679,6 +698,16 @@ struct RootPaletteView: View {
         vm.selection = next
         scroll = ScrollIntent(kind: .follow)
         return true
+    }
+
+    /// ⌥⌘↑/↓ — reorder the Favorites section, mirroring its rows. Claimed whole on the launcher, so
+    /// a press at an end of the section can't fall through to the caret; nil leaves ↑/↓ their own.
+    private func moveFavorite(_ delta: Int, modifiers: EventModifiers) -> KeyPress.Result? {
+        guard modifiers.contains(.command), modifiers.contains(.option), !isCollapsed,
+            let launcher = screen as? LauncherScreen
+        else { return nil }
+        if launcher.moveFavorite(delta, at: selection(in: launcher)), menuOpen { closeMenus() }
+        return .handled
     }
 
     /// Move the open menu's highlight, clamped at the ends (no wrap — consistent with `move`).
@@ -749,31 +778,6 @@ private enum OpenMenu {
     case clipboardFilter
 }
 
-private struct SearchPlaceholder: View {
-    let state: PaletteState
-    let prompt: String
-    @State private var hasMarkedText = false
-
-    var body: some View {
-        Group {
-            if state.query.isEmpty, !hasMarkedText {
-                Text(prompt)
-                    .font(Theme.Typography.searchField)
-                    .foregroundStyle(Theme.Colors.textTertiary)
-                    .lineLimit(1)
-                    .allowsHitTesting(false)
-            }
-        }
-        .onAppear {
-            hasMarkedText = state.searchHasMarkedText
-            state.onSearchMarkedTextChanged = { hasMarkedText = $0 }
-        }
-        .onDisappear {
-            state.onSearchMarkedTextChanged = nil
-        }
-    }
-}
-
 /// The footer's menu circle; hover lives here, so a sweep never re-renders the body.
 private struct MenuCircleButton: View {
     let action: () -> Void
@@ -832,52 +836,44 @@ struct EmptyResults: View {
     }
 }
 
-/// A compact-bar favorites slot: a launchable app, or the overflow that expands.
-enum CompactFavoriteSlot {
-    case app(AppEntry)
-    case more
-
-    // Stable identity, so a reorder moves icons with their app rather than by position.
-    var id: String {
-        switch self {
-        case .app(let app): return app.id
-        case .more: return "__tinycast.more__"
-        }
-    }
-}
-
-/// The compact bar's favorites strip: up to 5 buttons, ⌘1–⌘5 in each tooltip.
+/// The compact bar's favorites strip: up to 5 buttons carrying their chord in the tooltip, then the
+/// overflow, which is a button rather than a slot so no favorite loses its digit to it.
 private struct CompactFavoritesRow: View {
-    let slots: [CompactFavoriteSlot]
+    let favorites: [AppEntry]
+    let showsOverflow: Bool
     let onLaunch: (AppEntry) -> Void
     let onOverflow: () -> Void
 
     var body: some View {
         HStack(spacing: Theme.Spacing.xs) {
-            ForEach(Array(slots.enumerated()), id: \.element.id) { index, slot in
-                switch slot {
-                case .app(let app):
-                    CompactFavoriteButton(help: "\(app.name)  ⌘\(index + 1)") {
-                        onLaunch(app)
-                    } content: {
-                        AppIconView(app: app)
-                            .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
-                    }
-                case .more:
-                    CompactFavoriteButton(help: "Show all  ⌘\(index + 1)", action: onOverflow) {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                            .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Theme.Colors.controlSurface)
-                                    .padding(Theme.Spacing.xxs)
-                            )
-                    }
+            // Identified by the app, so a reorder moves an icon with its app rather than by position.
+            ForEach(Array(favorites.enumerated()), id: \.element.id) { index, app in
+                CompactFavoriteButton(help: help(for: app, at: index)) {
+                    onLaunch(app)
+                } content: {
+                    AppIconView(app: app)
+                        .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
+                }
+            }
+            if showsOverflow {
+                CompactFavoriteButton(help: "Show all  ↓", action: onOverflow) {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Theme.Colors.controlSurface)
+                                .padding(Theme.Spacing.xxs)
+                        )
                 }
             }
         }
+    }
+
+    private func help(for app: AppEntry, at index: Int) -> String {
+        guard let digit = FavoriteSlots.digit(at: index) else { return app.name }
+        return "\(app.name)  ⌘\(digit)"
     }
 }
 

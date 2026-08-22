@@ -440,24 +440,18 @@ final class ExtensionHostBridge: ExtensionHostAPI {
         ]
     }
 
-    /// Reuses the Accessibility grant the paste path already needs.
+    /// Reads the app the palette displaced, never the system-wide focus, which is our own field here.
     private func selectedText() throws -> String {
         guard Permissions.ensureAccessibility() else {
             throw ExtensionHostError.unsupported("getSelectedText without the Accessibility permission")
         }
-        let system = AXUIElementCreateSystemWide()
-        var focused: AnyObject?
-        guard
-            AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused)
-                == .success,
-            let element = focused as! AXUIElement?
-        else { throw ExtensionHostError.unsupported("getSelectedText (no focused element)") }
+        guard let target = context?.pasteTarget,
+            target.processIdentifier != NSRunningApplication.current.processIdentifier
+        else { throw ExtensionHostError.unsupported("getSelectedText (no target application)") }
 
-        var value: AnyObject?
-        guard
-            AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value)
-                == .success, let text = value as? String
-        else { throw ExtensionHostError.unsupported("getSelectedText (no selection)") }
+        guard let text = AccessibilityText.selection(in: target), !text.isEmpty else {
+            throw ExtensionHostError.unsupported("getSelectedText (no selection)")
+        }
         return text
     }
 

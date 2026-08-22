@@ -121,12 +121,13 @@ struct ExtensionTests {
         extensionName: String = "fixture", command: String = "fixture",
         mode: ExtensionCommandMode = .view, assets: String = "/tmp",
         preferences: [String: ExtensionPreferenceValue] = [:],
-        arguments: [String: String] = [:]
+        arguments: [String: String] = [:], isDarkAppearance: Bool = true
     ) -> ExtensionLaunchContext {
         ExtensionLaunchContext(
             extensionName: extensionName, extensionTitle: extensionName, commandName: command,
             commandMode: mode, assetsPath: assets, supportPath: "/tmp",
-            preferences: preferences, caches: [:], arguments: arguments, fallbackText: nil)
+            preferences: preferences, caches: [:], arguments: arguments, fallbackText: nil,
+            isDarkAppearance: isDarkAppearance)
     }
 
     /// `EXT_TEST_ARGS="hours=0,minutes=5"` — stands in for the palette's inline argument fields.
@@ -224,6 +225,13 @@ struct ExtensionTests {
         check("no-view mode", manifest.commands[1].mode == .noView)
         check("menu-bar is unsupported", manifest.commands[2].mode.isSupported == false)
         check("menu-bar explains itself", manifest.commands[2].mode.unsupportedReason != nil)
+        // Extensions branch on `environment.appearance`, so the host must not report a fixed one.
+        check(
+            "a dark host reports dark",
+            launchContext(isDarkAppearance: true).jsonString().contains("\"appearance\":\"dark\""))
+        check(
+            "a light host reports light",
+            launchContext(isDarkAppearance: false).jsonString().contains("\"appearance\":\"light\""))
         check("keywords", manifest.commands[0].keywords == ["find"])
         check("arguments", manifest.commands[3].arguments.first?.name == "q")
         check("argument required", manifest.commands[3].arguments.first?.required == true)

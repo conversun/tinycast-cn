@@ -3,9 +3,20 @@ import SwiftUI
 /// Actions menu for a launcher app, from right-click or the Actions pill.
 @MainActor
 enum AppActionsMenu {
+    /// The favorites rows for one entry — what they may do and how to run them, resolved by the
+    /// screen that owns the visible order. Every row here runs the same call its chord does.
+    @MainActor
+    struct FavoriteActions {
+        let isFavorite: Bool
+        let canMoveUp: Bool
+        let canMoveDown: Bool
+        let toggle: () -> Void
+        let move: (Int) -> Void
+    }
+
     static func content(
-        app: AppEntry, searchQuery: String, core: AppCore, favorites: FavoritesStore,
-        running: Bool, onResetRanking: @escaping () -> Void
+        app: AppEntry, searchQuery: String, core: AppCore, running: Bool,
+        favorites: FavoriteActions, onResetRanking: @escaping () -> Void
     ) -> PopoverMenuContent {
         var items: [PopoverMenuItem] = [
             PopoverMenuItem(
@@ -13,15 +24,25 @@ enum AppActionsMenu {
                 shortcut: "↵"
             ) { core.launcherCoordinator.launch(app, searchQuery: searchQuery) }
         ]
-        if favorites.isFavorite(app) {
+        items.append(
+            PopoverMenuItem(
+                title: favorites.isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                systemImage: favorites.isFavorite ? "star.slash" : "star", shortcut: "⇧⌘F",
+                action: favorites.toggle))
+        if favorites.canMoveUp {
             items.append(
-                PopoverMenuItem(title: "Remove from Favorites", systemImage: "star.slash") {
-                    favorites.toggle(app)
+                PopoverMenuItem(
+                    title: "Move Favorite Up", systemImage: "arrow.up", shortcut: "⌥⌘↑"
+                ) {
+                    favorites.move(-1)
                 })
-        } else {
+        }
+        if favorites.canMoveDown {
             items.append(
-                PopoverMenuItem(title: "Add to Favorites", systemImage: "star") {
-                    favorites.toggle(app)
+                PopoverMenuItem(
+                    title: "Move Favorite Down", systemImage: "arrow.down", shortcut: "⌥⌘↓"
+                ) {
+                    favorites.move(1)
                 })
         }
         if core.launcherRanking.hasRanking(for: app.preferenceKey) {

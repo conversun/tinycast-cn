@@ -155,6 +155,13 @@ screens hold (see [palette.md](palette.md)).
   too. `isShowingDetail` splits the screen into rows plus a detail pane.
 - **Detail** — markdown rendered block-by-block (headings, lists, code fences, quotes, rules, remote
   images) with `AttributedString` handling inline styling, plus `Detail.Metadata`.
+- **Appearance** — `environment.appearance` reports the real one, so an extension that branches on it
+  is told the truth. It is an injected field on `ExtensionLaunchContext` (a `Model/` type owns no
+  environment), which means a **running command keeps the appearance it booted with**; a change
+  reaches it on the next launch. A `{light, dark}` icon or colour is picked by
+  `ExtensionImage.resolve(_:assetsPath:isDark:)`, whose `isDark` comes from the view's
+  `\.isDarkAppearance` so the pick re-renders when the surface flips; either side stands in when an
+  extension supplies only one. The feature's own fills live in `ExtensionColors` — never in `Theme`.
 - **Form** — label-left/control-right rows. Field values live in the extension (React owns them); every
   edit dispatches `onTinycastChange` and the resulting re-render is what updates the control, so
   `defaultValue`, a controlled `value`, and `ref.reset()` all behave.
@@ -250,10 +257,17 @@ source, which is the only contract such an extension offers. Lifecycle scripts a
 build script is the contract, a `postinstall` is code nobody asked to run. The package manager is
 `Automatic` by default, which takes the first of pnpm, Bun, Yarn and npm that is installed — a GUI app
 inherits none of a login shell's `PATH`, so `ExtensionPackageManager.searchPaths` is where they are
-looked for, version managers included.
+looked for, version managers included (Homebrew, Volta, asdf, mise, fnm, nvm, Yarn).
 
-Neither the registry list nor the package manager rides a settings backup: one names a tool the
-machine an import lands on may not have, the other is a source of code that will be run.
+That hardcoded list can never cover every toolchain layout — Nix among them — so the Registries sheet
+also has "Custom search paths": a `:`-separated list, `extensionCustomSearchPaths` in `AppSettings`,
+checked *before* the built-in list wherever it resolves a package manager or Node. Set once, it applies
+to every future install; nothing about it needs entering per-install. `ExtensionInstaller` takes it as
+`additionalSearchPaths` rather than reading settings itself, keeping the Model/Service split intact.
+
+Neither the registry list, the package manager, nor the custom search paths ride a settings backup:
+the first two name a tool or a source of code the machine an import lands on may not have or want, and
+the last is a set of paths specific to this Mac's toolchain layout.
 
 ## Shortcuts
 
@@ -370,12 +384,13 @@ never shares with an installed copy.
 | Icon override | `UserDefaults` → `extensionAppearances` | yes |
 | Command shortcuts | `UserDefaults` → `hotkey.extensionCommand.<entry id>` | yes |
 | Favorites, hidden items | `UserDefaults` → `favoriteApps`, `hiddenItemKeys` | yes |
+| User alias | `UserDefaults` → `launcherAliases` | yes |
 | Launch ranking | `Caches/<bundle id>/launcher-ranking.json` | yes |
 
 `ExtensionCatalog.safeName` maps an npm-style name onto one path segment, and is the **only** copy of
 that mapping — a second one that drifts orphans every file the first one wrote.
 
-The last three rows are pruned by `ExtensionCoordinator.removeExtensionReferences`, reached through
+The last four rows are pruned by `ExtensionCoordinator.removeExtensionReferences`, reached through
 `ExtensionManager.onDidUninstall`. An extension's `preferenceKey` is its entry id, because it has no
 bundle id, so `extension:<name>/<command>` is what those stores are keyed by. `CustomCommandCoordinator`
 and `QuicklinkCoordinator` prune the same stores the same way; extensions are not a special case.
@@ -415,8 +430,8 @@ nothing about extensions. It lends out only the pixel work (`displayPixel`, `art
 symbol tile both sit at `IconCache.artworkExtent` **0.83**. The gap is deliberate and optical, not a
 size correction — measured, all three paths already produce an identical 40pt box.
 
-In dark mode every macOS 26 app icon is a dark squircle with a bright glyph inside it. The ground
-disappears into the palette, so only the glyph reads. A Raycast icon is a flat, fully saturated tile,
+Every macOS 26 app icon is a squircle with a glyph inside it, and the ground disappears into the
+palette, so only the glyph reads. A Raycast icon is a flat, fully saturated tile,
 so every pixel of it reads. At equal geometry the extension shouts, and fitting it smaller is what
 makes the two match by eye. Shipped and fetched images take the same target, so an icon doesn't
 change size depending on where it came from.

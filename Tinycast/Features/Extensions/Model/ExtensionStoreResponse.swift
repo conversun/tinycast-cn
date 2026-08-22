@@ -72,7 +72,8 @@ enum ExtensionStoreResponse {
                 title: entry.title ?? entry.name,
                 summary: entry.description ?? "",
                 author: entry.author?.name ?? entry.author?.handle ?? "",
-                iconURL: (entry.icons?.light ?? entry.icons?.dark).flatMap(URL.init(string:)),
+                lightIconURL: entry.icons?.light.flatMap(URL.init(string:)),
+                darkIconURL: entry.icons?.dark.flatMap(URL.init(string:)),
                 commandCount: entry.commands?.count ?? 0,
                 downloadCount: entry.downloadCount,
                 registryID: registry.id,
@@ -170,18 +171,21 @@ enum ExtensionStoreResponse {
         guard let manifest = try? JSONDecoder().decode(Manifest.self, from: data),
             let name = manifest.name ?? manifest.title
         else { return nil }
+        // One artwork per manifest, so both appearances resolve to it.
+        let manifestIcon = manifest.icon.flatMap {
+            URL(
+                string:
+                    "https://raw.githubusercontent.com/\(registry.owner)/\(registry.repository)"
+                    + "/\(registry.ref)/\(registry.path)/\(folder)/assets/\($0)")
+        }
         return ExtensionListing(
             id: "\(registry.id.uuidString)/\(folder)",
             name: name,
             title: manifest.title ?? name,
             summary: manifest.description ?? "",
             author: manifest.author ?? "",
-            iconURL: manifest.icon.flatMap {
-                URL(
-                    string:
-                        "https://raw.githubusercontent.com/\(registry.owner)/\(registry.repository)"
-                        + "/\(registry.ref)/\(registry.path)/\(folder)/assets/\($0)")
-            },
+            lightIconURL: manifestIcon,
+            darkIconURL: manifestIcon,
             commandCount: manifest.commands?.count ?? 0,
             downloadCount: nil,
             registryID: registry.id,

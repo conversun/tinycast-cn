@@ -9,7 +9,7 @@ final class MessageHUDController {
         presenter = HUDPresenter(
             anchor: .edgeInset(Theme.Size.hudEdgeOffset),
             dwell: Theme.Duration.messageHUD,
-            screen: { settings.openOnCursorScreen ? .underCursor : .main })
+            screen: { settings.openOnCursorScreen ? .underCursor : .primary })
     }
 
     func show(message: String, tone: DialogTone = .success) {
