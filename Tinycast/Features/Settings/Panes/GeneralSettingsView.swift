@@ -157,7 +157,7 @@ struct GeneralSettingsView: View {
                 }
                 Picker(selection: $settings.popToRootTimeout) {
                     ForEach(PopToRootTimeout.allCases) { timeout in
-                        Text(timeout.title).tag(timeout)
+                        Text(timeout.title.localizedUI).tag(timeout)
                     }
                 } label: {
                     Text("Pop to Root Search")

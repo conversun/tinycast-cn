@@ -335,7 +335,7 @@
 "Shortcut" = "快捷键";
 "Shortcuts" = "快捷键";
 "Show %@ in launcher" = "在启动器中显示 %@";
-"Show all  ⌘%@" = "显示全部  ⌘%@";
+"Show all  ↓" = "显示全部  ↓";
 "Show confirmation" = "显示确认";
 "Show Desktop" = "显示桌面";
 "Show favorites in compact mode" = "在紧凑模式中显示收藏";
@@ -439,7 +439,7 @@
 "%lld items" = "%lld 个项目";
 "%@ (%@) will be moved to the Trash, where you can put them back." = "%@（%@）将移到废纸篓，你可以从中恢复。";
 "%@ will quit first." = "%@ 将先退出。";
-"Hyper Key shortcuts will be shown in Tinycast with ✦." = "Tinycast 会用 ✦ 显示 Hyper Key 快捷键。";
+"Hyper Key shortcuts are shown in Tinycast with ✦." = "Tinycast 会用 ✦ 显示 Hyper Key 快捷键。";
 "Hyper Key will remap to the %@ modifier keys." = "Hyper Key 将重映射为 %@ 修饰键。";
 "Include Shift (⇧)" = "包含 Shift（⇧）";
 "Pressing %@ will trigger the left %@ modifier keys." = "按下 %@ 将触发左侧 %@ 修饰键。";

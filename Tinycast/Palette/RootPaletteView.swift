@@ -889,6 +889,7 @@ private struct CompactFavoriteButton<Content: View>: View {
                 .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
         }
         .buttonStyle(.plain)
-        .help(help)
+        // An app's own name passes through the table untouched; only “Show all” has an entry.
+        .help(help.localizedUI)
     }
 }

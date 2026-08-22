@@ -52,8 +52,8 @@ struct QuicklinksSettingsView: View {
     private var storageNotice: some View {
         Section {
             Label(
-                "Quicklinks can't be saved: the database couldn't be opened, so nothing you change"
-                    + " here will stick. The existing file was left untouched.",
+                ("Quicklinks can't be saved: the database couldn't be opened, so nothing you change"
+                    + " here will stick. The existing file was left untouched.").localizedUI,
                 systemImage: "exclamationmark.triangle.fill"
             )
             .foregroundStyle(.orange)
