@@ -54,7 +54,8 @@ jobs:
           if [ -n "$REQUESTED_TAG" ]; then
             RELEASE="$(gh api "repos/${UPSTREAM_REPOSITORY}/releases/tags/${REQUESTED_TAG}")"
           else
-            RELEASE="$(gh api "repos/${UPSTREAM_REPOSITORY}/releases?per_page=1" --jq '.[0]')"
+            # /releases/latest, not /releases: that list is newest-first and counts betas as latest.
+            RELEASE="$(gh api "repos/${UPSTREAM_REPOSITORY}/releases/latest")"
           fi
           UPSTREAM_TAG="$(jq -r '.tag_name' <<< "$RELEASE")"
           PRERELEASE="$(jq -r '.prerelease' <<< "$RELEASE")"

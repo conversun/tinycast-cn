@@ -6,7 +6,8 @@
 ## 正常路径：全自动
 
 [`sync-upstream-release.yml`](../.github/workflows/sync-upstream-release.yml) 每 6 小时跑一次：
-解析上游最新 release → `git merge <tag>` → `run-tests.sh` → push main → 调
+解析上游最新**稳定** release（`/releases/latest`，上游的 beta 与 `-sequoia` 预发布都不参与）→
+`git merge <tag>` → `run-tests.sh` → push main → 调
 [`release-cn.yml`](../.github/workflows/release-cn.yml) 发 `<上游版本>-cn.1`。
 对应 release 已存在时十几秒内退出，幂等，无需干预。
 
@@ -67,4 +68,5 @@ gh workflow run release-cn.yml --repo conversun/tinycast-cn \
 - 版本规则：自动同步固定 `-cn.1`；同一上游版本之上再发汉化跟进，用 `-cn.2` 起手动派发。
 - release 发布后，定时同步检测到同名 release 即跳过，两者互不干扰。
 - 成功后自动 bump [homebrew-tinycast-cn](https://github.com/conversun/homebrew-tinycast-cn)
-  的 cask（version + sha256），无需手动操作。
+  的 cask（version + sha256），无需手动操作；`prerelease=true` 的派发只发 GitHub release，
+  不动 cask —— `brew upgrade --cask tinycast-cn` 是稳定通道。

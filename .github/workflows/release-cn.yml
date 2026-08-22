@@ -149,7 +149,9 @@ jobs:
             "${PRERELEASE_FLAG[@]}"
 
       # A deploy key on the tap, not a PAT: write access to exactly one repo and nothing else.
+      # Skipped for a prerelease: `brew upgrade --cask tinycast-cn` is the stable channel.
       - name: Update Homebrew cask
+        if: ${{ !inputs.prerelease }}
         env:
           TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
           VERSION: ${{ inputs.version }}
