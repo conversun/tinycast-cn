@@ -1102,3 +1102,18 @@
 "“%@” can't be used as a note title." = "“%@”不能用作笔记标题。";
 "The note isn't valid UTF-8. (%@)" = "笔记不是有效的 UTF-8 编码。（%@）";
 "The note file is outside this Tinycast channel. (%@)" = "笔记文件位于此 Tinycast 通道之外。（%@）";
+
+
+/* Upstream v0.9.5 → v0.9.8: 启动器别名、收藏排序与自动切换输入源。 */
+"Theme" = "外观";
+"Match macOS, or pin Tinycast to Light or Dark." = "跟随 macOS，或将 Tinycast 固定为浅色或深色。";
+"System" = "跟随系统";
+"Auto-switch input source" = "自动切换输入源";
+"Switch the keyboard to this source while the launcher is open." = "启动器打开时将键盘切换到该输入源。";
+"Add Alias" = "添加别名";
+"Alias for %@" = "%@ 的别名";
+"Clear alias for %@" = "清除 %@ 的别名";
+"Move Favorite Up" = "上移收藏";
+"Move Favorite Down" = "下移收藏";
+"Aliases" = "别名";
+"%lld aliases" = "%lld 个别名";

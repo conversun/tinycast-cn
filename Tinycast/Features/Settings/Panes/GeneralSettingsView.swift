@@ -113,7 +113,7 @@ struct GeneralSettingsView: View {
             Section {
                 Picker(selection: $settings.appearance) {
                     ForEach(AppAppearance.allCases) { appearance in
-                        Text(appearance.title).tag(appearance)
+                        Text(appearance.title.localizedUI).tag(appearance)
                     }
                 } label: {
                     Text("Theme")
