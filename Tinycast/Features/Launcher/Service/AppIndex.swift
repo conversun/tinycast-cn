@@ -73,7 +73,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
     var matchAliases: [String] = []
     /// Per-item symbol, for the one kind whose glyph is the user's choice. Nil elsewhere.
     var symbolName: String?
-    /// Spotlight's `kMDItemAlternateNames`, ranked below the display name. Applications only.
+    /// Spotlight's `kMDItemAlternateNames`, ranked below the display name — and, for a built-in
+    /// command, the untranslated name. Applications and commands only.
     var alternateNames: [String] = []
     /// `CFBundleExecutable`, matched literally as a last resort. Applications only.
     var executableName: String?
@@ -176,9 +177,12 @@ struct AppEntry: Identifiable, Hashable, Sendable {
 
 extension AppEntry.Kind {
     /// The descriptors' own words, lowercased once, so a keystroke costs a lookup and not a scan.
+    /// Both spellings of each name: a section reads 应用程序 but is still addressable as `applications`.
     private static let byCategoryName: [String: AppEntry.Kind] = allCases.reduce(into: [:]) {
-        $0[$1.descriptor.sectionTitle.lowercased()] = $1
-        $0[$1.descriptor.label.lowercased()] = $1
+        for word in [$1.descriptor.sectionTitle, $1.descriptor.label] {
+            $0[word.lowercased()] = $1
+            $0[word.localizedUI.lowercased()] = $1
+        }
     }
 
     /// The category a query names outright. Exact only — a prefix would take a word from an entry.

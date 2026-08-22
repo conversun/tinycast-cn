@@ -97,7 +97,8 @@ A query that *equals* a category's own name lists that whole category under its 
 order the section shows when the field is empty. Both words a kind already carries work — the section
 title and the singular label, `Snippets`/`Snippet`, `Window Management`/`Window Command` — read straight
 off `KindDescriptor` by `AppEntry.Kind.named(by:)`, so no category name is written a second time and a
-new `Kind` case gets its category word for free.
+new `Kind` case gets its category word for free. This fork indexes each word twice — as written and as
+translated — so a section that reads 应用 answers to both spellings.
 
 **The trigger is exact equality, never a prefix or a fuzzy hit**, because a looser rule would take a word
 away from a real entry: `System Settings` names both a category and an installed application. That one

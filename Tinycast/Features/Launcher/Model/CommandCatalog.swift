@@ -9,7 +9,8 @@ enum CommandCatalog {
                 id: id.rawValue, name: id.name,
                 url: URL(
                     string: "tinycast://" + id.rawValue.replacingOccurrences(of: ":", with: "/"))!,
-                bundleID: nil, kind: .command)
+                bundleID: nil, kind: .command,
+                alternateNames: [id.untranslatedName])
         }
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
