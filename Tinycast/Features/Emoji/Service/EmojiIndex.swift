@@ -50,6 +50,12 @@ final class EmojiIndex {
             for (order, entry) in entries.enumerated() {
                 let nameScore = FuzzyMatch.score(query: q, candidate: entry.name)
                 var best = nameScore
+                // Unpenalized: the localized name is a name, not one term inside a keyword blob.
+                if !entry.localizedName.isEmpty,
+                    let localized = FuzzyMatch.score(query: q, candidate: entry.localizedName)
+                {
+                    best = max(best ?? Int.min, localized)
+                }
                 if !entry.keywords.isEmpty,
                     let keywordScore = FuzzyMatch.score(query: q, candidate: entry.keywords)
                 {

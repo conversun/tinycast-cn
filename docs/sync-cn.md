@@ -48,6 +48,9 @@
 - 以下走 String 重载、**不查表**，需要 `String(localized:)` 或 `.localizedUI`：
   - `Text(cond ? "A" : "B")` —— 三元表达式是 String；
   - `.help(变量)`、`.accessibilityLabel(变量)`，以及接收 String 参数的自定义视图。
+  - `Label("A" + "B")` —— 两段字面量相加就不再是字面量，上游为了排版换行常这么写。
+- **词条在表里不等于界面会显示**：上游改一个词（`will be shown` → `are shown`）就让译文静默失效。
+  同步后按渲染路径核对，不要只看 `Localizable.strings` 有没有这一条。
 - 插值 key 会变成格式串：Int → `%lld`，String → `%@`。
   如 `String(localized: "\(n) characters")` 的词条 key 是 `"%lld characters"`。
 - **测试不受影响**：harness 二进制没有 zh bundle，`String(localized:)` 回退英文，
@@ -56,6 +59,16 @@
   会落成文件名的默认值（`Untitled` → `未命名`）是有意决策，不是遗漏。
 - 收尾校验：`plutil -lint` 词条文件；逐 key 与源码字面量交叉核对；
   在构建产物 `Resources/zh-Hans.lproj` 里确认词条真的进了包。
+
+### 汉化会改动搜索的三处
+
+汉化把条目名换成了中文，搜索索引跟着变，这三处是补偿：
+
+- `CommandID.untranslatedName` 保留英文原名，`CommandCatalog` 把它放进 `alternateNames`，
+  这样 `clipboard` 仍能搜到「剪贴板历史」；中文与拼音由 name 和 `Pinyin` 覆盖。
+- `AppIndex.byCategoryName` 把每个分类词按原文和译文各存一次，`应用` 与 `applications` 都能整段列出。
+- emoji 的中文名与关键词来自 CLDR `zh`，由 `Scripts/gen-emoji.js` 一起生成；中文名是记录的第六段，
+  `EmojiIndex` 按 name 计分而不是按关键词计分。
 
 ## 手动补发 release
 

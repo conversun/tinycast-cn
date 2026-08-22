@@ -8,6 +8,10 @@ A palette sub-screen (reached like Clipboard / Calculator History) presenting a 
   compiled by `emoji-test`, so an `import AppKit` there breaks the test suite.
 - **`EmojiData.generated.swift` is emitted by `node Scripts/gen-emoji.js`** (Node 18+ for global `fetch`)
   and is never edited by hand. Regenerate and commit instead.
+- **Every record carries its CLDR Chinese name in a sixth field**, and `EmojiIndex` scores that field
+  like `name` rather than like a keyword — 火 would otherwise rank behind whichever keyword blob
+  happened to be shortest. Regenerating against the `en` sources alone silently ends Chinese search,
+  which is what `emoji-test`'s 👋 assertion is there to catch.
 
 ## Layout
 

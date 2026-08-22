@@ -25,6 +25,9 @@ struct EmojiTests {
         let wave = entries.first { $0.name == "waving hand" }
         expect(wave?.supportsSkinTone == true, "👋 is tone-capable")
         expect(wave?.keywords.contains("hello") == true, "👋 carries CLDR keywords")
+        // Regenerating without the zh annotations would silently kill Chinese emoji search.
+        expect(wave?.localizedName == "挥手", "👋 carries its CLDR Chinese name")
+        expect(wave?.keywords.contains("你好") == true, "👋 carries Chinese keywords")
         let holdingHands = entries.first { $0.glyph == "🧑‍🤝‍🧑" }
         expect(holdingHands?.supportsSkinTone == false, "multi-person ZWJ is not tone-capable")
         let euro = entries.first { $0.glyph == "€" }

@@ -72,6 +72,9 @@ struct EmojiEntry: Identifiable, Hashable, Sendable {
     let category: EmojiCategory
     let supportsSkinTone: Bool
     let keywords: String  // space-joined search terms; empty for most symbols
+    /// The CLDR name in this fork's language, scored like `name` so 火 finds 🔥 and not the blob
+    /// that merely lists it. Empty where CLDR has no annotation for the glyph.
+    let localizedName: String
 
     var id: String { glyph }
     var displayName: String { name.capitalized }
@@ -91,18 +94,20 @@ enum EmojiCatalog {
         return String(scalars)
     }
 
-    /// Parse the generated `glyph|name|category|tone|keywords` records, dropping malformed lines.
+    /// Parse the generated `glyph|name|category|tone|keywords|localizedName` records, dropping
+    /// malformed lines.
     nonisolated static func parse(_ raw: String) -> [EmojiEntry] {
         var result: [EmojiEntry] = []
         result.reserveCapacity(2200)
         for line in raw.split(separator: "\n") {
-            let fields = line.split(separator: "|", maxSplits: 4, omittingEmptySubsequences: false)
-            guard fields.count == 5, let category = EmojiCategory(rawValue: String(fields[2]))
+            let fields = line.split(separator: "|", maxSplits: 5, omittingEmptySubsequences: false)
+            guard fields.count == 6, let category = EmojiCategory(rawValue: String(fields[2]))
             else { continue }
             result.append(
                 EmojiEntry(
                     glyph: String(fields[0]), name: String(fields[1]), category: category,
-                    supportsSkinTone: fields[3] == "1", keywords: String(fields[4])))
+                    supportsSkinTone: fields[3] == "1", keywords: String(fields[4]),
+                    localizedName: String(fields[5])))
         }
         return result
     }
