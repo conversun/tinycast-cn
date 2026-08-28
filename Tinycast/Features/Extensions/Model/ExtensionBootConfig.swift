@@ -111,5 +111,5 @@ struct ExtensionLaunchContext: Sendable {
 
 enum ExtensionRuntimeVersion {
     /// The @raycast/api version the bundled shim tracks. Surfaced as `environment.raycastVersion`.
-    static let raycastAPI = "1.104.0"
+    static let raycastAPI = "2.0.3"
 }

@@ -7,7 +7,7 @@ final class QuicklinkCoordinator {
     private let argumentSession: QuicklinkArgumentSession
     private let settings: AppSettings
     private let appIndex: AppIndex
-    private let injector: SnippetTextInjector
+    private let injector: TextInjector
     private let hotKeys: HotKeyManager
     private let favorites: FavoritesStore
     private let visibility: VisibilityStore
@@ -29,7 +29,7 @@ final class QuicklinkCoordinator {
         argumentSession: QuicklinkArgumentSession,
         settings: AppSettings,
         appIndex: AppIndex,
-        injector: SnippetTextInjector,
+        injector: TextInjector,
         hotKeys: HotKeyManager,
         favorites: FavoritesStore,
         visibility: VisibilityStore,

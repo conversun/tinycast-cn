@@ -26,6 +26,23 @@ what you touched.
 ./Scripts/run-tests.sh calc-test    # just one, while iterating
 ```
 
+The suite runs in parallel, `hw.ncpu` harnesses at a time, which is what takes it from about 140
+seconds to about 15. `TINYCAST_TEST_JOBS=1` forces it back to one at a time. Parallelism is safe
+because each harness already roots its scratch state somewhere of its own — a UUID-suffixed
+`temporaryDirectory`, a `UserDefaults(suiteName:)`, or `NSPasteboard.withUniqueName()` — and a new
+harness must keep doing that rather than reach for a fixed path.
+
+Two consequences worth knowing. Status lines arrive in **completion order**, not the order the `run`
+lines are written; and a failing harness's compiler diagnostics or assertion output are replayed
+together at the bottom, under its name, rather than streamed where they happened. That is deliberate:
+a compiler diagnostic is far longer than `PIPE_BUF`, so eleven workers streaming at once would
+interleave into nonsense.
+
+A `run` line takes two optional markers before the harness name. `-O` compiles that harness optimised,
+which is worth it only where the run dominates the compile — `raycast-test` spends 47 seconds in
+scrypt at `-Onone` and one second at `-O`. `slow` dispatches it in the first wave, so the longest
+harnesses are not still running after everything else has finished.
+
 The script is the **only** place the harness set is written down — CI runs exactly this, so the two
 cannot drift. Adding a harness means adding one `run` line.
 
@@ -58,7 +75,9 @@ If a change touches anything in the right column, the harness on the left is man
 | `file-search-session-test` | serialized query execution, debounce coalescing and cancellation |
 | `ranking-test` | `Launcher/Model/LauncherRankingStore.swift` |
 | `scopes-test` | `Launcher/Model/SearchScopes.swift` |
+| `app-name-test` | `Platform/AppDisplayName.swift` — every path that names a scanned bundle |
 | `calc-test` | all of `Calculator/Model/` |
+| `calendar-test` | all of `Calendar/Model/` — link detection, the join window, the day buckets |
 | `clipboard-test` | `Clipboard/Model/ClipboardStore.swift` |
 | `emoji-test` | `Emoji/Model/EmojiCatalog.swift`, `EmojiGridGeometry.swift`, the generated data |
 | `palette-selection-test` | `Features/PaletteRowIndex.swift` |
@@ -81,6 +100,8 @@ If a change touches anything in the right column, the harness on the left is man
 | `ext-icon-test` | `Extensions/Service/ExtensionIconCache.swift` — artwork sizing and its fallback |
 | `entry-icon-test` | `EntryIcon` — that each case draws, caches and prints apart from the others |
 | `settings-backup-test` | `Settings/AppSettingsKey.swift`, `Backup/Model/SettingsBackupCoverage.swift` |
+| `updates-test` | `Updates/Model/` — version precedence, channel filtering, install route, readiness |
+| `support-test` | `Support/Model/` — when the support reminder comes due, and a clock moved backwards |
 
 A harness that passed before a change passes after it. There is no "I'll fix it next commit" and no
 commenting out a case. If a change genuinely invalidates an assertion, the assertion is rewritten in the
@@ -122,7 +143,7 @@ find ~/Library/Developer/Xcode/DerivedData -name "Tinycast*.app" -maxdepth 6 -pr
 - No `@unchecked Sendable`, `nonisolated(unsafe)` or `assumeIsolated` added without a stated reason.
 - The type-checker did not time out. `LauncherList.rows` already carries an explicit annotation for
   this reason; the fix for a timeout is an annotation, not a restructure.
-- Release binary under **4 MB**, and under 2% growth for an ordinary change.
+- Release binary under **5 MB**, and under 2% growth for an ordinary change.
 
 ### Lint
 
@@ -175,6 +196,7 @@ Measured at the end of the 2026 refactor, on `main`. Useful as orders of magnitu
 | `SettingsPaneScanner` warm scan | 0.014 ms (16.5 ms cold), 52 panes |
 | Largest view / owner | `RootPaletteView` 662 lines, `AppCore` 284 lines |
 | Comment density | 1,653 of 27,289 source lines (6.1%) |
+| The harness suite | ~15 s wall clock, 11-way parallel (~98 s serial, ~140 s before either) |
 | `palette-selection-test` | 111,684 assertions — a tripwire: a change in this count means the row-order model moved |
 | `SnippetKeywordPolicy` match | 7 µs/keystroke at 50 keywords, 59 µs at 1,000 — the `lowercased()` is 0.09 µs of it |
 | `ClipboardStore.pinnedItems` | 27–127 µs per uncached search, 1,000-row window — no cache earns its invalidation yet |
@@ -194,7 +216,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 ### Core
 
-- Palette hotkey opens the launcher; pressing it again closes it; Escape closes it; clicking away closes it
+- Palette hotkey opens the launcher; pressing it again closes it; Escape clears a non-empty query,
+  then hides on a second press; clicking away closes it
 - Reopening focuses the search field with an empty query, in the same position and at the same size
 - Compact mode: typing expands it, and the search bar does **not** shift vertically during the swap
 - With a CJK IME: the placeholder clears as soon as composition starts and the composing text never
@@ -334,6 +357,42 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - A bare amount (`1 usd`) answers in the Mac's region currency, and follows a change to
   System Settings ▸ General ▸ Language & Region without a relaunch — and nothing prompts for location
 - A crypto query (`1 btc`, `0.5 sol to eur`) answers, and `1 usd to btc` stays in plain notation
+
+### Calendar and meetings
+
+- With Calendar **off**: no launcher entries, no card, no permission prompt at launch
+- Enabling shows the consent dialog **before** the macOS prompt; declining prompts for nothing
+- With a meeting four minutes out, an empty palette shows the card on top, provider glyph and all
+- The countdown steps on the minute boundary rather than on a keystroke
+- ↵ joins: a Zoom link opens the Zoom app, and the browser where no app claims the scheme
+- Typing a character swaps the card for the calculator's; ↑/↓ never lands on a phantom row
+- Unchecking a calendar drops its events from the launcher and My Schedule, and survives a relaunch
+- Adding or deleting an event in Calendar.app updates an open palette without a reopen
+- A meeting with no link is listed and searchable, and answers Open in Calendar rather than Join
+- Import a backup taken with Calendar on: it comes back **off**, and no calendar toggle travels
+- Menu bar on Never: the item is the plain icon; on 5 minutes the title and countdown appear at T-5
+  and step on the minute boundary, not on a keystroke
+- `Only show events with meetings` hides a linkless event and shows it again when unchecked
+- Hide Current Event on Automatically clears the entry at the start and hands the space to the next
+  event inside its lead time; on 5 minutes it lingers counting up, then clears
+- Clicking the menu bar item opens the menu with `Join <title>` on top — a bare click never joins
+- Camera Preview on: ↵ on the join card opens the panel **already showing live video** — no black
+  frame, no blank mid-preview; ↵ joins, Esc drops the join; the camera light goes out with the
+  panel, and the first run prompts once, before any panel appears
+- A meeting that ends leaves the launcher results and `My Schedule` on the same minute boundary it
+  leaves the menu bar, with the palette open or closed over the end
+- Auto Join on: the meeting opens itself at its start, **once** — dismiss it and it does not return.
+  With confirm on and camera preview off, the dialog asks first
+- Arming Auto Join during a meeting already under way joins nothing
+- Sleeping over a meeting's start and waking past it reloads the events; one still inside the window
+  joins, one long past does not
+- Create Event writes to the default calendar and shows up on the card, the schedule and the launcher
+  without a relaunch; a blank title leaves the dialog up on ↵ and on a click
+- Arrow keys move the caret in the New Event title field, and still step the Set Volume slider
+- Every row of Settings ▸ Calendar has Add Alias, Record Hotkey and a checkbox, and an alias set
+  there is the alias the Commands pane shows
+- Export with auto join and camera preview on, import onto a clean profile: both come back **off**,
+  while the menu-bar settings carry over
 
 ### System actions and window management
 

@@ -2056,5 +2056,51 @@ $|dollar sign|xc|0|比索 美元 金钱 usd money currency|美元符号
 №|numero sign|xs|0|number|
 ¡|inverted exclamation mark|xs|0|倒置 惊叹号 感叹 感叹号 猛撞 spanish punctuation|倒置的感叹号
 ¿|inverted question mark|xs|0|倒置 疑问 问号 spanish punctuation|倒置的问号
+※|reference mark|xj|0|kome komejirushi note footnote annotation|参考标记
+〃|ditto mark|xj|0|same repeat above|
+〄|japanese industrial standard symbol|xj|0|jis|
+〆|ideographic closing mark|xj|0|shime close seal|
+〇|ideographic number zero|xj|0|maru circle zero|
+〒|postal mark|xj|0|post yubin mail address|
+〓|geta mark|xj|0|tofu missing glyph|
+〶|circled postal mark|xj|0|post yubin mail|
+〷|ideographic telegraph line feed separator symbol|xj|0|telegraph|
+〻|vertical ideographic iteration mark|xj|0|repeat|
+〼|masu mark|xj|0|square|
+〜|wave dash|xj|0|tilde range approximately|
+～|fullwidth tilde|xj|0|wave dash range|
+・|katakana middle dot|xj|0|圆点 片假名 间隔号 nakaguro separator interpunct|片假名间隔号
+―|horizontal bar|xj|0|条形 横线 线条 quotation dash long|横条
+‥|two dot leader|xj|0|ellipsis dots|
+々|ideographic iteration mark|xj|0|noma kurikaeshi repeat|
+ゝ|hiragana iteration mark|xj|0|repeat|
+ゞ|hiragana voiced iteration mark|xj|0|repeat dakuten|
+ヽ|katakana iteration mark|xj|0|repeat|
+ヾ|katakana voiced iteration mark|xj|0|repeat dakuten|
+゠|katakana-hiragana double hyphen|xj|0|double hyphen|
+ヵ|katakana letter small ka|xj|0|counter months|
+ヶ|katakana letter small ke|xj|0|counter months ka|
+〳|vertical kana repeat mark upper half|xj|0|repeat vertical|
+〴|voiced vertical kana repeat mark upper half|xj|0|repeat dakuten|
+〵|vertical kana repeat mark lower half|xj|0|repeat vertical|
+〈|left angle bracket|xj|0|人字形标记 元组 尖括号 尖角括号 括号 quote open|左尖括号
+〉|right angle bracket|xj|0|人字形标记 元组 尖括号 尖角括号 括号 quote close|右尖括号
+《|left double angle bracket|xj|0|双尖括号 括号 quote title open|左双尖括号
+》|right double angle bracket|xj|0|双尖括号 括号 quote title close|右双尖括号
+「|left corner bracket|xj|0|方括号 角括号 kagi quote open|左角括号
+」|right corner bracket|xj|0|方括号 角括号 kagi quote close|右角括号
+『|left white corner bracket|xj|0|中空角括号 方括号 quote title open|左中空角括号
+』|right white corner bracket|xj|0|中空角括号 方括号 quote title close|右中空角括号
+【|left black lenticular bracket|xj|0|方括号 荚状方括号 透镜状方括号 heading open|左黑色透镜状方括号
+】|right black lenticular bracket|xj|0|方括号 荚状方括号 透镜状方括号 heading close|右黑色透镜状方括号
+︱|vertical em dash|xj|0|tategaki presentation form|
+︵|vertical left parenthesis|xj|0|tategaki presentation form open|
+︶|vertical right parenthesis|xj|0|tategaki presentation form close|
+︻|vertical left black lenticular bracket|xj|0|tategaki heading open|
+︼|vertical right black lenticular bracket|xj|0|tategaki heading close|
+﹁|vertical left corner bracket|xj|0|tategaki kagi quote open|
+﹂|vertical right corner bracket|xj|0|tategaki kagi quote close|
+﹃|vertical left white corner bracket|xj|0|tategaki quote open|
+﹄|vertical right white corner bracket|xj|0|tategaki quote close|
 """
 }

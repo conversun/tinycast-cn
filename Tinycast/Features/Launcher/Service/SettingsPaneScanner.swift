@@ -65,8 +65,7 @@ enum SettingsPaneScanner {
     ) -> String? {
         if let override = nameOverrides[bundleID] { return override }
         if let localized = loctableName(appexURL: appexURL) { return localized }
-        return (info["CFBundleDisplayName"] as? String)?.usableName
-            ?? (info["CFBundleName"] as? String)?.usableName
+        return AppDisplayName.inInfo(info)
     }
 
     /// Localized name from `InfoPlist.loctable`, preferred languages first, then English.
@@ -85,9 +84,11 @@ enum SettingsPaneScanner {
         ).filter { wanted.contains(Locale(identifier: $0).language.languageCode?.identifier ?? "") }
         codes.append("en")
         for code in codes {
+            // `preferredLocalizations` hands back the dashed spelling line 87 fed it; the table keys are Apple's underscored ones.
             let key = code.replacingOccurrences(of: "-", with: "_")
             if let entry = (table[key] ?? table[code]) as? [String: Any],
-                let name = (entry["CFBundleDisplayName"] as? String)?.usableName {
+                let name = AppDisplayName.named(entry["CFBundleDisplayName"])
+            {
                 return name
             }
         }

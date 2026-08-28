@@ -81,8 +81,7 @@ a narrow filter over a broad query can show fewer rows than the history holds.
 ## Pinned entries
 
 A row's ⌘K Actions menu carries **Pin Entry / Unpin Entry** (⌘., since ⌘P opens the type filter),
-persisted as a `pinned_at` column
-on `items` (added to existing databases by an `ALTER TABLE` migration, alongside `source_app`'s) —
+persisted as a `pinned_at` column on `items` —
 a stamp rather than a flag, because the Pinned section is ordered by _when you pinned_, not by
 recency.
 
@@ -108,6 +107,10 @@ Pins change four things:
 Pasting a pinned entry deliberately does **not** promote it: it holds its place in the Pinned
 section, so `promote` skips pinned rows instead of rewriting the row and its FTS entry for no
 visible change.
+
+The ten palette slots shared with launcher favorites address this visible Pinned block too. A slot
+uses the current query and type filter, so its first entry is the first visible pin; a missing slot is
+a no-op. They are fixed to the physical number row, with ⌘1…⌘9 then ⌘0 as their labels.
 
 `load` reads every pinned row plus the newest 1000 unpinned ones as two indexed branches over a
 partial index on `pinned_at` (`Tests/clipboard-test.swift` covers the shape). The single

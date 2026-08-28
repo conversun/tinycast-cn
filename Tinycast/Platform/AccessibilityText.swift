@@ -8,10 +8,18 @@ enum AccessibilityText {
     /// Generous for a responsive app, short enough that a wedged one can't stall the main actor.
     private static let timeout: Float = 1
 
+    /// The two have different fixes; collapsing them tells a reader to select what they selected.
+    enum Selection: Equatable {
+        case text(String)
+        case noFocusedElement
+        case empty
+    }
+
     static func focusedElement(in app: NSRunningApplication) -> AXUIElement? {
         let application = AXUIElementCreateApplication(app.processIdentifier)
         // Per element and never inherited, so the focused element needs its own against a hang.
         AXUIElementSetMessagingTimeout(application, timeout)
+        activateManualAccessibility(of: application)
         var focusedValue: CFTypeRef?
         guard
             AXUIElementCopyAttributeValue(
@@ -27,16 +35,28 @@ enum AccessibilityText {
         return element
     }
 
-    static func selection(in app: NSRunningApplication) -> String? {
-        guard let element = focusedElement(in: app) else { return nil }
+    static func read(in app: NSRunningApplication) -> Selection {
+        guard let element = focusedElement(in: app) else { return .noFocusedElement }
         var value: CFTypeRef?
         let status = AXUIElementCopyAttributeValue(
             element,
             kAXSelectedTextAttribute as CFString,
             &value)
-        let text = status == .success ? value as? String : nil
-        if let text, !text.isEmpty { return text }
-        return webSelection(in: element) ?? text
+        if status == .success, let text = value as? String, !text.isEmpty { return .text(text) }
+        guard let web = webSelection(in: element), !web.isEmpty else { return .empty }
+        return .text(web)
+    }
+
+    /// A narrower question, for callers that can act on the text but not on why there is none.
+    static func selection(in app: NSRunningApplication) -> String? {
+        guard case .text(let text) = read(in: app) else { return nil }
+        return text
+    }
+
+    /// Chromium builds its tree only once asked, so Chrome and Electron answer nothing until this.
+    private static func activateManualAccessibility(of application: AXUIElement) {
+        AXUIElementSetAttributeValue(
+            application, "AXManualAccessibility" as CFString, kCFBooleanTrue)
     }
 
     /// Browsers have no `AXSelectedText`: web selection exists only as an opaque marker range.

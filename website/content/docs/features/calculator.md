@@ -48,13 +48,14 @@ temperatures may only be added or subtracted within one scale.
 
 ## Currency and crypto
 
-| You type                    | It means             |
-| --------------------------- | -------------------- |
-| `1 euro to dollars`         | Named currencies     |
-| `€20 to GBP` / `20€ to GBP` | Symbols, either side |
-| `eur to usd`                | Amount 1 implied     |
-| `1 btc to eur`              | Crypto               |
-| `$10 + €5`                  | Mixed arithmetic     |
+| You type                    | It means                    |
+| --------------------------- | --------------------------- |
+| `1 euro to dollars`         | Named currencies            |
+| `€20 to GBP` / `20€ to GBP` | Symbols, either side        |
+| `eur to usd`                | Amount 1 implied            |
+| `1 btc to eur`              | Crypto                      |
+| `$10 + €5`                  | Mixed arithmetic            |
+| `(20 sgd to usd) * 30`      | Convert, then multiply      |
 
 159 fiat codes plus a hand-picked crypto list.
 
@@ -67,7 +68,8 @@ Shared nouns are assigned deliberately: `dollars` (22 currencies), `francs` (10)
 `pesos` (8), `rupees` (6). A genuinely ambiguous word produces **no card at all** — `krona` is both
 SEK and ISK, so Tinycast declines to guess.
 
-Slang is deliberately unsupported: **`quid`, `bucks` and `rmb` do not work.**
+Slang is deliberately unsupported: **`quid` and `bucks` do not work.** `rmb` and `renminbi` do —
+ISO 4217 names CNY "Yuan Renminbi", so those are the standard's own words rather than slang.
 
 Units run before currency, so `10 pounds to kg` is weight, `10 pounds to euros` is money, and
 `1 cup to ml` stays volume even though `CUP` is the Cuban peso. Crypto tickers outrank generated

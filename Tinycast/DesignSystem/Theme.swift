@@ -15,6 +15,12 @@ enum Theme {
         static let xxxl: CGFloat = 28
         /// Gap under a category header, shared by every palette list's `SectionHeader`.
         static let sectionHeaderBottom: CGFloat = 4
+        /// Clearance under a transcript's last message, so its actions row reads as belonging to
+        /// the message rather than to the palette footer sitting directly beneath it.
+        static let chatTranscriptBottom: CGFloat = 28
+        /// How near the end still counts as following a reply. A stream grows the transcript while
+        /// the reader is on their way down, so an exact-bottom test is a target that runs away.
+        static let chatFollowTailSlack: CGFloat = 44
         /// Space above every header but the first, reading as the previous section's close.
         static let sectionSpacing: CGFloat = 12
     }
@@ -33,6 +39,12 @@ enum Theme {
         static let keyCap: CGFloat = 6
         /// Settings shortcut-recorder keycap — smaller than the palette's `keyCap` chip.
         static let recorderKeyCap: CGFloat = 4
+    }
+
+    enum Blur {
+        /// Enough to make a redacted address unreadable at full size without turning the row into a
+        /// smear; the scramble underneath is what actually hides it.
+        static let redaction: CGFloat = 3
     }
 
     enum Size {
@@ -97,6 +109,12 @@ enum Theme {
         static let menuButton: CGFloat = 36
         static let noteGlyph: CGFloat = 16
         static let noteEmptyGlyph: CGFloat = 28
+        /// Hit target for a chat message footer glyph; its caption symbol floats inside it.
+        static let chatMessageAction: CGFloat = 16
+        /// A one-pixel markdown rule and table header separator.
+        static let hairline: CGFloat = 1
+        static let markdownListMarker: CGFloat = 20
+        static let markdownQuoteBar: CGFloat = 2
         /// The uninstall list's leading checkbox / lock glyph.
         static let checkbox: CGFloat = 16
         static let clipboardListWidth: CGFloat = 290
@@ -106,6 +124,13 @@ enum Theme {
         static let clipboardFilterMenuWidth: CGFloat = 200
         /// A menu row's glyph slot, sized so symbol and app-icon rows read the same.
         static let menuIcon: CGFloat = 20
+        /// A brand mark inside the menu icon slot, sized to the optical weight of a symbol.
+        static let menuBrandIcon: CGFloat = 14
+        /// The same mark in a header bar button, matched to the callout symbol beside it.
+        static let barBrandIcon: CGFloat = 12
+        /// A sent image in the transcript; a staged one is a glyph in a pill beside the search text.
+        static let chatImageThumb: CGFloat = 96
+        static let chatAttachmentGlyph: CGFloat = 16
         /// Opening size and the resize floor; tall enough that the sidebar's rows never scroll.
         static let settingsWindow = CGSize(width: 860, height: 700)
         /// Settings sidebar: a fixed column, wide enough for "Window Management".
@@ -128,6 +153,18 @@ enum Theme {
         static let dialogWidth: CGFloat = 420
         /// A dialog's leading glyph, larger than a row icon: it carries the subject.
         static let dialogIcon: CGFloat = 32
+        /// 16:9 at the dialog's own width, so the two surfaces read as siblings.
+        static let cameraPreview = CGSize(width: 420, height: 236)
+        /// Wider than a dialog: a Quick Action's result is prose to read, not a sentence to answer.
+        static let quickActionPanel: CGFloat = 520
+        /// Matched to the title's cap height; a row-sized glyph beside it reads as an error.
+        static let quickActionHeaderIcon: CGFloat = 14
+        /// The dissolve ramp below each bar's clear zone, measured against text behind the title.
+        static let quickActionScrollFade: CGFloat = 40
+        /// Past this the result scrolls, so a long summary cannot grow the panel off the screen.
+        static let quickActionPanelBody: CGFloat = 320
+        /// Keeps a two-word grammar fix from collapsing the panel to a slot.
+        static let quickActionPanelMinBody: CGFloat = 44
         /// Transient volume HUD shown after any volume or mute command.
         static let hudWidth: CGFloat = 200
         static let hudHeight: CGFloat = 100
@@ -147,6 +184,8 @@ enum Theme {
         static let exit: TimeInterval = 0.12
         /// Fade-in/out for a hover `Tooltip`.
         static let tooltip: TimeInterval = 0.15
+        static let copyFeedback: TimeInterval = 1.2
+        static let chatFooter: TimeInterval = 0.12
     }
 
     /// System text styles (not hardcoded sizes) so the UI honors Dynamic Type.
@@ -161,13 +200,23 @@ enum Theme {
         static let rowTitle = Font.body
         static let rowTrailing = Font.callout
         static let sectionHeader = Font.subheadline.weight(.medium)
+        /// A borderless panel's own title, which names the surface rather than a section inside it.
+        static let panelTitle = Font.headline
         /// The big value line on the calculator answer card (both source and target sides).
         static let calcResult = Font.title
         static let keyCap = Font.caption
         /// Pair with the matching `Size` for `KeyCapChip.Scale`.
         static let compactKeyCap = Font.caption2
         static let heroKeyCap = Font.body
+        static let markdownHeading1 = Font.title2.weight(.semibold)
+        static let markdownHeading2 = Font.title3.weight(.semibold)
+        static let markdownHeading3 = Font.headline
+        static let code = Font.system(.callout, design: .monospaced)
+        static let inlineCode = Font.body.monospaced()
         static let bar = Font.callout.weight(.medium)
+        /// A staged chat attachment's name beside the search text; the NSFont measures the chip.
+        static let chip = Font.callout
+        @MainActor static let chipNSFont = NSFont.preferredFont(forTextStyle: .callout)
         /// A dropdown control's trailing chevron, deliberately smaller than the label it follows.
         static let disclosure = Font.caption.weight(.semibold)
         static let menuRow = Font.body
@@ -222,6 +271,8 @@ enum Theme {
         static let destructive = Color.red
         /// Success tint: the leading glyph of a `.success` dialog.
         static let success = Color.green
+        /// Progress tint: the message pill's spinner while the work behind it is still running.
+        static let progress = Color.blue
     }
 }
 

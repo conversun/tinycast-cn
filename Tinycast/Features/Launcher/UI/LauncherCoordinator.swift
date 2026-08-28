@@ -15,6 +15,7 @@ final class LauncherCoordinator {
     private let fileSearchCoordinator: FileSearchCoordinator
     private let notesCoordinator: NotesCoordinator
     private let extensionCoordinator: ExtensionCoordinator
+    private let calendarCoordinator: CalendarCoordinator
     /// The backup commands only, which need the live stores to gather from and apply to.
     private unowned let core: AppCore
 
@@ -31,6 +32,7 @@ final class LauncherCoordinator {
         fileSearchCoordinator: FileSearchCoordinator,
         notesCoordinator: NotesCoordinator,
         extensionCoordinator: ExtensionCoordinator,
+        calendarCoordinator: CalendarCoordinator,
         core: AppCore
     ) {
         self.ranking = ranking
@@ -45,6 +47,7 @@ final class LauncherCoordinator {
         self.fileSearchCoordinator = fileSearchCoordinator
         self.notesCoordinator = notesCoordinator
         self.extensionCoordinator = extensionCoordinator
+        self.calendarCoordinator = calendarCoordinator
         self.core = core
     }
 
@@ -82,6 +85,11 @@ final class LauncherCoordinator {
             extensionCoordinator.runExtensionCommand(app, arguments: arguments)
             return
         }
+        if app.kind == .meeting {
+            guard let id = MeetingEvent.id(fromEntryID: app.id) else { return }
+            calendarCoordinator.activateMeeting(id: id)
+            return
+        }
         // Before the palette hides: an unfilled quicklink stays up to ask first.
         if app.kind == .quicklink {
             guard let id = Quicklink.id(fromEntryID: app.id) else { return }
@@ -100,13 +108,23 @@ final class LauncherCoordinator {
             let snippetID = String(app.id.dropFirst("snippet:".count))
             snippetExpansion.expandSnippet(id: snippetID, targetApp: previous)
         case .command, .customCommand, .systemAction, .windowCommand, .quicklink,
-            .extensionCommand:
+            .extensionCommand, .meeting:
             break  // handled above
         }
     }
 
     private func runCommand(_ entry: AppEntry) {
         switch CommandCatalog.command(for: entry) {
+        case .aiChat:
+            core.aiChatCoordinator.showChat()
+        case .fixGrammar:
+            core.quickActionCoordinator.run(.fixGrammar)
+        case .rewrite:
+            core.quickActionCoordinator.run(.rewrite)
+        case .translate:
+            core.quickActionCoordinator.run(.translate)
+        case .summarize:
+            core.quickActionCoordinator.run(.summarize)
         case .calculatorHistory:
             paletteCoordinator.showPalette(mode: .calculatorHistory)
         case .clipboardHistory:
@@ -115,6 +133,16 @@ final class LauncherCoordinator {
             paletteCoordinator.showPalette(mode: .emoji)
         case .searchFiles:
             fileSearchCoordinator.show()
+        case .joinNextMeeting:
+            calendarCoordinator.joinNextMeeting()
+        case .copyMeetingLink:
+            calendarCoordinator.copyNextMeetingLink()
+        case .mySchedule:
+            calendarCoordinator.showSchedule()
+        case .openInCalendar:
+            calendarCoordinator.openNextMeetingInCalendar()
+        case .createEvent:
+            calendarCoordinator.createEvent()
         case .showNotes:
             paletteCoordinator.hidePalette(restoreFocus: false)
             notesCoordinator.show()
@@ -144,12 +172,18 @@ final class LauncherCoordinator {
         case .importFromRaycast:
             paletteCoordinator.hidePalette(restoreFocus: false)
             settingsCoordinator.showBackupSettings()
+        case .checkForUpdates:
+            paletteCoordinator.hidePalette(restoreFocus: false)
+            core.updateCoordinator.checkForUpdates()
         case .settings:
             paletteCoordinator.hidePalette(restoreFocus: false)
             settingsCoordinator.showSettings()
         case .about:
             paletteCoordinator.hidePalette(restoreFocus: false)
             settingsCoordinator.showAbout()
+        case .support:
+            paletteCoordinator.hidePalette(restoreFocus: false)
+            core.supportCoordinator.showSupport()
         case .quit:
             NSApp.terminate(nil)
         case nil:

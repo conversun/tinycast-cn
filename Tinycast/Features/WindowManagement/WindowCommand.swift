@@ -10,6 +10,8 @@ struct WindowCommand: Identifiable, Hashable, Sendable {
         case topRightQuarter = "top-right-quarter"
         case bottomLeftQuarter = "bottom-left-quarter"
         case bottomRightQuarter = "bottom-right-quarter"
+        case firstThreeFourths = "first-three-fourths"
+        case lastThreeFourths = "last-three-fourths"
         case firstThird = "first-third"
         case centerThird = "center-third"
         case lastThird = "last-third"
@@ -32,6 +34,8 @@ struct WindowCommand: Identifiable, Hashable, Sendable {
         case nextDisplay = "next-display"
         case previousDisplay = "previous-display"
         case toggleFullscreen = "toggle-fullscreen"
+        case previousSpace = "previous-space"
+        case nextSpace = "next-space"
     }
 
     /// What the mover has to do, so its dispatch stays exhaustive over the catalog.
@@ -42,25 +46,31 @@ struct WindowCommand: Identifiable, Hashable, Sendable {
         case restore
         /// No geometry at all — the native `AXFullScreen` toggle.
         case fullscreen
+        /// No window at all — a synthetic Dock gesture that moves between Spaces.
+        case space
     }
 
     /// The launcher section a command belongs to, and the order the Settings panel lists them in.
     enum Group: String, CaseIterable, Sendable {
         case halves
         case quarters
+        case fourths
         case thirds
         case sizing
         case moving
         case fullscreen
+        case spaces
 
         var title: String {
             switch self {
             case .halves: return String(localized: "Halves")
             case .quarters: return String(localized: "Quarters")
+            case .fourths: return String(localized: "Fourths")
             case .thirds: return String(localized: "Thirds")
             case .sizing: return String(localized: "Sizing")
             case .moving: return String(localized: "Moving")
             case .fullscreen: return String(localized: "Fullscreen")
+            case .spaces: return String(localized: "Spaces")
             }
         }
     }
@@ -118,6 +128,8 @@ enum WindowCommandCatalog {
         case .topRightQuarter: return String(localized: "Top Right Quarter")
         case .bottomLeftQuarter: return String(localized: "Bottom Left Quarter")
         case .bottomRightQuarter: return String(localized: "Bottom Right Quarter")
+        case .firstThreeFourths: return String(localized: "First Three Fourths")
+        case .lastThreeFourths: return String(localized: "Last Three Fourths")
         case .firstThird: return String(localized: "First Third")
         case .centerThird: return String(localized: "Center Third")
         case .lastThird: return String(localized: "Last Third")
@@ -140,6 +152,8 @@ enum WindowCommandCatalog {
         case .nextDisplay: return String(localized: "Move to Next Display")
         case .previousDisplay: return String(localized: "Move to Previous Display")
         case .toggleFullscreen: return String(localized: "Toggle Fullscreen")
+        case .previousSpace: return String(localized: "Switch to Previous Space")
+        case .nextSpace: return String(localized: "Switch to Next Space")
         }
     }
 
@@ -153,6 +167,8 @@ enum WindowCommandCatalog {
         case .topRightQuarter: return "rectangle.inset.toptrailing.filled"
         case .bottomLeftQuarter: return "rectangle.inset.bottomleading.filled"
         case .bottomRightQuarter: return "rectangle.inset.bottomtrailing.filled"
+        case .firstThreeFourths: return "rectangle.lefthalf.inset.filled"
+        case .lastThreeFourths: return "rectangle.righthalf.inset.filled"
         case .firstThird, .firstTwoThirds: return "rectangle.leadingthird.inset.filled"
         case .centerThird: return "rectangle.center.inset.filled"
         case .lastThird, .lastTwoThirds: return "rectangle.trailingthird.inset.filled"
@@ -173,6 +189,8 @@ enum WindowCommandCatalog {
         case .nextDisplay: return "rectangle.on.rectangle.angled"
         case .previousDisplay: return "rectangle.on.rectangle.angled"
         case .toggleFullscreen: return "arrow.up.left.and.arrow.down.right.square"
+        case .previousSpace: return "chevron.backward.2"
+        case .nextSpace: return "chevron.forward.2"
         }
     }
 
@@ -180,6 +198,7 @@ enum WindowCommandCatalog {
         switch id {
         case .restore: return .restore
         case .toggleFullscreen: return .fullscreen
+        case .previousSpace, .nextSpace: return .space
         default: return .geometry
         }
     }
@@ -190,6 +209,8 @@ enum WindowCommandCatalog {
             return .halves
         case .topLeftQuarter, .topRightQuarter, .bottomLeftQuarter, .bottomRightQuarter:
             return .quarters
+        case .firstThreeFourths, .lastThreeFourths:
+            return .fourths
         case .firstThird, .centerThird, .lastThird, .firstTwoThirds, .lastTwoThirds:
             return .thirds
         case .maximize, .almostMaximize, .reasonableSize, .maximizeHeight, .maximizeWidth, .center,
@@ -199,6 +220,8 @@ enum WindowCommandCatalog {
             return .moving
         case .toggleFullscreen:
             return .fullscreen
+        case .previousSpace, .nextSpace:
+            return .spaces
         }
     }
 }

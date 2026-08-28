@@ -16,9 +16,10 @@ in (see Currency below).
   snapshot has landed yet. `CurrencyRateStore` owns the fetch and the cacheless `.ephemeral` session,
   and `CurrencyFeed` — pure, so the harness covers it — turns the payloads into that snapshot.
 - **`CurrencyData.generated.swift` is emitted by `node Scripts/gen-currencies.js`** and never hand-edited.
-  Two currency tables are hand-maintained, both in `CalcCurrency`: `contested`, the nouns several
-  currencies share (`dollars`, `pounds`), and `crypto`, which no standards body names. Do not add slang
-  or synonyms to either — no source of truth, so they rot.
+  Three currency tables are hand-maintained, all in `CalcCurrency`: `contested`, the nouns several
+  currencies share (`dollars`, `pounds`); `isoNames`, the standard's own names where CLDR substitutes
+  a different one (ISO 4217 calls CNY "Yuan Renminbi"); and `crypto`, which no standards body names.
+  Do not add slang or synonyms to any of them — no source of truth, so they rot.
 
 ## Evaluation pipeline
 
@@ -31,8 +32,9 @@ in (see Currency below).
 4. Complete-prefix evaluation for a trailing binary operator (`10kg +` → `10 kg`)
 5. Base conversion
 6. Explicit unit conversion (`10km to mi`)
-7. **Typed quantity arithmetic** (`10kg + 500g`, `$10 + €5`, `(1hr + 30min) to s`), which also
-   answers a bare amount (`1 usd`, `1 btc`) in the Mac's own currency
+7. **Typed quantity arithmetic** (`10kg + 500g`, `$10 + €5`, `(1hr + 30min) to s`,
+   `(20 sgd to usd) * 30`), which also answers a bare amount (`1 usd`, `1 btc`) in the Mac's own
+   currency
 8. **Currency conversion** (`1 euro to dollars`, `€20 to GBP`, `1 btc to eur`)
 9. **Bare-unit auto-conversion** (`1m` → feet + inches, `1hr` → 60 min, via
    `CalcUnits.parseBareConversion` + the `autoTargets` map)
@@ -57,8 +59,9 @@ the way date pickers do — 00–68 to the 2000s, 69–99 to the 1900s.
 
 `CalcQuantity` is a separate typed precedence parser rather than a mode added to the scalar
 `CalcParser`. Scalar `*` / `/` preserve the unit, compatible quantity division returns a scalar, and a
-trailing `to` / `in` converts the complete expression. Percentages keep relative semantics for addition
-(`10kg + 20%` → `12 kg`) and act as fractional scalars for multiplication and division
+trailing `to` / `in` converts the complete expression. A conversion inside parentheses is itself a
+quantity, so `(20 sgd to usd) * 30` converts then multiplies. Percentages keep relative semantics
+for addition (`10kg + 20%` → `12 kg`) and act as fractional scalars for multiplication and division
 (`10kg * 3%` → `0.3 kg`, `10kg / 25%` → `40 kg`).
 
 **The last unit typed decides the answer's unit.** `+` / `-` convert the _left_ side into the right
@@ -155,17 +158,20 @@ and folded, so `krónur` and `kronur` both resolve. The noun itself is the name'
 only wrong where that word isn't one — `NOT_NOUNS` in the generator drops those ("Special Drawing
 Rights" is not a "rights").
 
-What's left hand-written in `CalcCurrency.swift` is one table, `contested`: the nouns several
+What's left hand-written in `CalcCurrency.swift` starts with `contested`: the nouns several
 currencies share, where CLDR correctly refuses to choose and the calculator must. `dollars` is
 claimed by 22 currencies, `francs` 10, `pounds` 9, `pesos` 8, `rupees` 6. CLDR says "US dollars" and
 "Canadian dollars"; nothing in it says a bare "dollars" is USD. Words that stay genuinely ambiguous
 are assigned to nobody — `krona` is both SEK and ISK, so it produces no card. Slang and synonyms
-(`quid`, `bucks`, `rmb`) are deliberately _not_ carried: they'd be hand-maintained data with no
-source of truth.
+(`quid`, `bucks`) are deliberately _not_ carried: they'd be hand-maintained data with no source of
+truth. `isoNames` is the narrow exception that proves the rule: where ISO 4217 itself names a
+currency and CLDR substitutes a different word, the standard's name is carried with the standard as
+its source — CNY is "Yuan Renminbi" to ISO 4217, so `rmb` and `renminbi` resolve, while CLDR's own
+"Chinese Yuan" supplies `yuan` through the generator.
 
 ### Crypto
 
-`CalcCurrency.crypto` is the second hand-written table, and the only one with no external source at
+`CalcCurrency.crypto` is the third hand-written table, and the only one with no external source at
 all: no standards body names a coin, and the feed silently omits any symbol it can't price, so it
 can't even report which exist. The list is therefore a product choice — and it is also the symbol
 list the fetch asks for, since `CurrencyRateStore` builds its request from `cryptoCodes`. The two
@@ -186,7 +192,9 @@ and a unit on the other produces the same friendly category error as any other m
 The typed quantity path uses the same ordering and injected rate snapshot. Currency arithmetic is
 therefore deterministic: `$10 + €5` converts the left operand into euros when rates are available —
 the same last-unit-typed rule the measurements follow. Bare prefix and suffix signs (`$10`, `10$`)
-are accepted, and a conversion suffix applies to the whole expression.
+are accepted, and a conversion suffix applies to the whole expression. Parentheses make the
+conversion an operand (`(20 sgd to usd) * 30`), matching a trailing suffix on a scalar product
+(`20 sgd * 30 to usd`).
 
 ### The Mac's own currency
 

@@ -6,7 +6,6 @@ struct RankingTest {
     static func main() async {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("tinycast-ranking-\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: fileURL) }
 
         var clock = Date(timeIntervalSince1970: 2_000_000_000)
         let store = LauncherRankingStore(fileURL: fileURL) { clock }
@@ -138,6 +137,7 @@ struct RankingTest {
             "the observed boost cap stays under a band stride",
             maxBoost < SearchRelevance.bandStride - FuzzyMatch.maximumScore)
 
+        try? FileManager.default.removeItem(at: fileURL)
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }

@@ -61,6 +61,16 @@ enum FuzzyMatch {
         match(query: query, candidate: candidate)?.score
     }
 
+    /// The folded form, for a caller sweeping many candidates against one query.
+    static func score(_ query: Query, candidate: String) -> Int? {
+        match(query, candidate: candidate)?.score
+    }
+
+    /// Exact-only, for a caller that discards every weaker tier: skips the subsequence walk.
+    static func isExact(_ query: Query, candidate: String) -> Bool {
+        normalized(candidate) == query.text
+    }
+
     /// The widest score `match` returns; the bands are sized off it so they never overlap.
     static let maximumScore = 100_000
 
@@ -154,7 +164,11 @@ enum SearchRelevance {
 
     /// Base relevance from the strongest matching field, or nil when no field matches.
     static func score(query: String, fields: SearchFields) -> Int? {
-        let query = FuzzyMatch.Query(query)
+        score(FuzzyMatch.Query(query), fields: fields)
+    }
+
+    /// The folded form: an index ranking every entry against one query folds it once, not per entry.
+    static func score(_ query: FuzzyMatch.Query, fields: SearchFields) -> Int? {
         // Every entry is equally relevant to an empty query, so no field claims a band.
         guard !query.isEmpty else { return 0 }
         var best: Int?
@@ -189,8 +203,8 @@ enum SearchRelevance {
         if let bundleID = fields.bundleID {
             consider(identifyingPart(of: bundleID), literal: .bundleID, subsequence: nil)
             // A pasted identifier should still resolve, which the trimmed form alone can't do.
-            if let match = FuzzyMatch.match(query, candidate: bundleID), match.tier == .exact {
-                best = max(best ?? Int.min, Band.bundleID.offset + match.score)
+            if FuzzyMatch.isExact(query, candidate: bundleID) {
+                best = max(best ?? Int.min, Band.bundleID.offset + FuzzyMatch.maximumScore)
             }
         }
         if let executableName = fields.executableName {

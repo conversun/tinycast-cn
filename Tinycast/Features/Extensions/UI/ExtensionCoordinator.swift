@@ -178,7 +178,7 @@ final class ExtensionCoordinator {
         return command.arguments
     }
 
-    /// Escape in an extension screen: pop the extension's own stack first, then leave the command.
+    /// Escape past an empty search field: pop the extension's own stack, then leave the command.
     func exitExtensionScreen() {
         Task {
             if await extensions.popNavigation() { return }
@@ -213,6 +213,9 @@ final class ExtensionCoordinator {
 
     /// True while the palette is on screen — a toast has somewhere to render only then.
     var isPaletteVisible: Bool { paletteCoordinator.isVisible }
+
+    /// True while an OAuth authorization flow is actively awaiting callback.
+    var isAuthorizing: Bool { extensions.isAuthorizing }
 
     func closeMainWindow() {
         paletteCoordinator.hidePalette(restoreFocus: false)

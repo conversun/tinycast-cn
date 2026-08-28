@@ -32,6 +32,8 @@ struct EmojiTests {
         expect(holdingHands?.supportsSkinTone == false, "multi-person ZWJ is not tone-capable")
         let euro = entries.first { $0.glyph == "€" }
         expect(euro?.category == .currency, "€ landed in Currency")
+        let reference = entries.first { $0.glyph == "※" }
+        expect(reference?.category == .cjk, "※ landed in CJK Symbols")
 
         // Skin tone application
         expect(EmojiCatalog.applyTone(.dark, to: "👋") == "👋🏿", "modifier appended")

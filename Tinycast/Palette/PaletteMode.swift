@@ -3,9 +3,12 @@ import AppKit
 enum PaletteMode: String, CaseIterable, Identifiable {
     case launcher
     case clipboard
+    case ai
+    case aiHistory
     case calculatorHistory
     case emoji
     case fileSearch
+    case schedule
     case uninstall
     case quicklinks
     /// Collects a quicklink's `{argument}` values; the request lives on the session.
@@ -14,26 +17,16 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     case extensionCommand
 
     var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .launcher: return String(localized: "Apps")
-        case .clipboard: return String(localized: "Clipboard")
-        case .calculatorHistory: return String(localized: "Calculator History")
-        case .emoji: return String(localized: "Emoji & Symbols")
-        case .fileSearch: return String(localized: "Search Files")
-        case .uninstall: return String(localized: "Uninstall Application")
-        case .quicklinks: return String(localized: "Quicklinks")
-        case .quicklinkArguments: return String(localized: "Open Quicklink")
-        case .extensionCommand: return String(localized: "Extension")
-        }
-    }
     var systemImage: String {
         switch self {
         case .launcher: return "magnifyingglass"
         case .clipboard: return "doc.on.doc"
+        case .ai: return "sparkles"
+        case .aiHistory: return "clock.arrow.circlepath"
         case .calculatorHistory: return "plus.forwardslash.minus"
         case .emoji: return "face.smiling"
         case .fileSearch: return "doc.text.magnifyingglass"
+        case .schedule: return "calendar"
         case .uninstall: return "trash"
         case .quicklinks, .quicklinkArguments: return Quicklink.sfSymbol
         case .extensionCommand: return "puzzlepiece.extension"
@@ -43,10 +36,13 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         switch self {
         case .launcher: return String(localized: "Search for apps and commands…")
         case .clipboard: return String(localized: "Type to filter entries…")
+        case .ai: return String(localized: "Ask anything…")
+        case .aiHistory: return String(localized: "Search chats…")
         case .calculatorHistory:
             return String(localized: "Do math, convert units, or search your past calculations…")
         case .emoji: return String(localized: "Search emoji and symbols…")
         case .fileSearch: return String(localized: "Search files and folders…")
+        case .schedule: return String(localized: "Search today and tomorrow…")
         case .uninstall: return String(localized: "Filter files and folders by name…")
         case .quicklinks: return String(localized: "Search quicklinks…")
         // Replaced by the pending argument's name; only reached if the session vanished mid-render.

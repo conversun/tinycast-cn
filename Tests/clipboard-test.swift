@@ -13,11 +13,11 @@ struct ClipboardTests {
         pasteLeavesPinsAlone()
         pinsSurvivePruningAndTheWindow()
         pinsLeadFilteredSearches()
+        pinnedSlotResolutionUsesVisiblePins()
         textFormClassification()
         typeFilterSplitsTheHistory()
         typeFilterJoinsTheSearchMemo()
         persistence()
-        migrationFromShippedDatabase()
 
         print("\(passes)/\(passes + failures) passed")
         if failures > 0 { exit(1) }
@@ -144,6 +144,44 @@ struct ClipboardTests {
         }
     }
 
+    /// Slot picks are taken from the visible pinned block after query/filter, not from all pins.
+    static func pinnedSlotResolutionUsesVisiblePins() {
+        withStore { store, _ in
+            store.addText("alpha one", sourceBundleID: nil)
+            store.addText("beta two", sourceBundleID: nil)
+            store.addText("beta three", sourceBundleID: nil)
+            store.addText("plain text", sourceBundleID: nil)
+
+            store.togglePinned(item(store, "alpha one"))
+            store.togglePinned(item(store, "beta two"))
+            store.togglePinned(item(store, "beta three"))
+
+            expect(
+                store.pinnedItem(at: 0, in: "", filter: .all)?.text == "alpha one",
+                "slot 1 maps to the first pinned row")
+            expect(
+                store.pinnedItem(at: 2, in: "", filter: .all)?.text == "beta three",
+                "slot 3 maps to the third pinned row")
+            expect(
+                store.pinnedItem(at: 3, in: "", filter: .all) == nil,
+                "missing pinned slot returns nil")
+
+            expect(
+                store.pinnedItem(at: 0, in: "beta", filter: .all)?.text == "beta two",
+                "query narrows the pinned block before slot mapping")
+            expect(
+                store.pinnedItem(at: 1, in: "beta", filter: .all)?.text == "beta three",
+                "slot mapping follows visible pinned order under query")
+            expect(
+                store.pinnedItem(at: 2, in: "beta", filter: .all) == nil,
+                "query can remove pinned slots from reach")
+
+            expect(
+                store.pinnedItem(at: 0, in: "", filter: .link) == nil,
+                "filter applies before pinned slot mapping")
+        }
+    }
+
     /// The link/address classifier, including the filenames that must not read as links.
     static func textFormClassification() {
         let links = [
@@ -242,34 +280,6 @@ struct ClipboardTests {
         }
     }
 
-    /// A shipped pre-pin database migrates in place. Failing to open one is not a soft failure: the store deletes and recreates a database it can't open, taking the history with it.
-    static func migrationFromShippedDatabase() {
-        let dir = scratchDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let db = dir.appendingPathComponent("clipboard.sqlite3")
-        seedPrePinDatabase(at: db)
-
-        let store = ClipboardStore(directory: dir)
-        store.load()
-        expect(texts(store) == ["newer", "older"], "existing history survives the migration")
-
-        store.addText("after", sourceBundleID: nil)
-        store.togglePinned(item(store, "older"))
-        expect(texts(store) == ["older", "after", "newer"], "the migrated database takes pins")
-
-        let reopened = ClipboardStore(directory: dir)
-        reopened.load()
-        expect(texts(reopened) == ["older", "after", "newer"], "and keeps them across a reopen")
-
-        expect(
-            sqlite(db, "SELECT name FROM pragma_table_info('items')").contains("pinned_at"),
-            "the pin stamp column was added")
-        expect(
-            sqlite(db, "SELECT name FROM sqlite_master WHERE type = 'index'")
-                .contains("items_pinned_at"),
-            "and indexed")
-    }
-
     // MARK: - Harness
 
     /// Runs `body` against a store rooted in a fresh temp directory, torn down afterwards.
@@ -285,51 +295,6 @@ struct ClipboardTests {
                 "tinycast-clipboard-test-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
-    }
-
-    /// Writes the schema as shipped before pinning existed: no `pinned_at`, and two rows to migrate.
-    static func seedPrePinDatabase(at url: URL) {
-        let now = Date().timeIntervalSince1970
-        sqlite(
-            url,
-            """
-            CREATE TABLE items(
-              id TEXT NOT NULL UNIQUE, kind TEXT NOT NULL, text TEXT, image_path TEXT,
-              created_at REAL NOT NULL, source_app TEXT
-            );
-            CREATE INDEX items_created_at ON items(created_at);
-            CREATE VIRTUAL TABLE items_fts USING fts5(
-              text, content='items', content_rowid='rowid', tokenize='trigram'
-            );
-            CREATE TRIGGER items_ai AFTER INSERT ON items BEGIN
-              INSERT INTO items_fts(rowid, text) VALUES(new.rowid, new.text);
-            END;
-            CREATE TRIGGER items_ad AFTER DELETE ON items BEGIN
-              INSERT INTO items_fts(items_fts, rowid, text) VALUES('delete', old.rowid, old.text);
-            END;
-            INSERT INTO items(id, kind, text, created_at)
-              VALUES('\(UUID().uuidString)', 'text', 'older', \(now - 60));
-            INSERT INTO items(id, kind, text, created_at)
-              VALUES('\(UUID().uuidString)', 'text', 'newer', \(now));
-            """)
-    }
-
-    /// Rows returned by the `sqlite3` CLI — used to write a legacy database and to read the schema back, neither of which the store exposes.
-    @discardableResult
-    static func sqlite(_ database: URL, _ sql: String) -> Set<String> {
-        let task = Process()
-        let pipe = Pipe()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
-        task.arguments = [database.path, sql]
-        task.standardOutput = pipe
-        guard (try? task.run()) != nil else {
-            fail("could not run sqlite3")
-            return []
-        }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-        if task.terminationStatus != 0 { fail("sqlite3 failed: \(sql.prefix(60))") }
-        return Set(String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init))
     }
 
     static func form(_ text: String) -> ClipboardItem.TextForm? {

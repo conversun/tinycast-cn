@@ -20,16 +20,9 @@ struct NotesTests {
         let root = temporaryRoot("repository")
         defer { try? FileManager.default.removeItem(at: root) }
         let support = root.appendingPathComponent("com.tinycast.app")
-        let trash = root.appendingPathComponent("Trash", isDirectory: true)
-        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
-        let stable = NotesRepository(
-            applicationSupportDirectory: support,
-            trashOperation: { url in
-                try FileManager.default.moveItem(
-                    at: url, to: trash.appendingPathComponent(url.lastPathComponent))
-            })
-        let development = NotesRepository(
-            applicationSupportDirectory: root.appendingPathComponent("com.tinycast.app.dev"))
+        let stable = try repository(in: root, support: support)
+        let development = try repository(
+            in: root, support: root.appendingPathComponent("com.tinycast.app.dev"))
 
         try FileManager.default.createDirectory(
             at: stable.notesDirectory, withIntermediateDirectories: true)
@@ -104,7 +97,7 @@ struct NotesTests {
         check(
             "deletion moves the file through the injected Trash operation",
             FileManager.default.fileExists(
-                atPath: trash.appendingPathComponent(plan.id.rawValue).path))
+                atPath: trashDirectory(in: root).appendingPathComponent(plan.id.rawValue).path))
 
         let outside = root.appendingPathComponent("outside.md")
         try Data("outside".utf8).write(to: outside)
@@ -125,8 +118,8 @@ struct NotesTests {
             "symlinked Markdown files are absent from enumeration",
             !(try stable.list()).contains { $0.id == symlinkID })
 
-        let empty = NotesRepository(
-            applicationSupportDirectory: root.appendingPathComponent("com.tinycast.app.empty"))
+        let empty = try repository(
+            in: root, support: root.appendingPathComponent("com.tinycast.app.empty"))
         let emptyLoad = try empty.load(preferredID: nil)
         check("an empty collection loads no document", emptyLoad.0.isEmpty && emptyLoad.1 == nil)
         check(
@@ -174,14 +167,7 @@ struct NotesTests {
     private static func testStoreCollectionAndAutosave() async throws {
         let root = temporaryRoot("store")
         defer { try? FileManager.default.removeItem(at: root) }
-        let trash = root.appendingPathComponent("Trash", isDirectory: true)
-        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
-        let repository = NotesRepository(
-            applicationSupportDirectory: root,
-            trashOperation: { url in
-                try FileManager.default.moveItem(
-                    at: url, to: trash.appendingPathComponent(url.lastPathComponent))
-            })
+        let repository = try repository(in: root)
         let selection = SelectionBox()
         let store = NotesStore(
             repository: repository,
@@ -244,7 +230,7 @@ struct NotesTests {
         check(
             "trashing another note moves it through the injected Trash operation",
             FileManager.default.fileExists(
-                atPath: trash.appendingPathComponent(projectID.rawValue).path))
+                atPath: trashDirectory(in: root).appendingPathComponent(projectID.rawValue).path))
         check("trashing another note keeps the active note", store.activeID == firstID)
 
         for summary in store.summaries {
@@ -264,7 +250,7 @@ struct NotesTests {
     private static func testCollectionMutationsFlushTheDraft() async throws {
         let root = temporaryRoot("mutation-flush")
         defer { try? FileManager.default.removeItem(at: root) }
-        let repository = NotesRepository(applicationSupportDirectory: root)
+        let repository = try repository(in: root)
         let store = NotesStore(repository: repository)
 
         _ = await store.create()
@@ -304,7 +290,7 @@ struct NotesTests {
     private static func testStoreRecoversFromFailures() async throws {
         let root = temporaryRoot("recovery")
         defer { try? FileManager.default.removeItem(at: root) }
-        let repository = NotesRepository(applicationSupportDirectory: root)
+        let repository = try repository(in: root)
         try FileManager.default.createDirectory(
             at: repository.notesDirectory, withIntermediateDirectories: true)
         let unreadable = repository.fileURL(for: NoteID(rawValue: "Unreadable.md"))
@@ -344,6 +330,22 @@ struct NotesTests {
             "an edit that lands during a write is not lost",
             try String(contentsOf: activeURL, encoding: .utf8) == "edit during the write")
         store.stop()
+    }
+
+    /// Deleting a note trashes it for real, so every harness repository redirects that inside the root.
+    private static func repository(in root: URL, support: URL? = nil) throws -> NotesRepository {
+        let trash = trashDirectory(in: root)
+        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
+        return NotesRepository(
+            applicationSupportDirectory: support ?? root,
+            trashOperation: { url in
+                try FileManager.default.moveItem(
+                    at: url, to: trash.appendingPathComponent(url.lastPathComponent))
+            })
+    }
+
+    private static func trashDirectory(in root: URL) -> URL {
+        root.appendingPathComponent("Trash", isDirectory: true)
     }
 
     private static func temporaryRoot(_ name: String) -> URL {

@@ -57,6 +57,8 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             panel.contentView?.layoutSubtreeIfNeeded()
             core.inputSourceSwitcher.beginSession(
                 preferredInputSourceID: core.settings.autoSwitchInputSourceID)
+            // Events go stale while the palette is closed, and the countdown only ticks while up.
+            core.calendarCoordinator.paletteDidShow()
             // Non-activating, so summoning never raises our own aux windows behind it.
             panel.makeKeyAndOrderFront(nil)
             panel.orderFrontRegardless()
@@ -71,6 +73,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     func hide(restoreFocus: Bool) {
         panel?.orderOut(nil)
         core.inputSourceSwitcher.endSession()
+        core.calendarCoordinator.paletteDidHide()
         // Drop the anchor, so the next summon re-resolves for the screen in use then.
         anchor = nil
         // The guides must never outlive the panel they point at.
@@ -91,19 +94,27 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
 
     /// Pop to Root Search: reset now, or after the delay unless a reopen consumes it.
     private func schedulePopToRoot() {
+        // Don't pop to root if an extension is waiting for OAuth authorization in the browser.
+        guard !core.extensions.isAuthorizing else { return }
         popToRootTimer?.invalidate()
         let timeout = core.settings.popToRootTimeout
         guard timeout != .immediately else {
-            core.palette.prepare(mode: .launcher)
+            popToRoot()
             return
         }
         popToRootTimer = Timer.scheduledTimer(withTimeInterval: timeout.interval, repeats: false) {
             [weak self] _ in
             MainActor.assumeIsolated {
-                self?.popToRootTimer = nil
-                self?.core.palette.prepare(mode: .launcher)
+                guard let self, !self.core.extensions.isAuthorizing else { return }
+                self.popToRootTimer = nil
+                self.popToRoot()
             }
         }
+    }
+
+    /// The screen only: a conversation is not a typed query, and `Opens To` decides its lifetime.
+    private func popToRoot() {
+        core.palette.prepare(mode: .launcher)
     }
 
     /// True while a hidden palette still holds pre-close state; consuming cancels the reset.
@@ -127,9 +138,11 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
 
     // MARK: - NSWindowDelegate
 
-    /// Dismiss when the palette loses key status (click-away, ⌘-Tab, app switch).
+    /// Dismiss when the palette loses key status (click-away, ⌘-Tab, app switch). One of our own
+    /// dialogs is none of those: hiding would pop to root, which tears down an extension command
+    /// while its `confirmAlert` is still waiting for the answer.
     func windowDidResignKey(_ notification: Notification) {
-        guard isVisible else { return }
+        guard isVisible, !core.isShowingDialog else { return }
         core.paletteCoordinator.hidePalette(restoreFocus: false)
     }
 
@@ -223,6 +236,8 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             .environment(core.quicklinks)
             .environment(core.quicklinkArguments)
             .environment(core.extensions)
+            .environment(core.calendarStore)
+            .environment(core.meetingClock)
         let panel = PalettePanel(rootView: root)
         panel.delegate = self
         panel.paletteState = core.palette
@@ -242,6 +257,13 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
                 core.palette.selection = 0
                 return true
             }
+            if core.palette.mode == .aiHistory {
+                core.palette.prepare(mode: .ai)
+                return true
+            }
+            if core.palette.mode == .ai, core.aiChatCoordinator.removeLastAttachment() {
+                return true
+            }
             core.palette.prepare(mode: .launcher)
             return true
         }
@@ -250,6 +272,12 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             guard let self, !event.isARepeat,
                 event.modifierFlags.intersection([.command, .option, .control, .shift]) == .command
             else { return false }
+            if self.core.palette.mode == .launcher || self.core.palette.mode == .clipboard,
+                let index = FavoriteSlots.index(forKeyCode: event.keyCode)
+            {
+                self.core.palette.noteFavoriteSlot(index)
+                return true
+            }
             // Escape has no character, so it matches by key code.
             if Int(event.keyCode) == kVK_Escape {
                 self.core.palette.prepare(mode: .launcher)
@@ -268,6 +296,8 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             case "w":
                 self.core.paletteCoordinator.hidePalette()
                 return true
+            case "v":
+                return self.core.palette.mode == .ai && self.core.aiChatCoordinator.attachPastedImage()
             default:
                 return false
             }

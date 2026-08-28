@@ -76,10 +76,11 @@ struct ExtensionStoreClient: Sendable {
         -> [ExtensionListing]
     {
         let folders = try await folderNames(in: registry)
+        let folded = FuzzyMatch.Query(query)
         let ranked =
             folders
             .compactMap { folder -> (String, Int)? in
-                guard let score = FuzzyMatch.score(query: query, candidate: folder) else {
+                guard let score = FuzzyMatch.score(folded, candidate: folder) else {
                     return nil
                 }
                 return (folder, score)

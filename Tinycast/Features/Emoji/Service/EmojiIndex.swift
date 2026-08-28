@@ -47,8 +47,9 @@ final class EmojiIndex {
         return searchMemo.value(for: SearchKey(query: q, revision: revision)) {
             // Penalized just under half a tier, so an equal-quality name match always wins.
             var scored: [ScoredEntry] = []
+            let query = FuzzyMatch.Query(q)
             for (order, entry) in entries.enumerated() {
-                let nameScore = FuzzyMatch.score(query: q, candidate: entry.name)
+                let nameScore = FuzzyMatch.score(query, candidate: entry.name)
                 var best = nameScore
                 // Unpenalized: the localized name is a name, not one term inside a keyword blob.
                 if !entry.localizedName.isEmpty,
@@ -57,7 +58,7 @@ final class EmojiIndex {
                     best = max(best ?? Int.min, localized)
                 }
                 if !entry.keywords.isEmpty,
-                    let keywordScore = FuzzyMatch.score(query: q, candidate: entry.keywords)
+                    let keywordScore = FuzzyMatch.score(query, candidate: entry.keywords)
                 {
                     best = max(best ?? Int.min, keywordScore - 500)
                 }

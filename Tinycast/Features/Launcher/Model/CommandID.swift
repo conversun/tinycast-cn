@@ -2,10 +2,20 @@ import Foundation
 
 /// Built-in launcher actions, surfaced alongside the user-authored ones.
 enum CommandID: String, CaseIterable, Sendable {
+    case aiChat = "command:ai-chat"
+    case fixGrammar = "command:fix-grammar"
+    case rewrite = "command:rewrite"
+    case translate = "command:translate"
+    case summarize = "command:summarize"
     case calculatorHistory = "command:calculator-history"
     case clipboardHistory = "command:clipboard-history"
     case searchEmoji = "command:search-emoji"
     case searchFiles = "command:search-files"
+    case joinNextMeeting = "command:join-next-meeting"
+    case copyMeetingLink = "command:copy-meeting-link"
+    case mySchedule = "command:my-schedule"
+    case openInCalendar = "command:open-in-calendar"
+    case createEvent = "command:create-event"
     case showNotes = "command:show-notes"
     case createNote = "command:create-note"
     case searchNotes = "command:search-notes"
@@ -16,8 +26,10 @@ enum CommandID: String, CaseIterable, Sendable {
     case exportSettings = "command:export-settings"
     case importSettings = "command:import-settings"
     case importFromRaycast = "command:import-from-raycast"
+    case checkForUpdates = "command:check-for-updates"
     case settings = "command:settings"
     case about = "command:about"
+    case support = "command:support"
     case quit = "command:quit"
 
     var name: String { untranslatedName.localizedUI }
@@ -26,10 +38,20 @@ enum CommandID: String, CaseIterable, Sendable {
     /// make `clipboard` stop finding 剪贴板历史.
     var untranslatedName: String {
         switch self {
+        case .aiChat: return "AI Chat"
+        case .fixGrammar: return QuickAction.fixGrammar.title
+        case .rewrite: return QuickAction.rewrite.title
+        case .translate: return QuickAction.translate.title
+        case .summarize: return QuickAction.summarize.title
         case .calculatorHistory: return "Calculator History"
         case .clipboardHistory: return "Clipboard History"
         case .searchEmoji: return "Search Emoji & Symbols"
         case .searchFiles: return "Search Files"
+        case .joinNextMeeting: return "Join Next Meeting"
+        case .copyMeetingLink: return "Copy Meeting Link"
+        case .mySchedule: return "My Schedule"
+        case .openInCalendar: return "Open in Calendar"
+        case .createEvent: return "Create Event"
         case .showNotes: return "Show Notes"
         case .createNote: return "Create Note"
         case .searchNotes: return "Search Notes"
@@ -40,18 +62,30 @@ enum CommandID: String, CaseIterable, Sendable {
         case .exportSettings: return "Export Settings"
         case .importSettings: return "Import Settings"
         case .importFromRaycast: return "Import from Raycast"
+        case .checkForUpdates: return "Check for Updates"
         case .settings: return "Settings"
         case .about: return "About Tinycast"
+        case .support: return "Support Tinycast"
         case .quit: return "Quit Tinycast"
         }
     }
 
     var sfSymbol: String {
         switch self {
+        case .aiChat: return "sparkles"
+        case .fixGrammar: return QuickAction.fixGrammar.symbol
+        case .rewrite: return QuickAction.rewrite.symbol
+        case .translate: return QuickAction.translate.symbol
+        case .summarize: return QuickAction.summarize.symbol
         case .calculatorHistory: return "plus.forwardslash.minus"
         case .clipboardHistory: return "doc.on.clipboard"
         case .searchEmoji: return "face.smiling"
         case .searchFiles: return "doc.text.magnifyingglass"
+        case .joinNextMeeting: return "video.fill"
+        case .copyMeetingLink: return "link"
+        case .mySchedule: return "calendar"
+        case .openInCalendar: return "calendar.badge.clock"
+        case .createEvent: return "calendar.badge.plus"
         case .showNotes: return "text.page"
         case .createNote: return "note.text.badge.plus"
         case .searchNotes: return "text.magnifyingglass"
@@ -62,9 +96,21 @@ enum CommandID: String, CaseIterable, Sendable {
         case .exportSettings: return "square.and.arrow.up"
         case .importSettings: return "square.and.arrow.down"
         case .importFromRaycast: return "arrow.down.doc"
+        case .checkForUpdates: return "arrow.down.circle"
         case .settings: return "gearshape"
         case .about: return "info.circle"
+        case .support: return "heart"
         case .quit: return "power"
+        }
+    }
+
+    /// Exhaustive over `QuickAction`, so a fifth cannot reach the launcher without a row here.
+    init(_ action: QuickAction) {
+        switch action {
+        case .fixGrammar: self = .fixGrammar
+        case .rewrite: self = .rewrite
+        case .translate: self = .translate
+        case .summarize: self = .summarize
         }
     }
 
@@ -77,6 +123,14 @@ enum CommandID: String, CaseIterable, Sendable {
         case .showNotes: return .showNotes
         case .createNote: return .createNote
         case .searchNotes: return .searchNotes
+        case .joinNextMeeting: return .joinNextMeeting
+        case .mySchedule: return .mySchedule
+        case .createEvent: return .createEvent
+        case .aiChat: return .aiChat
+        case .fixGrammar: return .quickAction(.fixGrammar)
+        case .rewrite: return .quickAction(.rewrite)
+        case .translate: return .quickAction(.translate)
+        case .summarize: return .quickAction(.summarize)
         default: return nil
         }
     }

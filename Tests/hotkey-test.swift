@@ -88,14 +88,22 @@ struct DoubleTapDetectorTests {
     // MARK: - Built-in command mappings
 
     static func commandActions() {
-        let expected: [(CommandID, HotKeyAction, String)] = [
-            (.clipboardHistory, .toggleClipboard, "hotkey.toggleClipboard"),
-            (.searchEmoji, .toggleEmoji, "hotkey.toggleEmoji"),
-            (.searchFiles, .searchFiles, "hotkey.searchFiles"),
-            (.showNotes, .showNotes, "hotkey.showNotes"),
-            (.createNote, .createNote, "hotkey.createNote"),
-            (.searchNotes, .searchNotes, "hotkey.searchNotes")
-        ]
+        let expected: [(CommandID, HotKeyAction, String)] =
+            [
+                (.clipboardHistory, .toggleClipboard, "hotkey.toggleClipboard"),
+                (.searchEmoji, .toggleEmoji, "hotkey.toggleEmoji"),
+                (.searchFiles, .searchFiles, "hotkey.searchFiles"),
+                (.joinNextMeeting, .joinNextMeeting, "hotkey.joinNextMeeting"),
+                (.mySchedule, .mySchedule, "hotkey.mySchedule"),
+                (.createEvent, .createEvent, "hotkey.createEvent"),
+                (.showNotes, .showNotes, "hotkey.showNotes"),
+                (.createNote, .createNote, "hotkey.createNote"),
+                (.searchNotes, .searchNotes, "hotkey.searchNotes"),
+                (.aiChat, .aiChat, "hotkey.aiChat")
+            ]
+            + QuickAction.allCases.map {
+                (CommandID($0), .quickAction($0), "hotkey.quickAction.\($0.rawValue)")
+            }
         let answers = CommandID.allCases.compactMap { id in id.hotKeyAction.map { (id, $0) } }
         expect(
             answers.count == expected.count,
@@ -109,6 +117,29 @@ struct DoubleTapDetectorTests {
             Set(HotKeyAction.builtInActions)
                 .isSuperset(of: Set(CommandID.allCases.compactMap(\.hotKeyAction))),
             "every bindable command appears among the built-in hotkey actions")
+
+        // Every action reaches the launcher as well as a shortcut; `CommandID.init` is exhaustive.
+        expect(
+            QuickAction.allCases.allSatisfy { CommandID($0).name == $0.title },
+            "each Quick Action's command carries the action's own title")
+        expect(
+            Set(QuickAction.allCases.map(CommandID.init)).count == QuickAction.allCases.count,
+            "no two Quick Actions share a launcher command")
+
+        // Parameterised, so a new Quick Action must arrive bindable without editing this enum.
+        for action in QuickAction.allCases {
+            let hotKey = HotKeyAction.quickAction(action)
+            expect(
+                hotKey.defaultsKey == "hotkey.quickAction.\(action.rawValue)",
+                "\(action.title) keys its binding on its raw value, not its position")
+            expect(
+                HotKeyAction.builtInActions.contains(hotKey),
+                "\(action.title) is registered at launch like every other fixed action")
+        }
+        expect(
+            Set(HotKeyAction.builtInActions.map(\.defaultsKey)).count
+                == HotKeyAction.builtInActions.count,
+            "no two built-in actions share a defaults key, which would bind them together")
     }
 
     // MARK: - The Hyper chord

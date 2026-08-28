@@ -5,13 +5,8 @@ import Foundation
 struct CustomCommandTests {
     @MainActor
     static func main() async {
-        let suiteName = "com.tinycast.custom-command-tests.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            print("FAIL  could not create an isolated UserDefaults suite")
-            exit(1)
-        }
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let suiteName = "com.tinycast.custom-command-tests"
+        let defaults = isolatedDefaults(suiteName)
 
         var failures = 0
 
@@ -103,7 +98,6 @@ struct CustomCommandTests {
         let zdotdir = FileManager.default.temporaryDirectory
             .appendingPathComponent("tinycast-zdotdir-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: zdotdir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: zdotdir) }
         try? Data("alias tinycast_probe=true\n".utf8).write(
             to: zdotdir.appendingPathComponent(".zshrc"))
         setenv("ZDOTDIR", zdotdir.path, 1)
@@ -129,7 +123,26 @@ struct CustomCommandTests {
 
         unsetenv("ZDOTDIR")
 
+        try? FileManager.default.removeItem(at: zdotdir)
+        discardSuite(suiteName, defaults)
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }
+}
+
+/// `removePersistentDomain` only empties the domain; cfprefsd still leaves the plist on disk.
+private func discardSuite(_ name: String, _ defaults: UserDefaults) {
+    defaults.removePersistentDomain(forName: name)
+    UserDefaults.standard.removeSuite(named: name)
+    CFPreferencesAppSynchronize(name as CFString)
+    try? FileManager.default.removeItem(
+        at: URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("Library/Preferences/\(name).plist"))
+}
+
+/// A fixed suite name stops cfprefsd accumulating a plist per run; the domain is cleared at both ends.
+private func isolatedDefaults(_ name: String) -> UserDefaults {
+    let defaults = UserDefaults(suiteName: name)!
+    defaults.removePersistentDomain(forName: name)
+    return defaults
 }

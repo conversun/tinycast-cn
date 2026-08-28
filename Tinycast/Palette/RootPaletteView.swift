@@ -13,6 +13,9 @@ struct RootPaletteView: View {
     @Environment(EmojiIndex.self) private var emojiIndex
     @Environment(FrequentEmojiStore.self) private var frequentEmoji
     @Environment(FileSearchSession.self) private var fileSearch
+    @Environment(CalendarStore.self) private var calendarStore
+    /// Observed so the join card's countdown redraws on the minute boundary.
+    @Environment(MeetingClock.self) private var meetingClock
     @Environment(UninstallSession.self) private var uninstall
     @Environment(QuicklinkStore.self) private var quicklinks
     @Environment(QuicklinkArgumentSession.self) private var quicklinkArguments
@@ -40,6 +43,7 @@ struct RootPaletteView: View {
             return LauncherScreen(
                 appIndex: appIndex, favorites: favorites, visibility: visibility,
                 currencyRates: currencyRates, core: core, vm: vm, running: selectionIsRunning,
+                meeting: core.calendarCoordinator.cardedMeeting, now: meetingClock.now,
                 openActions: openActions,
                 scrollToFollow: { scroll = ScrollIntent(kind: .follow) })
         case .uninstall:
@@ -59,18 +63,29 @@ struct RootPaletteView: View {
         case .fileSearch:
             return FileSearchScreen(
                 session: fileSearch, core: core, vm: vm, openActions: openActions)
+        case .schedule:
+            return ScheduleScreen(
+                store: calendarStore, clock: meetingClock, core: core, vm: vm,
+                openActions: openActions)
         case .clipboard:
             return ClipboardScreen(
                 store: store, core: core, vm: vm, openActions: openActions,
                 scrollToFollow: { scroll = ScrollIntent(kind: .follow) })
+        case .ai:
+            return AIScreen(
+                vm: vm, chat: core.aiChat, settings: core.aiSettings,
+                coordinator: core.aiChatCoordinator)
+        case .aiHistory:
+            return ChatHistoryScreen(
+                history: core.chatHistory, chat: core.aiChat, coordinator: core.aiChatCoordinator,
+                vm: vm, openActions: openActions)
         case .calculatorHistory:
             return CalculatorHistoryScreen(
                 history: calcHistory, currencyRates: currencyRates, core: core, vm: vm,
                 openActions: openActions)
         case .extensionCommand:
             return ExtensionCommandScreen(
-                screen: extensionScreen, extensions: extensions, core: core, vm: vm,
-                openActions: openActions)
+                screen: extensionScreen, extensions: extensions, vm: vm, openActions: openActions)
         }
     }
 
@@ -96,12 +111,6 @@ struct RootPaletteView: View {
 
     // MARK: - Popover menu content
 
-    /// The Actions menu for the current selection, or nil when it has no actions.
-    private var actionsContent: PopoverMenuContent? {
-        let screen = screen
-        return screen.actions(at: selection(in: screen))
-    }
-
     /// The clipboard type filter's rows; activating one is the only way the filter changes.
     private var clipboardFilterContent: PopoverMenuContent {
         PopoverMenuContent(
@@ -112,11 +121,32 @@ struct RootPaletteView: View {
             })
     }
 
-    /// The bottom-left app menu content (About / Settings).
+    /// Every model configured for chat; selecting one updates the app-wide default route.
+    private var aiModelContent: PopoverMenuContent {
+        let options = core.aiChatCoordinator.modelOptions
+        guard !options.isEmpty else {
+            return PopoverMenuContent(items: [
+                PopoverMenuItem(title: "Configure AI", systemImage: "slider.horizontal.3") {
+                    core.aiChatCoordinator.showSettings()
+                }
+            ])
+        }
+        return PopoverMenuContent(
+            items: options.map { option in
+                PopoverMenuItem(title: option.menuTitle, icon: option.menuIcon) {
+                    core.aiChatCoordinator.selectModel(option)
+                }
+            })
+    }
+
+    /// The bottom-left app menu content (About / Support / Settings).
     private var appMenuContent: PopoverMenuContent {
         PopoverMenuContent(items: [
             PopoverMenuItem(title: "About Tinycast", systemImage: "info.circle") {
                 core.settingsCoordinator.showAbout()
+            },
+            PopoverMenuItem(title: "Support Tinycast", systemImage: "heart") {
+                core.supportCoordinator.showSupport()
             },
             PopoverMenuItem(title: "Settings", systemImage: "gearshape", shortcut: "⌘,") {
                 core.settingsCoordinator.showSettings()
@@ -124,12 +154,26 @@ struct RootPaletteView: View {
         ])
     }
 
-    /// Whichever menu is open — the one source `moveMenu` and `activateMenuItem` address rows through.
-    private var menuContent: PopoverMenuContent? {
+    /// Whichever menu is open — the one source `moveMenu`, `activateMenuItem` and the overlays
+    /// address rows through, so no two of them can disagree about what a row index means.
+    private var menuContent: PaletteMenuContent? {
         switch openMenu {
-        case .actions: return actionsContent
-        case .app: return appMenuContent
-        case .clipboardFilter: return clipboardFilterContent
+        case .actions:
+            let screen = screen
+            return screen.menuContent(
+                at: selection(in: screen), menuSelection: $menuSelection,
+                onActivate: activateMenuItem)
+        case .app:
+            return PaletteMenuContent(
+                popover: appMenuContent, selection: $menuSelection, onActivate: activateMenuItem)
+        case .clipboardFilter:
+            return PaletteMenuContent(
+                popover: clipboardFilterContent, selection: $menuSelection,
+                width: headerMenuWidth, onActivate: activateMenuItem)
+        case .aiModel:
+            return PaletteMenuContent(
+                popover: aiModelContent, selection: $menuSelection,
+                width: headerMenuWidth, onActivate: activateMenuItem)
         case nil: return nil
         }
     }
@@ -161,55 +205,36 @@ struct RootPaletteView: View {
         // The panel has no title bar, so this thin top margin is the only place left to grab it.
         .overlay(alignment: .top) { topDragStrip }
         .modifier(ExtensionToastOverlay(extensions: extensions, showing: vm.mode == .extensionCommand))
-        // In-window overlays, so a menu stays clipped inside the panel.
+        // Never conditionally mounted: unmounting strands SwiftUI's hover target and eats clicks.
         .overlay {
-            if menuOpen {
-                Color.black.opacity(0.001)
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: closeMenus)
-            }
+            Color.black.opacity(0.001)
+                .contentShape(Rectangle())
+                // Not a tap: a drifting press must still dismiss, the way a native menu's does.
+                .gesture(DragGesture(minimumDistance: 0).onEnded { _ in closeMenus() })
+                .allowsHitTesting(menuOpen)
         }
         .overlay(alignment: .bottomLeading) {
-            if openMenu == .app {
-                let content = appMenuContent
-                PopoverMenu(
-                    header: content.header, items: content.items, selection: $menuSelection,
-                    onActivate: activateMenuItem
-                )
-                .padding(Self.menuInset)
-                .transition(Self.menuTransition(.bottomLeading))
+            if openMenu == .app, let content = menuContent {
+                content.view()
+                    .padding(Self.menuInset)
+                    .transition(Self.menuTransition(.bottomLeading))
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            if openMenu == .actions, let content = actionsContent {
-                Group {
-                    // An extension declares its own panel, which runs long enough to need scrolling.
-                    if vm.mode == .extensionCommand {
-                        ExtensionActionsPanel(
-                            header: content.header, items: content.items, selection: $menuSelection,
-                            onActivate: activateMenuItem)
-                    } else {
-                        PopoverMenu(
-                            header: content.header, items: content.items, selection: $menuSelection,
-                            onActivate: activateMenuItem)
-                    }
-                }
-                .padding(Self.menuInset)
-                .transition(Self.menuTransition(.bottomTrailing))
+            if openMenu == .actions, let content = menuContent {
+                content.view()
+                    .padding(Self.menuInset)
+                    .transition(Self.menuTransition(.bottomTrailing))
             }
         }
-        // Hangs off the header's filter button rather than a corner, so it needs the header's metrics.
+        // Header menus hang from their buttons rather than a panel corner.
         .overlay(alignment: .topTrailing) {
-            if openMenu == .clipboardFilter {
-                let content = clipboardFilterContent
-                PopoverMenu(
-                    items: content.items, selection: $menuSelection,
-                    width: Theme.Size.clipboardFilterMenuWidth, onActivate: activateMenuItem
-                )
-                .padding(.top, Theme.Size.headerPadding + Theme.Size.headerHeight)
-                // Right edges flush with the button's, which sits inside the same trailing gutter.
-                .padding(.trailing, Theme.Spacing.md * 2)
-                .transition(Self.menuTransition(.topTrailing))
+            if openMenu == .clipboardFilter || openMenu == .aiModel, let content = menuContent {
+                content.view()
+                    .padding(.top, Theme.Size.headerPadding + Theme.Size.headerHeight)
+                    // Right edges flush with the button's, which sits inside the same trailing gutter.
+                    .padding(.trailing, Theme.Spacing.md * 2)
+                    .transition(Self.menuTransition(.topTrailing))
             }
         }
         // The window's frame is the size source, so the glass and clip stay matched.
@@ -245,7 +270,7 @@ struct RootPaletteView: View {
             if vm.mode != .uninstall { uninstall.cancel() }
             if vm.mode != .fileSearch { fileSearch.cancel() }
             // Leaving the screen any other way than Escape still ends the command's session.
-            if vm.mode != .extensionCommand, extensions.running != nil {
+            if vm.mode != .extensionCommand, extensions.running != nil, !extensions.isAuthorizing {
                 Task { await extensions.stop() }
             }
             // Same for a half-filled argument form: leaving the screen abandons the pending open.
@@ -257,6 +282,8 @@ struct RootPaletteView: View {
         }
         // ⌘. arrives as a token rather than a key press. See `PaletteState.pinChordToken`.
         .onChange(of: vm.pinChordToken) { pinSelection() }
+        // ⌘1…⌘0 arrives as a slot index from AppKit keyCode matching.
+        .onChange(of: vm.favoriteSlotToken) { activateFavoriteSlotShortcut() }
         // One optional makes "exactly one menu" structural; this only mirrors it for the panel.
         .onChange(of: openMenu) {
             vm.menuOpen = menuOpen
@@ -265,15 +292,6 @@ struct RootPaletteView: View {
         // Several paths flip `paletteIsCollapsed`, so resize the window to match.
         .onChange(of: core.paletteCoordinator.paletteIsCollapsed) {
             core.paletteCoordinator.syncPaletteSize()
-        }
-        // ⌘1–⌘9/⌘0 launch favorites by position, in both palette sizes.
-        .onKeyPress(keys: Self.favoriteSlotKeys, phases: .down) { press in
-            guard press.modifiers.contains(.command),
-                !isCollapsed || settings.showFavoritesInCompactMode,
-                let index = FavoriteSlots.index(for: press.key.character),
-                let launcher = screen as? LauncherScreen
-            else { return .ignored }
-            return launcher.launchFavorite(at: index) ? .handled : .ignored
         }
         // Repeat included: holding the key must keep stepping, as the bare-key form does by default.
         .onKeyPress(keys: [.downArrow], phases: [.down, .repeat]) { press in
@@ -325,16 +343,18 @@ struct RootPaletteView: View {
             return screen.pasteKeepingWindowOpen(at: selection) ? .handled : .ignored
         }
         .onKeyPress(.escape) {
-            if menuOpen {
+            switch PaletteEscapeAction.resolve(menuOpen: menuOpen, query: vm.query, mode: vm.mode) {
+            case .closeMenu:
                 closeMenus()
-                return .handled
-            }
-            // An extension pops its own navigation stack before the command is left.
-            if vm.mode == .extensionCommand {
+            case .clearQuery:
+                vm.query = ""
+            case .exitExtensionScreen:
                 core.extensionCoordinator.exitExtensionScreen()
-                return .handled
+            case .exitToLauncher:
+                exitToLauncher()
+            case .hidePalette:
+                core.paletteCoordinator.hidePalette()
             }
-            core.paletteCoordinator.hidePalette()
             return .handled
         }
         .onKeyPress(.tab) {
@@ -374,6 +394,10 @@ struct RootPaletteView: View {
                 history.delete(at: selection)
                 return .handled
             }
+            if let history = screen as? ChatHistoryScreen {
+                history.delete(at: selection)
+                return .handled
+            }
             return .ignored
         }
         // ⌃X / ⌃⇧X mirror the delete rows — both cases, Shift uppercasing — and close an open menu.
@@ -386,6 +410,8 @@ struct RootPaletteView: View {
             case let clipboard as ClipboardScreen:
                 if all { clipboard.deleteAll() } else { clipboard.delete(at: selection) }
             case let history as CalculatorHistoryScreen:
+                if all { history.deleteAll() } else { history.delete(at: selection) }
+            case let history as ChatHistoryScreen:
                 if all { history.deleteAll() } else { history.delete(at: selection) }
             default:
                 return .ignored
@@ -441,7 +467,7 @@ struct RootPaletteView: View {
             headerGutter(width: Theme.Spacing.md * 2)
             // Sub-screens of the root search, so their header icon is a back chevron.
             if vm.mode != .launcher {
-                Button(action: exitToLauncher) {
+                Button(action: navigateBack) {
                     Image(systemName: "chevron.left")
                         .font(Theme.Typography.headerIcon)
                         .symbolRenderingMode(.hierarchical)
@@ -466,12 +492,24 @@ struct RootPaletteView: View {
                 accessory.view
                 Spacer(minLength: 0)
             }
+            if tabOpensChat {
+                headerGutter(width: Theme.Spacing.md)
+                aiChatTabHint
+            }
             // Keyed off the mode, which is what says which screen is up; the field just flexes narrower.
             if !isCollapsed, vm.mode == .clipboard {
                 headerGutter(width: Theme.Spacing.md)
                 ClipboardFilterButton(
                     filter: vm.clipboardFilter, isOpen: openMenu == .clipboardFilter,
                     action: toggleClipboardFilter)
+            }
+            if !isCollapsed, vm.mode == .ai {
+                headerGutter(width: Theme.Spacing.md)
+                AIModelButton(
+                    title: core.aiChatCoordinator.selectedModelTitle,
+                    icon: core.aiChatCoordinator.selectedModelIcon,
+                    isOpen: openMenu == .aiModel,
+                    action: toggleAIModel)
             }
             // Compact pins favorites beside the field; expanded shows them as rows.
             if isCollapsed, settings.showFavoritesInCompactMode,
@@ -499,9 +537,31 @@ struct RootPaletteView: View {
     /// Controls the selected row wants beside the search field. Only the expanded launcher offers
     /// them — inside a sub-screen the search bar belongs to that screen.
     private var headerAccessory: PaletteHeaderAccessory? {
-        guard vm.mode == .launcher, !isCollapsed else { return nil }
+        guard vm.mode == .launcher || vm.mode == .ai, !isCollapsed else { return nil }
         let screen = screen
         return screen.headerAccessory(at: selection(in: screen), focus: $argumentFocused)
+    }
+
+    /// Nothing else advertises Tab, so the launcher says where it goes — the footer's own pairing
+    /// of a label with its cap, and the click does exactly what the key it names does.
+    private var aiChatTabHint: some View {
+        BarButton(chrome: .rounded, action: cycleMode) {
+            HStack(spacing: Theme.Spacing.sm) {
+                Text("AI Chat")
+                    .font(Theme.Typography.bar)
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                KeyCapChip(text: "⇥", style: .outline)
+            }
+        }
+        .help("Open AI Chat  ⇥")
+    }
+
+    /// Resolved through `PaletteTabAction` rather than restated, so the hint cannot promise a
+    /// destination the key does not go to — an argument field to walk takes Tab first.
+    private var tabOpensChat: Bool {
+        guard !isCollapsed, headerAccessory?.fieldNames.isEmpty ?? true else { return false }
+        return PaletteTabAction.resolve(mode: vm.mode, aiEnabled: settings.aiEnabled)
+            == .freshScreen(.ai)
     }
 
     /// Width the search field shrinks to when an accessory sits beside it: the typed text's own
@@ -518,7 +578,7 @@ struct RootPaletteView: View {
     /// In the argument form the field is that argument's input, so it names the argument.
     private var searchPrompt: String {
         // The field is only wide enough for the caret while argument fields are beside it.
-        if headerAccessory != nil { return "" }
+        if headerAccessory != nil, vm.mode != .ai { return "" }
         if vm.mode == .quicklinkArguments { return quicklinkArguments.prompt }
         // Inside a running command the search bar belongs to the extension.
         if vm.mode == .extensionCommand, let placeholder = extensionScreen.searchPlaceholder {
@@ -642,6 +702,26 @@ struct RootPaletteView: View {
         open(.clipboardFilter, highlighting: active)
     }
 
+    /// Opens on the selected model, mirroring the clipboard filter's active-row behavior.
+    private func toggleAIModel() {
+        if openMenu == .aiModel {
+            closeMenus()
+            return
+        }
+        core.aiChatCoordinator.prepareModelSwitcher()
+        let options = core.aiChatCoordinator.modelOptions
+        let selected = core.aiSettings.defaultModel
+        let active =
+            selected.flatMap { selected in
+                options.firstIndex(where: { $0.matches(selected) })
+            } ?? 0
+        open(.aiModel, highlighting: active)
+    }
+
+    private var headerMenuWidth: CGFloat {
+        openMenu == .aiModel ? Theme.Size.menuWidth : Theme.Size.clipboardFilterMenuWidth
+    }
+
     /// Every open path lands here, so the highlight is always stated rather than left behind.
     private func open(_ menu: OpenMenu, highlighting row: Int) {
         menuSelection = row
@@ -651,10 +731,6 @@ struct RootPaletteView: View {
     private func closeMenus() {
         withAnimation(Self.menuAnimation) { openMenu = nil }
     }
-
-    /// SwiftUI wants a Set; built once so the palette isn't allocating one per render.
-    private static let favoriteSlotKeys: Set<KeyEquivalent> =
-        Set(FavoriteSlots.digits.map { KeyEquivalent($0) })
 
     /// Inset from the bottom corners, so the menu's own corner isn't clipped.
     private static let menuInset: CGFloat = 8
@@ -712,15 +788,17 @@ struct RootPaletteView: View {
 
     /// Move the open menu's highlight, clamped at the ends (no wrap — consistent with `move`).
     private func moveMenu(_ delta: Int) {
-        guard let count = menuContent?.items.count, count > 0 else { return }
-        menuSelection = min(max(menuSelection + delta, 0), count - 1)
+        guard let content = menuContent, content.rowCount > 0 else { return }
+        menuSelection = min(max(menuSelection + delta, 0), content.rowCount - 1)
     }
 
     /// The one activation path for a menu row: run its action, then close.
     private func activateMenuItem(_ index: Int) {
-        guard let items = menuContent?.items, items.indices.contains(index) else { return }
-        items[index].action()
+        guard let content = menuContent, (0..<content.rowCount).contains(index) else { return }
+        content.activate(index)
         closeMenus()
+        // A mouse click on a row takes the caret with it; menus close back into the field.
+        if argumentFocused == nil { searchFocused = true }
     }
 
     /// ⌘. — mirrors the Actions row, and works while that menu is open like the rest.
@@ -734,17 +812,43 @@ struct RootPaletteView: View {
         }
     }
 
-    /// Tab flips launcher↔clipboard; Calculator History exits rather than joining.
-    private func toggleMode() {
-        vm.mode = vm.mode == .launcher ? .clipboard : .launcher
+    /// Dispatches the Cmd+number slot action to the active screen.
+    private func activateFavoriteSlotShortcut() {
+        guard let index = vm.favoriteSlotIndex else { return }
+        if let launcher = screen as? LauncherScreen {
+            _ = launcher.launchFavorite(at: index)
+            return
+        }
+        if let clipboard = screen as? ClipboardScreen {
+            _ = clipboard.activatePinned(at: index)
+        }
     }
 
-    /// Tab walks the inline argument fields first — search field → each argument → back — and only
-    /// toggles the mode when the selection declares none.
+    /// Tab rings launcher → chat → clipboard; every other mode exits rather than joining. Crossing
+    /// chat's edge opens a fresh screen, so a draft is never handed to a list that would search it.
+    private func cycleMode() {
+        switch PaletteTabAction.resolve(mode: vm.mode, aiEnabled: settings.aiEnabled) {
+        case .carryQuery(let mode): vm.mode = mode
+        case .freshScreen(let mode): vm.prepare(mode: mode)
+        }
+    }
+
+    /// Tab walks the inline argument fields first — search field → each argument → back — and rings
+    /// on when there are none, chat's staged-image chips included: those declare no fields to walk.
     private func advanceTabFocus() {
-        guard let accessory = headerAccessory else { return toggleMode() }
+        guard let accessory = headerAccessory, !accessory.fieldNames.isEmpty else {
+            return cycleMode()
+        }
         argumentFocused = accessory.fieldAfter(argumentFocused)
         searchFocused = argumentFocused == nil
+    }
+
+    private func navigateBack() {
+        if vm.mode == .aiHistory {
+            vm.prepare(mode: .ai)
+        } else {
+            exitToLauncher()
+        }
     }
 
     /// Back out to a fresh root search, the same reset `prepare` does on show.
@@ -776,6 +880,7 @@ private enum OpenMenu {
     case actions
     case app
     case clipboardFilter
+    case aiModel
 }
 
 /// The footer's menu circle; hover lives here, so a sweep never re-renders the body.

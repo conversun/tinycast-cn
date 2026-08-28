@@ -6,7 +6,6 @@ struct ScopesTest {
         let fm = FileManager.default
         let root = fm.temporaryDirectory
             .appendingPathComponent("tinycast-scopes-\(UUID().uuidString)")
-        defer { try? fm.removeItem(at: root) }
 
         var failures = 0
 
@@ -93,6 +92,7 @@ struct ScopesTest {
             "defaults are already normalized",
             SearchScopes.normalize(SearchScopes.defaults) == SearchScopes.defaults)
 
+        try? fm.removeItem(at: root)
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }

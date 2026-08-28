@@ -149,7 +149,7 @@ Two gotchas worth knowing before they cost an afternoon:
 
 ### Observation
 
-28 types use `@Observable`; nothing uses `ObservableObject` or `@Published`. Migrating anything new into
+38 types use `@Observable`; nothing uses `ObservableObject` or `@Published`. Migrating anything new into
 this model:
 
 - `@ObservationIgnored` on memo caches and lazily-built collaborators. Without it, reading a memo
@@ -167,7 +167,7 @@ Budgets, not aspirations:
 
 - **Resident memory under 100 MB, always.** No feature is worth going over. Memory returns to baseline
   after the palette closes.
-- Release binary under **4 MB**.
+- Release binary under **5 MB**.
 - Launch is the thing the app protects most. Work added to `AppCore.start()` or to an initialiser is the
   most expensive place to put it; defer it into a `Task` or do it on first use.
 - The palette must feel instant. Anything on the summon path is resolved once per show, never per render.

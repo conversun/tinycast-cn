@@ -58,7 +58,6 @@ struct SnippetRepository: Sendable {
 
     struct MutationHooks: Sendable {
         var beforeRevalidation: @Sendable (Mutation, URL) -> Void = { _, _ in }
-        var afterRevalidation: @Sendable (Mutation, URL) -> Void = { _, _ in }
     }
 
     struct Snapshot: Sendable, Equatable {
@@ -201,7 +200,6 @@ struct SnippetRepository: Sendable {
                             expected: expectedRevision,
                             actual: actualRevision)
                     }
-                    mutationHooks.afterRevalidation(.save, mutationURL)
                     try Data(content.utf8).write(to: mutationURL, options: .atomic)
                     return StoredSnippet(
                         fileURL: fileURL,
@@ -229,7 +227,6 @@ struct SnippetRepository: Sendable {
                             expected: expectedRevision,
                             actual: actualRevision)
                     }
-                    mutationHooks.afterRevalidation(.delete, mutationURL)
                     try FileManager.default.removeItem(at: mutationURL)
                 }
             }
@@ -295,15 +292,6 @@ struct SnippetRepository: Sendable {
         } catch {
             try? FileManager.default.removeItem(at: temporaryURL)
             throw error
-        }
-    }
-
-    private func nextAvailableFileURL(for name: String, in directory: URL) -> URL {
-        var suffix = 1
-        while true {
-            let candidate = uniqueFileURL(for: name, suffix: suffix, in: directory)
-            if !FileManager.default.fileExists(atPath: candidate.path) { return candidate }
-            suffix += 1
         }
     }
 

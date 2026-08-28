@@ -11,7 +11,9 @@
 //
 //   /tmp/ext-test ~/.config/raycast/extensions/<uuid> [command-name]
 
+import AppKit
 import Foundation
+import SwiftUI
 
 @main
 struct ExtensionTests {
@@ -35,6 +37,7 @@ struct ExtensionTests {
         var calls: [String] = []
         var toasts: [String] = []
         var huds: [String] = []
+        var oauthTokens: [String: String] = [:]
         private let fetcher = ExtensionFetcher()
 
         func perform(api: String, method: String, arguments: [RenderValue]) async throws -> String {
@@ -70,6 +73,21 @@ struct ExtensionTests {
                     #"{"name":"Finder","path":"/System/Library/CoreServices/Finder.app","bundleId":"com.apple.finder"}"#
             case "system.applications":
                 return "[]"
+            case "oauth.authorize":
+                let state = arguments[safe: 1]?.stringValue ?? ""
+                return "{\"authorizationCode\":\"auth_code_swift_test\",\"state\":\"\(state)\"}"
+            case "oauth.getTokens":
+                let providerId = arguments.first?.stringValue ?? ""
+                return oauthTokens[providerId] ?? ""
+            case "oauth.setTokens":
+                let providerId = arguments.first?.stringValue ?? ""
+                let tokens = arguments[safe: 1]?.stringValue ?? ""
+                oauthTokens[providerId] = tokens
+                return ""
+            case "oauth.removeTokens":
+                let providerId = arguments.first?.stringValue ?? ""
+                oauthTokens.removeValue(forKey: providerId)
+                return ""
             default:
                 return ""
             }
@@ -180,6 +198,8 @@ struct ExtensionTests {
         manifestChecks()
         renderNodeChecks()
         screenChecks()
+        actionIconChecks()
+        oauthUnitChecks()
         await runtimeChecks()
 
         print("\n\(passes) passed, \(failures) failed")
@@ -370,7 +390,7 @@ struct ExtensionTests {
         check("filters locally", list.filtersLocally)
         check(
             "items flattened in order",
-            list.items.map { $0.string("title") } == ["Apple", "Banana", "Cherry"])
+            list.items.map { $0.node.string("title") } == ["Apple", "Banana", "Cherry"])
         check("rows interleave the section header", list.rows.count == 4, "\(list.rows.count)")
         if case .header(let title, let subtitle, _) = list.rows.first {
             check("header title", title == "Alpha")
@@ -383,11 +403,11 @@ struct ExtensionTests {
         let filtered = ExtensionScreen(tree: tree(listJSON), query: "an")
         check(
             "filter matches title and keyword",
-            filtered.items.map { $0.string("title") } == ["Banana"],
-            String(describing: filtered.items.map { $0.string("title") }))
+            filtered.items.map { $0.node.string("title") } == ["Banana"],
+            String(describing: filtered.items.map { $0.node.string("title") }))
         check("empty section drops its header", filtered.rows.count == 2, "\(filtered.rows.count)")
         let byKeyword = ExtensionScreen(tree: tree(listJSON), query: "red")
-        check("keyword match", byKeyword.items.map { $0.string("title") } == ["Cherry"])
+        check("keyword match", byKeyword.items.map { $0.node.string("title") } == ["Cherry"])
 
         // A command that owns the search text must not be filtered behind its back.
         let controlled = ExtensionScreen(
@@ -442,6 +462,135 @@ struct ExtensionTests {
         check("item panel wins", panels.actionPanel(forItemAt: 0)?.id == 9)
         check("screen panel is the fallback", panels.actionPanel(forItemAt: 1)?.id == 8)
         check("out-of-range selection falls back", panels.actionPanel(forItemAt: 99)?.id == 8)
+    }
+
+    /// An `Action`'s icon is a full `ImageLike`, so the ⌘K panel has to keep its tint: a picker built
+    /// from `{Icon.Circle, tintColor}` rows is one grey column without it. See docs/features/extensions.md.
+    @MainActor
+    static func actionIconChecks() {
+        func icon(
+            _ json: String, isDestructive: Bool = false, assets: String? = nil
+        ) -> ExtensionImage.Resolved {
+            let wrapped = Data(#"{"icon": \#(json)}"#.utf8)
+            let props = (try? JSONSerialization.jsonObject(with: wrapped)) as? [String: Any]
+            return ExtensionImage.actionIcon(
+                props?["icon"].map(RenderValue.init(json:)), assetsPath: assets, isDark: true,
+                isDestructive: isDestructive)
+        }
+
+        let tinted = icon(#"{"source":"circle-16","tintColor":"raycast-green"}"#)
+        check("a tinted symbol keeps its source", tinted.source == .symbol("circle"))
+        check("a tinted symbol keeps its tint", tinted.tint == .green)
+
+        // Doubled delimiters: the hex tint contains `"#`, which closes a single-# raw string.
+        check(
+            "raw hex tints too",
+            icon(##"{"source":"circle-16","tintColor":"#FF3B30"}"##).tint
+                == Color(red: 1, green: 0x3B / 255, blue: 0x30 / 255))
+        check(
+            "a themed tint picks the dark side",
+            icon(#"{"source":"circle-16","tintColor":{"light":"raycast-red","dark":"raycast-blue"}}"#)
+                .tint == .blue)
+
+        let bare = icon(#""checkmark-circle-16""#)
+        check("a bare icon still resolves", bare.source == .symbol("checkmark.circle"))
+        check("and carries no tint", bare.tint == nil)
+
+        let asset = icon(#""logo.png""#, assets: "/tmp/demo/assets")
+        check(
+            "an asset name resolves against assets/", asset.source == .file("/tmp/demo/assets/logo.png"),
+            String(describing: asset.source))
+
+        check("no icon falls back to a glyph", icon("null").source == .symbol("bolt"))
+        let destructive = icon("null", isDestructive: true)
+        check("a destructive fallback is a trash glyph", destructive.source == .symbol("trash"))
+        check("and takes red", destructive.tint == .red)
+        check(
+            "a destructive action's own tint wins",
+            icon(#"{"source":"circle-16","tintColor":"raycast-yellow"}"#, isDestructive: true).tint
+                == .yellow)
+        // A tint masks artwork rather than colouring it, so a destructive PNG must stay untinted.
+        let destructiveArtwork = icon(#""danger.png""#, isDestructive: true, assets: "/tmp/a")
+        check(
+            "a destructive artwork icon keeps its own colours",
+            destructiveArtwork.source == .file("/tmp/a/danger.png") && destructiveArtwork.tint == nil,
+            String(describing: destructiveArtwork))
+    }
+
+    private final class MockTokenStore: ExtensionOAuthTokenStore, @unchecked Sendable {
+        var storage: [String: String] = [:]
+
+        func get(account: String) -> String? {
+            storage[account]
+        }
+
+        func set(_ value: String, account: String) -> Bool {
+            storage[account] = value
+            return true
+        }
+
+        func remove(account: String) -> Bool {
+            storage.removeValue(forKey: account) != nil
+        }
+
+        func removeAll(prefix: String, exactMatch: String) {
+            storage = storage.filter { key, _ in
+                key != exactMatch && !key.hasPrefix(prefix)
+            }
+        }
+    }
+
+    @MainActor
+    static func oauthUnitChecks() {
+        let originalStore = ExtensionOAuthKeychain.store
+        ExtensionOAuthKeychain.store = MockTokenStore()
+        defer { ExtensionOAuthKeychain.store = originalStore }
+
+        // Keychain round-trip
+        let extName = "com.test.unit"
+        let provId = "unit_provider"
+        let json = "{\"accessToken\":\"token_xyz\",\"refreshToken\":\"refresh_abc\"}"
+
+        ExtensionOAuthKeychain.setTokens(json, extensionName: extName, providerId: provId)
+        let read = ExtensionOAuthKeychain.getTokens(extensionName: extName, providerId: provId)
+        check("OAuth Keychain sets and gets tokens", read == json, read ?? "nil")
+
+        ExtensionOAuthKeychain.removeTokens(extensionName: extName, providerId: provId)
+        let afterRemove = ExtensionOAuthKeychain.getTokens(extensionName: extName, providerId: provId)
+        check("OAuth Keychain removes tokens", afterRemove == nil, afterRemove ?? "not nil")
+
+        ExtensionOAuthKeychain.setTokens(json, extensionName: extName, providerId: "prov1")
+        ExtensionOAuthKeychain.setTokens(json, extensionName: extName, providerId: "prov2")
+        ExtensionOAuthKeychain.removeAllTokens(extensionName: extName)
+        let afterRemoveAll1 = ExtensionOAuthKeychain.getTokens(extensionName: extName, providerId: "prov1")
+        let afterRemoveAll2 = ExtensionOAuthKeychain.getTokens(extensionName: extName, providerId: "prov2")
+        check(
+            "OAuth Keychain removeAllTokens clears all for extension",
+            afterRemoveAll1 == nil && afterRemoveAll2 == nil)
+
+        // URL parsing in ExtensionOAuthSession
+        let raycastURL = URL(string: "raycast://oauth?code=auth_123&state=state_456")!
+        let params = ExtensionOAuthSession.parseCallback(url: raycastURL)
+        check(
+            "parseCallback parses query parameters",
+            params["code"] == "auth_123" && params["state"] == "state_456")
+
+        let fragmentURL = URL(string: "raycast://oauth#access_token=token_xyz&state=state_789")!
+        let fragParams = ExtensionOAuthSession.parseCallback(url: fragmentURL)
+        check(
+            "parseCallback parses hash fragment",
+            fragParams["access_token"] == "token_xyz" && fragParams["state"] == "state_789")
+
+        let nonOAuthURL = URL(string: "raycast://extensions/installed")!
+        check(
+            "handleCallbackURL ignores a non-oauth URL",
+            ExtensionOAuthSession.handleCallbackURL(nonOAuthURL) == .ignored)
+
+        // A callback with nothing waiting for it is reported, not silently dropped.
+        let strayURL = URL(string: "tinycast://oauth?code=abc&state=xyz")!
+        check(
+            "handleCallbackURL reports an expired callback",
+            ExtensionOAuthSession.handleCallbackURL(strayURL) == .expired)
     }
 
     // MARK: - End-to-end through JavaScriptCore
@@ -514,22 +663,22 @@ struct ExtensionTests {
         check("navigation title", screen.navigationTitle == "Synthetic")
         check(
             "timer fired and re-rendered",
-            screen.items.first?.string("title") == "count=1",
-            screen.items.first?.string("title") ?? "nil")
+            screen.items.first?.node.string("title") == "count=1",
+            screen.items.first?.node.string("title") ?? "nil")
         check(
-            "node path shim", screen.items.first?.string("subtitle") == "/a/c",
-            screen.items.first?.string("subtitle") ?? "nil")
+            "node path shim", screen.items.first?.node.string("subtitle") == "/a/c",
+            screen.items.first?.node.string("subtitle") ?? "nil")
         check(
             "crypto shim",
-            ExtensionAccessoriesView_labelForTest(screen.items.first?.array("accessories").first)
+            ExtensionAccessoriesView_labelForTest(screen.items.first?.node.array("accessories").first)
                 == "ba7816bf",
-            String(describing: screen.items.first?.array("accessories").first))
+            String(describing: screen.items.first?.node.array("accessories").first))
         check("toast reached the host", host.toasts == ["hello"], host.toasts.joined(separator: ","))
         check(
             "AbortSignal carries its statics",
-            ExtensionAccessoriesView_labelForTest(screen.items.first?.array("accessories").last)
+            ExtensionAccessoriesView_labelForTest(screen.items.first?.node.array("accessories").last)
                 == "function,function,function,false,AbortError",
-            String(describing: screen.items.first?.array("accessories").last))
+            String(describing: screen.items.first?.node.array("accessories").last))
 
         // Dispatch the row's action and confirm the re-render.
         let actions = ExtensionScreen.actions(in: screen.actionPanel(forItemAt: 0))
@@ -542,9 +691,49 @@ struct ExtensionTests {
             screen = ExtensionScreen(tree: recorder.trees.last!, query: "")
             check(
                 "action re-rendered the row",
-                screen.items.first?.string("title") == "count=11",
-                screen.items.first?.string("title") ?? "nil")
+                screen.items.first?.node.string("title") == "count=11",
+                screen.items.first?.node.string("title") ?? "nil")
         }
+
+        // OAuth PKCE and TokenSet runtime tests
+        let (oauthRuntime, oauthHost, oauthRecorder) = makeRuntime()
+        try? await oauthRuntime.boot(
+            config: .current(supportDirectory: FileManager.default.temporaryDirectory))
+        let oauthCommand = """
+            "use strict";
+            const { OAuth, showHUD } = require("@raycast/api");
+            module.exports.default = async function () {
+              const client = new OAuth.PKCEClient({
+                redirectMethod: OAuth.RedirectMethod.Web,
+                providerName: "GitHub",
+                providerId: "gh",
+              });
+              const req = await client.authorizationRequest({
+                endpoint: "https://github.com/login/oauth/authorize",
+                clientId: "id123",
+              });
+              const auth = await client.authorize(req);
+              const tokens = new OAuth.TokenSet({
+                accessToken: "token_" + auth.authorizationCode,
+                refreshToken: "refresh_123",
+                expiresIn: 3600,
+              });
+              await client.setTokens(tokens);
+              const read = await client.getTokens();
+              await showHUD(read.accessToken);
+            };
+            """
+        await oauthRuntime.start(
+            session: "sOAuth", code: oauthCommand,
+            file: URL(fileURLWithPath: "/tmp/oauth.js"), mode: .noView,
+            context: launchContext(mode: .noView))
+        await settle()
+        check("oauth command finished", oauthRecorder.finished, oauthRecorder.failures.joined())
+        check(
+            "oauth flow reached token storage",
+            oauthHost.huds == ["token_auth_code_swift_test"],
+            oauthHost.huds.joined(separator: ","))
+        await oauthRuntime.stop(session: "sOAuth")
 
         // Command arguments must reach `props.arguments`, and the bag must exist even when empty.
         let (withArguments, _, argumentRecorder) = makeRuntime()
@@ -627,10 +816,11 @@ struct ExtensionTests {
         check(
             "the second run's timers still fire",
             rerunRecorder.trees.last
-                .map { ExtensionScreen(tree: $0, query: "").items.first?.string("title") == "count=1" }
+                .map { ExtensionScreen(tree: $0, query: "").items.first?.node.string("title") == "count=1" }
                 == true,
             rerunRecorder.trees.last
-                .flatMap { ExtensionScreen(tree: $0, query: "").items.first?.string("title") } ?? "no tree")
+                .flatMap { ExtensionScreen(tree: $0, query: "").items.first?.node.string("title") }
+                ?? "no tree")
         await runtime.stop(session: "s1b")
         runtime.setDelegate(recorder)
 
@@ -763,12 +953,13 @@ struct ExtensionTests {
             let screen = ExtensionScreen(tree: tree, query: "")
             print("root: \(screen.kind)  rows: \(screen.rows.count)  fields: \(screen.fields.count)")
             for item in screen.items.prefix(12) {
-                let accessories = item.array("accessories").count
+                let node = item.node
+                let accessories = node.array("accessories").count
                 print(
-                    "  • \(item.string("title") ?? "")"
-                        + (item.string("subtitle").map { "  —  \($0)" } ?? "")
+                    "  • \(node.string("title") ?? "")"
+                        + (node.string("subtitle").map { "  —  \($0)" } ?? "")
                         + (accessories > 0 ? "  [\(accessories) accessories]" : "")
-                        + (item.node("actions") != nil ? "  ⌘K" : ""))
+                        + (node.node("actions") != nil ? "  ⌘K" : ""))
             }
             if case .detail = screen.kind {
                 print("  markdown: \((screen.root?.string("markdown") ?? "").prefix(200))")

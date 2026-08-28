@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="64" viewBox="0 0 320 64" role="img" aria-label="Support Tinycast">
+  <title>Support Tinycast</title>
+  <rect x="-2" y="-2" width="324" height="68" fill="#863BFF"/>
+  <g transform="translate(55 20)" fill="#ffffff">
+    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+  </g>
+  <text x="91" y="40" fill="#ffffff" font-size="21" font-weight="600" textLength="174" lengthAdjust="spacingAndGlyphs"
+        font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">Support Tinycast</text>
+</svg>

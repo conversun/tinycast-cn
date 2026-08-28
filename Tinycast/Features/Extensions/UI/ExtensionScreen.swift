@@ -12,14 +12,24 @@ struct ExtensionScreen: Equatable {
         case unsupported(String)
     }
 
+    /// One selectable row. `index` is the flat `selection` index, and `id` is what a `LazyVStack` or
+    /// `LazyVGrid` registers as its scroll target — an `.id()` applied inside a row only exists once
+    /// the row has been realized, which is exactly when scrolling to it isn't needed.
+    struct Item: Equatable, Identifiable {
+        let node: RenderNode
+        let index: Int
+
+        var id: String { "item:\(node.id)" }
+    }
+
     enum Row: Equatable, Identifiable {
         case header(title: String, subtitle: String?, id: String)
-        case item(RenderNode)
+        case item(Item)
 
         var id: String {
             switch self {
             case .header(_, _, let id): return "header:" + id
-            case .item(let node): return "item:\(node.id)"
+            case .item(let item): return item.id
             }
         }
     }
@@ -28,7 +38,7 @@ struct ExtensionScreen: Equatable {
     let root: RenderNode?
     let rows: [Row]
     /// Selectable rows in visible order — what `selection` indexes.
-    let items: [RenderNode]
+    let items: [Item]
     /// Fields of a Form, in order.
     let fields: [RenderNode]
     let isLoading: Bool
@@ -104,9 +114,17 @@ struct ExtensionScreen: Equatable {
             let sectionType = root.type == "Grid" ? "Grid.Section" : "List.Section"
             let emptyType = root.type == "Grid" ? "Grid.EmptyView" : "List.EmptyView"
             emptyView = root.children.first { $0.type == emptyType }
-            let needle = filtersLocally ? query.trimmingCharacters(in: .whitespaces) : ""
+            let needle = FuzzyMatch.Query(
+                filtersLocally ? query.trimmingCharacters(in: .whitespaces) : "")
             var rows: [Row] = []
-            var items: [RenderNode] = []
+            var items: [Item] = []
+            // Numbering as the rows are built is what keeps `selection` and the drawn order in step;
+            // a row that has to search `items` for its own place can only get that wrong.
+            func append(_ node: RenderNode) {
+                let item = Item(node: node, index: items.count)
+                items.append(item)
+                rows.append(.item(item))
+            }
             for child in root.children {
                 if child.type == sectionType {
                     let matching = child.children
@@ -117,11 +135,9 @@ struct ExtensionScreen: Equatable {
                         .header(
                             title: child.string("title") ?? "",
                             subtitle: child.string("subtitle"), id: String(child.id)))
-                    rows.append(contentsOf: matching.map(Row.item))
-                    items.append(contentsOf: matching)
+                    matching.forEach(append)
                 } else if child.type == itemType, ExtensionScreen.matches(child, needle) {
-                    rows.append(.item(child))
-                    items.append(child)
+                    append(child)
                 }
             }
             self.rows = rows
@@ -143,7 +159,7 @@ struct ExtensionScreen: Equatable {
     }
 
     private init(
-        kind: Kind, root: RenderNode?, rows: [Row], items: [RenderNode], fields: [RenderNode],
+        kind: Kind, root: RenderNode?, rows: [Row], items: [Item], fields: [RenderNode],
         isLoading: Bool, navigationTitle: String?, searchPlaceholder: String?, filtersLocally: Bool,
         searchTextHandler: String?, selectionHandler: String?, searchBarAccessory: RenderNode?,
         showsDetail: Bool, screenActions: RenderNode?, emptyView: RenderNode?
@@ -167,12 +183,12 @@ struct ExtensionScreen: Equatable {
 
     /// Local filtering mirrors Raycast: title, subtitle and keywords, ranked by the launcher's matcher
     /// so an extension list feels like the rest of the palette.
-    static func matches(_ item: RenderNode, _ needle: String) -> Bool {
+    static func matches(_ item: RenderNode, _ needle: FuzzyMatch.Query) -> Bool {
         guard !needle.isEmpty else { return true }
         var haystack = [item.string("title") ?? ""]
         if let subtitle = item.string("subtitle") { haystack.append(subtitle) }
         haystack.append(contentsOf: item.array("keywords").compactMap(\.stringValue))
-        return haystack.contains { FuzzyMatch.score(query: needle, candidate: $0) != nil }
+        return haystack.contains { FuzzyMatch.score(needle, candidate: $0) != nil }
     }
 
     private static func gridColumns(_ root: RenderNode) -> Int {
@@ -187,7 +203,9 @@ struct ExtensionScreen: Equatable {
 
     /// The `ActionPanel` that applies to the current selection: the item's own, else the screen's.
     func actionPanel(forItemAt index: Int) -> RenderNode? {
-        if items.indices.contains(index), let panel = items[index].node("actions") { return panel }
+        if items.indices.contains(index), let panel = items[index].node.node("actions") {
+            return panel
+        }
         return screenActions
     }
 

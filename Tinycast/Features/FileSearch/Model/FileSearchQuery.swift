@@ -22,9 +22,12 @@ enum FileSearchQuery {
     ) -> [FileSearchResult] {
         let terms = terms(in: query)
         guard !terms.isEmpty else { return [] }
+        // Folded once each: a thousand candidates would otherwise re-fold every term per result.
+        let whole = FuzzyMatch.Query(query)
+        let folded = terms.map(FuzzyMatch.Query.init)
         return results.filter { !isExcludedPath($0.id, ignoring: ignore) }.map { result in
-            let full = FuzzyMatch.score(query: query, candidate: result.name)
-            let termScore = terms.compactMap { FuzzyMatch.score(query: $0, candidate: result.name) }
+            let full = FuzzyMatch.score(whole, candidate: result.name)
+            let termScore = folded.compactMap { FuzzyMatch.score($0, candidate: result.name) }
                 .reduce(0, +)
             return (result, full, termScore)
         }

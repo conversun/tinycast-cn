@@ -136,38 +136,37 @@ class TinycastHeaders {
   }
 }
 
+const EMPTY_BYTES = new Uint8Array(0);
+
 class TinycastResponse {
-  constructor({ status, statusText, headers, url, bodyBase64 }) {
-    this.status = status;
-    this.statusText = statusText || "";
-    this.headers = new TinycastHeaders(headers);
-    this.url = url || "";
-    this.ok = status >= 200 && status < 300;
+  // Spec shape: axios and friends construct a Response at module scope to probe the platform.
+  constructor(body = null, init = {}, url = "") {
+    this.status = init.status ?? 200;
+    this.statusText = init.statusText ?? "";
+    this.headers = new TinycastHeaders(init.headers);
+    this.url = url;
+    this.ok = this.status >= 200 && this.status < 300;
     this.redirected = false;
     this.type = "basic";
-    this._bodyBase64 = bodyBase64 || "";
+    this._bytes = bodyToBytes(body) ?? EMPTY_BYTES;
     this.bodyUsed = false;
   }
   clone() {
-    return new TinycastResponse({
-      status: this.status,
-      statusText: this.statusText,
-      headers: this.headers.toJSON(),
-      url: this.url,
-      bodyBase64: this._bodyBase64,
-    });
+    const { status, statusText, headers } = this;
+    return new TinycastResponse(this._bytes, { status, statusText, headers }, this.url);
   }
   async arrayBuffer() {
     this.bodyUsed = true;
-    return base64ToBytes(this._bodyBase64).buffer;
+    return (await this.bytes()).buffer;
   }
+  // A copy: the body outlives the read, so a caller mutating it must not affect the next reader.
   async bytes() {
     this.bodyUsed = true;
-    return base64ToBytes(this._bodyBase64);
+    return this._bytes.slice();
   }
   async text() {
     this.bodyUsed = true;
-    return utf8Decode(base64ToBytes(this._bodyBase64));
+    return utf8Decode(this._bytes);
   }
   async json() {
     return JSON.parse(await this.text());
@@ -208,7 +207,11 @@ async function tinycastFetch(input, init = {}) {
     },
   ]);
   if (signal?.aborted) throw abortError();
-  return new TinycastResponse(raw);
+  return new TinycastResponse(
+    base64ToBytes(raw.bodyBase64 || ""),
+    { status: raw.status, statusText: raw.statusText, headers: raw.headers },
+    raw.url || "",
+  );
 }
 
 function abortError() {
@@ -224,14 +227,19 @@ function timeoutError() {
   return error;
 }
 
-function encodeBody(body) {
+function bodyToBytes(body) {
   if (body === undefined || body === null) return null;
-  if (typeof body === "string") return bytesToBase64(utf8Encode(body));
-  if (body instanceof Uint8Array) return bytesToBase64(body);
-  if (body instanceof ArrayBuffer) return bytesToBase64(new Uint8Array(body));
-  if (g.Buffer && g.Buffer.isBuffer?.(body)) return bytesToBase64(new Uint8Array(body));
-  if (body instanceof URLSearchParams) return bytesToBase64(utf8Encode(body.toString()));
-  return bytesToBase64(utf8Encode(String(body)));
+  if (typeof body === "string") return utf8Encode(body);
+  if (body instanceof Uint8Array) return body;
+  if (body instanceof ArrayBuffer) return new Uint8Array(body);
+  if (ArrayBuffer.isView(body)) return new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+  if (body instanceof URLSearchParams) return utf8Encode(body.toString());
+  return utf8Encode(String(body));
+}
+
+function encodeBody(body) {
+  const bytes = bodyToBytes(body);
+  return bytes === null ? null : bytesToBase64(bytes);
 }
 
 if (!g.fetch) {

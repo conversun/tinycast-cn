@@ -24,6 +24,50 @@ enum PopToRootTimeout: Int, CaseIterable, Identifiable, Sendable {
     var interval: TimeInterval { TimeInterval(rawValue) }
 }
 
+/// How early the join card appears, and how long past the start it stays. See UpcomingWindow.
+enum JoinWindow: Int, CaseIterable, Identifiable, Sendable {
+    case one = 1
+    case two = 2
+    case five = 5
+    case ten = 10
+    case fifteen = 15
+
+    var id: Int { rawValue }
+
+    var title: String { rawValue == 1 ? "1 minute" : "\(rawValue) minutes" }
+}
+
+/// How early an event reaches the menu bar. Zero is the default, which `integer(forKey:)` also
+/// returns for an unset key — so absence and Never agree without a presence check.
+enum MenuBarEvents: Int, CaseIterable, Identifiable, Sendable {
+    case never = 0
+    case two = 2
+    case five = 5
+    case ten = 10
+    case thirty = 30
+
+    var id: Int { rawValue }
+
+    var title: String { self == .never ? "Never" : "\(rawValue) minutes before" }
+}
+
+/// How long a started event holds the menu bar. Zero, the default, means it goes as it starts.
+enum HideCurrentEvent: Int, CaseIterable, Identifiable, Sendable {
+    case automatically = 0
+    case afterFive = 5
+    case afterTen = 10
+    case afterThirty = 30
+
+    var id: Int { rawValue }
+
+    var title: String {
+        self == .automatically ? "Automatically" : "After \(rawValue) minutes"
+    }
+
+    /// Nil is "hide at the start"; `MenuBarSummary` reads it that way.
+    var minutes: Int? { self == .automatically ? nil : rawValue }
+}
+
 @MainActor
 @Observable
 final class AppSettings {
@@ -147,6 +191,10 @@ final class AppSettings {
         didSet { defaults.set(notesEnabled, forKey: Key.notesEnabled.rawValue) }
     }
 
+    var aiEnabled: Bool {
+        didSet { defaults.set(aiEnabled, forKey: Key.aiEnabled.rawValue) }
+    }
+
     var customCommandsEnabled: Bool {
         didSet { defaults.set(customCommandsEnabled, forKey: Key.customCommandsEnabled.rawValue) }
     }
@@ -162,6 +210,11 @@ final class AppSettings {
     /// Also keyword-expansion consent, so it confirms first and never rides a backup.
     var snippetsEnabled: Bool {
         didSet { defaults.set(snippetsEnabled, forKey: Key.snippetsEnabled.rawValue) }
+    }
+
+    /// Off out of the box: on means Tinycast may read a selection anywhere and type over it.
+    var quickActionsEnabled: Bool {
+        didSet { defaults.set(quickActionsEnabled, forKey: Key.quickActionsEnabled.rawValue) }
     }
 
     var snippetsShowInLauncher: Bool {
@@ -204,6 +257,50 @@ final class AppSettings {
             defaults.set(
                 extensionCustomSearchPaths, forKey: Key.extensionCustomSearchPaths.rawValue)
         }
+    }
+
+    /// Doubles as calendar-access consent, so only `CalendarCoordinator` may write it.
+    var calendarEnabled: Bool {
+        didSet { defaults.set(calendarEnabled, forKey: Key.calendarEnabled.rawValue) }
+    }
+
+    var calendarShowInLauncher: Bool {
+        didSet {
+            defaults.set(calendarShowInLauncher, forKey: Key.calendarShowInLauncher.rawValue)
+        }
+    }
+
+    var joinWindowMinutes: JoinWindow {
+        didSet { defaults.set(joinWindowMinutes.rawValue, forKey: Key.joinWindowMinutes.rawValue) }
+    }
+
+    /// Arms the app to open meeting links unattended, so only the Calendar pane's switch writes it.
+    var autoJoinMeetings: Bool {
+        didSet { defaults.set(autoJoinMeetings, forKey: Key.autoJoinMeetings.rawValue) }
+    }
+
+    var autoJoinConfirms: Bool {
+        didSet { defaults.set(autoJoinConfirms, forKey: Key.autoJoinConfirms.rawValue) }
+    }
+
+    /// Doubles as camera consent, so only the Calendar pane's switch writes it.
+    var cameraPreview: Bool {
+        didSet { defaults.set(cameraPreview, forKey: Key.cameraPreview.rawValue) }
+    }
+
+    var menuBarEvents: MenuBarEvents {
+        didSet { defaults.set(menuBarEvents.rawValue, forKey: Key.menuBarEvents.rawValue) }
+    }
+
+    var menuBarLinkedEventsOnly: Bool {
+        didSet {
+            defaults.set(
+                menuBarLinkedEventsOnly, forKey: Key.menuBarLinkedEventsOnly.rawValue)
+        }
+    }
+
+    var hideCurrentEvent: HideCurrentEvent {
+        didSet { defaults.set(hideCurrentEvent.rawValue, forKey: Key.hideCurrentEvent.rawValue) }
     }
 
     /// Off means fully off: no launcher entries, and a still-registered shortcut moves nothing.
@@ -265,6 +362,11 @@ final class AppSettings {
         }
     }
 
+    /// Whether the support window may reopen itself; off means never ask again.
+    var supportRemindersEnabled: Bool {
+        didSet { defaults.set(supportRemindersEnabled, forKey: Key.supportReminders.rawValue) }
+    }
+
     init() {
         // `integer(forKey:)` returns 0 when unset, which no case matches.
         clipboardRetention =
@@ -317,12 +419,14 @@ final class AppSettings {
         fileSearchIgnorePatterns =
             defaults.stringArray(forKey: Key.fileSearchIgnorePatterns.rawValue) ?? []
         notesEnabled = defaults.bool(forKey: Key.notesEnabled.rawValue)
+        aiEnabled = defaults.bool(forKey: Key.aiEnabled.rawValue)
         customCommandsEnabled = defaults.bool(forKey: Key.customCommandsEnabled.rawValue)
         // These default on, so absence must be distinguished from a stored `false`.
         customCommandsShowInLauncher =
             defaults.object(forKey: Key.customCommandsShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.customCommandsShowInLauncher.rawValue)
         snippetsEnabled = defaults.bool(forKey: Key.snippetsEnabled.rawValue)
+        quickActionsEnabled = defaults.bool(forKey: Key.quickActionsEnabled.rawValue)
         snippetsShowInLauncher =
             defaults.object(forKey: Key.snippetsShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.snippetsShowInLauncher.rawValue)
@@ -340,6 +444,27 @@ final class AppSettings {
             ?? ExtensionRegistry.defaults
         extensionCustomSearchPaths =
             defaults.stringArray(forKey: Key.extensionCustomSearchPaths.rawValue) ?? []
+        // Opt-in, like extensions: until it is asked for, EventKit is never loaded.
+        calendarEnabled = defaults.bool(forKey: Key.calendarEnabled.rawValue)
+        calendarShowInLauncher =
+            defaults.object(forKey: Key.calendarShowInLauncher.rawValue) == nil
+            || defaults.bool(forKey: Key.calendarShowInLauncher.rawValue)
+        joinWindowMinutes =
+            JoinWindow(rawValue: defaults.integer(forKey: Key.joinWindowMinutes.rawValue)) ?? .five
+        autoJoinMeetings = defaults.bool(forKey: Key.autoJoinMeetings.rawValue)
+        autoJoinConfirms =
+            defaults.object(forKey: Key.autoJoinConfirms.rawValue) == nil
+            || defaults.bool(forKey: Key.autoJoinConfirms.rawValue)
+        cameraPreview = defaults.bool(forKey: Key.cameraPreview.rawValue)
+        // Both default to their zero case, so an unset key needs no presence check.
+        menuBarEvents =
+            MenuBarEvents(rawValue: defaults.integer(forKey: Key.menuBarEvents.rawValue)) ?? .never
+        menuBarLinkedEventsOnly =
+            defaults.object(forKey: Key.menuBarLinkedEventsOnly.rawValue) == nil
+            || defaults.bool(forKey: Key.menuBarLinkedEventsOnly.rawValue)
+        hideCurrentEvent =
+            HideCurrentEvent(rawValue: defaults.integer(forKey: Key.hideCurrentEvent.rawValue))
+            ?? .automatically
         windowManagementEnabled = defaults.bool(forKey: Key.windowManagementEnabled.rawValue)
         windowManagementShowInLauncher =
             defaults.object(forKey: Key.windowManagementShowInLauncher.rawValue) == nil
@@ -358,5 +483,8 @@ final class AppSettings {
         quicklinkConfirmsBeforeDelete =
             defaults.object(forKey: Key.quicklinkConfirmsBeforeDelete.rawValue) == nil
             || defaults.bool(forKey: Key.quicklinkConfirmsBeforeDelete.rawValue)
+        supportRemindersEnabled =
+            defaults.object(forKey: Key.supportReminders.rawValue) == nil
+            || defaults.bool(forKey: Key.supportReminders.rawValue)
     }
 }

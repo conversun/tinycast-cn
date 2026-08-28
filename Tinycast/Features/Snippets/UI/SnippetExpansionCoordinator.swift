@@ -5,7 +5,7 @@ import AppKit
 final class SnippetExpansionCoordinator {
     private let store: SnippetsStore
     private let listener: SnippetKeywordListener
-    private let injector: SnippetTextInjector
+    private let injector: TextInjector
     private let clipboardStore: ClipboardStore
     private let appIndex: AppIndex
     private let settings: AppSettings
@@ -17,7 +17,7 @@ final class SnippetExpansionCoordinator {
     init(
         store: SnippetsStore,
         listener: SnippetKeywordListener,
-        injector: SnippetTextInjector,
+        injector: TextInjector,
         clipboardStore: ClipboardStore,
         appIndex: AppIndex,
         settings: AppSettings,
@@ -217,7 +217,7 @@ final class SnippetExpansionCoordinator {
         confirmation: String?
     ) {
         injector.deliver(
-            result,
+            InjectedText(result.text, cursorOffsetFromEnd: result.cursorOffsetFromEnd),
             targetApp: targetApp,
             expectedKeyword: expectedKeyword,
             keywordLength: keywordLength,

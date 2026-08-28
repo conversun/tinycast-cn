@@ -8,11 +8,17 @@ extension EnvironmentValues {
 }
 
 enum ExtensionImage {
-    /// A resolved icon: an SF Symbol, a file on disk, a remote URL, or a bare emoji/text glyph.
+    /// A resolved icon: an SF Symbol, an image file, the Finder icon of a path, a URL — fetched or
+    /// carrying its own bytes — or a bare emoji/text glyph.
     enum Source: Equatable {
         case symbol(String)
         case file(String)
+        /// Raycast's `{ fileIcon }` — the path names a bundle or document to ask `NSWorkspace` about,
+        /// not an image to decode.
+        case fileIcon(String)
         case remote(URL)
+        /// A `data:` URL — an extension that renders its own SVG hands over bytes rather than a path.
+        case inline(URL)
         case glyph(String)
     }
 
@@ -32,13 +38,14 @@ enum ExtensionImage {
         case .object(let fields):
             // Raycast's icon-with-tooltip form; unwrap only when it looks like one, not when themed.
             if let wrapped = fields["value"]?.objectValue,
-                wrapped["source"] != nil || wrapped["value"] != nil
+                wrapped["source"] != nil || wrapped["value"] != nil || wrapped["fileIcon"] != nil
             {
                 return resolve(.object(wrapped), assetsPath: assetsPath, isDark: isDark)
             }
-            let raw = fields["source"] ?? fields["value"]
-            let text = string(from: raw, isDark: isDark)
-            guard let text, let source = source(from: text, assetsPath: assetsPath) else {
+            // Falling back to the object itself covers the two forms that are a source rather than
+            // carry one: `{fileIcon}` and a bare `{light, dark}` pair.
+            let raw = fields["source"] ?? fields["value"] ?? .object(fields)
+            guard let source = source(from: raw, assetsPath: assetsPath, isDark: isDark) else {
                 // A tinted icon with no usable source still deserves the fallback tile.
                 return nil
             }
@@ -49,6 +56,20 @@ enum ExtensionImage {
         default:
             return nil
         }
+    }
+
+    /// An action row's glyph. Unlike a list row's, it always resolves to something: an action with no
+    /// usable icon draws a generic one rather than an empty slot, and a destructive action that named
+    /// no tint of its own takes red — the convention a native menu's delete row is drawn with.
+    static func actionIcon(
+        _ value: RenderValue?, assetsPath: String?, isDark: Bool, isDestructive: Bool
+    ) -> Resolved {
+        var icon =
+            resolve(value, assetsPath: assetsPath, isDark: isDark)
+            ?? Resolved(source: .symbol(isDestructive ? "trash" : "bolt"))
+        // Symbols only: a tint masks artwork, so reddening a delete row's own PNG would erase it.
+        if isDestructive, icon.tint == nil, case .symbol = icon.source { icon.tint = .red }
+        return icon
     }
 
     /// A `{light, dark}` themed source picks the side the host is rendering, falling back to the
@@ -63,6 +84,24 @@ enum ExtensionImage {
         }
     }
 
+    /// An `Image.Source`: a string, a `{fileIcon}`, or a `{light, dark}` pair naming either.
+    private static func source(
+        from value: RenderValue, assetsPath: String?, isDark: Bool
+    ) -> Source? {
+        switch value {
+        case .string(let text):
+            return source(from: text, assetsPath: assetsPath)
+        case .object(let fields):
+            if let path = fields["fileIcon"]?.stringValue, !path.isEmpty {
+                return .fileIcon((path as NSString).expandingTildeInPath)
+            }
+            let preferred = fields[isDark ? "dark" : "light"] ?? fields[isDark ? "light" : "dark"]
+            return preferred.flatMap { source(from: $0, assetsPath: assetsPath, isDark: isDark) }
+        default:
+            return nil
+        }
+    }
+
     private static func source(from text: String, assetsPath: String?) -> Source? {
         guard !text.isEmpty else { return nil }
         // Icon enum values all carry the `-16` suffix Raycast's generated enum uses.
@@ -70,8 +109,9 @@ enum ExtensionImage {
             if let digits = numberGlyph(forIcon: text) { return .glyph(digits) }
             if let symbol = symbolName(forIcon: text) { return .symbol(symbol) }
         }
-        if let url = URL(string: text), let scheme = url.scheme, scheme.hasPrefix("http") {
-            return .remote(url)
+        if let url = URL(string: text), let scheme = url.scheme {
+            if scheme.hasPrefix("http") { return .remote(url) }
+            if scheme == "data" { return .inline(url) }
         }
         if text.hasPrefix("/") || text.hasPrefix("~") {
             return .file((text as NSString).expandingTildeInPath)
@@ -300,7 +340,7 @@ struct ExtensionIconView: View {
         content
             .frame(width: size, height: size)
             .clipShape(shape)
-            .task(id: cacheKey) { await load() }
+            .task(id: resolved?.source) { await load() }
     }
 
     @ViewBuilder
@@ -316,13 +356,18 @@ struct ExtensionIconView: View {
             Text(text)
                 .font(.system(size: size * 0.72))
                 .frame(width: size, height: size)
-        case .file, .remote:
+        case .file, .fileIcon, .remote, .inline:
             if let loaded {
                 // Only a multi-frame image pays for `NSImageView`; a still stays on SwiftUI's path.
                 if animates, loaded.isAnimated {
                     AnimatedImageView(image: loaded)
                 } else {
-                    Image(nsImage: loaded).resizable().aspectRatio(contentMode: .fit)
+                    // A `tintColor` masks the artwork, which is what colours a `currentColor` SVG.
+                    Image(nsImage: loaded)
+                        .resizable()
+                        .renderingMode(resolved?.tint == nil ? .original : .template)
+                        .scaledToFit()
+                        .foregroundStyle(resolved?.tint ?? .primary)
                 }
             } else {
                 placeholder
@@ -343,14 +388,6 @@ struct ExtensionIconView: View {
             : AnyShape(RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous))
     }
 
-    private var cacheKey: String {
-        switch resolved?.source {
-        case .file(let path): return "file:" + path
-        case .remote(let url): return "remote:" + url.absoluteString
-        default: return ""
-        }
-    }
-
     /// An animating tile takes the image as shipped; the fitted path would hand back one frame.
     private func load() async {
         switch resolved?.source {
@@ -359,8 +396,14 @@ struct ExtensionIconView: View {
                 animates
                 ? await ExtensionIconCache.loadOriginalAsync(atPath: path)
                 : await ExtensionIconCache.loadAsync(atPath: path)
+        case .fileIcon(let path):
+            // Fitted rather than raw: a `fileIcon` list mixes app bundles with documents and folders,
+            // and only the normalized draw keeps them the same optical size down the column.
+            loaded = await IconCache.loadFittedAsync(forFile: path)
         case .remote(let url):
             loaded = await ExtensionIconCache.loadRemoteAsync(url, asIcon: !animates)
+        case .inline(let url):
+            loaded = await ExtensionIconCache.loadInlineAsync(url)
         default:
             loaded = nil
         }

@@ -9,6 +9,12 @@ earliest scope wins).
   `VisibilityStore` category and per Settings pane — never re-derive a category by sniffing an entry ID.
   A new category means a new case, a slice in `AppIndex.publishEntries()`, and the matching filter in
   `LauncherList.rows`, in that order.
+- **A category's switch is a master switch, not a list filter.** `VisibilityStore.isKindEnabled` gates
+  `orderedResults` *and* `HotKeyManager.perform`, so `Enable Applications` off stops the per-app chords
+  as well as the rows — the guard sits in the one dispatch funnel, the way each feature switch already
+  guards its own. The per-item checkbox beside it is the narrow tool: it hides one row and leaves that
+  row's shortcut firing. A new category must be wired into `VisibilityStore.allowsHotKey`, or its
+  chords keep running while its pane reads off.
 - **`Model/SearchRelevance.swift` is Foundation-only and pure**, so `fuzz-test` compiles the shipped
   scorer. It owns both `FuzzyMatch` and the field bands.
 - **Searchable fields stay separate** — display name, Spotlight alternate names, bundle id and executable
@@ -240,7 +246,7 @@ dismissal matches Accessibility subroles rather than English labels.
 
 ## Window commands
 
-`WindowCommandCatalog` supplies the 30 window actions as a static slice, published as a whole by
+`WindowCommandCatalog` supplies the 32 window actions as a static slice, published as a whole by
 `AppIndex.setWindowCommandsVisible(_:)` and shown under a "Window Management" section. Like system
 actions they carry dedicated global hotkeys (`AppEntry.hotKeyAction` returns `.windowCommand(id:)`),
 so launcher rows render keycaps for them. Their per-command shortcut and visibility controls live in
@@ -267,6 +273,17 @@ selection.
 Only the display name is indexed. Activation resolves the stable UUID through the store and dispatches
 to `ShellCommandRunner`; see [custom-commands.md](custom-commands.md) for persistence, hotkeys and
 execution semantics.
+
+## Quick Action commands
+
+`CommandID.fixGrammar`, `.rewrite`, `.translate` and `.summarize` publish the four Quick Actions
+while `quickActionsEnabled` is on, each carrying the action's own title and glyph so the launcher row
+and the settings row can never drift. `CommandID.init(_ action: QuickAction)` is exhaustive, so a
+fifth action cannot reach the launcher without one.
+
+Activation hands the action to `QuickActionCoordinator.run(_:)` **without** hiding the palette first:
+the coordinator reads the displaced app and then hides, because after the hide the frontmost app is
+Tinycast. See [quick-actions.md](quick-actions.md).
 
 ## Notes commands
 
@@ -316,10 +333,10 @@ across the list — the top of Favorites on add, the neighbour above the one tha
 
 ### ⌘-digit slots
 
-`FavoriteSlots` (`Launcher/Model/FavoriteSlots.swift`) is the whole rule: **⌘1…⌘9 then ⌘0 for the
-tenth**, ten digit keys being the physical ceiling — there is no ⌘10. The eleventh favorite is still
-listed and reorderable, and simply has no chord and no number. Three places read that table — the key
-handler, the row's number, the compact tooltip — so none of them can invent an eleventh slot.
+`FavoriteSlots` (`Launcher/Model/FavoriteSlots.swift`) defines ten local palette slots: **⌘1…⌘9 then
+⌘0**. They match the physical number row, not the character produced by the current keyboard layout,
+so the same positions work on QWERTY and AZERTY. The same slots address pinned Clipboard entries in
+that screen; the eleventh favorite is still listed and reorderable, and simply has no slot.
 
 Both palette sizes serve the chords from the same prefix, because `paletteIsCollapsed` already
 requires an empty query: **compact implies empty implies `favoriteCount` is the pinned prefix**. That

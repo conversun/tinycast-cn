@@ -6,6 +6,37 @@ enum PaletteAxis {
     case horizontal
 }
 
+/// A menu supplied by a palette screen, including its rendering and row activation.
+@MainActor struct PaletteMenuContent {
+    let rowCount: Int
+    /// Built on demand: `moveMenu` resolves the open menu on every arrow key, and only the render
+    /// path needs a view out of it.
+    let view: () -> AnyView
+    /// Bounds-checked by the caller against `rowCount`, so a row index is always one this menu has.
+    let activate: (Int) -> Void
+
+    init(rowCount: Int, view: @escaping () -> AnyView, activate: @escaping (Int) -> Void) {
+        self.rowCount = rowCount
+        self.view = view
+        self.activate = activate
+    }
+
+    init(
+        popover: PopoverMenuContent, selection: Binding<Int>, width: CGFloat = Theme.Size.menuWidth,
+        onActivate: @escaping (Int) -> Void
+    ) {
+        self.init(
+            rowCount: popover.items.count,
+            view: {
+                AnyView(
+                    PopoverMenu(
+                        header: popover.header, items: popover.items, selection: selection,
+                        width: width, onActivate: onActivate))
+            },
+            activate: { popover.items[$0].action() })
+    }
+}
+
 /// One palette mode. `rows` is its single source of visible order, so selection indexes it.
 @MainActor protocol PaletteScreen {
     associatedtype Row: Identifiable
@@ -15,7 +46,13 @@ enum PaletteAxis {
 
     /// False when the selection can't be acted on, which hides the footer pill and swallows ⌘K.
     func hasPrimaryAction(at selection: Int) -> Bool
+    /// The ⌘K rows as the palette's own menu, which is every screen but one; nil when there are none.
     func actions(at selection: Int) -> PopoverMenuContent?
+    /// The ⌘K menu whole, for a screen whose rows the palette's menu can't express. Defaults to
+    /// wrapping `actions(at:)`, so a screen implements one or the other, never both.
+    func menuContent(
+        at selection: Int, menuSelection: Binding<Int>, onActivate: @escaping (Int) -> Void
+    ) -> PaletteMenuContent?
     func activate(at selection: Int)
     /// ⌘↵. False when the selection has no secondary action, leaving the key unhandled.
     func secondary(at selection: Int) -> Bool
@@ -33,6 +70,14 @@ enum PaletteAxis {
 
 extension PaletteScreen {
     func hasPrimaryAction(at selection: Int) -> Bool { true }
+    func actions(at selection: Int) -> PopoverMenuContent? { nil }
+    func menuContent(
+        at selection: Int, menuSelection: Binding<Int>, onActivate: @escaping (Int) -> Void
+    ) -> PaletteMenuContent? {
+        guard let content = actions(at: selection) else { return nil }
+        return PaletteMenuContent(
+            popover: content, selection: menuSelection, onActivate: onActivate)
+    }
     func pasteKeepingWindowOpen(at selection: Int) -> Bool { false }
     func move(_ delta: Int, axis: PaletteAxis, from selection: Int) -> Int? { nil }
     func headerAccessory(

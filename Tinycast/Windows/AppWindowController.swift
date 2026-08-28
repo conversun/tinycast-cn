@@ -67,6 +67,22 @@ final class AppWindowController: NSObject, NSWindowDelegate {
         window?.close()
     }
 
+    /// Resizes an open window so the area SwiftUI lays out in is exactly `height` tall. The
+    /// transparent title bar sits inside the frame but outside that area, so its height has to be
+    /// added back — and the top edge is pinned, or the window would crawl up the screen.
+    func fitContent(width: CGFloat, height: CGFloat) {
+        guard let window else { return }
+        let titlebar = window.frame.height - window.contentLayoutRect.height
+        let size = CGSize(width: width, height: height + titlebar)
+        guard window.contentMinSize != size else { return }
+        let top = window.frame.maxY
+        window.contentMinSize = size
+        window.setContentSize(size)
+        var frame = window.frame
+        frame.origin.y = top - frame.height
+        window.setFrame(frame, display: true, animate: false)
+    }
+
     // MARK: - NSWindowDelegate
 
     func windowWillClose(_ notification: Notification) {

@@ -120,6 +120,7 @@ final class ClipboardStore {
           pinned_at REAL
         );
         CREATE INDEX IF NOT EXISTS items_created_at ON items(created_at);
+        CREATE INDEX IF NOT EXISTS items_pinned_at ON items(pinned_at) WHERE pinned_at IS NOT NULL;
         CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
           text, content='items', content_rowid='rowid', tokenize='trigram'
         );
@@ -296,6 +297,12 @@ final class ClipboardStore {
     /// Row index of `item` as currently listed, so the palette can follow a row that moved.
     func rowIndex(of item: ClipboardItem, in query: String, filter: ClipboardFilter) -> Int? {
         search(query, filter: filter).firstIndex { $0.id == item.id }
+    }
+
+    /// The Nth visible pinned entry under `query` and `filter`, where 0 is the first pinned row.
+    func pinnedItem(at index: Int, in query: String, filter: ClipboardFilter) -> ClipboardItem? {
+        guard index >= 0 else { return nil }
+        return search(query, filter: filter).prefix(while: \.isPinned).dropFirst(index).first
     }
 
     private func unfiltered(_ q: String) -> [ClipboardItem] {
@@ -491,18 +498,6 @@ final class ClipboardStore {
                 == SQLITE_OK,
             sqlite3_exec(db, Self.schema, nil, nil, nil) == SQLITE_OK
         else { return false }
-        // Migrates pre-source_app databases; guarded so current ones don't log "duplicate column".
-        if !columnExists("source_app", in: "items") {
-            sqlite3_exec(db, "ALTER TABLE items ADD COLUMN source_app TEXT", nil, nil, nil)
-        }
-        if !columnExists("pinned_at", in: "items") {
-            sqlite3_exec(db, "ALTER TABLE items ADD COLUMN pinned_at REAL", nil, nil, nil)
-        }
-        // After the migration, not in `schema`: the column may not exist yet.
-        sqlite3_exec(
-            db,
-            "CREATE INDEX IF NOT EXISTS items_pinned_at ON items(pinned_at) WHERE pinned_at IS NOT NULL",
-            nil, nil, nil)
         insertStmt = prepare(
             """
             INSERT INTO items(id, kind, text, image_path, created_at, source_app, pinned_at)
@@ -544,15 +539,6 @@ final class ClipboardStore {
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
         return stmt
-    }
-
-    private func columnExists(_ column: String, in table: String) -> Bool {
-        guard let stmt = prepare("PRAGMA table_info(\(table))") else { return false }
-        defer { sqlite3_finalize(stmt) }
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let c = sqlite3_column_text(stmt, 1), String(cString: c) == column { return true }
-        }
-        return false
     }
 
     private func closeDatabase() {

@@ -11,6 +11,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case windowCommand
         case quicklink
         case extensionCommand
+        case meeting
 
         var descriptor: KindDescriptor {
             switch self {
@@ -51,6 +52,10 @@ struct AppEntry: Identifiable, Hashable, Sendable {
                 return KindDescriptor(
                     label: "Extension", sectionTitle: "Extensions",
                     openVerb: "Run Command", canRevealInFinder: false, isSymbolIcon: true)
+            case .meeting:
+                return KindDescriptor(
+                    label: "Meeting", sectionTitle: "Meetings",
+                    openVerb: "Join Meeting", canRevealInFinder: false, isSymbolIcon: true)
             }
         }
     }
@@ -135,7 +140,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             return WindowCommandCatalog.command(forEntryID: id).map { .windowCommand(id: $0.id) }
         case .quicklink:
             return Quicklink.id(fromEntryID: id).map { .quicklink(id: $0) }
-        case .snippet, .extensionCommand:
+        case .snippet, .extensionCommand, .meeting:
             return nil
         }
     }
@@ -161,6 +166,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case .systemAction: return SystemActionCatalog.action(forEntryID: id)?.sfSymbol ?? "questionmark"
         case .windowCommand:
             return WindowCommandCatalog.command(forEntryID: id)?.sfSymbol ?? "questionmark"
+        case .meeting: return "video.fill"
         case .application, .systemSettings, .extensionCommand: return "questionmark"
         }
     }
@@ -243,6 +249,7 @@ final class AppIndex {
     private var windowCommandEntries: [AppEntry] = []
     private var quicklinkEntries: [AppEntry] = []
     private var extensionEntries: [AppEntry] = []
+    private var meetingEntries: [AppEntry] = []
     /// The catalog's commands a disabled feature hides; the Commands slice is recomputed from it.
     private var hiddenCommands: Set<CommandID> = []
     private var alternateNameCache = SpotlightNames.Cache()
@@ -305,6 +312,14 @@ final class AppIndex {
             }
         guard entries != quicklinkEntries else { return }
         quicklinkEntries = entries
+        publishEntries()
+    }
+
+    /// Replaces the meeting slice. Events move on their own, so this is called from the store's
+    /// change hook rather than from a user edit.
+    func setMeetings(_ entries: [AppEntry]) {
+        guard entries != meetingEntries else { return }
+        meetingEntries = entries
         publishEntries()
     }
 
@@ -402,9 +417,7 @@ final class AppIndex {
                 if let bundleID, !seenBundleIDs.insert(bundleID).inserted { continue }
                 // Each fallback is taken only when the key is *usably* absent: RapidAPI and Asset Catalog Creator both ship an empty `CFBundleDisplayName`, and a plain `??` chain hands that blank string straight to the row.
                 let name =
-                    (bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)?.usableName
-                    ?? (bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String)?.usableName
-                    ?? url.deletingPathExtension().lastPathComponent
+                    bundle?.installedAppName ?? url.deletingPathExtension().lastPathComponent
                 let executable =
                     bundle?.object(forInfoDictionaryKey: "CFBundleExecutable") as? String
                 result.append(
@@ -430,7 +443,7 @@ final class AppIndex {
     private func publishEntries() {
         // Each slice arrives in its own display order; the slice order is the section order.
         let updated =
-            discoveredEntries + extensionEntries + quicklinkEntries + snippetEntries
+            meetingEntries + discoveredEntries + extensionEntries + quicklinkEntries + snippetEntries
             + Self.systemActionEntries + windowCommandEntries + customCommandEntries
             + commandEntries
         guard updated != apps else { return }
@@ -478,11 +491,12 @@ final class AppIndex {
     private func rank(_ q: String, limit: Int) -> [AppEntry] {
         Signposts.interval("AppIndex.rank") {
             let learned = ranking.boosts(query: q)
+            let query = FuzzyMatch.Query(q)
             let scored = apps.compactMap { app -> (AppEntry, Int)? in
                 var fields = app.searchFields
                 fields.userAlias = aliases.alias(for: app.preferenceKey)
                 // Base relevance is the strongest field; the boost is added blind to it.
-                guard let score = SearchRelevance.score(query: q, fields: fields) else {
+                guard let score = SearchRelevance.score(query, fields: fields) else {
                     return nil
                 }
                 return (app, score + (learned[app.preferenceKey] ?? 0))

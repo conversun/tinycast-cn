@@ -14,6 +14,7 @@ enum EmojiCategory: String, CaseIterable, Sendable {
     case currency = "xc"
     case math = "xm"
     case shapesAndPunctuation = "xs"
+    case cjk = "xj"
 
     var title: String {
         switch self {
@@ -29,6 +30,7 @@ enum EmojiCategory: String, CaseIterable, Sendable {
         case .currency: return String(localized: "Currency")
         case .math: return String(localized: "Math")
         case .shapesAndPunctuation: return "Shapes & Punctuation"
+        case .cjk: return "CJK Symbols"
         }
     }
 }

@@ -1,6 +1,6 @@
 ---
 title: Window management
-description: 30 tiling commands — halves, quarters, thirds, nudges and display moves.
+description: 34 commands — halves, quarters, fourths, thirds, nudges, display moves and instant Space switching.
 ---
 
 Move and resize the window you were last in, without installing anything else.
@@ -17,6 +17,8 @@ launcher entries and a still-registered shortcut moves nothing.
 
 **Quarters** — Top Left · Top Right · Bottom Left · Bottom Right
 
+**Fourths** — First Three Fourths · Last Three Fourths
+
 **Thirds** — First Third · Center Third · Last Third · First Two Thirds · Last Two Thirds
 
 **Sizing** — Maximize · Almost Maximize · Reasonable Size · Maximize Height · Maximize Width ·
@@ -25,6 +27,8 @@ Center · Center Half · Make Larger · Make Smaller · Restore
 **Moving** — Left · Right · Up · Down · Next Display · Previous Display
 
 **Fullscreen** — Toggle Fullscreen
+
+**Spaces** — Switch to Previous Space · Switch to Next Space
 
 ## Settings
 
@@ -82,6 +86,19 @@ There is deliberately no synthetic <kbd>⌃</kbd><kbd>⌘</kbd><kbd>F</kbd> atte
 and firing an unrelated menu command would be worse than doing nothing.
 
 It clears the cycle chain but keeps the restore point.
+
+## Spaces
+
+**Switch to Previous Space** and **Switch to Next Space** move between macOS Spaces without the
+sliding transition — roughly 56 ms, against about a second for the system's own
+<kbd>⌃</kbd><kbd>←</kbd> and <kbd>⌃</kbd><kbd>→</kbd>.
+
+They work by synthesising the trackpad swipe macOS already switches Spaces with, at a velocity high
+enough that the transition finishes rather than animates. Desktop Spaces and fullscreen Spaces are
+both included, since it is the same gesture either way.
+
+Held down, presses that arrive while a switch is still in flight are dropped rather than queued, so a
+long press never overshoots. At the first or last Space, macOS does whatever it normally does.
 
 ## Failing quietly
 

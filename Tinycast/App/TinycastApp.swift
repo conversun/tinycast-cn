@@ -10,9 +10,13 @@ struct TinycastApp: App {
     private let appName = Bundle.main.appDisplayName
 
     var body: some Scene {
-        MenuBarExtra(
-            appName, systemImage: "macwindow.on.rectangle", isInserted: $showInMenuBar
-        ) {
+        MenuBarExtra(isInserted: $showInMenuBar) {
+            if let meeting = AppCore.shared.calendarCoordinator.menuBarEvent {
+                Button(String(localized: "Join \(meeting.title)")) {
+                    AppCore.shared.calendarCoordinator.join(meeting)
+                }
+                Divider()
+            }
             Button(String(localized: "Open \(appName)")) {
                 AppCore.shared.paletteCoordinator.showPalette(mode: .launcher)
             }
@@ -20,11 +24,15 @@ struct TinycastApp: App {
                 AppCore.shared.paletteCoordinator.showPalette(mode: .clipboard)
             }
             Divider()
+            Button("Check for Updates...") { AppCore.shared.updateCoordinator.checkForUpdates() }
+            Button("Support \(appName)...") { AppCore.shared.supportCoordinator.showSupport() }
             Button("Settings...") { AppCore.shared.settingsCoordinator.showSettings() }
                 .keyboardShortcut(",")
             Divider()
             // No ⌘Q: the app menu binds it to Close Settings, and two contradictory ⌘Qs is a lie.
             Button(String(localized: "Quit \(appName)")) { NSApp.terminate(nil) }
+        } label: {
+            MenuBarLabel(appName: appName)
         }
         .commands { menuBarCommands }
     }
@@ -36,6 +44,7 @@ struct TinycastApp: App {
             Button(String(localized: "About \(appName)")) {
                 AppCore.shared.settingsCoordinator.showAbout()
             }
+            Button("Check for Updates…") { AppCore.shared.updateCoordinator.checkForUpdates() }
         }
         CommandGroup(replacing: .appSettings) {
             Button("Settings…") { AppCore.shared.settingsCoordinator.showSettings() }

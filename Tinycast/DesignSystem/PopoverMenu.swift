@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// A menu row's leading glyph: a symbol, or a real app icon from `IconCache`.
+/// A menu row's leading glyph: a symbol, a bundled template asset, or an app icon from `IconCache`.
 enum PopoverMenuIcon: Equatable {
     case symbol(String)
+    case asset(String)
     case file(path: String)
 
     /// A paste row's glyph: the target app's icon when known, else a generic symbol.
@@ -107,6 +108,13 @@ private struct PopoverMenuRow: View {
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(item.isDestructive ? Color.red : Color.secondary)
                         .frame(width: Theme.Size.menuIcon, height: Theme.Size.menuIcon)
+                case .asset(let name):
+                    Image(name)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundStyle(item.isDestructive ? Color.red : Color.secondary)
+                        .frame(width: Theme.Size.menuBrandIcon, height: Theme.Size.menuBrandIcon)
+                        .frame(width: Theme.Size.menuIcon, height: Theme.Size.menuIcon)
                 case .file(let path):
                     MenuFileIcon(path: path)
                 }
@@ -138,7 +146,7 @@ private struct PopoverMenuRow: View {
 }
 
 /// A menu row's app icon, seeded warm so the paste target paints on the first frame.
-private struct MenuFileIcon: View {
+struct MenuFileIcon: View {
     let path: String
     @State private var image: NSImage?
 

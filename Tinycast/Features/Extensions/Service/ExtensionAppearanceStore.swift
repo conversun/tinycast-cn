@@ -34,12 +34,6 @@ final class ExtensionAppearanceStore {
         persist()
     }
 
-    /// Replace the whole map at once (used when importing a settings backup).
-    func replace(_ newOverrides: [String: ExtensionAppearance]) {
-        overrides = newOverrides
-        persist()
-    }
-
     private func persist() {
         guard let data = try? JSONEncoder().encode(overrides) else { return }
         defaults.set(data, forKey: key)

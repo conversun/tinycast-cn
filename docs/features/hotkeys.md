@@ -29,7 +29,6 @@ the keycap rendering — only the _engine_ differs.
 - **`KeyShortcut.hyperChord(includesShift:)` is the only spelling of the Hyper chord**, read by both the
   ✦ collapse and the re-point below. `HyperKeyTap` composes its own flags because it also needs the
   left-side device bits, which no display path wants.
-- `LegacyHotKeyRecords` is scheduled for deletion and nothing new may depend on it.
 
 ## Persistence
 
@@ -50,15 +49,9 @@ but the guarantee that every decode runs through the initializer that masks devi
 `SettingsBackup.HotkeyBackup` stores the same values, so the backup file carries this shape too; only
 export → import within one build is guaranteed to round-trip.
 
-`LegacyHotKeyRecords` adopts the records shipped before this namespace existed — `v0.7.5` wrote a bare
-`{"carbonKeyCode":N,"carbonModifiers":N}` under `KeyboardShortcuts_<name>`. It runs once from
-`start()`, consumes each old record, and never overwrites a key the user has already rebound. Its
-`legacyKey` returns nil for an action that postdates the scheme, so nothing new has to invent a
-migration key it never wrote. It is scheduled for deletion.
-
 `hotkey.searchFiles`, `hotkey.toggleClipboard`, `hotkey.toggleEmoji`, `hotkey.showNotes`,
-`hotkey.createNote` and `hotkey.searchNotes` are the built-in launcher commands with an action of their
-own, alongside `hotkey.togglePalette`, which has no command row. They are the only `CommandID`s whose
+`hotkey.createNote`, `hotkey.searchNotes`, `hotkey.joinNextMeeting`, `hotkey.mySchedule` and
+`hotkey.createEvent` are the built-in launcher commands with an action of their own, alongside `hotkey.togglePalette`, which has no command row. They are the only `CommandID`s whose
 `hotKeyAction` is non-nil — which is what puts a recorder on their rows in Settings ▸ Commands, and a
 keycap on their launcher rows. Each is also reachable from its own feature pane, so it is one binding
 from two places, not two settings. `HotKeyManager` names them all through `CommandID`, so a conflict
@@ -67,9 +60,7 @@ callout spells an action exactly as its command row does.
 Like a window command, the chord registers regardless of the launcher row. Search Files and Notes both
 re-check their feature switches before opening; see [file-search.md](file-search.md#invocation) and
 [notes.md](notes.md#ownership-and-enablement). A hidden launcher row does not disable its shortcut, but
-disabling the feature does. `SettingsBackup.HotkeyBackup` carries every fixed feature binding. They
-return nil from `LegacyHotKeyRecords.legacyKey` because they postdate the old scheme and must never
-invent migration records.
+disabling the feature does. `SettingsBackup.HotkeyBackup` carries every fixed feature binding.
 
 System actions and window commands are the fixed-catalog case: they persist under
 `hotkey.systemAction.<raw-id>` and `hotkey.windowCommand.<raw-id>`

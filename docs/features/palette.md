@@ -55,6 +55,14 @@ only the closure wiring; the behaviour is `PaletteCoordinator`'s.
 Showing the palette calls `prepare(mode:)`, which resets state and bumps `focusToken` (a UUID) so the
 SwiftUI search field re-focuses.
 
+Hiding schedules Pop to Root Search, and `PaletteWindowController.popToRoot` is its only path: the
+palette returns to the launcher *and* chat starts a new conversation, at once or after
+`popToRootTimeout`, unless a re-summon inside that window consumes the pending reset first. An
+unfinished chat is a thing being done, exactly like a typed query, so the screen and the conversation
+are reset together rather than the screen alone. A reply still streaming is the one exception — it was
+asked for, and resetting would throw the answer away. Nothing is lost either way: a conversation is
+written to Chat History as soon as it has a message.
+
 Each `PaletteMode` maps to one type conforming to `PaletteScreen`, and the protocol is what keeps the
 selection invariant honest: a screen exposes `rows` as its single source of visible order, and the
 palette indexes into it. Adding a mode means adding a conformer, not a branch in `RootPaletteView`.
@@ -66,21 +74,37 @@ palette indexes into it. Adding a mode means adding a conformer, not a branch in
 | `.calculatorHistory` | `CalculatorHistoryScreen` | `CalculatorHistoryList` |
 | `.emoji` | `EmojiScreen` | `EmojiGridView` |
 | `.fileSearch` | `FileSearchScreen` | `FileSearchList` (see [file-search.md](file-search.md)) |
+| `.schedule` | `ScheduleScreen` | `ScheduleList` (see [calendar.md](calendar.md)) |
 | `.uninstall` | `UninstallScreen` | `UninstallList` (see [uninstall.md](uninstall.md)) |
 | `.quicklinks` | `QuicklinkListScreen` | `QuicklinkList` |
 | `.quicklinkArguments` | `QuicklinkArgumentsScreen` | `QuicklinkArgumentsView` (see [quicklinks.md](quicklinks.md#the-argument-prompt)) |
 | `.extensionCommand` | `ExtensionCommandScreen` | `ExtensionCommandView` (see [extensions.md](extensions.md)) |
 
-Every mode but `.launcher` is a sub-screen that backs out to the launcher. **Tab cycles launcher ↔
-clipboard and nothing else** unless the selected row declares arguments, in which case it walks those
-fields first (see below); the rest are reached by a command or a global hotkey, and Uninstall only
-from a launcher app's Actions menu, scoped to that app.
+Every mode but `.launcher` is a sub-screen that backs out to the launcher. **Tab rings the three
+surfaces a reader opens directly — launcher → AI chat → clipboard → launcher** — unless the selected
+row declares arguments, in which case it walks those fields first (see below); every other mode exits
+to the launcher rather than joining the ring, and is reached by a command or a global hotkey, with
+Uninstall only from a launcher app's Actions menu, scoped to that app. Chat is skipped whole when
+`aiEnabled` is off, which leaves the launcher ↔ clipboard flip the ring replaced. **Escape clears a
+non-empty query before it leaves the screen**, so one press clears and the next leaves: chat backs
+out to the launcher, an extension screen exits itself, and anywhere else the palette hides.
+
+The launcher advertises the first hop in the header — `AI Chat` beside a `⇥` cap, the footer's own
+pairing of a label with its key. It is drawn only when Tab really would open chat, a condition read
+back out of `PaletteTabAction` rather than restated, so a hint can never promise a destination the
+key does not go to: an argument field to walk takes Tab first, and the hint steps aside for it.
+
+`PaletteTabAction` decides where Tab goes *and* whether the typed text travels with it. Launcher and
+clipboard hand the query over, since one search narrows either list; crossing chat's edge opens a
+fresh screen in both directions, because that field holds a half-written message rather than a query
+— seeding a composer from a search reads as noise, and a draft dropped into a filter matches nothing.
 
 The argument screen is the one mode where the search field is not a search field: it _is_ the current
 argument's input, so its placeholder names that argument and ↵ submits rather than activating a row.
 Its own state lives on `AppCore.quicklinkArguments`, the way `.uninstall`'s target lives on
 `UninstallSession`, and leaving the mode cancels the pending open. A bare backspace steps back an
-argument before it falls through to the usual exit-to-launcher.
+argument before it falls through to the usual exit-to-launcher; Escape erases the half-typed answer
+first, and a second press hides the palette, which ends the pending open with it.
 
 ### Inline command arguments
 
@@ -100,8 +124,8 @@ The typed values live on `PaletteState.commandArguments`, keyed by
 `PaletteState.argumentKey(entryID, name)`, and are cleared with the rest of the screen.
 
 The flat `selection` index is the single source of truth for highlight / activation and **must always
-match the visible row order**, including the inline calculator card at index 0 when present (see
-[calculator.md](calculator.md)).
+match the visible row order**, including the card at index 0 when present — the calculator's (see
+[calculator.md](calculator.md)) or the meeting join card (see [calendar.md](calendar.md)), never both.
 
 ## Window placement
 
@@ -253,9 +277,15 @@ the arrow outside it, and AppKit's own alternation over the field came straight 
 structural instead of a pair of `onChange` handlers pushing each other closed. Three cases today —
 the ⌘K Actions menu (`.bottomTrailing`), the app menu (`.bottomLeading`) and the clipboard type
 filter (`.topTrailing`, hung under its header button). `menuContent` resolves the open case to one
-`PopoverMenuContent`, which is what lets ↑/↓, plain ↵, Esc and the click-away catcher serve every
-menu without knowing which is up. Every open path goes through `open(_:highlighting:)` and states
-where the highlight starts: the first row, except the type filter, which opens on the active filter.
+`PaletteMenuContent` — a row count, a row action and a view built on demand — so ↑/↓, plain ↵, Esc and
+the click-away catcher serve every menu without knowing which is up. A screen supplies its rows as a
+`PopoverMenuContent` through `actions(at:)` and the default `menuContent` wraps them; a screen whose
+rows the palette's menu can't express overrides `menuContent` and hands over its own view instead —
+`ExtensionCommandScreen` is the only one, and the reason the seam exists (see
+[extensions.md](extensions.md)). The view is a closure because `moveMenu` resolves the open menu on
+every arrow key and needs the row count alone. Every open path goes through `open(_:highlighting:)`
+and states where the highlight starts: the first row, except the type filter, which opens on the
+active filter.
 
 Every row closes the menu behind it — `activateMenuItem` is the one path, and a row that reorders the
 list under itself (Move Favorite Up/Down) is no exception, so no row ever runs against a rebuilt menu.
@@ -282,6 +312,10 @@ Most ⌘/⌃ chords reach SwiftUI's `onKeyPress` fine. Three kinds do not, and a
 
 - **A bare backspace** — the field editor consumes it as an edit (`onBareBackspace`).
 - **Chords with no main menu item** — ⌘, and ⌘w, which an app with a menu bar would never see here.
+- **The physical number-row slots.** `FavoriteSlots` matches ⌘1…⌘0 by key code before fixed command
+  chords, then publishes the resolved position to the active screen. Only the launcher and clipboard
+  screens intercept these slots; other screens keep their own ⌘-number shortcuts. The launcher's
+  compact visibility setting is visual only and does not disable its favorite slots.
 - **Chords AppKit has already bound to a selector.** `⌘.` is the one that bites: AppKit binds it to
   `cancelOperation:` alongside Escape, so `interpretKeyEvents` hands it to the field editor and
   `onKeyPress(keys: ["."])` never fires. Pin (⌘.) therefore arrives through `onCommandShortcut`,

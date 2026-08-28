@@ -22,8 +22,9 @@ final class HUDPresenter {
         self.screen = screen
     }
 
-    /// Replaces whatever is up; a nil `size` lets SwiftUI measure, as the pill needs.
-    func show(_ view: some View, size: CGSize? = nil) {
+    /// Replaces whatever is up; a nil `size` lets SwiftUI measure, as the pill needs. Progress has
+    /// no natural dwell, so `dwells: false` leaves it up until it is replaced or dismissed.
+    func show(_ view: some View, size: CGSize? = nil, dwells: Bool = true) {
         let panel = panel ?? make()
         let host = NSHostingView(rootView: view)
         // Never size from `host.frame` after attaching: AppKit resets it to the content rect.
@@ -38,7 +39,13 @@ final class HUDPresenter {
         } else {
             panel.fadeIn(duration: Theme.Duration.enter) { panel.orderFrontRegardless() }
         }
-        scheduleDismissal()
+        if dwells { scheduleDismissal() } else { dismissal?.cancel() }
+    }
+
+    func dismiss() {
+        dismissal?.cancel()
+        guard let panel, panel.isVisible else { return }
+        panel.fadeOut(duration: Theme.Duration.exit)
     }
 
     /// Re-arms the dismissal, so a repeat extends the dwell rather than replaying it.
