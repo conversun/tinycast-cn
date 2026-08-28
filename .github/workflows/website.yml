@@ -25,6 +25,8 @@ concurrency:
 
 jobs:
   build:
+    # Upstream only: a fork has no Pages target, so deploy-pages 404s on every push.
+    if: github.repository == 'abue-ammar/tinycast'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

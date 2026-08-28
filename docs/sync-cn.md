@@ -11,6 +11,15 @@
 [`release-cn.yml`](../.github/workflows/release-cn.yml) 发 `<上游版本>-cn.1`。
 对应 release 已存在时十几秒内退出，幂等，无需干预。
 
+## 受阻路径：开 issue，不留红叉
+
+汉化 fork 与上游冲突是设计使然，所以 `git merge` 冲突或 `run-tests.sh` 失败都**不算故障**：
+工作流回滚合并、不推 main，改为开一条带 `sync-blocked` 标签的 issue（标题 `Sync vX.Y.Z needs a hand`，
+正文附冲突文件清单或测试尾部日志），run 本身保持绿色。同一 tag 只开一条，6 小时一次的重试不会刷屏。
+
+按下文配方在本地解完、`main` 带上合并提交后，关掉 issue 即可 —— 下一次定时同步发现
+merge 已是 no-op，测试通过，就会照常发 `-cn.1`。
+
 ## 上游 rebase 过历史时（merge 炸假冲突）
 
 **症状**：`git merge vX.Y.Z` 出现几十上百个 add/add 与 content 冲突，定时任务失败。

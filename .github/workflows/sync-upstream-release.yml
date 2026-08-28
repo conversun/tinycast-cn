@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: sync-upstream-release
@@ -28,6 +29,7 @@ jobs:
       prerelease: ${{ steps.meta.outputs.prerelease }}
       upstream_tag: ${{ steps.meta.outputs.upstream_tag }}
       source_commit: ${{ steps.merge.outputs.source_commit }}
+      merged: ${{ steps.merge.outputs.merged }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -77,6 +79,8 @@ jobs:
             echo "upstream_tag=${UPSTREAM_TAG}"
           } >> "$GITHUB_OUTPUT"
 
+      # A localization fork conflicts with upstream by design, so a blocked merge is news, not a
+      # fault: it reports through the issue below and leaves the run green.
       - name: Merge upstream release into main
         id: merge
         if: steps.meta.outputs.should_release == 'true'
@@ -87,14 +91,80 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/abue-ammar/tinycast.git
           git fetch --no-tags upstream "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
-          git merge --no-edit "$UPSTREAM_TAG"
-          ./Scripts/run-tests.sh
+          # Called on the main shell, never down a pipe: a subshell's `exit` would not stop the step.
+          report() {
+            {
+              echo "merged=false"
+              echo "blocker=$1"
+              echo "detail<<TINYCAST_EOF"
+              printf '%s\n' "$2"
+              echo "TINYCAST_EOF"
+            } >> "$GITHUB_OUTPUT"
+          }
+          if ! git merge --no-edit "$UPSTREAM_TAG"; then
+            CONFLICTS="$(git diff --name-only --diff-filter=U)"
+            git merge --abort
+            report conflict "$CONFLICTS"
+            exit 0
+          fi
+          if ! ./Scripts/run-tests.sh > /tmp/tests.log 2>&1; then
+            cat /tmp/tests.log
+            report tests "$(tail -n 40 /tmp/tests.log)"
+            exit 0
+          fi
           git push origin HEAD:main
-          echo "source_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          {
+            echo "merged=true"
+            echo "source_commit=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      # One open issue per upstream tag: the cron retries every 6h and must not restate the same news.
+      - name: Report a blocked sync
+        if: steps.merge.outputs.merged == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_TAG: ${{ steps.meta.outputs.upstream_tag }}
+          BLOCKER: ${{ steps.merge.outputs.blocker }}
+          DETAIL: ${{ steps.merge.outputs.detail }}
+        run: |
+          TITLE="Sync ${UPSTREAM_TAG} needs a hand"
+          OPEN="$(gh issue list --state open --limit 100 --json title \
+            --jq "map(select(.title == \"${TITLE}\")) | length")"
+          if [ "$OPEN" != "0" ]; then
+            echo "Issue '${TITLE}' is already open; nothing to add."
+            exit 0
+          fi
+          if [ "$BLOCKER" = "conflict" ]; then
+            SUMMARY="\`git merge ${UPSTREAM_TAG}\` stopped on conflicts in these files:"
+          else
+            SUMMARY="The merge applied cleanly but \`./Scripts/run-tests.sh\` failed. Last 40 lines:"
+          fi
+          gh label create sync-blocked --color FBCA04 --description "Upstream sync needs a human" \
+            --force >/dev/null 2>&1 || true
+          gh issue create --title "$TITLE" --label sync-blocked --body "$(cat <<EOF
+          Upstream published \`${UPSTREAM_TAG}\`. Nothing has been pushed to \`main\`.
+
+          ${SUMMARY}
+
+          \`\`\`
+          ${DETAIL}
+          \`\`\`
+
+          To resolve locally:
+
+          \`\`\`sh
+          git fetch --no-tags origin refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}
+          git switch -c sync/${UPSTREAM_TAG} main
+          git merge ${UPSTREAM_TAG}
+          \`\`\`
+
+          Close this issue once \`main\` carries the merge; the next scheduled run picks the release up.
+          EOF
+          )"
 
   release:
     needs: sync
-    if: needs.sync.outputs.should_release == 'true'
+    if: needs.sync.outputs.merged == 'true'
     uses: ./.github/workflows/release-cn.yml
     with:
       version: ${{ needs.sync.outputs.version }}

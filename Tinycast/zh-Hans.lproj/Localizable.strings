@@ -456,7 +456,7 @@
 "Imported %lld snippets." = "已导入 %lld 个文本片段。";
 "Incorrect passphrase, or the file is corrupted." = "密码不正确，或文件已损坏。";
 "Raycast 1.x export" = "Raycast 1.x 导出文件";
-"Raycast X export" = "Raycast X 导出文件";
+"Raycast 2.x export" = "Raycast 2.x 导出文件";
 "Raycast is running — quit it to avoid hotkey conflicts." = "Raycast 正在运行，请退出以避免快捷键冲突。";
 "The Raycast export could not be read." = "无法读取 Raycast 导出文件。";
 "This backup contains %@ and %@. Custom commands can run arbitrary shell code. Only import files you trust." = "此备份包含 %@ 和 %@。自定义命令可以运行任意 Shell 代码，请仅导入你信任的文件。";
@@ -1117,3 +1117,16 @@
 "Move Favorite Down" = "下移收藏";
 "Aliases" = "别名";
 "%lld aliases" = "%lld 个别名";
+
+
+/* Upstream v0.9.8 → v0.10.2: 四分之三分屏、Spaces 切换、AI 与日程面板、菜单栏会议入口。 */
+"Fourths" = "四分之三屏";
+"First Three Fourths" = "左侧四分之三";
+"Last Three Fourths" = "右侧四分之三";
+"Spaces" = "桌面空间";
+"Switch to Previous Space" = "切换到上一个桌面";
+"Switch to Next Space" = "切换到下一个桌面";
+"Ask anything…" = "问点什么…";
+"Search chats…" = "搜索对话…";
+"Search today and tomorrow…" = "搜索今天和明天…";
+"Join %@" = "加入 %@";

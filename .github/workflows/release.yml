@@ -23,6 +23,8 @@ permissions:
 
 jobs:
   build:
+    # Upstream only: the CN fork ships through release-cn.yml, which signs and names its own build.
+    if: github.repository == 'abue-ammar/tinycast'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
