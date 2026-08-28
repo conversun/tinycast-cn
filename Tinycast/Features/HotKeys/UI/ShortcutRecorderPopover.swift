@@ -34,7 +34,7 @@ struct ShortcutRecorderPopover: View {
             .frame(height: Theme.Size.heroKeyCap)
             .opacity(state.isExample ? 0.5 : 1)
 
-            Text(state.label)
+            Text(state.label.localizedUI)
                 .font(Theme.Typography.compactKeyCap)
                 .foregroundStyle(state.tint ?? Theme.Colors.textSecondary)
                 .lineLimit(1)

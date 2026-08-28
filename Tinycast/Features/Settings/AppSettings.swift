@@ -34,7 +34,9 @@ enum JoinWindow: Int, CaseIterable, Identifiable, Sendable {
 
     var id: Int { rawValue }
 
-    var title: String { rawValue == 1 ? "1 minute" : "\(rawValue) minutes" }
+    var title: String {
+        rawValue == 1 ? String(localized: "1 minute") : String(localized: "\(rawValue) minutes")
+    }
 }
 
 /// How early an event reaches the menu bar. Zero is the default, which `integer(forKey:)` also
@@ -48,7 +50,10 @@ enum MenuBarEvents: Int, CaseIterable, Identifiable, Sendable {
 
     var id: Int { rawValue }
 
-    var title: String { self == .never ? "Never" : "\(rawValue) minutes before" }
+    var title: String {
+        self == .never
+            ? String(localized: "Never") : String(localized: "\(rawValue) minutes before")
+    }
 }
 
 /// How long a started event holds the menu bar. Zero, the default, means it goes as it starts.
@@ -61,7 +66,8 @@ enum HideCurrentEvent: Int, CaseIterable, Identifiable, Sendable {
     var id: Int { rawValue }
 
     var title: String {
-        self == .automatically ? "Automatically" : "After \(rawValue) minutes"
+        self == .automatically
+            ? String(localized: "Automatically") : String(localized: "After \(rawValue) minutes")
     }
 
     /// Nil is "hide at the start"; `MenuBarSummary` reads it that way.

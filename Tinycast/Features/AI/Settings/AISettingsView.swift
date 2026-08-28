@@ -97,7 +97,7 @@ struct AISettingsView: View {
                 if let efforts = selectedSubscriptionModel?.efforts, !efforts.isEmpty {
                     Picker(selection: effortBinding) {
                         ForEach(efforts) { effort in
-                            Text(effort.title).tag(effort.id)
+                            Text(effort.title.localizedUI).tag(effort.id)
                         }
                     } label: {
                         Text("Reasoning effort")
@@ -108,7 +108,7 @@ struct AISettingsView: View {
         } header: {
             Text("Default")
         } footer: {
-            Text(defaultModelFooter)
+            Text(defaultModelFooter.localizedUI)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -149,7 +149,7 @@ struct AISettingsView: View {
         @Bindable var settings = settings
         return Section {
             Picker(selection: $settings.opensTo) {
-                ForEach(AIOpensTo.allCases) { Text($0.title).tag($0) }
+                ForEach(AIOpensTo.allCases) { Text($0.title.localizedUI).tag($0) }
             } label: {
                 Text("Opens to")
                 Text("What summoning AI Chat lands on.")
@@ -163,7 +163,7 @@ struct AISettingsView: View {
                 }
             }
             Picker(selection: $settings.retention) {
-                ForEach(AIRetention.allCases) { Text($0.title).tag($0) }
+                ForEach(AIRetention.allCases) { Text($0.title.localizedUI).tag($0) }
             } label: {
                 Text("Keep conversations")
                 Text("Older conversations are deleted permanently.")
@@ -173,8 +173,8 @@ struct AISettingsView: View {
             Text("Conversations")
         } footer: {
             Text(
-                "Conversations stay on this Mac. Nothing here is carried in a settings backup — which "
-                    + "chats a Mac keeps is that Mac's business."
+                ("Conversations stay on this Mac. Nothing here is carried in a settings backup — which "
+                    + "chats a Mac keeps is that Mac's business.").localizedUI
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -206,18 +206,18 @@ struct AISettingsView: View {
             chatGPTConnection
             if let limits = subscription.rateLimits, subscription.isConnected {
                 if let primary = limits.primary {
-                    quotaRow(primary, fallbackTitle: "Primary window")
+                    quotaRow(primary, fallbackTitle: String(localized: "Primary window"))
                 }
                 if let secondary = limits.secondary {
-                    quotaRow(secondary, fallbackTitle: "Secondary window")
+                    quotaRow(secondary, fallbackTitle: String(localized: "Secondary window"))
                 }
             }
         } header: {
             Text("ChatGPT Subscription")
         } footer: {
             Text(
-                "Uses OpenAI’s supported Codex App Server. The sign-in is stored in Tinycast’s "
-                    + "private support folder and stays separate from your normal Codex setup."
+                ("Uses OpenAI’s supported Codex App Server. The sign-in is stored in Tinycast’s "
+                    + "private support folder and stays separate from your normal Codex setup.").localizedUI
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -256,8 +256,8 @@ struct AISettingsView: View {
                     if let email = account.email {
                         RedactedText(
                             value: email,
-                            revealHelp: "Click to reveal the signed-in account",
-                            hideHelp: "Click to hide the signed-in account")
+                            revealHelp: String(localized: "Click to reveal the signed-in account"),
+                            hideHelp: String(localized: "Click to hide the signed-in account"))
                     } else {
                         Text("Connected to ChatGPT")
                     }
@@ -314,8 +314,8 @@ struct AISettingsView: View {
             Text("API Connections")
         } footer: {
             Text(
-                "OpenAI, Claude, Gemini and OpenRouter are presets. Custom OpenAI-compatible "
-                    + "endpoints are supported too. API keys stay in your login Keychain."
+                ("OpenAI, Claude, Gemini and OpenRouter are presets. Custom OpenAI-compatible "
+                    + "endpoints are supported too. API keys stay in your login Keychain.").localizedUI
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -328,7 +328,7 @@ struct AISettingsView: View {
             groups.append(
                 AIModelGroup(
                     id: "apple-intelligence",
-                    title: "On device",
+                    title: String(localized: "On device"),
                     choices: [
                         AIModelChoice(
                             selection: .appleIntelligence, title: AppleIntelligence.title)
@@ -450,11 +450,12 @@ struct AISettingsView: View {
             } else if retargeted, AIEndpointPolicy.isLoopback(connection.baseURL) {
                 try keyStore.removeKey(for: connection.id)
             } else if retargeted {
-                return "Enter an API key for this endpoint — the saved key stays with the old one."
+                return String(
+                    localized: "Enter an API key for this endpoint — the saved key stays with the old one.")
             } else if !AIEndpointPolicy.isLoopback(connection.baseURL)
                 && keyStatuses[connection.id] != true
             {
-                return "Enter an API key for this remote provider."
+                return String(localized: "Enter an API key for this remote provider.")
             }
             settings.save(connection)
             editor = nil
@@ -464,8 +465,8 @@ struct AISettingsView: View {
         } catch {
             keyError = true
             return isNew
-                ? "The key could not be saved to Keychain."
-                : "The saved key could not be updated in Keychain."
+                ? String(localized: "The key could not be saved to Keychain.")
+                : String(localized: "The saved key could not be updated in Keychain.")
         }
     }
 
@@ -560,12 +561,17 @@ private struct AIConnectionRow: View {
     }
 
     private var keyStatus: String {
-        if AIEndpointPolicy.isLoopback(connection.baseURL), !hasStoredKey { return "No key" }
-        return hasStoredKey ? "Keychain" : "Key missing"
+        if AIEndpointPolicy.isLoopback(connection.baseURL), !hasStoredKey {
+            return String(localized: "No key")
+        }
+        return hasStoredKey
+            ? String(localized: "Keychain") : String(localized: "Key missing")
     }
 
     private var modelCount: String {
-        connection.models.count == 1 ? "1 model" : "\(connection.models.count) models"
+        connection.models.count == 1
+            ? String(localized: "1 model")
+            : String(localized: "\(connection.models.count) models")
     }
 }
 
@@ -625,8 +631,8 @@ private struct AIConnectionEditorSheet: View {
                             .foregroundStyle(.secondary)
                     } else if target.hasStoredKey {
                         Label(
-                            "The saved key stays with the endpoint it was saved for. "
-                                + "Enter a key for this one.",
+                            ("The saved key stays with the endpoint it was saved for. "
+                                + "Enter a key for this one.").localizedUI,
                             systemImage: "exclamationmark.triangle"
                         )
                         .font(.caption)
@@ -656,8 +662,10 @@ private struct AIConnectionEditorSheet: View {
                     }
                 } footer: {
                     Text(
-                        "Search the models available to this key and add one or more. Exact model "
-                            + "IDs remain available when discovery is unsupported."
+                        String(
+                            localized:
+                                "Search the models available to this key and add one or more. Exact model ")
+                            + String(localized: "IDs remain available when discovery is unsupported.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -819,10 +827,10 @@ private struct AIConnectionEditorSheet: View {
 
     private var modelPlaceholder: String {
         switch connection.provider {
-        case .openAI, .openAICompatible: return "Model ID (e.g. gpt-5.4-mini)"
-        case .anthropic: return "Model ID (e.g. claude-sonnet-4-6)"
-        case .gemini: return "Model ID (e.g. gemini-3.7-flash)"
-        case .openRouter: return "Model ID (e.g. openai/gpt-5.4-mini)"
+        case .openAI, .openAICompatible: return String(localized: "Model ID (e.g. gpt-5.4-mini)")
+        case .anthropic: return String(localized: "Model ID (e.g. claude-sonnet-4-6)")
+        case .gemini: return String(localized: "Model ID (e.g. gemini-3.7-flash)")
+        case .openRouter: return String(localized: "Model ID (e.g. openai/gpt-5.4-mini)")
         }
     }
 
@@ -833,14 +841,17 @@ private struct AIConnectionEditorSheet: View {
     }
 
     private var apiKeyPlaceholder: String {
-        if storedKeyMatchesTarget { return "Leave blank to keep saved key" }
-        if AIEndpointPolicy.isLoopback(connection.baseURL) { return "Optional for local endpoint" }
-        return "Paste API key"
+        if storedKeyMatchesTarget { return String(localized: "Leave blank to keep saved key") }
+        if AIEndpointPolicy.isLoopback(connection.baseURL) {
+            return String(localized: "Optional for local endpoint")
+        }
+        return String(localized: "Paste API key")
     }
 
     private var modelSearchPlaceholder: String {
         connection.provider == .openRouter
-            ? "Search by model or company" : "Search available models"
+            ? String(localized: "Search by model or company")
+            : String(localized: "Search available models")
     }
 
     private func matchingModels(
@@ -876,7 +887,8 @@ private struct AIConnectionEditorSheet: View {
                 apiKey = try APIKeyStore().key(for: connection.id) ?? ""
             } catch {
                 discovery = .failed(
-                    "The saved key could not be read from Keychain.", allowsManualEntry: false)
+                    String(localized: "The saved key could not be read from Keychain."),
+                    allowsManualEntry: false)
                 return
             }
         } else if AIEndpointPolicy.isLoopback(connection.baseURL) {
@@ -909,7 +921,7 @@ private struct AIConnectionEditorSheet: View {
             let catalogError = error as? AIModelDiscovery.DiscoveryError
             discovery = .failed(
                 catalogError?.errorDescription
-                    ?? "The provider could not load models. Enter one manually.",
+                    ?? String(localized: "The provider could not load models. Enter one manually."),
                 allowsManualEntry: catalogError != .rejectedKey)
         }
     }
@@ -930,11 +942,11 @@ private struct AIConnectionEditorSheet: View {
 
     private func save() {
         if case .failed(_, let allowsManualEntry) = discovery, !allowsManualEntry {
-            error = "Resolve the API key or endpoint error before saving."
+            error = String(localized: "Resolve the API key or endpoint error before saving.")
             return
         }
         guard !connection.models.isEmpty else {
-            error = "Select or add at least one model."
+            error = String(localized: "Select or add at least one model.")
             return
         }
         do {

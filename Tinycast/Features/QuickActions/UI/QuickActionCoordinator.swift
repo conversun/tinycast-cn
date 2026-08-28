@@ -57,9 +57,9 @@ final class QuickActionCoordinator {
                 await core.confirm(
                     title: "Enable Quick Actions?",
                     message:
-                        "Tinycast needs the Accessibility permission to read the text you have "
-                        + "selected in other apps and replace it. Nothing is read until you press "
-                        + "a shortcut.",
+                        "Tinycast needs the Accessibility permission to read the text you have ".localizedUI
+                        + "selected in other apps and replace it. Nothing is read until you press ".localizedUI
+                        + "a shortcut.".localizedUI,
                     symbol: "wand.and.sparkles", confirmTitle: "Continue", tone: .neutral,
                     confirmRole: .standard)
             else { return }
@@ -125,9 +125,9 @@ final class QuickActionCoordinator {
                 await core.reportFailure(
                     title: "Quick Actions can't read your selection",
                     message:
-                        "Tinycast needs the Accessibility permission to read the text you have "
-                        + "selected and replace it. If Tinycast is already listed, switch it off "
-                        + "and on again — a rebuilt app keeps a stale entry.",
+                        "Tinycast needs the Accessibility permission to read the text you have ".localizedUI
+                        + "selected and replace it. If Tinycast is already listed, switch it off ".localizedUI
+                        + "and on again — a rebuilt app keeps a stale entry.".localizedUI,
                     symbol: "wand.and.sparkles", recovery: "Open System Settings")
             else { return }
             Permissions.openAccessibilitySettings()
@@ -181,7 +181,7 @@ final class QuickActionCoordinator {
 
     private func deliver(_ text: String, to target: NSRunningApplication?, action: QuickAction) {
         injector.replaceSelection(with: text, in: target) { [weak self] in
-            self?.core.showMessage("\(action.title) applied")
+            self?.core.showMessage(String(format: "%@ applied".localizedUI, action.title.localizedUI))
         }
     }
 

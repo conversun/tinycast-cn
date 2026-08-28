@@ -76,7 +76,7 @@ final class ChatGPTSubscriptionManager {
                 guard let urlString = response["authUrl"]?.stringValue,
                     let url = URL(string: urlString), openURL(url)
                 else {
-                    self.phase = .failed("The ChatGPT sign-in page could not be opened.")
+                    self.phase = .failed(String(localized: "The ChatGPT sign-in page could not be opened."))
                     return
                 }
                 self.phase = .waitingForBrowser
@@ -121,7 +121,7 @@ final class ChatGPTSubscriptionManager {
             await loadModelsAndLimits()
         }
         guard account != nil else {
-            throw AIProviderError.unavailable("Connect ChatGPT in Settings first.")
+            throw AIProviderError.unavailable(String(localized: "Connect ChatGPT in Settings first."))
         }
     }
 
@@ -249,7 +249,8 @@ final class ChatGPTSubscriptionManager {
                 runOperation { [weak self] in await self?.refreshNow() }
             } else {
                 phase = .failed(
-                    params["error"]?.stringValue ?? "ChatGPT sign-in did not complete.")
+                    params["error"]?.stringValue
+                        ?? String(localized: "ChatGPT sign-in did not complete."))
             }
         case "account/updated":
             runOperation { [weak self] in await self?.refreshNow() }
@@ -283,7 +284,7 @@ final class ChatGPTSubscriptionManager {
         if error is AIProviderError { return error }
         let message =
             (error as? LocalizedError)?.errorDescription
-            ?? "The ChatGPT connection failed."
+            ?? String(localized: "The ChatGPT connection failed.")
         return AIProviderError.responseFailed(message)
     }
 }

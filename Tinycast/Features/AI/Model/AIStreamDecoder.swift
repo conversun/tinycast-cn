@@ -146,9 +146,9 @@ struct AIStreamDecoder: Sendable {
 
     private static func anthropicErrorMessage(_ type: String?) -> String {
         switch type {
-        case "authentication_error": return "API key rejected — check it in Settings."
-        case "rate_limit_error": return "Rate limit reached — try again later."
-        default: return "The provider stopped the response with an error."
+        case "authentication_error": return String(localized: "API key rejected — check it in Settings.")
+        case "rate_limit_error": return String(localized: "Rate limit reached — try again later.")
+        default: return String(localized: "The provider stopped the response with an error.")
         }
     }
 }

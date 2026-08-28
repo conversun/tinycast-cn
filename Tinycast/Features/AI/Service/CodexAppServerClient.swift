@@ -12,10 +12,11 @@ final class CodexAppServerClient {
         var errorDescription: String? {
             switch self {
             case .executableMissing:
-                return "Install the Codex CLI to connect a ChatGPT subscription."
-            case .launchFailed(let detail): return "Codex could not start: \(detail)"
+                return String(localized: "Install the Codex CLI to connect a ChatGPT subscription.")
+            case .launchFailed(let detail):
+                return String(localized: "Codex could not start: \(detail)")
             case .processExited(let detail), .requestFailed(let detail): return detail
-            case .timedOut: return "Codex did not respond in time."
+            case .timedOut: return String(localized: "Codex did not respond in time.")
             }
         }
     }
@@ -61,7 +62,8 @@ final class CodexAppServerClient {
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o700], ofItemAtPath: workspace.path)
         } catch {
-            throw ClientError.launchFailed("Its private support folder could not be prepared.")
+            throw ClientError.launchFailed(
+                String(localized: "Its private support folder could not be prepared."))
         }
 
         let process = Process()
@@ -152,7 +154,9 @@ final class CodexAppServerClient {
     func request(
         method: String, params: [String: Any] = [:], timeout: Duration = .seconds(15)
     ) async throws -> [String: CodexValue] {
-        guard isRunning else { throw ClientError.processExited("Codex is not running.") }
+        guard isRunning else {
+            throw ClientError.processExited(String(localized: "Codex is not running."))
+        }
         let id = nextID
         nextID += 1
         return try await withTaskCancellationHandler {
@@ -177,7 +181,7 @@ final class CodexAppServerClient {
     }
 
     func stop() {
-        stop(error: ClientError.processExited("Codex stopped."))
+        stop(error: ClientError.processExited(String(localized: "Codex stopped.")))
     }
 
     /// Closing stdin is the clean exit — the server leaves on EOF — and SIGTERM is the backstop.
@@ -192,7 +196,9 @@ final class CodexAppServerClient {
     }
 
     private func send(_ data: Data) throws {
-        guard let input else { throw ClientError.processExited("Codex is not running.") }
+        guard let input else {
+            throw ClientError.processExited(String(localized: "Codex is not running."))
+        }
         try input.write(contentsOf: data)
     }
 
@@ -206,7 +212,9 @@ final class CodexAppServerClient {
         }
         // An unterminated multi-megabyte line means whatever is talking is not the app server.
         guard outputBuffer.count > Self.outputLimit else { return }
-        let message = "Codex sent an unterminated oversized response and was disconnected."
+        let message = String(
+            localized:
+                "Codex sent an unterminated oversized response and was disconnected.")
         onExit?(message)
         stop(error: ClientError.processExited(message))
     }
@@ -245,7 +253,7 @@ final class CodexAppServerClient {
         default:
             try? send(
                 CodexAppServerProtocol.errorResponse(
-                    id: id, message: "Tinycast does not expose Codex tools."))
+                    id: id, message: String(localized: "Tinycast does not expose Codex tools.")))
             return
         }
         try? send(CodexAppServerProtocol.response(id: id, result: result))

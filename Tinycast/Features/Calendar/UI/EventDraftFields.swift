@@ -44,7 +44,7 @@ private struct ChipRow: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            Text(label)
+            Text(label.localizedUI)
                 .font(Theme.Typography.rowTrailing)
                 .foregroundStyle(Theme.Colors.textSecondary)
                 .frame(width: Theme.Size.dialogIcon, alignment: .leading)

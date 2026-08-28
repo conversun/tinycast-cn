@@ -97,10 +97,11 @@ final class CodexTurnRunner {
                 activeContinuation?.finish(
                     throwing: AIProviderError.responseFailed(
                         turn["error"]?.objectValue?["message"]?.stringValue
-                            ?? "ChatGPT could not finish the response."))
+                            ?? String(localized: "ChatGPT could not finish the response.")))
             default:
                 activeContinuation?.finish(
-                    throwing: AIProviderError.responseFailed("The response was interrupted."))
+                    throwing: AIProviderError.responseFailed(
+                        String(localized: "The response was interrupted.")))
             }
             clearActiveTurn()
         case "error":
@@ -108,7 +109,7 @@ final class CodexTurnRunner {
             activeContinuation?.finish(
                 throwing: AIProviderError.responseFailed(
                     params["error"]?.objectValue?["message"]?.stringValue
-                        ?? "ChatGPT returned an error."))
+                        ?? String(localized: "ChatGPT returned an error.")))
             clearActiveTurn()
         default:
             break
@@ -146,7 +147,8 @@ final class CodexTurnRunner {
             })
         else {
             continuation.finish(
-                throwing: AIProviderError.unavailable("There is no user message to send."))
+                throwing: AIProviderError.unavailable(
+                    String(localized: "There is no user message to send.")))
             return
         }
         var tookOwnership = false
@@ -156,11 +158,11 @@ final class CodexTurnRunner {
             try Task.checkCancellation()
             guard !model.isEmpty else {
                 throw AIProviderError.unavailable(
-                    "No ChatGPT model is available for this account.")
+                    String(localized: "No ChatGPT model is available for this account."))
             }
             activeContinuation?.finish(
                 throwing: AIProviderError.responseFailed(
-                    "A newer request replaced this response."))
+                    String(localized: "A newer request replaced this response.")))
             activeContinuation = continuation
             activeToken = token
             tookOwnership = true
@@ -197,7 +199,7 @@ final class CodexTurnRunner {
                 let threadID = thread["id"]?.stringValue
             else {
                 throw CodexAppServerClient.ClientError.requestFailed(
-                    "Codex returned no generation thread.")
+                    String(localized: "Codex returned no generation thread."))
             }
             // Ownership can change while `thread/start` is in flight: a Stop's cancellation and the
             // real response race to resume this. Claiming the thread after losing the turn would aim
@@ -315,7 +317,8 @@ final class CodexTurnRunner {
     private func clearActiveTurn() {
         let wasLive = activeContinuation != nil
         activeContinuation?.finish(
-            throwing: AIProviderError.responseFailed("The ChatGPT connection was interrupted."))
+            throwing: AIProviderError.responseFailed(
+                String(localized: "The ChatGPT connection was interrupted.")))
         activeContinuation = nil
         activeToken = nil
         activeThreadID = nil

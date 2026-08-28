@@ -193,7 +193,8 @@ struct QuicklinkEditorSheet: View {
     private func optionToggle(_ title: String, isOn: Binding<Bool>, detail: String) -> some View {
         Toggle(isOn: isOn) {
             VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                Text(title)
+                // The callers pass a String, which takes Text's verbatim overload.
+                Text(title.localizedUI)
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)

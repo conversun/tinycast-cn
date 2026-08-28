@@ -39,7 +39,7 @@ struct CameraPreviewView: View {
     private func unavailable(_ message: String) -> some View {
         VStack(spacing: Theme.Spacing.md) {
             SymbolImage(name: "video.slash", size: Theme.Size.dialogIcon)
-            Text(message)
+            Text(message.localizedUI)
                 .font(Theme.Typography.rowTrailing)
                 .multilineTextAlignment(.center)
         }
@@ -99,7 +99,7 @@ private struct PreviewButton: View {
 
     var body: some View {
         Button(action: onActivate) {
-            Text(title)
+            Text(title.localizedUI)
                 .font(Theme.Typography.bar)
                 .foregroundStyle(
                     role == .cancel ? Theme.Colors.textSecondary : Theme.Colors.textPrimary

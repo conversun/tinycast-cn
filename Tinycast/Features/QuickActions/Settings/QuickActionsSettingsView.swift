@@ -19,8 +19,8 @@ struct QuickActionsSettingsView: View {
                 Toggle(isOn: enabledBinding) {
                     Text("Enable Quick Actions")
                     Text(
-                        "Act on the text you have selected in any app. Nothing is read until you "
-                            + "press a shortcut.")
+                        ("Act on the text you have selected in any app. Nothing is read until you "
+                            + "press a shortcut.").localizedUI)
                 }
                 if appSettings.quickActionsEnabled, !isTrusted {
                     // Every shortcut fails without it; better said here than found one press later.
@@ -71,12 +71,12 @@ struct QuickActionsSettingsView: View {
                     .labelsHidden()
                     .fixedSize()
                     .disabled(action.alwaysPreviews)
-                    .accessibilityLabel("What \(action.title) does with its result")
+                    .accessibilityLabel("What \(action.title.localizedUI) does with its result")
                     if let entry = CommandCatalog.entry(for: CommandID(action)) {
                         Toggle("", isOn: launcherBinding(entry))
                             .labelsHidden()
                             .toggleStyle(.checkbox)
-                            .accessibilityLabel("Show \(action.title) in launcher")
+                            .accessibilityLabel("Show \(action.title.localizedUI) in launcher")
                     }
                 }
             }
@@ -84,9 +84,9 @@ struct QuickActionsSettingsView: View {
             Text("Actions")
         } footer: {
             Text(
-                "Replace puts the result straight into your document — undo in the app you were in "
+                ("Replace puts the result straight into your document — undo in the app you were in "
                     + "brings it back. Preview shows it in a panel first. The checkbox lists the "
-                    + "action in the launcher; its shortcut works either way."
+                    + "action in the launcher; its shortcut works either way.").localizedUI
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -112,9 +112,9 @@ struct QuickActionsSettingsView: View {
             Text("Model")
         } footer: {
             Text(
-                "Separate from chat's model on purpose: a shortcut you press all day should not "
-                    + "bill an API every time. Apple Intelligence runs on this Mac for nothing."
-            )
+                ("Separate from chat's model on purpose: a shortcut you press all day should not "
+                    + "bill an API every time. Apple Intelligence runs on this Mac for nothing.")
+                    .localizedUI)
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -135,8 +135,8 @@ struct QuickActionsSettingsView: View {
             Text("Translate")
         } footer: {
             Text(
-                "Translation uses Apple's own translator on this Mac, so it costs nothing and "
-                    + "reaches no provider. A language downloads the first time you use it."
+                "Translation uses Apple's own translator on this Mac, so it costs nothing and ".localizedUI
+                    + "reaches no provider. A language downloads the first time you use it.".localizedUI
             )
             .font(.caption)
             .foregroundStyle(.secondary)

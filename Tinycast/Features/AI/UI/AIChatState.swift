@@ -63,7 +63,8 @@ final class AIChatState {
                 guard let self, !Task.isCancelled, self.replyGeneration == generation,
                     self.isStreaming
                 else { return }
-                self.finishLast(state: .failed, fallback: "The response ended unexpectedly.")
+                self.finishLast(
+                    state: .failed, fallback: String(localized: "The response ended unexpectedly."))
             } catch {
                 guard let self, !Task.isCancelled, self.replyGeneration == generation,
                     self.isStreaming
@@ -115,7 +116,7 @@ final class AIChatState {
             discardPendingText()
             return
         }
-        finishLast(state: .failed, fallback: "Cancelled")
+        finishLast(state: .failed, fallback: String(localized: "Cancelled"))
     }
 
     func startNewChat() {
@@ -161,7 +162,7 @@ final class AIChatState {
     }
 
     /// The line shown in the empty streaming bubble while nothing has arrived yet.
-    var liveStatus: String? { isThinking ? "Thinking…" : nil }
+    var liveStatus: String? { isThinking ? String(localized: "Thinking…") : nil }
 
     var lastAssistantText: String? {
         session.messages.last(where: { $0.role == .assistant && !$0.text.isEmpty })?.text
@@ -193,7 +194,7 @@ final class AIChatState {
         case .usage(let usage):
             self.usage = usage
         case .finished:
-            finishLast(state: .complete, fallback: "No response")
+            finishLast(state: .complete, fallback: String(localized: "No response"))
         }
     }
 

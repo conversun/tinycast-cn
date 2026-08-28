@@ -31,7 +31,7 @@ struct CalendarSettingsView: View {
             Section {
                 Picker(selection: $settings.joinWindowMinutes) {
                     ForEach(JoinWindow.allCases) { window in
-                        Text(window.title).tag(window)
+                        Text(window.title.localizedUI).tag(window)
                     }
                 } label: {
                     Text("Show the join card")
@@ -58,7 +58,7 @@ struct CalendarSettingsView: View {
             Section {
                 Picker(selection: $settings.menuBarEvents) {
                     ForEach(MenuBarEvents.allCases) { lead in
-                        Text(lead.title).tag(lead)
+                        Text(lead.title.localizedUI).tag(lead)
                     }
                 } label: {
                     Text("Show Events in Menu Bar")
@@ -71,7 +71,7 @@ struct CalendarSettingsView: View {
                 .settingsEnabled(settings.menuBarEvents != .never)
                 Picker(selection: $settings.hideCurrentEvent) {
                     ForEach(HideCurrentEvent.allCases) { hide in
-                        Text(hide.title).tag(hide)
+                        Text(hide.title.localizedUI).tag(hide)
                     }
                 } label: {
                     Text("Hide Current Event")
@@ -164,7 +164,7 @@ private struct CalendarPickerSection: View {
             SettingsFilterField(prompt: "Search calendars…", query: $query)
 
             if calendars.isEmpty {
-                Text(emptyMessage)
+                Text(emptyMessage.localizedUI)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
             } else {
@@ -187,7 +187,7 @@ private struct CalendarPickerSection: View {
     private static let rowPadding: CGFloat = 15
 
     private var emptyMessage: String {
-        if !query.isEmpty { return "No matches for “\(query)”." }
+        if !query.isEmpty { return String(localized: "No matches for “\(query)”.") }
         return store.access == .granted ? "No calendars on this Mac." : "Nothing to show yet."
     }
 }

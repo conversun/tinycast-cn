@@ -256,7 +256,7 @@ final class AIChatCoordinator {
 
     /// Shortened here, not by layout: a flexible label would take the row from the search field.
     var selectedModelTitle: String {
-        guard let selected = core.aiSettings.defaultModel else { return "Choose Model" }
+        guard let selected = core.aiSettings.defaultModel else { return String(localized: "Choose Model") }
         let title = selectedModelOption?.title ?? selected.model
         guard title.count > Self.maxModelTitleLength else { return title }
         let keep = Self.maxModelTitleLength / 2
@@ -371,7 +371,7 @@ struct AIModelOption: Identifiable {
             ? [
                 AIModelOption(
                     selection: .appleIntelligence, title: AppleIntelligence.title,
-                    sourceTitle: "On device", menuIcon: appleIntelligenceIcon)
+                    sourceTitle: String(localized: "On device"), menuIcon: appleIntelligenceIcon)
             ] : []
         let subscription = chatGPT.map { model in
             AIModelOption(

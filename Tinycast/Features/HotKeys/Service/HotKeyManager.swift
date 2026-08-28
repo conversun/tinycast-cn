@@ -218,7 +218,7 @@ final class HotKeyManager {
         case .aiChat:
             return CommandID.aiChat.name
         case .quickAction(let action):
-            return action.title
+            return action.title.localizedUI
         case .app(let bundleID), .settingsPane(let bundleID):
             return displayName?(action) ?? bundleID
         case .customCommand:

@@ -11,7 +11,8 @@ struct PermissionsSettingsView: View {
             Section {
                 LabeledContent {
                     Label(
-                        accessibilityTrusted ? "Granted" : "Not granted",
+                        accessibilityTrusted
+                            ? String(localized: "Granted") : String(localized: "Not granted"),
                         systemImage: accessibilityTrusted
                             ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
                     )
@@ -22,11 +23,17 @@ struct PermissionsSettingsView: View {
                 }
 
                 LabeledContent {
-                    Button(accessibilityTrusted ? "Open…" : "Grant Access…") {
+                    Button(
+                        accessibilityTrusted
+                            ? String(localized: "Open…") : String(localized: "Grant Access…")
+                    ) {
                         Permissions.openAccessibilitySettings()
                     }
                 } label: {
-                    Text(accessibilityTrusted ? "Manage in System Settings" : "Grant access")
+                    Text(
+                        accessibilityTrusted
+                            ? String(localized: "Manage in System Settings")
+                            : String(localized: "Grant access"))
                     Text("Opens Privacy & Security › Accessibility.")
                 }
             } header: {
@@ -39,7 +46,7 @@ struct PermissionsSettingsView: View {
 
             Section {
                 LabeledContent {
-                    Label(calendarStatus.title, systemImage: calendarStatus.symbol)
+                    Label(calendarStatus.title.localizedUI, systemImage: calendarStatus.symbol)
                         .foregroundStyle(calendarStatus.tint)
                 } label: {
                     Text("Calendars")

@@ -10,7 +10,7 @@ enum AIProviderFactory {
         keyStore: APIKeyStore = APIKeyStore()
     ) throws -> any AIProvider {
         guard let selection = settings.defaultModel else {
-            throw AIProviderError.unavailable("Choose a default AI model in Settings.")
+            throw AIProviderError.unavailable(String(localized: "Choose a default AI model in Settings."))
         }
         return try make(
             selection: selection, settings: settings, subscription: subscription,
@@ -36,7 +36,7 @@ enum AIProviderFactory {
                 turns: subscription.turns, model: model, effort: effort)
         case .api(let connectionID, let model):
             guard let connection = settings.connection(id: connectionID) else {
-                throw AIProviderError.unavailable("Choose an API connection in Settings.")
+                throw AIProviderError.unavailable(String(localized: "Choose an API connection in Settings."))
             }
             let baseURL: URL
             do {
@@ -48,10 +48,11 @@ enum AIProviderFactory {
             do {
                 key = try keyStore.key(for: connection.id) ?? ""
             } catch {
-                throw AIProviderError.unavailable("The API key could not be read from Keychain.")
+                throw AIProviderError.unavailable(
+                    String(localized: "The API key could not be read from Keychain."))
             }
             guard AIEndpointPolicy.isLoopback(connection.baseURL) || !key.isEmpty else {
-                throw AIProviderError.unavailable("Add an API key in Settings.")
+                throw AIProviderError.unavailable(String(localized: "Add an API key in Settings."))
             }
             return HTTPAIProvider(
                 configuration: AIHTTPConfiguration(

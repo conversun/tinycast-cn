@@ -96,7 +96,7 @@ enum AIProviderError: LocalizedError, Equatable, Sendable {
     var errorDescription: String? {
         switch self {
         case .unavailable(let message), .responseFailed(let message): return message
-        case .malformedResponse: return "The provider returned malformed streaming data."
+        case .malformedResponse: return String(localized: "The provider returned malformed streaming data.")
         }
     }
 }

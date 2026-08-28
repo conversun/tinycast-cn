@@ -237,6 +237,7 @@ run ai-chat-test           Tinycast/Features/AI/Model/AIRequest.swift \
                            Tinycast/Features/AI/Service/ChatHistoryStore.swift \
                            Tinycast/Features/AI/UI/AIChatState.swift
 run quick-action-test      Tinycast/Features/Settings/AppSettingsKey.swift \
+                           Tinycast/Platform/Localization.swift \
                            Tinycast/Features/AI/Model/AIConnection.swift \
                            Tinycast/Features/AI/Model/AppleIntelligence.swift \
                            Tinycast/Features/QuickActions/Model/*.swift \

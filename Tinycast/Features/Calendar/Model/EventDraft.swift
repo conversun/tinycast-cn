@@ -24,7 +24,7 @@ struct EventDraft: Sendable, Equatable {
     }
 
     static func label(startOffset minutes: Int) -> String {
-        minutes == 0 ? "Now" : label(duration: minutes)
+        minutes == 0 ? String(localized: "Now") : label(duration: minutes)
     }
 
     static func label(duration minutes: Int) -> String {

@@ -26,7 +26,7 @@ enum AINewChatAfter: Int, CaseIterable, Identifiable, Sendable {
     var id: Int { rawValue }
 
     var title: String {
-        self == .never ? "Never" : "\(rawValue) Minutes"
+        self == .never ? String(localized: "Never") : String(localized: "\(rawValue) Minutes")
     }
 
     var interval: TimeInterval { TimeInterval(rawValue) * 60 }

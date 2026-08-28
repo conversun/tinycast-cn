@@ -23,9 +23,10 @@ struct RedactedText: View {
                 .textSelection(.disabled)
         }
         .buttonStyle(.plain)
-        .help(isRevealed ? hideHelp : revealHelp)
+        .help((isRevealed ? hideHelp : revealHelp).localizedUI)
         // Reading a disguise aloud is worse than useless to someone who cannot see the blur.
-        .accessibilityLabel(isRevealed ? value : "Hidden: \(revealHelp.lowercased())")
+        .accessibilityLabel(
+            isRevealed ? value : String(localized: "Hidden: \(revealHelp.localizedUI.lowercased())"))
         .accessibilityAddTraits(.isButton)
     }
 }

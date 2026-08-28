@@ -24,7 +24,7 @@ final class QuickActionRunner {
         // Only when Accessibility saw a text element is "nothing is selected" the honest answer.
         throw reported == .empty
             ? QuickActionFailure.noSelection
-            : .unreadableApp(targetApp.localizedName ?? "That app")
+            : .unreadableApp(targetApp.localizedName ?? String(localized: "That app"))
     }
 
     private static func accepted(_ text: String) throws -> String {

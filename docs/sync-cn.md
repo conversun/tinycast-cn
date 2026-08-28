@@ -48,6 +48,46 @@ merge 已是 no-op，测试通过，就会照常发 `-cn.1`。
 6. **校验增量纯净**：`git diff vX.Y.Z HEAD --stat` 只应剩 fork 自有改动
    （汉化、拼音搜索、CN workflow、README）。
 
+## 找出漏译：先用编译器，再补它的盲区
+
+不要靠 grep 猜。Xcode 自己的抽取是权威清单：
+
+```sh
+xcodebuild -exportLocalizations -project Tinycast.xcodeproj \
+  -localizationPath /tmp/loc -exportLanguage zh-Hans SWIFT_EMIT_LOC_STRINGS=YES
+```
+
+`SWIFT_EMIT_LOC_STRINGS=YES` 是关键 —— 不加只抽 SwiftUI 字面量，`String(localized:)` 一条不出
+（v0.10.2 那次是 785 条 vs 242 条）。把 `/tmp/loc/zh-Hans.xcloc/Localized Contents/zh-Hans.xliff`
+里的 `<source>` 与 `Localizable.strings` 的 key 求差集，就是待译清单。改完再跑一次直到差集为空。
+
+**它抽不到的两类**，得另外找：
+
+- **`.localizedUI` 接的变量** —— 字符串来自 model 层的 `title`/`label`/`detail`/`message` 字面量，
+  编译期看不见。扫「合并动过的 .swift 里的字面量，减去抽取集，减去已有词条」，再逐条判断是否用户可见。
+- **`Info.plist` 的用途说明** —— 走 `InfoPlist.strings`，按 `NSCameraUsageDescription` 这类
+  **键名**索引，不是按英文原文。
+
+## 渲染路径：词条在表里 ≠ 界面会变中文
+
+v0.10.2 那次，292 条用户可见字符串里有 200 条只加词条不生效。判定标准是**这个字面量最终落进
+`LocalizedStringKey` 还是 `String`** —— 后者绑定的是不查表的重载：
+
+| 写法 | 结果 | 修法 |
+| --- | --- | --- |
+| `Text("字面量")` | 查表 | 只加词条 |
+| `Text(cond ? "A" : "B")` | **不查表**，三元是 String | 两个分支各套 `String(localized:)` |
+| `Text("A" + "B")` | **不查表** | 对**合并后的整句**套一次；分别套会重复出文 |
+| `Text(param)`（`param: String`） | **不查表** | 渲染处 `Text(param.localizedUI)` |
+| `"前缀 \(x)"` 直接当 String 用 | **不查表** | `String(localized: "前缀 \(x)")` |
+
+两个反复踩到的坑：
+
+- **插值会改 key**。`String(localized: "\(n) models")` 查的是 `"%lld models"`，不是源码文本；
+  String 插值变 `%@`。照源码字面量落词条，等于落了一条永远不触发的死条目。
+- **拼接要在合并处包一次**。分别包两半时，译者通常把整句写进了其中一半，界面会把开头念两遍；
+  合并后原来的两个片段词条即成死条目，应一并删除。
+
 ## 汉化 checklist（同步带来新界面时）
 
 - 新 key 追加到 `Tinycast/zh-Hans.lproj/Localizable.strings` 末尾，新起一节

@@ -16,7 +16,7 @@ enum QuickActionFailure: LocalizedError, Equatable {
         case .noTarget:
             return "Select text in another app first."
         case .unreadableApp(let name):
-            return "\(name) doesn't share its text with Tinycast."
+            return String(format: "%@ doesn't share its text with Tinycast.".localizedUI, name)
         case .noSelection:
             return "Select some text first."
         case .tooLong:

@@ -100,7 +100,7 @@ struct QuickActionResultView: View {
             HStack(spacing: Theme.Spacing.sm) {
                 SymbolImage(name: state.action.symbol, size: Theme.Size.quickActionHeaderIcon)
                     .foregroundStyle(Theme.Colors.textSecondary)
-                Text(state.action.title)
+                Text(state.action.title.localizedUI)
                     .font(Theme.Typography.panelTitle)
                 Spacer(minLength: Theme.Spacing.md)
             }
@@ -124,7 +124,7 @@ struct QuickActionResultView: View {
         case .running, .finished:
             output
         case .failed(let message):
-            Label(message, systemImage: "exclamationmark.triangle")
+            Label(message.localizedUI, systemImage: "exclamationmark.triangle")
                 .font(Theme.Typography.rowTitle)
                 .foregroundStyle(Theme.Colors.textSecondary)
         case .needsLanguageDownload:

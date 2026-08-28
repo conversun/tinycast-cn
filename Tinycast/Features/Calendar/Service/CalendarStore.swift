@@ -161,7 +161,7 @@ final class CalendarStore {
         return MeetingEvent(
             id: (event.eventIdentifier ?? event.calendarItemIdentifier)
                 + "|\(start.timeIntervalSinceReferenceDate)",
-            title: event.title ?? "(No Title)",
+            title: event.title ?? String(localized: "(No Title)"),
             start: start,
             end: end,
             isAllDay: event.isAllDay,

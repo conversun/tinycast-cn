@@ -91,6 +91,6 @@ struct HeaderMenuButton: View {
             }
             .foregroundStyle(Theme.Colors.textSecondary)
         }
-        .help(help)
+        .help(help.localizedUI)
     }
 }

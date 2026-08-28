@@ -115,6 +115,6 @@ private struct MeetingRow: View {
 
     /// A meeting under way says so; everything else reads as the clock time it starts.
     private var trailing: String {
-        meeting.isInProgress(now: now) ? "Now" : MeetingTimeFormat.clock(meeting.start)
+        meeting.isInProgress(now: now) ? String(localized: "Now") : MeetingTimeFormat.clock(meeting.start)
     }
 }
