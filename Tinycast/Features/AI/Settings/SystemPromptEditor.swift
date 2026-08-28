@@ -22,7 +22,10 @@ struct SystemPromptEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack(spacing: Theme.Spacing.sm) {
-                Text(text.isBlank ? "Nothing added" : "Added to every message")
+                // A ternary types as String, so each arm looks itself up rather than the key.
+                Text(text.isBlank
+                    ? String(localized: "Nothing added")
+                    : String(localized: "Added to every message"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: Theme.Spacing.lg)
@@ -32,9 +35,13 @@ struct SystemPromptEditor: View {
                     Image(systemName: isRevealed ? "eye.slash" : "eye")
                 }
                 .buttonStyle(.plain)
-                .help(isRevealed ? "Hide the prompt" : "Show the prompt")
+                .help(isRevealed
+                    ? String(localized: "Hide the prompt")
+                    : String(localized: "Show the prompt"))
                 .disabled(text.isBlank)
-                .accessibilityLabel(isRevealed ? "Hide the system prompt" : "Show the system prompt")
+                .accessibilityLabel(isRevealed
+                    ? String(localized: "Hide the system prompt")
+                    : String(localized: "Show the system prompt"))
             }
             prompt
                 .padding(Theme.Spacing.sm)

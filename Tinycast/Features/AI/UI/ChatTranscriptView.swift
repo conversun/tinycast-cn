@@ -244,7 +244,9 @@ private struct ChatSearchRow: View {
             } else {
                 ProgressView().controlSize(.small)
             }
-            Text(search.isComplete ? "Searched web" : "Searching web")
+            Text(search.isComplete
+                ? String(localized: "Searched web")
+                : String(localized: "Searching web"))
                 .font(Theme.Typography.rowTrailing)
             if let query = search.query, !query.isEmpty {
                 Text("· \(query)")

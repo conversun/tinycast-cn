@@ -1,2 +1,4 @@
 "NSAppleEventsUsageDescription" = "Tinycast 仅在你明确运行系统操作时使用自动化权限。";
 "NSBluetoothAlwaysUsageDescription" = "Tinycast 仅在你运行“切换蓝牙”操作时访问蓝牙。";
+"NSCalendarsFullAccessUsageDescription" = "Tinycast 会读取今天和明天的日历事件，方便你直接从启动器加入会议。";
+"NSCameraUsageDescription" = "Tinycast 会显示摄像头预览，方便你在加入会议前查看自己的画面。";

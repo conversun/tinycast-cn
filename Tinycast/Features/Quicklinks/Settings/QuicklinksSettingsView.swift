@@ -69,8 +69,8 @@ struct QuicklinksSettingsView: View {
             if results.isEmpty {
                 Text(
                     store.quicklinks.isEmpty
-                        ? "Add one to make it searchable from the launcher."
-                        : "No quicklink matches “\(query)”."
+                        ? String(localized: "Add one to make it searchable from the launcher.")
+                        : String(localized: "No quicklink matches “\(query)”.")
                 )
                 .foregroundStyle(.secondary)
             } else {

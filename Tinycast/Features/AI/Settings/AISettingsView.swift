@@ -47,7 +47,8 @@ struct AISettingsView: View {
                 onCancel: { editor = nil })
         }
         .confirmationDialog(
-            pendingRemoval.map { "Remove “\($0.title)”?" } ?? "Remove connection?",
+            pendingRemoval.map { String(localized: "Remove “\($0.title)”?") }
+                ?? String(localized: "Remove connection?"),
             isPresented: removalPresented,
             titleVisibility: .visible
         ) {
@@ -635,7 +636,9 @@ private struct AIConnectionEditorSheet: View {
                         Text(error).foregroundStyle(.orange)
                     }
                 } header: {
-                    Text(target.isNew ? "Add API Connection" : "Edit API Connection")
+                    Text(target.isNew
+                        ? String(localized: "Add API Connection")
+                        : String(localized: "Edit API Connection"))
                 }
 
                 Section {
@@ -797,7 +800,8 @@ private struct AIConnectionEditorSheet: View {
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } label: {
-            Text(title).font(.callout.weight(.medium))
+            // A String parameter takes Text's non-localizing overload; the caller's literal is a key.
+            Text(title.localizedUI).font(.callout.weight(.medium))
         }
     }
 
