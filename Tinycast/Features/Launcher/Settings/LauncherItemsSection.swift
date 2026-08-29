@@ -21,18 +21,21 @@ struct LauncherItemsSection: View {
     var body: some View {
         Section {
             Toggle(isOn: enabledBinding) {
-                Text("Enable \(header)")
+                Text("Enable \(header.localizedUI)")
                 Text("Off hides them all and stops their shortcuts. Uncheck one below to hide just that one.")
             }
         } header: {
-            Text(header)
+            // A String parameter takes Text's verbatim overload; the callers pass keys.
+            Text(header.localizedUI)
         }
 
         Section {
             SettingsFilterField(prompt: searchPrompt, query: $query)
 
             if entries.isEmpty {
-                Text(query.isEmpty ? "Nothing here yet." : "No matches for “\(query)”.")
+                Text(query.isEmpty
+                    ? String(localized: "Nothing here yet.")
+                    : String(localized: "No matches for “\(query)”."))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
             } else {

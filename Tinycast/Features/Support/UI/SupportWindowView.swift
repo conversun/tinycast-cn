@@ -65,7 +65,9 @@ struct SupportWindowView: View {
 
     private var action: some View {
         VStack(spacing: Theme.Spacing.lg) {
-            SupportActionButton(title: "Support \(Bundle.main.appDisplayName)", icon: "heart") {
+            SupportActionButton(
+                title: String(localized: "Support \(Bundle.main.appDisplayName)"), icon: "heart"
+            ) {
                 support.openCheckout()
             }
             Text("Secure checkout on Polar.")

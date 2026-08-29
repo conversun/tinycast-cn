@@ -28,6 +28,6 @@ struct EventDraft: Sendable, Equatable {
     }
 
     static func label(duration minutes: Int) -> String {
-        minutes < 60 ? "\(minutes) min" : "\(minutes / 60) hr"
+        minutes < 60 ? String(localized: "\(minutes) min") : String(localized: "\(minutes / 60) hr")
     }
 }

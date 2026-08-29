@@ -209,10 +209,10 @@ final class QuicklinkStore {
 
     private static func uniqueName(basedOn name: String, taken: [String]) -> String {
         let folded = Set(taken.map { $0.folding(options: [.caseInsensitive], locale: .current) })
-        var candidate = name + " Copy"
+        var candidate = String(localized: "\(name) Copy")
         var suffix = 2
         while folded.contains(candidate.folding(options: [.caseInsensitive], locale: .current)) {
-            candidate = "\(name) Copy \(suffix)"
+            candidate = String(localized: "\(name) Copy \(suffix)")
             suffix += 1
         }
         return candidate

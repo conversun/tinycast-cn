@@ -904,7 +904,7 @@ private struct AIConnectionEditorSheet: View {
         } catch {
             discovery = .failed(
                 (error as? LocalizedError)?.errorDescription
-                    ?? "Enter a valid provider base URL.",
+                    ?? String(localized: "Enter a valid provider base URL."),
                 allowsManualEntry: false)
             return
         }
@@ -954,7 +954,7 @@ private struct AIConnectionEditorSheet: View {
         } catch {
             self.error =
                 (error as? LocalizedError)?.errorDescription
-                ?? "Enter a valid provider base URL."
+                ?? String(localized: "Enter a valid provider base URL.")
             return
         }
         error = onSave(connection, key, target.isNew)

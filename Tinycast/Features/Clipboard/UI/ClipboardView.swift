@@ -163,7 +163,7 @@ private struct ClipboardRow: View {
         case .text:
             return String((item.text ?? "").prefix(200)).trimmingCharacters(
                 in: .whitespacesAndNewlines)
-        case .image: return "Image"
+        case .image: return "Image".localizedUI
         }
     }
 
@@ -367,7 +367,7 @@ private struct ClipboardInfoSection: View {
             }
         }
         rows.append(
-            InfoRow(label: "Copied", value: Self.copiedFormatter.string(from: item.createdAt)))
+            InfoRow(label: "Copied".localizedUI, value: Self.copiedFormatter.string(from: item.createdAt)))
         return rows
     }
 

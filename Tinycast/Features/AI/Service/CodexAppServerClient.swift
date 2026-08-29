@@ -277,7 +277,9 @@ final class CodexAppServerClient {
     private func didExit(status: Int32) {
         let detail = String(decoding: stderrBuffer, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let message = detail.isEmpty ? "Codex exited with status \(status)." : detail
+        let message =
+            detail.isEmpty
+            ? String(localized: "Codex exited with status \(Int(status)).") : detail
         onExit?(message)
         cleanup(error: ClientError.processExited(message))
     }

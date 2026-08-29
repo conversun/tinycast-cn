@@ -36,7 +36,7 @@ final class UpdateCoordinator {
     }
 
     var channel: ReleaseChannel { store.channel }
-    var runningVersion: String { store.runningVersion?.description ?? "unknown" }
+    var runningVersion: String { store.runningVersion?.description ?? String(localized: "unknown") }
 
     /// A local build has no release stream, so it does not advertise the command either.
     func applyEnabled() {

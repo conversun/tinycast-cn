@@ -368,15 +368,15 @@ enum CalcDateTime {
         guard let last = phrase.split(separator: " ").last.map(String.init) else { return nil }
         switch last {
         case "s", "sec", "secs", "second", "seconds":
-            return DurUnit(seconds: 1, singular: "second", plural: "seconds", kind: .subSecond)
+            return DurUnit(seconds: 1, singular: String(localized: "second"), plural: String(localized: "seconds"), kind: .subSecond)
         case "min", "mins", "minute", "minutes":
-            return DurUnit(seconds: 60, singular: "minute", plural: "minutes", kind: .subSecond)
+            return DurUnit(seconds: 60, singular: String(localized: "minute"), plural: String(localized: "minutes"), kind: .subSecond)
         case "h", "hr", "hrs", "hour", "hours":
-            return DurUnit(seconds: 3600, singular: "hour", plural: "hours", kind: .subSecond)
+            return DurUnit(seconds: 3600, singular: String(localized: "hour"), plural: String(localized: "hours"), kind: .subSecond)
         case "d", "day", "days":
-            return DurUnit(seconds: 86400, singular: "day", plural: "days", kind: .day)
+            return DurUnit(seconds: 86400, singular: String(localized: "day"), plural: String(localized: "days"), kind: .day)
         case "wk", "week", "weeks":
-            return DurUnit(seconds: 604800, singular: "week", plural: "weeks", kind: .week)
+            return DurUnit(seconds: 604800, singular: String(localized: "week"), plural: String(localized: "weeks"), kind: .week)
         default:
             return nil
         }

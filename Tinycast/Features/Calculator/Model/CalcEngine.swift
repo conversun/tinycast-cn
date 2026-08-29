@@ -95,9 +95,10 @@ enum CalcEngine {
                 return CalcResult(
                     expression: query,
                     payload: .error(
-                        message:
-                            "Cannot convert \(from.category.displayName) to \(to.category.displayName)."
-                    ))
+                        message: String(
+                            localized:
+                                "Cannot convert \(from.category.displayName) to \(to.category.displayName)."
+                        )))
             }
         }
 
@@ -121,7 +122,7 @@ enum CalcEngine {
             case .mismatch(let from, let to):
                 return CalcResult(
                     expression: query,
-                    payload: .error(message: "Cannot convert \(from) to \(to)."))
+                    payload: .error(message: String(localized: "Cannot convert \(from) to \(to).")))
             case .noRate(let code):
                 return CalcResult(
                     expression: query,

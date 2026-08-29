@@ -1178,7 +1178,7 @@
 "Dismiss" = "关闭";
 "Download" = "下载";
 "Edit API Connection" = "编辑 API 连接";
-"Enable %@" = "启用 %@";
+"Enable %@" = "启用%@";
 "Enable AI" = "启用 AI";
 "Enable Quick Actions" = "启用快速操作";
 "Enter an API key to search its available models." = "输入 API 密钥以搜索可用模型。";
@@ -1537,3 +1537,30 @@
 "Uses OpenAI’s supported Codex App Server. The sign-in is stored in Tinycast’s private support folder and stays separate from your normal Codex setup." = "使用 OpenAI 官方支持的 Codex App Server。登录信息保存在 Tinycast 专属的应用支持文件夹中，与你平时的 Codex 配置相互独立。";
 "Pin to top" = "置顶";
 "Show in root search" = "在根搜索中显示";
+
+
+/* 渲染路径审计：把只在 String 位置出现、因而从不查表的字面量补齐。 */
+"%@ %@ is available" = "%@ %@ 已可更新";
+"%@ Copy" = "%@ 副本";
+"%@ Copy %lld" = "%@ 副本 %lld";
+"%@ doesn't update itself" = "%@ 不会自行更新";
+"%@ is up to date" = "%@ 已是最新版本";
+"%lld hr" = "%lld 小时";
+"%lld min" = "%lld 分钟";
+"Codex exited with status %lld." = "Codex 已退出，状态码 %lld。";
+"Downloading… %@ of %@" = "正在下载… %@ / %@";
+"The download did not finish. %@" = "下载未完成。%@";
+"The downloaded app is version %@, not %@." = "下载的应用版本是 %@，而不是 %@。";
+"The downloaded archive could not be expanded. %@" = "下载的压缩包无法解压。%@";
+"Tinycast could not be replaced. %@" = "无法替换 Tinycast。%@";
+"Version %@" = "版本 %@";
+"You have %@." = "你当前使用的是 %@。";
+"hour" = "小时";
+"hours" = "小时";
+"minute" = "分钟";
+"minutes" = "分钟";
+"second" = "秒";
+"seconds" = "秒";
+"unknown" = "未知";
+"week" = "周";
+"weeks" = "周";

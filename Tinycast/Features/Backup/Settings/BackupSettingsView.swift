@@ -22,7 +22,7 @@ struct BackupSettingsView: View {
 
     private var raycastFileSubtitle: String {
         guard let name = raycastFile?.lastPathComponent else {
-            return "Choose a .rayconfig file exported from Raycast."
+            return String(localized: "Choose a .rayconfig file exported from Raycast.")
         }
         return "\(name) — \(format?.title ?? String(localized: "not a Raycast export"))"
     }

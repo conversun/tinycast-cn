@@ -13,6 +13,9 @@ struct GeneralSettingsView: View {
     /// The Hyper modifier chord as prose glyphs, tracking the Include Shift toggle.
     private var hyperGlyphs: String { settings.hyperKeyIncludesShift ? "⌃⌥⇧⌘" : "⌃⌥⌘" }
 
+    /// Localized before substitution: a key name baked into prose can never match a key.
+    private var hyperKeyName: String { settings.hyperKey.title.localizedUI }
+
     /// The missing-permission half is its own row, so it can carry the button that fixes it.
     private var hyperSubtitle: String {
         guard settings.hyperKey != .none else {
@@ -22,7 +25,7 @@ struct GeneralSettingsView: View {
         }
         return String(
             format: "Pressing %@ will trigger the left %@ modifier keys.".localizedUI,
-            settings.hyperKey.title, hyperGlyphs)
+            hyperKeyName, hyperGlyphs)
             + " " + "Hyper Key shortcuts are shown in Tinycast with ✦.".localizedUI
     }
 
@@ -61,7 +64,7 @@ struct GeneralSettingsView: View {
             Section {
                 Picker(selection: $settings.hyperKey) {
                     ForEach(HyperKeyPhysicalKey.allCases) { key in
-                        Text(key.title).tag(key)
+                        Text(key.title.localizedUI).tag(key)
                     }
                 } label: {
                     Text("Hyper Key")
@@ -89,13 +92,13 @@ struct GeneralSettingsView: View {
                     Picker(selection: $settings.hyperKeyQuickPress) {
                         Text("Does Nothing").tag(HyperKeyQuickPress.none)
                         if let original = settings.hyperKey.quickPressOriginalTitle {
-                            Text(original).tag(HyperKeyQuickPress.originalKey)
+                            Text(original.localizedUI).tag(HyperKeyQuickPress.originalKey)
                         }
                         Text("Trigger Escape").tag(HyperKeyQuickPress.escape)
                     } label: {
                         Text("Quick Press")
                         Text(
-                            "Select an action to perform when \(settings.hyperKey.title) is pressed without any other keys."
+                            "Select an action to perform when \(hyperKeyName) is pressed without any other keys."
                         )
                     }
                 }

@@ -468,7 +468,7 @@ enum SnippetTemplateEngine {
 
     private static func parseArgument(_ token: ParsedToken) -> ArgumentToken? {
         guard token.hasOnly(["name", "default", "options"]) else { return nil }
-        let name = token.parameters["name"]?.trimmingCharacters(in: .whitespaces) ?? "Argument"
+        let name = token.parameters["name"]?.trimmingCharacters(in: .whitespaces) ?? String(localized: "Argument")
         guard !name.isEmpty else { return nil }
         let options = (token.parameters["options"] ?? "")
             .split(separator: ",")

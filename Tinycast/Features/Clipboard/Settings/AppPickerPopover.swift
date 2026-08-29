@@ -28,7 +28,7 @@ struct AppPickerPopover: View {
             ScrollView {
                 LazyVStack(spacing: 1) {
                     if let clearTitle, query.isEmpty {
-                        row(title: clearTitle, icon: nil) { onSelect(nil) }
+                        row(title: clearTitle.localizedUI, icon: nil) { onSelect(nil) }
                     }
                     ForEach(candidates) { app in
                         row(title: app.name, icon: app.icon) {

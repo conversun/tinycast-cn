@@ -98,7 +98,7 @@ struct SnippetsSettingsView: View {
     private var libraryNotices: some View {
         if case .failed(let message) = snippetsStore.state {
             noticeSection(
-                "Couldn’t load the snippet library", message, tint: .orange,
+                String(localized: "Couldn’t load the snippet library"), message, tint: .orange,
                 retryHint: "Tries to load the snippet library again.")
         }
 
@@ -111,7 +111,8 @@ struct SnippetsSettingsView: View {
         // The editor reports its own failures, so this covers the ones with no sheet behind.
         if editor == nil, let operationError = snippetsStore.operationError {
             noticeSection(
-                "The snippet operation failed", operationError, tint: .red, retryHint: nil)
+                String(localized: "The snippet operation failed"), operationError, tint: .red,
+                retryHint: nil)
         }
     }
 
@@ -142,16 +143,18 @@ struct SnippetsSettingsView: View {
     private var snippetIssueTitle: String {
         let count = snippetsStore.issues.count
         return count == 1
-            ? "1 snippet file couldn’t be loaded" : "\(count) snippet files couldn’t be loaded"
+            ? String(localized: "1 snippet file couldn’t be loaded")
+            : String(localized: "\(count) snippet files couldn’t be loaded")
     }
 
     private var snippetIssueMessage: String {
         let first = snippetsStore.issues[0]
+        let filename = first.fileURL.lastPathComponent
         if snippetsStore.issues.count == 1 {
-            return "\(first.fileURL.lastPathComponent): \(first.message)"
+            return String(localized: "\(filename): \(first.message)")
         }
-        return
-            "\(first.fileURL.lastPathComponent): \(first.message) Plus \(snippetsStore.issues.count - 1) more."
+        return String(
+            localized: "\(filename): \(first.message) Plus \(snippetsStore.issues.count - 1) more.")
     }
 
     private func delete(_ record: StoredSnippet) {
@@ -346,7 +349,7 @@ private struct SnippetEditorSheet: View {
         title: String, placeholder: String, text: Binding<String>, hint: String
     ) -> some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text(title)
+            Text(title.localizedUI)
                 .font(.callout.weight(.medium))
             TextField(placeholder, text: text)
                 .textFieldStyle(.roundedBorder)
@@ -360,8 +363,8 @@ private struct SnippetEditorSheet: View {
     ) -> some View {
         Toggle(isOn: isOn) {
             VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                Text(title)
-                Text(detail)
+                Text(title.localizedUI)
+                Text(detail.localizedUI)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

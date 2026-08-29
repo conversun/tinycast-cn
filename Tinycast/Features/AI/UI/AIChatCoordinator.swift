@@ -181,7 +181,7 @@ final class AIChatCoordinator {
                 {
                     return (png, file.lastPathComponent)
                 }
-                if let pasted, let png = Self.boundedPNG(pasted) { return (png, "Image") }
+                if let pasted, let png = Self.boundedPNG(pasted) { return (png, String(localized: "Image")) }
                 return nil
             }.value
             guard let self else { return }

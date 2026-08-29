@@ -18,7 +18,7 @@ struct ChatSession: Equatable, Sendable {
 
     var title: String {
         guard let text = messages.first(where: { $0.role == .user })?.text else {
-            return "New Chat"
+            return String(localized: "New Chat")
         }
         return Self.summary(text, limit: 72)
     }

@@ -94,8 +94,8 @@ struct CustomCommandEditorSheet: View {
     ) -> some View {
         Toggle(isOn: isOn) {
             VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                Text(title)
-                Text(detail)
+                Text(title.localizedUI)
+                Text(detail.localizedUI)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

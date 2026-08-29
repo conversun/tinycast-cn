@@ -100,7 +100,7 @@ struct QuicklinksSettingsView: View {
             }
             Picker(selection: $settings.quicklinkSelectionFallback) {
                 ForEach(QuicklinkSelectionFallback.allCases) { option in
-                    Text(option.title).tag(option)
+                    Text(option.title.localizedUI).tag(option)
                 }
             } label: {
                 Text("When there's no selected text")

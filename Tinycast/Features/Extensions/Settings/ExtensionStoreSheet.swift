@@ -216,7 +216,7 @@ struct ExtensionStoreSheet: View {
         }
         results = merged
         notices = found.compactMap { result in
-            result.failure.map { "\(result.registry.name): \($0)" }
+            result.failure.map { "\(result.registry.name.localizedUI): \($0)" }
         }
     }
 

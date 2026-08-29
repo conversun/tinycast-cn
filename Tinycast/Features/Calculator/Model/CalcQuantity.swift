@@ -28,7 +28,7 @@ enum CalcQuantity {
             if let code = parser.currencyCodes.first(where: { rates.rate(for: $0) == nil }) {
                 return CalcResult(
                     expression: query,
-                    payload: .error(message: "No exchange rate for \(code)."))
+                    payload: .error(message: String(localized: "No exchange rate for \(code).")))
             }
         }
 
@@ -632,11 +632,11 @@ private struct QuantityParser {
             return nil
         }
         guard rates.rate(for: from.code) != nil else {
-            issue = "No exchange rate for \(from.code)."
+            issue = String(localized: "No exchange rate for \(from.code).")
             return nil
         }
         guard rates.rate(for: to.code) != nil else {
-            issue = "No exchange rate for \(to.code)."
+            issue = String(localized: "No exchange rate for \(to.code).")
             return nil
         }
         return rates.convert(amount, from: from.code, to: to.code)
