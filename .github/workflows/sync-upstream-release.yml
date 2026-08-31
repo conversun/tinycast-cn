@@ -3,8 +3,6 @@ name: Sync upstream release
 run-name: "Sync Tinycast release ${{ inputs.upstream_tag || 'latest' }}"
 
 on:
-  schedule:
-    - cron: "23 */6 * * *"
   workflow_dispatch:
     inputs:
       upstream_tag:
@@ -118,7 +116,7 @@ jobs:
             echo "source_commit=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
 
-      # One open issue per upstream tag: the cron retries every 6h and must not restate the same news.
+      # One open issue per upstream tag: a repeat dispatch must not restate the same news.
       - name: Report a blocked sync
         if: steps.merge.outputs.merged == 'false'
         env:
@@ -158,7 +156,7 @@ jobs:
           git merge ${UPSTREAM_TAG}
           \`\`\`
 
-          Close this issue once \`main\` carries the merge; the next scheduled run picks the release up.
+          Close this issue once \`main\` carries the merge, then dispatch this workflow again.
           EOF
           )"
 
