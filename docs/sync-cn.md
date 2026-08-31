@@ -18,16 +18,16 @@ gh workflow run sync-upstream-release.yml --repo conversun/tinycast-cn
 
 代价：没有任何东西会主动提醒你上游发了新版，得自己盯 upstream 的 releases。
 
-## 受阻路径：回滚合并，不推 main
+## 受阻路径：开 issue，不留红叉
 
 汉化 fork 与上游冲突是设计使然，所以 `git merge` 冲突或 `run-tests.sh` 失败都**不算故障**：
 工作流回滚合并、不推 main，改为开一条带 `sync-blocked` 标签的 issue（标题 `Sync vX.Y.Z needs a hand`，
-正文附冲突文件清单或测试尾部日志），同一 tag 只开一条。**但 fork 当前关闭了 Issues**，
-`gh issue list` 非零退出，这一步连带整次派发变红 —— 冲突清单去 run 日志的
-`Merge upstream release into main` 一步里看。想恢复原设计（受阻不留红叉），在仓库设置里打开 Issues。
+正文附冲突文件清单或测试尾部日志），run 本身保持绿色。同一 tag 只开一条，重复派发不会刷屏。
+这一步靠仓库开着 Issues：关掉的话 `gh issue list` 非零退出，整次派发会跟着变红，
+冲突清单只能去 run 日志的 `Merge upstream release into main` 一步里看。
 
-按下文配方在本地解完、`main` 带上合并提交后，再派发一次 —— merge 已是 no-op，测试通过，
-就会照常发 `-cn.1`。
+按下文配方在本地解完、`main` 带上合并提交后，关掉 issue 并再派发一次 —— merge 已是 no-op，
+测试通过，就会照常发 `-cn.1`。
 
 ## 上游 rebase 过历史时（merge 炸假冲突）
 
