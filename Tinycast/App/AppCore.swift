@@ -41,6 +41,7 @@ final class AppCore {
     let activationPolicy = ActivationPolicy()
     let uninstall = UninstallSession()
     let quicklinkArguments = QuicklinkArgumentSession()
+    let customCommandArguments = CustomCommandArgumentSession()
     let notesStore: NotesStore
     let extensions: ExtensionManager
     let chatHistory: ChatHistoryStore
@@ -52,10 +53,14 @@ final class AppCore {
 
     /// Set when a quicklink editor should open with Settings; the pane consumes it.
     var pendingQuicklinkEdit: QuicklinkEditRequest?
+    /// Set when a snippet editor should open with Settings; the pane consumes it.
+    var pendingSnippetEdit: SnippetEditRequest?
 
-    @ObservationIgnored private(set) lazy var snippetExpansion = SnippetExpansionCoordinator(
+    @ObservationIgnored private(set) lazy var snippetCoordinator = SnippetCoordinator(
         store: snippetsStore, listener: snippetListener, injector: textInjector,
         clipboardStore: clipboardStore, appIndex: appIndex, settings: settings,
+        windowController: windowController, paletteCoordinator: paletteCoordinator,
+        settingsCoordinator: settingsCoordinator,
         showMessage: { [unowned self] in self.showMessage($0) }, core: self)
     @ObservationIgnored private(set) lazy var quicklinkCoordinator = QuicklinkCoordinator(
         store: quicklinks, argumentSession: quicklinkArguments, settings: settings,
@@ -63,7 +68,7 @@ final class AppCore {
         visibility: visibility, ranking: launcherRanking, aliases: aliases,
         windowController: windowController,
         paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
-        clipboardHistory: { [unowned self] in self.snippetExpansion.clipboardHistoryForExpansion() },
+        clipboardHistory: { [unowned self] in self.snippetCoordinator.clipboardHistoryForExpansion() },
         core: self)
 
     @ObservationIgnored private(set) lazy var paletteCoordinator = PaletteCoordinator(
@@ -87,10 +92,11 @@ final class AppCore {
         settings: settings, paletteCoordinator: paletteCoordinator, windowMover: windowMover,
         spaceSwitcher: spaceSwitcher)
     @ObservationIgnored private(set) lazy var customCommandCoordinator = CustomCommandCoordinator(
-        store: customCommands, settings: settings, appIndex: appIndex,
+        store: customCommands, argumentSession: customCommandArguments, settings: settings,
+        appIndex: appIndex,
         paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
         hotKeys: hotKeys, favorites: favorites, visibility: visibility,
-        ranking: launcherRanking, aliases: aliases, core: self)
+        ranking: launcherRanking, aliases: aliases, activationPolicy: activationPolicy, core: self)
     @ObservationIgnored private(set) lazy var notesCoordinator = NotesCoordinator(
         store: notesStore,
         settings: settings,
@@ -105,7 +111,7 @@ final class AppCore {
         systemActionCoordinator: systemActionCoordinator,
         quicklinkCoordinator: quicklinkCoordinator,
         windowCommandCoordinator: windowCommandCoordinator,
-        snippetExpansion: snippetExpansion, fileSearchCoordinator: fileSearchCoordinator,
+        snippetCoordinator: snippetCoordinator, fileSearchCoordinator: fileSearchCoordinator,
         notesCoordinator: notesCoordinator, extensionCoordinator: extensionCoordinator,
         calendarCoordinator: calendarCoordinator,
         core: self)
@@ -223,6 +229,7 @@ final class AppCore {
             hotKeys.onCreateNote = { [weak self] in self?.notesCoordinator.createNote() }
             hotKeys.onSearchNotes = { [weak self] in self?.notesCoordinator.searchNotes() }
             hotKeys.onSearchFiles = { [weak self] in self?.fileSearchCoordinator.show() }
+            hotKeys.onSearchSnippets = { [weak self] in self?.snippetCoordinator.showSnippets() }
             hotKeys.onShowAIChat = { [weak self] in self?.aiChatCoordinator.showChat() }
             hotKeys.onQuickAction = { [weak self] in self?.quickActionCoordinator.run($0) }
             hotKeys.onJoinNextMeeting = { [weak self] in
@@ -267,14 +274,16 @@ final class AppCore {
 
             snippetsStore.onSnapshot = { [weak self] snapshot in
                 guard let self else { return }
-                self.snippetExpansion.applySnippetsLauncherPresence()
+                self.snippetCoordinator.applySnippetsLauncherPresence()
                 self.snippetListener.update(snapshot.records)
             }
             // Off out of the box, so an unused feature costs no load, watcher or tap.
             if settings.snippetsEnabled {
                 Task { await snippetsStore.start() }
-                snippetExpansion.startSnippetKeywordListener()
+                snippetCoordinator.startSnippetKeywordListener()
             }
+            // Unconditional: a disabled feature has to take its command rows down with it.
+            snippetCoordinator.applySnippetsLauncherPresence()
 
             observeFeatureSwitches()
 
@@ -292,6 +301,7 @@ final class AppCore {
         if onboardingCoordinator.focusExisting() { return }
         if updateCoordinator.focusExisting() { return }
         if supportCoordinator.focusExisting() { return }
+        if customCommandCoordinator.focusOutputWindow() { return }
         paletteCoordinator.showPalette(mode: .launcher, restoreAnyMode: true)
     }
 
@@ -320,9 +330,9 @@ final class AppCore {
             return quicklinks.quicklink(id: id)?.name
         case .extensionCommand(let entryID):
             return appIndex.apps.first { $0.kind == .extensionCommand && $0.id == entryID }?.name
-        case .togglePalette, .toggleClipboard, .toggleEmoji, .searchFiles, .systemAction,
-            .showNotes, .createNote, .searchNotes, .windowCommand, .joinNextMeeting, .mySchedule,
-            .createEvent, .aiChat, .quickAction:
+        case .togglePalette, .toggleClipboard, .toggleEmoji, .searchFiles, .searchSnippets,
+            .systemAction, .showNotes, .createNote, .searchNotes, .windowCommand, .joinNextMeeting,
+            .mySchedule, .createEvent, .aiChat, .quickAction:
             return nil
         }
     }
@@ -389,6 +399,9 @@ final class AppCore {
                 _ = $0.calendarShowInLauncher
             }, reproject: { $0.calendarCoordinator.applyEnabled() })
         track(
+            { _ = $0.calendarIncludesTomorrow },
+            reproject: { $0.calendarCoordinator.applySpan() })
+        track(
             {
                 _ = $0.autoJoinMeetings
                 _ = $0.menuBarEvents
@@ -398,22 +411,21 @@ final class AppCore {
                 _ = $0.fileSearchScopes
                 _ = $0.fileSearchIgnorePatterns
             }, reproject: { $0.fileSearchCoordinator.applyPolicy() })
-        track({ _ = $0.snippetsEnabled }, reproject: { $0.snippetExpansion.applySnippetsEnabled() })
+        track({ _ = $0.snippetsEnabled }, reproject: { $0.snippetCoordinator.applySnippetsEnabled() })
         // Not a feature switch, but the same re-projection: a combo has the chord's ⇧ bit baked in.
         track({ _ = $0.hyperKeyIncludesShift }, reproject: { $0.applyHyperChord() })
         track(
             { _ = $0.snippetsShowInLauncher },
-            reproject: { $0.snippetExpansion.applySnippetsLauncherPresence() })
+            reproject: { $0.snippetCoordinator.applySnippetsLauncherPresence() })
         track({ _ = $0.appearance }, reproject: { $0.applyAppearance() })
     }
 
-    /// `.system` resolves to `nil`, which is what makes AppKit follow macOS without anything polling.
+    /// `.system` resolves to `nil`, so AppKit follows macOS with nothing polling.
     private func applyAppearance() {
         NSApp.appearance = settings.appearance.nsAppearance
     }
 
-    /// Covers our own assignment and a macOS change alike, which is why `IconCache` is told here
-    /// rather than from `applyAppearance()` — under `.system` that one never fires.
+    /// IconCache is told here, not from `applyAppearance()`, which never fires under `.system`.
     private func observeEffectiveAppearance() {
         // Synchronous on main, so no row can cache a tile under the outgoing appearance's key.
         appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.initial]) { app, _ in
@@ -457,7 +469,7 @@ final class AppCore {
             isRunningExtension: extensions.running != nil,
             isUninstalling: uninstall.isTrashing,
             isRecordingHotKey: hotKeys.recordingAction != nil,
-            isPromptingForArguments: quicklinkArguments.isActive,
+            isPromptingForArguments: quicklinkArguments.isActive || customCommandArguments.isActive,
             isShowingDialog: isShowingDialog,
             isPaletteVisible: paletteCoordinator.isVisible)
     }

@@ -122,8 +122,11 @@ Tinycast's own dialog and leaves no partial state.
 
 Quicklinks are their own `AppEntry.Kind`, their own `AppIndex` slice and their own launcher section,
 between System Settings and Snippets. Only the **name** is indexed; the destination is not searchable
-(a URL is a subsequence of almost any query). Per-quicklink "Show in root search" filters the slice;
-the pane's "Show in launcher" hides the whole section.
+(a URL is a subsequence of almost any query) — beside the name, a quicklink answers to whatever
+[user alias](launcher.md#user-aliases) its Settings row carries, which is why a hidden one dims the
+field. Per-quicklink "Show in root search" filters the slice;
+the pane's "Show in launcher" takes the section and the four Quicklink commands out of the
+launcher together, leaving shortcuts and the pane itself working.
 
 `Quicklink.precedes` is the one display order — pinned first in the order they were pinned, then the
 rest by name — and both the store and the launcher slice sort through it, so the two can never
@@ -149,16 +152,16 @@ and use the system handler, once, without changing what is saved.
 ~/Library/Application Support/<bundle-id>/quicklinks.sqlite3
 ```
 
-Application Support, not Caches: quicklinks are **authored data, not a regenerable cache**. That one
-fact decides the two ways `QuicklinkStore` differs from `ClipboardStore`, which it otherwise mirrors
-(WAL, `PRAGMA table_info` column sniffing plus `ALTER TABLE` for migrations, prepared statements, an
+Quicklinks are **authored data**, which decides the one way `QuicklinkStore` differs from
+`ClipboardStore` — they are neighbours in Application Support, and otherwise mirror each other (WAL,
+`PRAGMA table_info` column sniffing plus `ALTER TABLE` for migrations, prepared statements, an
 `isolated deinit`):
 
-- The database lives beside the snippets library rather than in the cache.
 - **A database that won't open is never deleted.** `ClipboardStore` discards and recreates a corrupt
-  file because history is regenerable; doing that here would destroy the user's library. The store
-  publishes `isAvailable == false`, every mutation refuses with `QuicklinkError.storageUnavailable`,
-  and the pane says so. `Tests/quicklink-test.swift` asserts the file survives byte-for-byte.
+  file because a history is captured rather than authored; doing that here would destroy the user's
+  library. The store publishes `isAvailable == false`, every mutation refuses with
+  `QuicklinkError.storageUnavailable`, and the pane says so. `Tests/quicklink-test.swift` asserts the
+  file survives byte-for-byte.
 
 Editing preserves the UUID, and with it the quicklink's shortcut, favorite slot, visibility and
 learned ranking. Deleting goes through `AppCore`, which unwinds all four before removing the row.

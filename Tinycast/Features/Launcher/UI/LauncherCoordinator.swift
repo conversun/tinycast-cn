@@ -11,7 +11,7 @@ final class LauncherCoordinator {
     private let systemActionCoordinator: SystemActionCoordinator
     private let quicklinkCoordinator: QuicklinkCoordinator
     private let windowCommandCoordinator: WindowCommandCoordinator
-    private let snippetExpansion: SnippetExpansionCoordinator
+    private let snippetCoordinator: SnippetCoordinator
     private let fileSearchCoordinator: FileSearchCoordinator
     private let notesCoordinator: NotesCoordinator
     private let extensionCoordinator: ExtensionCoordinator
@@ -28,7 +28,7 @@ final class LauncherCoordinator {
         systemActionCoordinator: SystemActionCoordinator,
         quicklinkCoordinator: QuicklinkCoordinator,
         windowCommandCoordinator: WindowCommandCoordinator,
-        snippetExpansion: SnippetExpansionCoordinator,
+        snippetCoordinator: SnippetCoordinator,
         fileSearchCoordinator: FileSearchCoordinator,
         notesCoordinator: NotesCoordinator,
         extensionCoordinator: ExtensionCoordinator,
@@ -43,7 +43,7 @@ final class LauncherCoordinator {
         self.systemActionCoordinator = systemActionCoordinator
         self.quicklinkCoordinator = quicklinkCoordinator
         self.windowCommandCoordinator = windowCommandCoordinator
-        self.snippetExpansion = snippetExpansion
+        self.snippetCoordinator = snippetCoordinator
         self.fileSearchCoordinator = fileSearchCoordinator
         self.notesCoordinator = notesCoordinator
         self.extensionCoordinator = extensionCoordinator
@@ -56,7 +56,7 @@ final class LauncherCoordinator {
     func launch(
         _ app: AppEntry, searchQuery: String? = nil, arguments: [String: String] = [:]
     ) {
-        // A category listing is not a search for the row that ran; learning it would rank it under "s".
+        // A category listing is no search: learning it would rank the row under "s".
         if let searchQuery, AppEntry.Kind.named(by: searchQuery) == nil {
             ranking.record(itemKey: app.preferenceKey, query: searchQuery)
         }
@@ -106,7 +106,7 @@ final class LauncherCoordinator {
             AppLauncher.openSettingsPane(bundleID: bundleID)
         case .snippet:
             let snippetID = String(app.id.dropFirst("snippet:".count))
-            snippetExpansion.expandSnippet(id: snippetID, targetApp: previous)
+            snippetCoordinator.expandSnippet(id: snippetID, targetApp: previous)
         case .command, .customCommand, .systemAction, .windowCommand, .quicklink,
             .extensionCommand, .meeting:
             break  // handled above
@@ -154,6 +154,11 @@ final class LauncherCoordinator {
             notesCoordinator.searchNotes()
         case .searchQuicklinks:
             paletteCoordinator.showPalette(mode: .quicklinks)
+        case .searchSnippets:
+            snippetCoordinator.showSnippets()
+        case .createSnippet:
+            paletteCoordinator.hidePalette(restoreFocus: false)
+            snippetCoordinator.editSnippet(nil)
         case .createQuicklink:
             paletteCoordinator.hidePalette(restoreFocus: false)
             quicklinkCoordinator.editQuicklink(nil)
@@ -200,6 +205,13 @@ final class LauncherCoordinator {
     func showInFinder(_ app: AppEntry) {
         paletteCoordinator.hidePalette(restoreFocus: false)
         AppLauncher.showInFinder(app.url)
+    }
+
+    /// Focus is never handed back: the relaunch takes it, or the app that refused has it.
+    func restart(_ app: AppEntry) {
+        guard app.kind == .application, let bundleID = app.bundleID else { return }
+        paletteCoordinator.hidePalette(restoreFocus: false)
+        Task { await AppLauncher.restart(bundleID: bundleID, url: app.url) }
     }
 
     /// Quits the app behind an entry; a no-op (palette stays put) when it isn't running.

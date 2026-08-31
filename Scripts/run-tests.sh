@@ -99,10 +99,16 @@ run ranking-test           $L/SearchRelevance.swift $L/LauncherRankingStore.swif
 run scopes-test            $L/SearchScopes.swift
 run app-name-test          Tinycast/Platform/AppDisplayName.swift
 run favorites-test         $L/FavoriteSlots.swift
-run calc-test              Tinycast/Features/Calculator/Model/*.swift
+run calc-test              Tinycast/Features/Calculator/Model/*.swift \
+                           Tinycast/Platform/Localization.swift
 run calendar-test          Tinycast/Features/Calendar/Model/*.swift
 run clipboard-test         Tinycast/Features/Clipboard/Model/ClipboardStore.swift \
                            Tinycast/Features/Clipboard/Model/ClipboardFilter.swift
+# Expires 2026-09-05, and fails this suite once it has: see Tinycast/Migration/.
+run storage-relocation-test Tinycast/Platform/AppPaths.swift \
+                            Tinycast/Migration/StorageRelocation.swift \
+                            Tinycast/Features/Clipboard/Model/ClipboardStore.swift \
+                            Tinycast/Features/Clipboard/Model/ClipboardFilter.swift
 run emoji-test             Tinycast/Features/Emoji/Model/EmojiCatalog.swift \
                            Tinycast/Features/Emoji/Model/EmojiGridGeometry.swift \
                            Tinycast/Features/Emoji/Model/EmojiData.generated.swift
@@ -123,13 +129,16 @@ run hover-arming-test      Tinycast/Palette/HoverArming.swift \
                            Tinycast/Palette/PaletteMode.swift \
                            Tinycast/Features/Clipboard/Model/ClipboardStore.swift \
                            Tinycast/Features/Clipboard/Model/ClipboardFilter.swift \
-                           Tinycast/Features/Quicklinks/Model/Quicklink.swift
+                           Tinycast/Features/Quicklinks/Model/Quicklink.swift \
+                           Tinycast/Features/CustomCommands/Model/CustomCommand.swift
 run palette-escape-test    Tinycast/Palette/PaletteMode.swift \
                            Tinycast/Palette/PaletteEscapeAction.swift \
-                           Tinycast/Features/Quicklinks/Model/Quicklink.swift
+                           Tinycast/Features/Quicklinks/Model/Quicklink.swift \
+                           Tinycast/Features/CustomCommands/Model/CustomCommand.swift
 run palette-tab-test       Tinycast/Palette/PaletteMode.swift \
                            Tinycast/Palette/PaletteTabAction.swift \
-                           Tinycast/Features/Quicklinks/Model/Quicklink.swift
+                           Tinycast/Features/Quicklinks/Model/Quicklink.swift \
+                           Tinycast/Features/CustomCommands/Model/CustomCommand.swift
 run hotkey-test            Tinycast/Features/HotKeys/Model/DoubleTapModifier.swift \
                            Tinycast/Features/HotKeys/Model/DoubleTapDetector.swift \
                            Tinycast/Features/HotKeys/Model/HyperKey.swift \
@@ -147,10 +156,24 @@ run callout-test           Tinycast/Platform/Appearance.swift \
 run icon-cache-test        Tinycast/Platform/Appearance.swift \
                            Tinycast/Platform/Images/IconCache.swift
 run entry-icon-test        Tinycast/Platform/Appearance.swift \
-                           Tinycast/Platform/Images/IconCache.swift
+                           Tinycast/Platform/Images/IconCache.swift \
+                           Tinycast/Platform/Images/FileIconStamp.swift
 run ext-icon-test          Tinycast/Platform/Appearance.swift \
                            Tinycast/Platform/Images/IconCache.swift \
-                           Tinycast/Features/Extensions/Service/ExtensionIconCache.swift
+                           Tinycast/Platform/Compression/Zlib.swift \
+                           Tinycast/DesignSystem/Theme.swift \
+                           Tinycast/Features/Extensions/Model/ExtensionBootConfig.swift \
+                           Tinycast/Features/Extensions/Model/ExtensionManifest.swift \
+                           Tinycast/Features/Extensions/Model/RenderNode.swift \
+                           Tinycast/Features/Extensions/Service/ExtensionCatalog.swift \
+                           Tinycast/Features/Extensions/Service/ExtensionFetcher.swift \
+                           Tinycast/Features/Extensions/Service/ExtensionNodeShims.swift \
+                           Tinycast/Features/Extensions/Service/ExtensionOAuthKeychain.swift \
+                           Tinycast/Features/Extensions/Service/ExtensionOAuthSession.swift \
+                           Tinycast/Features/Extensions/Service/ExtensionRuntime.swift \
+                           Tinycast/Features/Extensions/Service/ExtensionIconCache.swift \
+                           Tinycast/Features/Extensions/UI/ExtensionAnimatedImage.swift \
+                           Tinycast/Features/Extensions/UI/ExtensionImage.swift
 run system-action-test     Tinycast/Features/SystemActions/Model/SystemAction.swift
 run volume-test            Tinycast/Features/SystemActions/Model/VolumeLevel.swift
 run window-command-test    Tinycast/Features/WindowManagement/WindowCommand.swift \
@@ -158,8 +181,10 @@ run window-command-test    Tinycast/Features/WindowManagement/WindowCommand.swif
                            Tinycast/Features/WindowManagement/WindowActionMemory.swift
 run space-gesture-test     Tinycast/Features/WindowManagement/WindowCommand.swift \
                            Tinycast/Features/WindowManagement/SpaceGesture.swift
-run custom-command-test    Tinycast/Features/CustomCommands/Model/CustomCommand.swift \
-                           Tinycast/Features/CustomCommands/Service/ShellCommandRunner.swift
+run custom-command-test    Tinycast/Platform/PseudoTerminal.swift \
+                           Tinycast/Features/CustomCommands/Model/CustomCommand.swift \
+                           Tinycast/Features/CustomCommands/Service/ShellCommandRunner.swift \
+                           Tinycast/Features/CustomCommands/Service/CustomCommandArgumentSession.swift
 run uninstall-test         Tinycast/Features/Uninstall/Model/UninstallTarget.swift \
                            Tinycast/Features/Uninstall/Model/UninstallSearchRoot.swift \
                            Tinycast/Features/Uninstall/Model/UninstallRules.swift \
@@ -185,13 +210,10 @@ run notes-editor-test      Tinycast/Platform/Signposts.swift \
                            Tinycast/Features/Notes/Model/NoteDocument.swift \
                            Tinycast/Features/Notes/UI/NoteTextView.swift \
                            Tinycast/Features/Notes/UI/NoteEditorView.swift
-run slow -O raycast-test   Tinycast/Features/Backup/Model/RaycastFormat.swift \
-                           Tinycast/Features/Backup/Model/RaycastV1Decoder.swift \
-                           Tinycast/Features/Backup/Service/RaycastV2Decoder.swift \
+run slow -O raycast-test   Tinycast/Features/Backup/Model/RaycastImportError.swift \
+                           Tinycast/Features/Backup/Service/RaycastDecoder.swift \
                            Tinycast/Features/Backup/Service/Scrypt.swift \
-                           Tinycast/Platform/Compression/Zlib.swift \
-                           Tinycast/Features/Clipboard/Model/ClipboardStore.swift \
-                           Tinycast/Features/Clipboard/Model/ClipboardFilter.swift
+                           Tinycast/Platform/Compression/Zlib.swift
 run settings-backup-test   Tinycast/Features/Settings/AppSettingsKey.swift \
                            Tinycast/Features/Backup/Model/SettingsBackupCoverage.swift
 E=Tinycast/Features/Extensions

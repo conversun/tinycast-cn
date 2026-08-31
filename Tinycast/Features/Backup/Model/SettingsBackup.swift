@@ -53,6 +53,8 @@ struct SettingsBackup: Codable {
         var quicklinkConfirmsBeforeDelete: Bool?
         // `calendarEnabled` is absent: an import must not grant calendar access.
         var calendarShowInLauncher: Bool?
+        // Carried: it narrows what is read rather than widening what may be reached.
+        var calendarIncludesTomorrow: Bool?
         var joinWindowMinutes: Int?
         // `autoJoinMeetings` and `cameraPreview` are absent: an import must arm neither.
         var autoJoinConfirms: Bool?
@@ -72,6 +74,7 @@ struct SettingsBackup: Codable {
         var createNote: HotKeyBinding?
         var searchNotes: HotKeyBinding?
         var searchFiles: HotKeyBinding?
+        var searchSnippets: HotKeyBinding?
         var joinNextMeeting: HotKeyBinding?
         var mySchedule: HotKeyBinding?
         var createEvent: HotKeyBinding?
@@ -137,6 +140,7 @@ extension SettingsBackup {
             quicklinkSelectionFallback: s.quicklinkSelectionFallback.rawValue,
             quicklinkConfirmsBeforeDelete: s.quicklinkConfirmsBeforeDelete,
             calendarShowInLauncher: s.calendarShowInLauncher,
+            calendarIncludesTomorrow: s.calendarIncludesTomorrow,
             joinWindowMinutes: s.joinWindowMinutes.rawValue,
             autoJoinConfirms: s.autoJoinConfirms,
             menuBarEvents: s.menuBarEvents.rawValue,
@@ -153,6 +157,7 @@ extension SettingsBackup {
         hotkeys.createNote = hk.binding(for: .createNote)
         hotkeys.searchNotes = hk.binding(for: .searchNotes)
         hotkeys.searchFiles = hk.binding(for: .searchFiles)
+        hotkeys.searchSnippets = hk.binding(for: .searchSnippets)
         hotkeys.joinNextMeeting = hk.binding(for: .joinNextMeeting)
         hotkeys.mySchedule = hk.binding(for: .mySchedule)
         hotkeys.createEvent = hk.binding(for: .createEvent)
@@ -360,6 +365,10 @@ extension SettingsBackup {
             settings.calendarShowInLauncher = flag
             count += 1
         }
+        if let flag = s.calendarIncludesTomorrow {
+            settings.calendarIncludesTomorrow = flag
+            count += 1
+        }
         if let raw = s.joinWindowMinutes, let window = JoinWindow(rawValue: raw) {
             settings.joinWindowMinutes = window
             count += 1
@@ -403,6 +412,7 @@ extension SettingsBackup {
         if let b = hotkeys.createNote { apply(b, .createNote) }
         if let b = hotkeys.searchNotes { apply(b, .searchNotes) }
         if let b = hotkeys.searchFiles { apply(b, .searchFiles) }
+        if let b = hotkeys.searchSnippets { apply(b, .searchSnippets) }
         if let b = hotkeys.joinNextMeeting { apply(b, .joinNextMeeting) }
         if let b = hotkeys.mySchedule { apply(b, .mySchedule) }
         if let b = hotkeys.createEvent { apply(b, .createEvent) }

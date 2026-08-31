@@ -3,8 +3,7 @@ import SwiftUI
 /// Actions menu for a launcher app, from right-click or the Actions pill.
 @MainActor
 enum AppActionsMenu {
-    /// The favorites rows for one entry — what they may do and how to run them, resolved by the
-    /// screen that owns the visible order. Every row here runs the same call its chord does.
+    /// Resolved by the screen that owns the visible order; every row runs its chord's call.
     @MainActor
     struct FavoriteActions {
         let isFavorite: Bool
@@ -60,6 +59,12 @@ enum AppActionsMenu {
                 })
         }
         if running, app.kind == .application {
+            items.append(
+                PopoverMenuItem(
+                    title: "Restart Application", systemImage: "arrow.clockwise", shortcut: "⌘R"
+                ) {
+                    core.launcherCoordinator.restart(app)
+                })
             items.append(
                 PopoverMenuItem(
                     title: "Quit Application", systemImage: "power", shortcut: "⌃⇧Q",

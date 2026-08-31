@@ -155,7 +155,10 @@ screens hold (see [palette.md](palette.md)).
 - **List / Grid** — sections and items flattened in render order. When `filtering` is on (Raycast's
   default unless the command supplies `onSearchTextChange`) rows are filtered with the launcher's own
   `FuzzyMatch` over title, subtitle and keywords, and a section whose items all drop loses its header
-  too. `isShowingDetail` splits the screen into rows plus a detail pane. `ExtensionScreen.Item`
+  too. `isShowingDetail` splits the screen into rows plus a detail pane and drops each row's
+  subtitle, but **not its accessories**: the API only advises an extension against sending them in
+  this mode, and Raycast draws the ones it is sent, so suppressing them here would lose a row its
+  whole signal. `ExtensionScreen.Item`
   carries both the flat `selection` index and the scroll id, and is the `ForEach` identity of the row
   and the grid cell alike — see the scroll-id rule in [ui.md](../ui.md#rows-selection-hover).
 - **Detail** — markdown rendered block-by-block (headings, lists, code fences, quotes, rules, fetched
@@ -171,7 +174,16 @@ screens hold (see [palette.md](palette.md)).
   image file — an `.app` has no bitmap to read. A `data:` URL is a source of its own too: an extension
   that renders its own SVG hands over the bytes, so they are decoded inline rather than fetched. A
   `tintColor` on any of them draws the image as a template, which is what colours an SVG written
-  against `currentColor`. The feature's own fills live in `ExtensionColors` — never in `Theme`.
+  against `currentColor`. A `raycast-*` colour name **inside** that SVG is rewritten to `rgba(…)`
+  during the decode, in `ExtensionIconCache.loadInlineAsync`: the name is legal wherever a Raycast
+  tint is, so extensions write it straight into `stroke`, and no SVG renderer knows it — left alone
+  the shape draws nothing at all. It happens there rather than in `resolve` because `resolve` runs
+  in a `body` and the decode already runs detached, and because the markdown images a Detail draws
+  never pass through `resolve` at all. The palette is handed in as `[name: css]`, resolved once per
+  appearance by `ExtensionImage.svgPalette(isDark:)` — a `Color` can only be flattened to sRGB on the
+  main actor, which is exactly what the decode must not touch. Anything reading a decoded image keys
+  its `.task` on `ExtensionImage.LoadKey`, since the URL alone no longer says what will be drawn.
+  The feature's own fills live in `ExtensionColors` — never in `Theme`.
 - **Form** — label-left/control-right rows. Field values live in the extension (React owns them); every
   edit dispatches `onTinycastChange` and the resulting re-render is what updates the control, so
   `defaultValue`, a controlled `value`, and `ref.reset()` all behave.
@@ -216,6 +228,11 @@ engine in memory until you leave it, which is the one standing cost this app has
 
 `Show in launcher` is separate, and independent: it decides whether the commands reach launcher search
 at all, without unloading anything.
+
+A published row carries the extension's own title in `AppEntry.ownerName`, which both labels the row
+and makes the extension a keyword for every command it ships — `lucide` finds *Search Icons*. It is
+matched in the launcher's weakest literal band, so a third-party title can never take a query from a
+real app; see [launcher.md](launcher.md#owner-names).
 
 ## Installing extensions
 
@@ -296,6 +313,9 @@ the last is a set of paths specific to this Mac's toolchain layout.
 A global shortcut binds to a **command**, not to an extension — a shortcut has to land on one thing to
 run, and an extension is a set of commands. `HotKeyAction.extensionCommand` is keyed by the launcher
 entry id (`extension:<extension>/<command>`).
+
+A view command summons the palette when the shortcut fires while it is hidden, or it would load
+behind a closed window. A no-view command still hides it and reports through its HUD.
 
 Its index is not pruned at launch the way the UUID-keyed ones are: the installed set is scanned
 asynchronously and only while extensions are on, so at launch "not installed yet" and "gone" look
@@ -428,7 +448,7 @@ never shares with an installed copy.
 | Command shortcuts | `UserDefaults` → `hotkey.extensionCommand.<entry id>` | yes |
 | Favorites, hidden items | `UserDefaults` → `favoriteApps`, `hiddenItemKeys` | yes |
 | User alias | `UserDefaults` → `launcherAliases` | yes |
-| Launch ranking | `Caches/<bundle id>/launcher-ranking.json` | yes |
+| Launch ranking | `launcher-ranking.json` | yes |
 
 `ExtensionCatalog.safeName` maps an npm-style name onto one path segment, and is the **only** copy of
 that mapping — a second one that drifts orphans every file the first one wrote.
@@ -482,7 +502,8 @@ fitted: the extension that drew it has already sized it, and rasterizing would c
 
 Change the number only against a rendered strip of real icons; it means nothing on its own.
 `ext-icon-test` guards the invariant: padding in the source cannot change the drawn size, and a
-`data:` payload decodes in either encoding.
+`data:` payload decodes in either encoding — and one naming a `raycast-*` colour draws ink, in the
+stroke that appearance calls for.
 
 - `ExtensionAppearance` (symbol + `ExtensionTint`) is stored per extension by manifest name in
   `ExtensionAppearanceStore`, and applies to **every command** of that extension — the same inheritance

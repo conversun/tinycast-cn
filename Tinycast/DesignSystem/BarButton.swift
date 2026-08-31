@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// A bar control's hover chrome. The footer's buttons are capsules; a header control takes the
-/// menu row's own corner instead, so every control along that row reads as one family.
+/// A bar control's hover chrome; footer pills and header pop-ups share `barControl` as one family.
 enum BarButtonChrome {
     case capsule
     case rounded
@@ -12,13 +11,12 @@ enum BarButtonChrome {
             return AnyShape(Capsule())
         case .rounded:
             return AnyShape(
-                RoundedRectangle(cornerRadius: Theme.Radius.menuRow, style: .continuous))
+                RoundedRectangle(cornerRadius: Theme.Radius.barControl, style: .continuous))
         }
     }
 }
 
-/// A palette bar control: bare label at rest, a faint fill on hover.
-/// Hover lives here, so a sweep across one never re-renders the view that owns it.
+/// A palette bar control, bare until hover; hover lives here so its owner never re-renders.
 struct BarButton<Label: View>: View {
     var chrome: BarButtonChrome = .capsule
     let action: () -> Void

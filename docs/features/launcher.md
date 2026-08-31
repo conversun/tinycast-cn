@@ -17,9 +17,9 @@ earliest scope wins).
   chords keep running while its pane reads off.
 - **`Model/SearchRelevance.swift` is Foundation-only and pure**, so `fuzz-test` compiles the shipped
   scorer. It owns both `FuzzyMatch` and the field bands.
-- **Searchable fields stay separate** — display name, Spotlight alternate names, bundle id and executable
-  name are never flattened into one string, because the field is what picks the band. A new searchable
-  field means a new `Band` case and a `consider` call, in priority order.
+- **Searchable fields stay separate** — display name, Spotlight alternate names, owner name, bundle id
+  and executable name are never flattened into one string, because the field is what picks the band. A
+  new searchable field means a new `Band` case and a `consider` call, in priority order.
 - **`Model/SearchScopes.swift` and `Model/LauncherRankingStore.swift` are pure too** — the ranking store
   takes its clock via `now` and its path via `fileURL`, for `scopes-test` and `ranking-test`.
 
@@ -59,15 +59,16 @@ format scalars first, since app metadata can contain bidi/zero-width markers bef
 
 ## Searchable fields
 
-An app is matched on five fields kept deliberately separate — flattening them into one string would
+An entry is matched on six fields kept deliberately separate — flattening them into one string would
 lose the thing that decides the ranking. `SearchRelevance.score` evaluates each independently and the
 strongest one becomes the entry's base relevance:
 
 | Band | Field                                   | Match strength                                    |
 | ---- | --------------------------------------- | ------------------------------------------------- |
-| 6    | user alias (any entry kind)             | anchored literal — exact / prefix                 |
-| 5    | display name (plus a snippet's keyword) | literal — exact / prefix / word-start / substring |
-| 4    | Spotlight alternate names, plus a user alias's word-start / substring hits | literal |
+| 7    | user alias (any entry kind)             | anchored literal — exact / prefix                 |
+| 6    | display name (plus a snippet's keyword) | literal — exact / prefix / word-start / substring |
+| 5    | Spotlight alternate names, plus a user alias's word-start / substring hits | literal |
+| 4    | owner name (the extension a command came from) | literal only                               |
 | 3    | display name                            | subsequence                                       |
 | 2    | Spotlight alternate names               | subsequence                                       |
 | 1    | bundle identifier                       | literal only                                      |
@@ -96,6 +97,21 @@ query (`cop` ⊂ `com.apple.Photos`), which would change _which_ apps appear rat
 order. For the same reason a bundle id is matched with its leading component stripped
 (`apple.Photos`, not `com.apple.Photos`): `com` alone prefixes almost every installed app. The full id
 still matches exactly, so a pasted identifier resolves.
+
+### Owner names
+
+An extension's title is a keyword for every command it ships: `lucide` finds Lucide's *Search Icons*
+without the user aliasing each command by hand. `AppEntry.ownerName` carries it — the same string the
+row already prints as its kind label — and `SearchRelevance` gives it the weakest literal band, for two
+reasons. It does not name the entry, so any hit on a command's own title, on another entry's title, or
+on a Spotlight alias outranks it; and every command of one extension carries the identical string, so a
+subsequence band there would surface a whole extension at once on letter soup. Literal-only keeps that
+bounded while a real prefix hit still beats an incidental subsequence elsewhere — the same trade the
+identifier fields make, for the same reason.
+
+Because the band is uniform across an extension, its commands score identically and cluster together,
+tie-broken alphabetically and then by the learned boost. Ranking a third-party string this low is
+deliberate: an extension titled `Safari` can never take that query from the real Safari.
 
 ### Category search
 
@@ -136,7 +152,9 @@ visibility checkbox, not a per-invocation action, so the ⌘K menu stays out of 
 on `LauncherItemsSection` puts an `AliasField` on each row, dressed like the `ShortcutRecorder`
 beside it; edits store as typed and trim when the field loses focus, and a blank means none. That
 list filters by **membership only**, keeping the index's name order — re-ranking it per keystroke
-would move the row being edited out from under its own field editor.
+would move the row being edited out from under its own field editor. A pane with a hand-written row
+hands `AliasField` the key itself: Settings ▸ Quicklinks passes `Quicklink.entryID`, and dims the
+field on a quicklink hidden from root search, whose entry the ranker never sees.
 
 Aliases ride along in a settings backup (`launcherAliases`), and deleting what an alias points at —
 uninstalling an app, deleting a quicklink or custom command, uninstalling an extension — removes it
@@ -239,8 +257,11 @@ is TCC-protected, so an unprivileged read fails in a way indistinguishable from 
 silently skip a real empty. Eject All Disks, Dismiss Notifications and Unhide All Apps report the same
 way when there is nothing to act on. Volume and mute fall back to the output's preferred stereo channels when the device exposes
 no master element (common on HDMI), and Toggle Mute parks the level at zero when there is no mute
-control at all. Multi-disk ejection excludes internal and network volumes, treats a sibling volume
-that the same physical eject already unmounted as done, and reports remaining failures together.
+control at all. Multi-disk ejection takes every external or ejectable volume — a dock's fixed-media
+HDD reports as neither ejectable nor removable, so external alone qualifies — while excluding
+internal, network and root volumes, treats a sibling volume that the same physical eject already
+unmounted as done, counts a volume whose eject errored but whose mount is gone as ejected, and
+reports remaining failures together.
 Preference-backed toggles refuse to write when the current value can't be read, and notification
 dismissal matches Accessibility subroles rather than English labels.
 
@@ -304,6 +325,13 @@ paths; see the command in `development.md`.
 Launcher icons use a persistent 32 MB cost-capped `NSCache`. Fitted file-row icons use a separate
 transient 8 MB cache that is purged when its palette list disappears (`IconCache`).
 
+A file-icon key carries a `FileIconStamp` as well as the path — the bundle's own modification and
+attribute dates plus its `Icon\r` — because pasting a custom icon in Finder leaves the bundle's
+contents alone, so a path-only key served the bitmap decoded first for the rest of the session.
+`AppIndex.scan` reads the stamp off-main into `AppEntry.iconStamp`, `EntryIcon.file` carries it, and
+because it is part of `iconKey` the re-scan on the next palette open re-decodes exactly the apps
+whose icon moved.
+
 ## Favorites
 
 `FavoritesStore.keys` is the order — the array *is* the ranking, and it only shows while the query is
@@ -360,18 +388,27 @@ Application and System Settings results expose **Show in Finder** in their ⌘K 
 shortcut is available for them. `AppEntry.canRevealInFinder` is the one rule both the menu row and
 the key handler read, so the advertised chord can't drift from the behavior.
 
-## Quitting apps
+## Quitting and restarting apps
 
 `RunningAppsMonitor` (live from `NSWorkspace` launch/terminate notifications) drives both the row's
-running dot and the availability of the quit actions:
+running dot and the availability of the running-only actions:
 
-- **Quit Application** — the last row of an app's ⌘K Actions menu, shown only while that app is
+- **Quit Application** — a row of an app's ⌘K Actions menu, shown only while that app is
   running, also bound to **⌃⇧Q** on the selected row. The chord guard mirrors the menu row's
   condition (an `.application` entry that `RunningAppsMonitor` reports running) so the key never
   swallows a press it won't act on, and it's skipped in the compact bar, which shows no selection.
   `AppLauncher.quit(bundleID:)` terminates every instance of the bundle and reports whether
   anything was running; the palette only dismisses when something was, and it restores focus unless
   the app it just quit _was_ `previousApp`.
+- **Restart Application** — the row above it and **⌘R**, on the same guard: both chords resolve
+  their target through `LauncherScreen.runningApplication(at:)`, the single place that condition
+  lives. `AppLauncher.restart(bundleID:url:)` snapshots the running instances, subscribes to
+  `NSWorkspace.DidTerminateApplicationMessage` _before_ terminating so an instance that exits at
+  once can't outrun the wait, then reopens the bundle once every snapshotted PID has gone. The wait
+  is bounded by a five-second grace: a quit an app refuses, or one sitting behind a save sheet the
+  user leaves standing, relaunches nothing and leaves that app running. The palette dismisses the
+  moment the quit is asked for and never restores focus — either the relaunch takes it, or the app
+  that refused the quit is the one asking for it.
 - **Quit All Applications** a system action. `AppLauncher.quitAllTargets()` is the
   policy (every `.regular` app except Finder — `terminate()` only relaunches it — and Tinycast,
   excluded by PID because About/Settings temporarily flips it to `.regular`). `SystemActionCoordinator.quitAllApps()`
@@ -382,6 +419,6 @@ Both quits are graceful `NSRunningApplication.terminate()`, so an app with unsav
 its own save sheet.
 
 The ⌘K menu samples `isRunning` **once, when it opens** (`RootPaletteView.openActions()`), so an app
-launching or quitting elsewhere can't add or drop the Quit row while the menu is up — the same freeze
+launching or quitting elsewhere can't add or drop those two rows while the menu is up — the same freeze
 the rest of the menu already has ([palette.md](palette.md)). Only `LauncherList` observes
 `RunningAppsMonitor` live, for the running dot.

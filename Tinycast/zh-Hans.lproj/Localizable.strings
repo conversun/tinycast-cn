@@ -455,13 +455,10 @@
 "Imported %d snippets." = "已导入 %d 个文本片段。";
 "Imported %lld snippets." = "已导入 %lld 个文本片段。";
 "Incorrect passphrase, or the file is corrupted." = "密码不正确，或文件已损坏。";
-"Raycast 1.x export" = "Raycast 1.x 导出文件";
-"Raycast 2.x export" = "Raycast 2.x 导出文件";
 "Raycast is running — quit it to avoid hotkey conflicts." = "Raycast 正在运行，请退出以避免快捷键冲突。";
 "The Raycast export could not be read." = "无法读取 Raycast 导出文件。";
 "This backup contains %@ and %@. Custom commands can run arbitrary shell code. Only import files you trust." = "此备份包含 %@ 和 %@。自定义命令可以运行任意 Shell 代码，请仅导入你信任的文件。";
 "This doesn't look like a Raycast export (.rayconfig)." = "此文件似乎不是 Raycast 导出文件（.rayconfig）。";
-"This Raycast export doesn't include %@." = "此 Raycast 导出文件不包含 %@。";
 "Tip: unset the matching Raycast shortcuts to avoid conflicts." = "提示：请取消 Raycast 中对应的快捷键以避免冲突。";
 "%d custom commands" = "%d 个自定义命令";
 "%lld custom commands" = "%lld 个自定义命令";
@@ -1564,3 +1561,30 @@
 "unknown" = "未知";
 "week" = "周";
 "weeks" = "周";
+
+/* Upstream v0.10.2 → v0.10.5：片段浏览器、命令参数与流式输出、日程开关、Quick Action 自定义指令。 */
+"%@ tokens" = "%@ 个 token";
+"Add one to be asked for a value before the command runs." = "添加参数后，命令运行前会先询问它的值。";
+"Argument name" = "参数名";
+"Asked for in order, then passed to the command as $1, $2 …" = "按顺序询问，然后以 $1、$2 … 传给命令。";
+"Customize %@" = "自定义%@";
+"Edit %@ instructions" = "编辑%@指令";
+"Finished successfully." = "已成功完成。";
+"Global Shortcut" = "全局快捷键";
+"Home folder" = "个人文件夹";
+"Include Tomorrow's Events" = "包含明天的日程";
+"Name it, paste a link, then add an alias or a shortcut if you want one." = "起个名字，粘贴链接，需要的话再加个别名或快捷键。";
+"Open Settings" = "打开设置";
+"Opens the snippets browser, whatever app you are in." = "无论你在哪个应用，都能打开片段浏览器。";
+"Read tomorrow as well as the rest of today, everywhere meetings appear." = "在所有显示会议的地方，除今天剩余日程外也读取明天。";
+"Remove this argument" = "移除此参数";
+"Run In" = "运行目录";
+"Running" = "运行中";
+"Schedule" = "日程";
+"Search snippets…" = "搜索文本片段…";
+"Search your schedule…" = "搜索你的日程…";
+"Stopped" = "已停止";
+"Tell Tinycast how you want %@ to handle your selected text." = "告诉 Tinycast 你希望%@如何处理选中的文本。";
+"The folder the command starts in. Leave empty for your home folder." = "命令的起始目录。留空则使用个人文件夹。";
+"Use Default" = "使用默认值";
+"optional" = "可选";

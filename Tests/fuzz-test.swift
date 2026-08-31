@@ -1,4 +1,4 @@
-// Standalone test for the launcher matcher, compiling the real scorer so a scoring change is caught.
+// Compiles the real scorer, so a scoring change is caught here.
 import Foundation
 
 @main
@@ -11,6 +11,7 @@ struct FuzzTest {
         var bundleID: String?
         var executable: String?
         var userAlias: String?
+        var owner: String?
 
         /// Mirrors AppEntry.searchFields, including the alternate-name sanitizing the scan applies.
         var fields: SearchFields {
@@ -20,6 +21,7 @@ struct FuzzTest {
                 alternateNames: SearchFields.usableAlternateNames(
                     alternates, displayName: name, fileName: name + ".app"),
                 romanizedNames: Pinyin.aliases(for: name),
+                ownerName: owner,
                 bundleID: bundleID, executableName: executable)
         }
     }
@@ -66,8 +68,12 @@ struct FuzzTest {
         App(name: "Weixin Helper"),
         // The corpus entries with user aliases, so the property loop exercises the alias bands.
         App(name: "Figma", userAlias: "fg"),
-        // The band-6 overreach repro: `term` inside `iterm` must not beat Terminal's own prefix.
-        App(name: "Kitty", userAlias: "iterm")
+        // The band-7 overreach repro: `term` inside `iterm` must not beat Terminal's own prefix.
+        App(name: "Kitty", userAlias: "iterm"),
+        // Extension commands; "Chess" collides with a real app on purpose, which must still win.
+        App(name: "Search Icons", owner: "Lucide"),
+        App(name: "Browse Categories", owner: "Lucide"),
+        App(name: "New Game", owner: "Chess")
     ]
 
     static func app(_ name: String) -> App { apps.first { $0.name == name }! }
@@ -76,7 +82,7 @@ struct FuzzTest {
         SearchRelevance.score(query: query, fields: app(name).fields)
     }
 
-    /// Mirrors AppIndex.rank: strongest field, plus the learned boost, then the alphabetical tiebreak.
+    /// Mirrors AppIndex.rank: strongest field, learned boost, alphabetical tiebreak.
     static func rank(_ query: String, boosts: [String: Int] = [:]) -> [String] {
         apps.compactMap { app -> (String, Int)? in
             guard let s = SearchRelevance.score(query: query, fields: app.fields) else { return nil }
@@ -114,6 +120,7 @@ struct FuzzTest {
         displayNameRanking()
         fieldPriority()
         userAliases()
+        ownerNames()
         alternateNameSanitizing()
         identifierFields()
         edgeCases()
@@ -216,16 +223,17 @@ struct FuzzTest {
         let userAlias = score("fg", "Figma")!
         let nameLiteral = score("chatgpt", "ChatGPT")!
         let aliasLiteral = score("codex", "ChatGPT")!
+        let ownerLiteral = score("lucide", "Search Icons")!
         let nameSubsequence = score("codex", "Code Explorer")!
         let aliasSubsequence = score("aplbks", "Books")!
         let identifier = score("openai", "ChatGPT")!
         let executable = score("electron", "Visual Studio Code")!
         let ordered = [
-            userAlias, nameLiteral, aliasLiteral, nameSubsequence, aliasSubsequence, identifier,
-            executable
+            userAlias, nameLiteral, aliasLiteral, ownerLiteral, nameSubsequence, aliasSubsequence,
+            identifier, executable
         ]
         check(
-            "bands are strictly ordered: user-alias > name > alias > name-fuzzy > alias-fuzzy > id > exec",
+            "bands are strictly ordered: user-alias > name > alias > owner > name-fuzzy > alias-fuzzy > id > exec",
             zip(ordered, ordered.dropFirst()).allSatisfy { $0 > $1 }, "got \(ordered)")
         check(
             "every band is a whole stride apart",
@@ -236,7 +244,7 @@ struct FuzzTest {
         // The strongest field wins; a weaker field on the same entry never drags it down.
         check(
             "Safari's exact display name beats its own alias band",
-            score("safari", "Safari")! >= 5 * SearchRelevance.bandStride)
+            score("safari", "Safari")! >= 6 * SearchRelevance.bandStride)
         check(
             "an entry with no matching field scores nil", score("qqqq", "Safari") == nil)
     }
@@ -250,7 +258,7 @@ struct FuzzTest {
         check("'fg' finds Figma by user alias", fg.first == "Figma", "got \(fg)")
         check(
             "the user alias sits in the band above the display name",
-            score("fg", "Figma")! >= 6 * SearchRelevance.bandStride)
+            score("fg", "Figma")! >= 7 * SearchRelevance.bandStride)
         check(
             "a user alias outranks another entry's exact display name",
             SearchRelevance.score(query: "code", fields: SearchFields(names: ["Mail"], userAlias: "code"))!
@@ -268,9 +276,9 @@ struct FuzzTest {
         let figma = SearchRelevance.score(query: "figma", fields: app("Figma").fields)!
         check(
             "the strongest field still wins on an aliased entry",
-            figma >= 5 * SearchRelevance.bandStride && figma < 6 * SearchRelevance.bandStride)
+            figma >= 6 * SearchRelevance.bandStride && figma < 7 * SearchRelevance.bandStride)
 
-        // Anchoring: only exact and prefix hits earn band 6; inside hits rank with vendor aliases.
+        // Anchoring: only exact and prefix hits earn band 7; inside hits rank with vendor aliases.
         let term = rank("term")
         check(
             "an inside alias hit does not beat another entry's own prefix",
@@ -281,7 +289,40 @@ struct FuzzTest {
             query: "ail", fields: SearchFields(names: ["\u{FFFF}"], userAlias: "mail2"))!
         check(
             "an inside alias hit ranks in the vendor-alias band",
-            inside >= 4 * SearchRelevance.bandStride && inside < 5 * SearchRelevance.bandStride)
+            inside >= 5 * SearchRelevance.bandStride && inside < 6 * SearchRelevance.bandStride)
+    }
+
+    // MARK: - Owner names
+
+    static func ownerNames() {
+        print("\n# owner names")
+
+        let lucide = rank("lucide")
+        check(
+            "an extension's title finds every command it ships",
+            lucide == ["Browse Categories", "Search Icons"], "got \(lucide)")
+        check("a prefix of the title works too", rank("luci") == lucide, "got \(rank("luci"))")
+        check(
+            "the owner band sits below the display name",
+            score("lucide", "Search Icons")! >= 4 * SearchRelevance.bandStride
+                && score("lucide", "Search Icons")! < 5 * SearchRelevance.bandStride)
+
+        let chess = rank("chess")
+        check(
+            "an app outranks an extension that took its name", above(chess, "Chess", "New Game"),
+            "got \(chess)")
+        check(
+            "an owner title never subsequence-matches",
+            SearchRelevance.score(
+                query: "lcd", fields: SearchFields(names: ["\u{FFFF}"], ownerName: "Lucide")) == nil)
+        check(
+            "a literal owner hit still beats another entry's subsequence name hit",
+            SearchRelevance.score(
+                query: "lucide", fields: SearchFields(names: ["\u{FFFF}"], ownerName: "Lucide"))!
+                > SearchRelevance.score(query: "lucide", fields: SearchFields(names: ["Lucid Engine"]))!)
+        check(
+            "the command's own title still wins on the same entry",
+            score("search", "Search Icons")! >= 6 * SearchRelevance.bandStride)
     }
 
     // MARK: - Spotlight junk
@@ -291,10 +332,10 @@ struct FuzzTest {
 
         let app = rank("app")
         check("'app' still finds App Store", app.first == "App Store", "got \(app)")
-        // The tail here is `com.apple.*` bundle ids, which the identifier band keeps below every name hit.
+        // The tail is `com.apple.*` ids, which the identifier band keeps below name hits.
         check(
             "'app' matches nothing by display name that isn't a real hit",
-            app.filter { score("app", $0)! >= 4 * SearchRelevance.bandStride }
+            app.filter { score("app", $0)! >= 5 * SearchRelevance.bandStride }
                 == ["App Store", "WhatsApp", "Books"], "got \(app)")
         check(
             "'.app' alternates are dropped entirely",
@@ -341,7 +382,7 @@ struct FuzzTest {
         check(
             "a short query does not drag in every reverse-DNS id",
             !rank("cml").contains("Photos"), "got \(rank("cml"))")
-        // These queries still hit display names, so the check is that nothing lands in the identifier band.
+        // These still hit display names, so nothing may land in the identifier band.
         func identifierHits(_ query: String) -> [String] {
             rank(query).filter { score(query, $0)! < 2 * SearchRelevance.bandStride }
         }
@@ -394,7 +435,7 @@ struct FuzzTest {
             "a snippet keyword ranks at display-name strength",
             SearchRelevance.score(
                 query: "sig", fields: SearchFields(names: ["Signature Block", "sig"]))!
-                >= 5 * SearchRelevance.bandStride)
+                >= 6 * SearchRelevance.bandStride)
 
         check(
             "ranking is deterministic across repeats",
@@ -430,7 +471,7 @@ struct FuzzTest {
         let alphabet = Array("abcdefghijklmnopqrstuvwxyz .-_0123456789浏览器사파리🙂\u{200E}\u{0301}")
         let allText = apps.flatMap { app -> [String] in
             [app.name] + app.alternates
-                + [app.bundleID, app.executable, app.userAlias].compactMap { $0 }
+                + [app.bundleID, app.executable, app.userAlias, app.owner].compactMap { $0 }
         }
         var rng = Random(seed: 0x5EED_1234_ABCD_0001)
 
@@ -442,7 +483,7 @@ struct FuzzTest {
         let iterations = 100_000
 
         for i in 0..<iterations {
-            // Three query shapes: a real slice of some field, a scrambled subsequence of one, and junk.
+            // Three query shapes: a real slice, a scrambled subsequence, and junk.
             let query: String
             switch i % 3 {
             case 0:
@@ -465,7 +506,7 @@ struct FuzzTest {
                 // Every score sits inside exactly one band, and the boost cap cannot lift it out.
                 let band = score / SearchRelevance.bandStride
                 let offset = score - band * SearchRelevance.bandStride
-                if offset < 0 || offset > FuzzyMatch.maximumScore || band > 6 { bandViolations += 1 }
+                if offset < 0 || offset > FuzzyMatch.maximumScore || band > 7 { bandViolations += 1 }
                 if (score + LauncherRankingBoostCap) / SearchRelevance.bandStride != band {
                     boostCrossedBand += 1
                 }
@@ -493,6 +534,7 @@ struct FuzzTest {
             let asName = SearchFields(names: [text])
             let asUserAlias = SearchFields(names: ["\u{FFFF}"], userAlias: text)
             let asAlternate = SearchFields(names: ["\u{FFFF}"], alternateNames: [text])
+            let asOwner = SearchFields(names: ["\u{FFFF}"], ownerName: text)
             let asBundleID = SearchFields(names: ["\u{FFFF}"], bundleID: text)
             let asExecutable = SearchFields(names: ["\u{FFFF}"], executableName: text)
             let source = Array(text)
@@ -503,16 +545,18 @@ struct FuzzTest {
             else { continue }
             let userAlias = SearchRelevance.score(query: query, fields: asUserAlias)
             let alternate = SearchRelevance.score(query: query, fields: asAlternate)
+            let owner = SearchRelevance.score(query: query, fields: asOwner)
             let bundleID = SearchRelevance.score(query: query, fields: asBundleID)
             let executable = SearchRelevance.score(query: query, fields: asExecutable)
-            // Same text, weaker field: the score must drop, and identifier fields may drop out entirely.
-            // An anchored alias hit outranks the name; an inside hit ranks below with vendor aliases.
+            // Same text, weaker field: an anchored alias outranks the name, an inside hit does not.
             if let userAlias, let tier = FuzzyMatch.match(query: query, candidate: text)?.tier,
                 tier.isAnchored ? userAlias <= name : userAlias >= name
             {
                 inversions += 1
             }
             if let alternate, alternate >= name { inversions += 1 }
+            if let owner, let alternate, owner >= alternate { inversions += 1 }
+            if let bundleID, let owner, bundleID >= owner { inversions += 1 }
             if let bundleID, let alternate, bundleID >= alternate { inversions += 1 }
             if let executable, let bundleID, executable >= bundleID { inversions += 1 }
         }

@@ -9,6 +9,7 @@ enum HotKeyAction: Hashable, Sendable {
     case createNote
     case searchNotes
     case searchFiles
+    case searchSnippets
     case joinNextMeeting
     case mySchedule
     case createEvent
@@ -21,8 +22,7 @@ enum HotKeyAction: Hashable, Sendable {
     case systemAction(id: SystemAction.ID)
     case windowCommand(id: WindowCommand.ID)
     case quicklink(id: UUID)
-    /// Keyed by `AppEntry.id` (`extension:<extension>/<command>`), which is what survives a
-    /// reinstall — an extension carries no id of its own beyond its name.
+    /// Keyed by `AppEntry.id`, which is what survives a reinstall of the extension.
     case extensionCommand(entryID: String)
 
     /// The UserDefaults key, and the `HotKeyCenter` registration id: one per action.
@@ -35,6 +35,7 @@ enum HotKeyAction: Hashable, Sendable {
         case .createNote: "hotkey.createNote"
         case .searchNotes: "hotkey.searchNotes"
         case .searchFiles: "hotkey.searchFiles"
+        case .searchSnippets: "hotkey.searchSnippets"
         case .joinNextMeeting: "hotkey.joinNextMeeting"
         case .mySchedule: "hotkey.mySchedule"
         case .createEvent: "hotkey.createEvent"
@@ -54,6 +55,6 @@ enum HotKeyAction: Hashable, Sendable {
     static let builtInActions: [HotKeyAction] =
         [
             .togglePalette, .toggleClipboard, .toggleEmoji, .showNotes, .createNote, .searchNotes,
-            .searchFiles, .joinNextMeeting, .mySchedule, .createEvent, .aiChat
+            .searchFiles, .searchSnippets, .joinNextMeeting, .mySchedule, .createEvent, .aiChat
         ] + QuickAction.allCases.map(HotKeyAction.quickAction)
 }
