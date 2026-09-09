@@ -11,6 +11,9 @@ enum CommandID: String, CaseIterable, Sendable {
     case clipboardHistory = "command:clipboard-history"
     case searchEmoji = "command:search-emoji"
     case searchFiles = "command:search-files"
+    case openCamera = "command:open-camera"
+    case openInBrowser = "command:open-in-browser"
+    case runShellCommand = "command:run-shell-command"
     case joinNextMeeting = "command:join-next-meeting"
     case copyMeetingLink = "command:copy-meeting-link"
     case mySchedule = "command:my-schedule"
@@ -19,6 +22,8 @@ enum CommandID: String, CaseIterable, Sendable {
     case showNotes = "command:show-notes"
     case createNote = "command:create-note"
     case searchNotes = "command:search-notes"
+    case createWindowLayout = "command:create-window-layout"
+    case captureWindowLayout = "command:capture-window-layout"
     case createQuicklink = "command:create-quicklink"
     case searchQuicklinks = "command:search-quicklinks"
     case searchSnippets = "command:search-snippets"
@@ -49,6 +54,9 @@ enum CommandID: String, CaseIterable, Sendable {
         case .clipboardHistory: return "Clipboard History"
         case .searchEmoji: return "Search Emoji & Symbols"
         case .searchFiles: return "Search Files"
+        case .openCamera: return "Open Camera"
+        case .openInBrowser: return "Open in Browser"
+        case .runShellCommand: return "Run Shell Command"
         case .joinNextMeeting: return "Join Next Meeting"
         case .copyMeetingLink: return "Copy Meeting Link"
         case .mySchedule: return "My Schedule"
@@ -57,14 +65,16 @@ enum CommandID: String, CaseIterable, Sendable {
         case .showNotes: return "Show Notes"
         case .createNote: return "Create Note"
         case .searchNotes: return "Search Notes"
+        case .createWindowLayout: return "Create Window Layout"
+        case .captureWindowLayout: return "Create Layout from Current Windows"
         case .createQuicklink: return "Create Quicklink"
         case .searchQuicklinks: return "Search Quicklinks"
         case .searchSnippets: return "Search Snippets"
         case .createSnippet: return "Create Snippet"
         case .importQuicklinks: return "Import Quicklinks"
         case .exportQuicklinks: return "Export Quicklinks"
-        case .exportSettings: return "Export Settings"
-        case .importSettings: return "Import Settings"
+        case .exportSettings: return "Export Backup"
+        case .importSettings: return "Import Backup"
         case .importFromRaycast: return "Import from Raycast"
         case .checkForUpdates: return "Check for Updates"
         case .settings: return "Settings"
@@ -85,6 +95,9 @@ enum CommandID: String, CaseIterable, Sendable {
         case .clipboardHistory: return "doc.on.clipboard"
         case .searchEmoji: return "face.smiling"
         case .searchFiles: return "doc.text.magnifyingglass"
+        case .openCamera: return "camera"
+        case .openInBrowser: return "globe"
+        case .runShellCommand: return "terminal"
         case .joinNextMeeting: return "video.fill"
         case .copyMeetingLink: return "link"
         case .mySchedule: return "calendar"
@@ -93,6 +106,8 @@ enum CommandID: String, CaseIterable, Sendable {
         case .showNotes: return "text.page"
         case .createNote: return "note.text.badge.plus"
         case .searchNotes: return "text.magnifyingglass"
+        case .createWindowLayout: return "plus.rectangle.on.rectangle"
+        case .captureWindowLayout: return "macwindow.badge.plus"
         case .createQuicklink: return "link.badge.plus"
         case .searchQuicklinks: return Quicklink.sfSymbol
         case .searchSnippets: return "curlybraces"
@@ -120,25 +135,13 @@ enum CommandID: String, CaseIterable, Sendable {
         }
     }
 
-    /// The built-ins with a global shortcut of their own; the rest open from the launcher.
+    /// Query-driven: the typed text is their input, so they are built where offered, never listed.
+    var isQueryDriven: Bool {
+        self == .openInBrowser || self == .runShellCommand
+    }
+
+    /// A chord carries no query, and none should be able to terminate the app outright.
     var hotKeyAction: HotKeyAction? {
-        switch self {
-        case .searchFiles: return .searchFiles
-        case .searchSnippets: return .searchSnippets
-        case .clipboardHistory: return .toggleClipboard
-        case .searchEmoji: return .toggleEmoji
-        case .showNotes: return .showNotes
-        case .createNote: return .createNote
-        case .searchNotes: return .searchNotes
-        case .joinNextMeeting: return .joinNextMeeting
-        case .mySchedule: return .mySchedule
-        case .createEvent: return .createEvent
-        case .aiChat: return .aiChat
-        case .fixGrammar: return .quickAction(.fixGrammar)
-        case .rewrite: return .quickAction(.rewrite)
-        case .translate: return .quickAction(.translate)
-        case .summarize: return .quickAction(.summarize)
-        default: return nil
-        }
+        isQueryDriven || self == .quit ? nil : .command(self)
     }
 }

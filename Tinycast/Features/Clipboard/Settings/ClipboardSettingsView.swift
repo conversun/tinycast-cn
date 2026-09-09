@@ -11,16 +11,26 @@ struct ClipboardSettingsView: View {
         @Bindable var settings = settings
         return Form {
             Section {
-                SettingsRow(title: "Clipboard History") {
-                    ShortcutRecorder(action: .toggleClipboard)
+                Toggle(isOn: $settings.clipboardEnabled) {
+                    SettingsRowTitle(.clipboardClipboard, "Enable Clipboard History")
+                    Text("Record what you copy, so you can paste anything back from the browser.")
                 }
             } header: {
-                Text("Global Shortcuts")
+                SettingsSectionHeader(.clipboardClipboard)
+            }
+
+            Section {
+                SettingsRow(title: "Clipboard History", anchor: .clipboardGlobalShortcuts) {
+                    ShortcutRecorder(action: .command(.clipboardHistory))
+                }
+            } header: {
+                SettingsSectionHeader(.clipboardGlobalShortcuts)
             } footer: {
                 Text("Open the clipboard history browser.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .settingsEnabled(settings.clipboardEnabled)
 
             Section {
                 Picker(selection: $settings.clipboardRetention) {
@@ -28,15 +38,24 @@ struct ClipboardSettingsView: View {
                         Text(retention.title).tag(retention)
                     }
                 } label: {
-                    Text("Keep history for")
+                    SettingsRowTitle(.clipboardHistory, "Keep history for")
                     Text("Entries older than this are deleted automatically.")
                 }
                 .onChange(of: settings.clipboardRetention) {
                     core.clipboardCoordinator.applyRetention(settings.clipboardRetention)
                 }
+                Picker(selection: $settings.clipboardDefaultAction) {
+                    ForEach(ClipboardDefaultAction.allCases) { action in
+                        Text(action.title).tag(action)
+                    }
+                } label: {
+                    SettingsRowTitle(.clipboardHistory, "Default action")
+                    Text("What ↵ does on an entry; ⌘↵ does the other one.")
+                }
             } header: {
-                Text("History")
+                SettingsSectionHeader(.clipboardHistory)
             }
+            .settingsEnabled(settings.clipboardEnabled)
 
             Section {
                 ForEach(settings.clipboardDisabledApps, id: \.self) { bundleID in
@@ -53,30 +72,32 @@ struct ClipboardSettingsView: View {
                         }
                     }
             } header: {
-                Text("Disabled Applications")
+                SettingsSectionHeader(.clipboardDisabledApplications)
             } footer: {
                 Text("Clipboard changes from these apps won't be recorded.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .settingsEnabled(settings.clipboardEnabled)
 
             Section {
                 LabeledContent {
                     Button("Clear…", role: .destructive) { confirmingClear = true }
                 } label: {
-                    Text("Clear history")
+                    SettingsRowTitle(.clipboardDisabledApplications, "Clear history")
                     Text("Permanently remove every saved clip and image.")
                 }
             }
         }
         .formStyle(.grouped)
+        .settingsScrollTarget(.clipboard)
         .confirmationDialog(
             "Clear clipboard history?",
             isPresented: $confirmingClear,
             titleVisibility: .visible
         ) {
             Button("Clear History", role: .destructive) {
-                core.clipboardStore.clearAll()
+                core.clipboardCoordinator.clearHistory()
             }
             Button("Cancel", role: .cancel) {}
         } message: {

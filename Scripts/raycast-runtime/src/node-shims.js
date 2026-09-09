@@ -5,8 +5,22 @@
 
 import { hostCall, hostCallSync } from "./host.js";
 import { Buffer, bufferModule } from "./buffer.js";
+import { EventEmitter } from "./events.js";
 import { base64ToBytes, bytesToBase64, reportUncaught, utf8Decode, utf8Encode } from "./polyfills.js";
-import { URL, URLSearchParams } from "./url.js";
+import {
+  Duplex,
+  PassThrough,
+  Readable,
+  Stream,
+  Transform,
+  Writable,
+  finished,
+  finishedPromise,
+  pipeline,
+  pipelinePromise,
+} from "./streams.js";
+import { ReadableStream, TransformStream, WritableStream } from "./web-streams.js";
+import { fileURLToPath, pathToFileURL, URL, URLSearchParams } from "./url.js";
 import { punycode } from "./punycode.js";
 
 // ─── path ───────────────────────────────────────────────────────────
@@ -295,6 +309,15 @@ function fsPath(input) {
   return String(input);
 }
 
+// Node takes a mode as a number or as an octal string, and Raycast's Swift wrapper passes "755".
+function fsMode(mode) {
+  const parsed = typeof mode === "string" ? Number.parseInt(mode, 8) : Math.trunc(Number(mode));
+  if (!Number.isFinite(parsed)) throw new TypeError(`Invalid file mode: ${mode}`);
+  return parsed & 0o7777;
+}
+
+const FILE_STREAM_CHUNK = 64 * 1024;
+
 const fs = {
   constants: { F_OK: 0, R_OK: 4, W_OK: 2, X_OK: 1 },
 
@@ -366,16 +389,65 @@ const fs = {
   mkdtempSync(prefix) {
     return hostCallSync("fs", "mkdtemp", [String(prefix)]);
   },
-  chmodSync() {},
+  chmodSync(file, mode) {
+    hostCallSync("fs", "chmod", [fsPath(file), fsMode(mode)]);
+  },
   utimesSync() {},
   watch() {
     throw new Error("fs.watch is not supported in Tinycast extensions.");
   },
-  createReadStream() {
-    throw new Error("fs.createReadStream is not supported in Tinycast extensions.");
+  createReadStream(file, options) {
+    const target = fsPath(file);
+    const encoding = typeof options === "string" ? options : options?.encoding;
+    const span = options?.highWaterMark ?? FILE_STREAM_CHUNK;
+    let offset = options?.start ?? 0;
+    const stream = new Readable({
+      highWaterMark: span,
+      read() {
+        try {
+          const bytes = base64ToBytes(hostCallSync("fs", "readRange", [target, offset, span]));
+          offset += bytes.length;
+          this.push(bytes.length ? Buffer.from(bytes) : null);
+        } catch (error) {
+          this.destroy(error);
+        }
+      },
+    });
+    stream.path = target;
+    if (encoding) stream.setEncoding(encoding);
+    return stream;
   },
-  createWriteStream() {
-    throw new Error("fs.createWriteStream is not supported in Tinycast extensions.");
+  // The host has no file handles, so each write is its own call: create once, then append.
+  createWriteStream(file, options) {
+    const target = fsPath(file);
+    let append = options?.flags === "a" || options?.flags === "a+";
+    const put = (data) => {
+      hostCallSync("fs", "writeFile", [target, bytesToBase64(data), append]);
+      append = true;
+    };
+    const stream = new Writable({
+      write(chunk, encoding, callback) {
+        const data = typeof chunk === "string" ? Buffer.from(chunk, encoding) : chunk;
+        try {
+          put(data);
+        } catch (error) {
+          return callback(error);
+        }
+        stream.bytesWritten += data.length;
+        callback(null);
+      },
+      final(callback) {
+        try {
+          if (!append) put(new Uint8Array(0));
+        } catch (error) {
+          return callback(error);
+        }
+        callback(null);
+      },
+    });
+    stream.bytesWritten = 0;
+    stream.path = target;
+    return stream;
   },
   Stats,
   Dirent,
@@ -623,128 +695,14 @@ const zlib = unsupportedModule("zlib", zlibImpl);
 
 // ─── events ─────────────────────────────────────────────────────────
 
-class EventEmitter {
-  constructor() {
-    this._events = new Map();
-    this._maxListeners = 10;
-  }
-  _list(event) {
-    if (!this._events.has(event)) this._events.set(event, []);
-    return this._events.get(event);
-  }
-  on(event, listener) {
-    this._list(event).push(listener);
-    return this;
-  }
-  addListener(event, listener) {
-    return this.on(event, listener);
-  }
-  prependListener(event, listener) {
-    this._list(event).unshift(listener);
-    return this;
-  }
-  once(event, listener) {
-    const wrapper = (...args) => {
-      this.off(event, wrapper);
-      listener(...args);
-    };
-    wrapper.listener = listener;
-    return this.on(event, wrapper);
-  }
-  off(event, listener) {
-    const list = this._events.get(event);
-    if (!list) return this;
-    const index = list.findIndex((entry) => entry === listener || entry.listener === listener);
-    if (index >= 0) list.splice(index, 1);
-    return this;
-  }
-  removeListener(event, listener) {
-    return this.off(event, listener);
-  }
-  removeAllListeners(event) {
-    if (event === undefined) this._events.clear();
-    else this._events.delete(event);
-    return this;
-  }
-  emit(event, ...args) {
-    const list = this._events.get(event);
-    if (!list?.length) return false;
-    for (const listener of list.slice()) listener.apply(this, args);
-    return true;
-  }
-  listenerCount(event) {
-    return this._events.get(event)?.length ?? 0;
-  }
-  listeners(event) {
-    return (this._events.get(event) ?? []).slice();
-  }
-  eventNames() {
-    return Array.from(this._events.keys());
-  }
-  setMaxListeners(count) {
-    this._maxListeners = count;
-    return this;
-  }
-  getMaxListeners() {
-    return this._maxListeners;
-  }
-}
-EventEmitter.EventEmitter = EventEmitter;
-EventEmitter.defaultMaxListeners = 10;
-EventEmitter.once = (emitter, event) =>
-  new Promise((resolve) => emitter.once(event, (...args) => resolve(args)));
-
-class BufferedStream extends EventEmitter {
-  constructor() {
-    super();
-    this.readable = true;
-    this.readableEnded = false;
-    this.encoding = null;
-    // `get-stream` (and therefore execa) consumes stdout by async iteration, not by `data` events.
-    this._delivered = new Promise((resolve) => {
-      this._resolveDelivered = resolve;
-    });
-  }
-
-  async *[Symbol.asyncIterator]() {
-    const bytes = await this._delivered;
-    if (bytes.length) yield this.encoding ? bytes.toString(this.encoding) : bytes;
-  }
-  setEncoding(encoding) {
-    this.encoding = encoding;
-    return this;
-  }
-  pipe(destination) {
-    this.on("data", (chunk) => destination.write?.(chunk));
-    this.on("end", () => destination.end?.());
-    return destination;
-  }
-  resume() {
-    return this;
-  }
-  pause() {
-    return this;
-  }
-  destroy() {
-    return this;
-  }
-  _deliver(bytes) {
-    this._resolveDelivered(bytes);
-    if (bytes.length) this.emit("data", this.encoding ? bytes.toString(this.encoding) : bytes);
-    this.readableEnded = true;
-    this.emit("end");
-    this.emit("close");
-  }
-}
-
 class BufferedChildProcess extends EventEmitter {
   constructor(file, args, options) {
     super();
     this.pid = 0;
     this.killed = false;
     this.exitCode = null;
-    this.stdout = new BufferedStream();
-    this.stderr = new BufferedStream();
+    this.stdout = new PassThrough();
+    this.stderr = new PassThrough();
     this._input = [];
     this._started = false;
 
@@ -792,19 +750,22 @@ class BufferedChildProcess extends EventEmitter {
     ]).then(
       (raw) => {
         this.exitCode = raw.status;
-        this.stdout._deliver(Buffer.from(base64ToBytes(raw.stdout)));
-        this.stderr._deliver(Buffer.from(base64ToBytes(raw.stderr)));
-        this.emit("exit", raw.status, raw.signal ?? null);
-        this.emit("close", raw.status, raw.signal ?? null);
+        this.stdout.end(Buffer.from(base64ToBytes(raw.stdout)));
+        this.stderr.end(Buffer.from(base64ToBytes(raw.stderr)));
+        // One host reply carries both, but a reader still expects the output before the exit code.
+        queueMicrotask(() => {
+          this.emit("exit", raw.status, raw.signal ?? null);
+          this.emit("close", raw.status, raw.signal ?? null);
+        });
       },
       (error) => {
         // Close the streams even on failure: a consumer that awaits stdout (execa does) would
         // otherwise see `undefined` where Node guarantees an empty string.
         this.exitCode = 1;
-        this.stdout._deliver(Buffer.alloc(0));
-        this.stderr._deliver(Buffer.from(String(error?.message ?? error), "utf8"));
+        this.stdout.end();
+        this.stderr.end(Buffer.from(String(error?.message ?? error), "utf8"));
         this.emit("error", error);
-        this.emit("close", 1, null);
+        queueMicrotask(() => this.emit("close", 1, null));
       },
     );
   }
@@ -890,78 +851,157 @@ function runAsync(spec, options, callback, label) {
   return handle;
 }
 
-// ─── stream ─────────────────────────────────────────────────────────
+// ─── http / https ───────────────────────────────────────────────────
 
-// Only what `@raycast/utils`' `useExec` needs: it pipes a child's stdout into a `PassThrough` and
-// reads back the buffered value, so `stream` cannot stay a stub or every `useExec` extension fails.
-// Worse, it fails opaquely — the thrown "not supported" never reaches the extension, which reports
-// the TypeError that follows from an undefined stdout instead. Everything else on the module still
-// refuses to run.
-class PassThrough extends EventEmitter {
-  constructor() {
+// Bundles ship their own HTTP client — node-fetch travels inside `@raycast/utils` — and drive
+// `http.request` instead of global `fetch`. One request, buffered both ways, over the same
+// URLSession bridge `fetch` uses: no sockets, no streaming, no keep-alive.
+class IncomingMessage extends PassThrough {
+  constructor(raw) {
     super();
-    this.readable = true;
+    this.statusCode = raw.status ?? 200;
+    this.statusMessage = raw.statusText ?? "";
+    this.httpVersion = "1.1";
+    this.url = raw.url ?? "";
+    this.complete = true;
+    // The bridge decodes the body itself, so keeping these would have the client gunzip plaintext.
+    this.headers = Object.fromEntries(
+      Object.entries(raw.headers ?? {}).filter(
+        ([name]) => name !== "content-encoding" && name !== "content-length",
+      ),
+    );
+    this.rawHeaders = Object.entries(this.headers).flat();
+  }
+}
+
+const HEADER_TOKEN = /^[\^`\-\w!#$%&'*+.|~]+$/;
+const HEADER_VALUE = /[^\t\u0020-\u007e\u0080-\u00ff]/;
+
+function headerError(message, code) {
+  const error = new TypeError(message);
+  error.code = code;
+  return error;
+}
+
+function validateHeaderName(name) {
+  if (typeof name !== "string" || !HEADER_TOKEN.test(name)) {
+    throw headerError(`Header name must be a valid HTTP token ["${name}"]`, "ERR_INVALID_HTTP_TOKEN");
+  }
+}
+
+function validateHeaderValue(name, value) {
+  if (value === undefined) {
+    throw headerError(`Invalid value "undefined" for header "${name}"`, "ERR_HTTP_INVALID_HEADER_VALUE");
+  }
+  if (HEADER_VALUE.test(String(value))) {
+    throw headerError(`Invalid character in header content ["${name}"]`, "ERR_INVALID_CHAR");
+  }
+}
+
+class ClientRequest extends EventEmitter {
+  constructor(url, options, callback) {
+    super();
+    this.url = url;
+    this.method = String(options.method ?? "GET").toUpperCase();
     this.writable = true;
     this.writableEnded = false;
-    this.encoding = null;
+    this._headers = new Map();
+    this._chunks = [];
+    this._destroyed = false;
+    for (const [name, value] of Object.entries(options.headers ?? {})) this.setHeader(name, value);
+    if (callback) this.once("response", callback);
   }
 
-  setEncoding(encoding) {
-    this.encoding = encoding;
+  setHeader(name, value) {
+    this._headers.set(String(name).toLowerCase(), Array.isArray(value) ? value.join(", ") : String(value));
     return this;
   }
 
+  getHeader(name) {
+    return this._headers.get(String(name).toLowerCase());
+  }
+
+  getHeaders() {
+    return Object.fromEntries(this._headers);
+  }
+
+  removeHeader(name) {
+    this._headers.delete(String(name).toLowerCase());
+  }
+
   write(chunk) {
-    const decode = this.encoding && typeof chunk !== "string";
-    this.emit("data", decode ? Buffer.from(chunk).toString(this.encoding) : chunk);
+    this._chunks.push(Buffer.from(chunk));
     return true;
   }
 
   end(chunk) {
     if (chunk !== undefined && chunk !== null) this.write(chunk);
     this.writableEnded = true;
-    this.emit("end");
-    this.emit("finish");
-    this.emit("close");
-  }
-
-  pipe(destination) {
-    this.on("data", (chunk) => destination.write?.(chunk));
-    this.on("end", () => destination.end?.());
-    return destination;
-  }
-
-  resume() {
+    this._send();
     return this;
   }
 
-  pause() {
+  abort() {
+    return this.destroy();
+  }
+
+  destroy(error) {
+    this._destroyed = true;
+    if (error) this.emit("error", error);
     return this;
   }
 
-  destroy() {
+  setTimeout() {
     return this;
+  }
+
+  setNoDelay() {
+    return this;
+  }
+
+  setSocketKeepAlive() {
+    return this;
+  }
+
+  flushHeaders() {}
+
+  async _send() {
+    // Content negotiation belongs to the transport, which decodes for us and reports the result.
+    this.removeHeader("accept-encoding");
+    const body = this._chunks.length ? Buffer.concat(this._chunks) : null;
+    try {
+      const raw = await hostCall("fetch", "request", [
+        {
+          url: this.url,
+          method: this.method,
+          headers: this.getHeaders(),
+          bodyBase64: body === null ? null : body.toString("base64"),
+        },
+      ]);
+      if (this._destroyed) return;
+      const response = new IncomingMessage(raw);
+      this.emit("response", response);
+      response.end(Buffer.from(raw.bodyBase64 ?? "", "base64"));
+      this.emit("close");
+    } catch (error) {
+      if (!this._destroyed) this.emit("error", error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
-/// Callback form, so `util.promisify(stream.pipeline)` works. Completion comes from the last stage:
-/// a source ends its destination when it ends, which is what `BufferedStream.pipe` wires up.
-function pipeline(...stages) {
-  const callback = typeof stages[stages.length - 1] === "function" ? stages.pop() : null;
-  let settled = false;
-  const finish = (error) => {
-    if (settled) return;
-    settled = true;
-    callback?.(error ?? null);
-  };
-  const last = stages.reduce((from, to) => {
-    from.on?.("error", finish);
-    return from.pipe(to);
-  });
-  last.on("error", finish);
-  last.on("finish", () => finish());
-  last.on("end", () => finish());
-  return last;
+function httpRequest(input, options, callback) {
+  if (typeof options === "function") return httpRequest(input, {}, options);
+  if (typeof input === "string" || input instanceof URL) {
+    return new ClientRequest(String(input), options ?? {}, callback);
+  }
+  const spec = input ?? {};
+  const host = spec.hostname ?? spec.host ?? "localhost";
+  const port = spec.port ? `:${spec.port}` : "";
+  return new ClientRequest(`${spec.protocol ?? "http:"}//${host}${port}${spec.path ?? "/"}`, spec, callback);
+}
+
+function httpGet(input, options, callback) {
+  return httpRequest(input, options, callback).end();
 }
 
 // ─── util ───────────────────────────────────────────────────────────
@@ -1003,6 +1043,44 @@ function format(first, ...rest) {
   return [text, ...rest.slice(index).map((value) => inspect(value))].join(" ");
 }
 
+const TYPED_ARRAYS = [Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array, Float32Array, Float64Array, BigInt64Array, BigUint64Array];
+const BOXED_TAGS = ["Boolean", "Number", "String", "Symbol", "BigInt"];
+
+const tagOf = (value) => Object.prototype.toString.call(value).slice(8, -1);
+const isBoxed = (value) => typeof value === "object" && value !== null && BOXED_TAGS.includes(tagOf(value));
+
+/// Node's whole `util.types` table, because a bundle that reaches an absent member gets a TypeError
+/// where the predicate would simply have answered `false` — node-fetch calls `isBoxedPrimitive` on
+/// every request body it normalises.
+const types = {
+  isDate: (value) => value instanceof Date,
+  isRegExp: (value) => value instanceof RegExp,
+  isPromise: (value) => !!value && typeof value.then === "function",
+  isMap: (value) => value instanceof Map,
+  isSet: (value) => value instanceof Set,
+  isWeakMap: (value) => value instanceof WeakMap,
+  isWeakSet: (value) => value instanceof WeakSet,
+  isNativeError: (value) => value instanceof Error,
+  isArgumentsObject: (value) => tagOf(value) === "Arguments",
+  isAsyncFunction: (value) => tagOf(value) === "AsyncFunction",
+  isGeneratorFunction: (value) => tagOf(value) === "GeneratorFunction",
+  isGeneratorObject: (value) => tagOf(value) === "Generator",
+  isModuleNamespaceObject: (value) => tagOf(value) === "Module",
+  isArrayBuffer: (value) => value instanceof ArrayBuffer,
+  isSharedArrayBuffer: (value) => tagOf(value) === "SharedArrayBuffer",
+  isAnyArrayBuffer: (value) => value instanceof ArrayBuffer || tagOf(value) === "SharedArrayBuffer",
+  isArrayBufferView: (value) => ArrayBuffer.isView(value),
+  isDataView: (value) => value instanceof DataView,
+  isTypedArray: (value) => ArrayBuffer.isView(value) && !(value instanceof DataView),
+  isBoxedPrimitive: isBoxed,
+  isProxy: () => false,
+  isExternal: () => false,
+  isKeyObject: () => false,
+  isCryptoKey: () => false,
+  ...Object.fromEntries(TYPED_ARRAYS.map((Type) => [`is${Type.name}`, (value) => value instanceof Type])),
+  ...Object.fromEntries(BOXED_TAGS.map((tag) => [`is${tag}Object`, (value) => isBoxed(value) && tagOf(value) === tag])),
+};
+
 const promisifyCustom = Symbol.for("nodejs.util.promisify.custom");
 
 const util = {
@@ -1033,14 +1111,7 @@ const util = {
   isDeepStrictEqual: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   TextEncoder: globalThis.TextEncoder,
   TextDecoder: globalThis.TextDecoder,
-  types: {
-    isDate: (value) => value instanceof Date,
-    isRegExp: (value) => value instanceof RegExp,
-    isPromise: (value) => !!value && typeof value.then === "function",
-    isTypedArray: (value) => ArrayBuffer.isView(value),
-    isUint8Array: (value) => value instanceof Uint8Array,
-    isArrayBuffer: (value) => value instanceof ArrayBuffer,
-  },
+  types,
 };
 util.promisify.custom = promisifyCustom;
 
@@ -1138,9 +1209,34 @@ function makeUnsupported(label) {
 }
 
 const httpLike = (name) =>
-  unsupportedModule(name, { globalAgent: {}, STATUS_CODES: {}, METHODS: [] });
+  unsupportedModule(name, {
+    request: httpRequest,
+    get: httpGet,
+    validateHeaderName,
+    validateHeaderValue,
+    IncomingMessage,
+    ClientRequest,
+    globalAgent: {},
+    STATUS_CODES: {},
+    METHODS: [],
+  });
 
-const streamStub = unsupportedModule("stream", { PassThrough, pipeline });
+const streamModule = unsupportedModule(
+  "stream",
+  Object.assign(Stream, {
+    Stream,
+    Readable,
+    Writable,
+    Duplex,
+    Transform,
+    PassThrough,
+    pipeline,
+    finished,
+    promises: { pipeline: (...stages) => pipelinePromise(stages), finished: finishedPromise },
+  }),
+);
+
+const webStreamModule = { ReadableStream, WritableStream, TransformStream };
 
 // ─── Registry ───────────────────────────────────────────────────────
 
@@ -1160,7 +1256,7 @@ export const nodeModules = {
   punycode,
   assert,
   string_decoder: { StringDecoder },
-  url: { URL, URLSearchParams, fileURLToPath: (input) => (input instanceof URL ? decodeURIComponent(input.pathname) : String(input).replace(/^file:\/\//, "")), pathToFileURL: (input) => new URL("file://" + encodeURI(String(input))), parse: (text) => new URL(text), format: (value) => String(value), resolve: (from, to) => new URL(to, from).href },
+  url: { URL, URLSearchParams, fileURLToPath, pathToFileURL, parse: (text) => new URL(text), format: (value) => String(value), resolve: (from, to) => new URL(to, from).href },
   timers: { setTimeout, clearTimeout, setInterval, clearInterval, setImmediate, clearImmediate },
   "timers/promises": { setTimeout: (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms)) },
   perf_hooks: { performance: globalThis.performance },
@@ -1169,9 +1265,9 @@ export const nodeModules = {
   net: unsupportedModule("net"),
   tls: unsupportedModule("tls"),
   dns: unsupportedModule("dns"),
-  stream: streamStub,
-  "stream/web": unsupportedModule("stream/web"),
-  "stream/promises": unsupportedModule("stream/promises"),
+  stream: streamModule,
+  "stream/web": webStreamModule,
+  "stream/promises": { pipeline: (...stages) => pipelinePromise(stages), finished: finishedPromise },
   worker_threads: unsupportedModule("worker_threads", { isMainThread: true }),
   readline: unsupportedModule("readline"),
   tty: { isatty: () => false },

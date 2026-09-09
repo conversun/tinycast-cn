@@ -57,7 +57,12 @@ is the trap: a running Tinycast records every write to it as a genuine copy, so 
 lands in clipboard history looking like something the user copied. `notes-editor-test` seeded one on
 every run from #232 onward by calling the native `copy:`/`cut:`/`paste:` actions; it now drives the
 `writeSelection(to:types:)` and `readSelection(from:)` primitives those actions delegate to, against
-`NSPasteboard.withUniqueName()`. Same AppKit path, no shared side effect.
+`NSPasteboard.withUniqueName()`. Same AppKit path, no shared side effect. `pasteboard-test` is the
+second case, and it is why `ClipboardManager.fileURLs(on:volatileRoots:)` and `Paster.write(_:store:to:)`
+each take the thing they act on as a parameter: a seam that exists so the harness never has to reach
+for the shared board. Its scratch tree lives under `temporaryDirectory`, which is itself a volatile
+root, so the cases about *reading* files inject an empty root list and the one case about durability
+is the one that runs against the shipped roots.
 
 Never join a compile to its run with `&&` in a `set -e` script. `set -e` is specified to ignore a
 failing command in a non-final AND-OR list member, so `swiftc … && /tmp/x` swallows a compile error and
@@ -70,7 +75,8 @@ If a change touches anything in the right column, the harness on the left is man
 
 | Harness | Guards |
 | --- | --- |
-| `fuzz-test` | `Launcher/Model/SearchRelevance.swift` |
+| `fuzz-test` | `Launcher/Model/SearchRelevance.swift`, `EntryNaming.swift`, `ScriptRomanization.swift`, `LauncherOrder.swift` |
+| `corpus-test` | the launcher's ranking, over a dense synthetic index — **a new complaint is a new case in `Tests/launcher-corpus/corpus.json`** |
 | `file-search-test` | `FileSearch/Model/`, plus the shared `FuzzyMatch` scorer |
 | `file-search-session-test` | serialized query execution, debounce coalescing and cancellation |
 | `ranking-test` | `Launcher/Model/LauncherRankingStore.swift` |
@@ -78,30 +84,47 @@ If a change touches anything in the right column, the harness on the left is man
 | `app-name-test` | `Platform/AppDisplayName.swift` — every path that names a scanned bundle |
 | `calc-test` | all of `Calculator/Model/` |
 | `calendar-test` | all of `Calendar/Model/` — link detection, the join window, the day buckets |
-| `clipboard-test` | `Clipboard/Model/ClipboardStore.swift` |
+| `clipboard-test` | `Clipboard/Model/ClipboardStore.swift`, `ClipboardFilter.swift`, `ClipboardFileKind.swift`, the colour trio |
+| `pasteboard-test` | `Clipboard/Service/ClipboardManager.swift` capture and `Paster.write` — what a Finder copy reads as, and what a file entry writes back |
 | `emoji-test` | `Emoji/Model/EmojiCatalog.swift`, `EmojiGridGeometry.swift`, the generated data |
+| `palette-navigation-test` | `Palette/PaletteState.swift`'s screen motions — `prepare`, `replace`, `push`, `pop` |
 | `palette-selection-test` | `Features/PaletteRowIndex.swift` |
 | `palette-placement-test` | `DesignSystem/Theme.swift`, `Palette/PalettePlacement.swift` |
 | `hotkey-test` | `HotKeys/Model/DoubleTapModifier.swift`, `DoubleTapDetector.swift`, `HyperKey.swift`, `HotKeyAction.swift`, `Service/KeyShortcut.swift`, and the command→action mapping in `Launcher/Model/CommandID.swift` |
+| `fallback-test` | `Launcher/Model/Fallback.swift`, plus the `CommandID` and `Quicklink` ids it is built from |
 | `callout-test` | `DesignSystem/Theme.swift`, `HotKeys/UI/CalloutPlacement.swift` |
 | `system-action-test` | `SystemActions/Model/SystemAction.swift` |
 | `volume-test` | `SystemActions/Model/VolumeLevel.swift` |
-| `window-command-test` | `WindowManagement/WindowCommand.swift`, `WindowLayout.swift`, `WindowActionMemory.swift` |
+| `window-command-test` | `WindowManagement/WindowCommand.swift`, `WindowPlacementEngine.swift`, `WindowActionMemory.swift` |
+| `window-layout-test` | `WindowManagement/Model/WindowLayout*.swift` — the layout record, its geometry and its inverse, the plan and the store |
 | `custom-command-test` | `CustomCommands/Model/CustomCommand.swift`, `Service/ShellCommandRunner.swift` |
 | `uninstall-test` | all five pure files in `Uninstall/Model/` |
-| `quicklink-test` | all four files in `Quicklinks/Model/` |
+| `quicklink-test` | all of `Quicklinks/Model/` |
 | `snippets-test` | all of `Snippets/Model/` and `Snippets/Service/`, plus `Platform/HealthTicker.swift` |
 | `notes-test` | all of `Notes/Model/` and `Notes/Service/`, plus the real fuzzy matcher and signposts |
 | `notes-editor-test` | the literal Notes editor with real TextKit 2 and AppKit editing objects |
 | `raycast-test` | `Backup/Service/RaycastDecoder.swift`, `Scrypt.swift`, `Platform/Compression/Zlib.swift` |
 | `symbols-test` | `Extensions/Service/SymbolCatalog.swift`, against this machine's CoreGlyphs |
 | `ext-store-test` | `Extensions/Model/` — the registry model and both registry APIs' parsers |
+| `ext-refresh-test` | `Extensions/Model/ExtensionRefreshPolicy.swift` — interval parsing, due dates, backoff, subtitle fallback, indicator state |
+| `ext-metadata-test` | `Extensions/Service/ExtensionCommandMetadataStore.swift` — round-trip, failure runs, uninstall |
 | `ext-test` | the extension runtime end to end — boots a real bundle in JavaScriptCore and renders it |
 | `ext-icon-test` | `Extensions/Service/ExtensionIconCache.swift` — artwork sizing and its fallback |
 | `entry-icon-test` | `EntryIcon` — that each case draws, caches and prints apart from the others, and that a moved `FileIconStamp` retires the bitmap decoded before it |
+| `text-diff-test` | `QuickActions/Model/TextDiffEngine.swift` — exact chunks, Unicode, ties, token-cap boundaries and fast paths |
 | `settings-backup-test` | `Settings/AppSettingsKey.swift`, `Backup/Model/SettingsBackupCoverage.swift` |
+| `backup-archive-test` | all of `Backup/Model/`, plus `Backup/Service/BackupStaging.swift` |
 | `updates-test` | `Updates/Model/` — version precedence, channel filtering, install route, readiness |
 | `support-test` | `Support/Model/` — when the support reminder comes due, and a clock moved backwards |
+| `mcp-test` | `MCP/Model/` and `MCPSettingsStore` — JSON-RPC framing, handles, tool names, output flattening, trust, `@server` addressing |
+| `mcp-stdio-test` | `MCP/Service/` against a stub server — handshake, listing, calling, and every way one can go away |
+
+The two harnesses that need a server to talk to bring their own: `Tests/ai-fixtures/codex-stub.js`
+and `mcp-stub.js`, each copied into a scratch directory and put in front of PATH so the locator finds
+it the way it would find a real one. Both read fd 0 synchronously rather than through a stream —
+`codex-stub.js` stalls mid-turn on purpose, and an event loop would read the next line while it is
+still holding — and both write with `fs.writeSync`, so a reply is on the pipe before a mode that
+exits does.
 
 A harness that passed before a change passes after it. There is no "I'll fix it next commit" and no
 commenting out a case. If a change genuinely invalidates an assertion, the assertion is rewritten in the
@@ -121,7 +144,7 @@ when touching a pure file:
 - `Calculator/Model/` still takes its clock via `now`/`calendar` and its rates via `rates`
 - `Uninstall/Model/`'s deciding half still receives directory **names** and a `PathFacts`, never URLs
 - `HotKeys/Model/DoubleTap*` still take the clock as a parameter
-- `WindowManagement/` geometry still touches no `NSScreen` and makes no AX call
+- `WindowManagement/Model/` still touches no `NSScreen` and makes no AX call, layouts included
 - `Features/PaletteRowIndex.swift` still imports Foundation alone, despite living under `Features/`
 - `Quicklinks/Model/` is still handed the home directory rather than reading it
 - `FileSearch/Model/` is still handed the home directory rather than reading it
@@ -143,7 +166,7 @@ find ~/Library/Developer/Xcode/DerivedData -name "Tinycast*.app" -maxdepth 6 -pr
 - No `@unchecked Sendable`, `nonisolated(unsafe)` or `assumeIsolated` added without a stated reason.
 - The type-checker did not time out. `LauncherList.rows` already carries an explicit annotation for
   this reason; the fix for a timeout is an annotation, not a restructure.
-- Release binary under **5 MB**, and under 2% growth for an ordinary change.
+- Release binary growth under **2%** for an ordinary change.
 
 ### Lint
 
@@ -155,6 +178,11 @@ SwiftLint owns the rules that catch defects, including the two checkable comment
 100-character cap and the ban on stacked comment lines. Errors block; warnings do not. There is no
 formatter, deliberately — the configuration and the measurements behind that are in
 [development.md](development.md#formatting).
+
+The script then runs `Scripts/check-settings-search.js`, one check SwiftLint can't: every
+`SettingsAnchor` must be claimed by a section, and every row in `SettingsSearchCatalog` must be
+marked by a `SettingsRowTitle`. Either gap compiles and reads fine, and fails only at runtime as a
+search result that navigates and then sits there.
 
 ## Performance measurement
 
@@ -176,6 +204,21 @@ swiftc -O -swift-version 6 Tinycast/Platform/Signposts.swift \
 
 Every query runs twice: once on the shipped rules and once with five extra user patterns, so the output
 says what the ignore list itself costs rather than only what Spotlight does.
+
+The calculator benchmark is deterministic — an injected clock, calendar and rate table — so it is a
+timing harness rather than an assertion one, and stays out of `run-tests.sh` for that reason:
+
+```sh
+swiftc -O -swift-version 6 Tinycast/Features/Calculator/Model/*.swift \
+    Tests/calc-performance.swift -o /tmp/calc-performance
+/tmp/calc-performance          # µs per query, by grammar
+/tmp/calc-performance --probe  # every answer as JSON, to diff two builds
+/tmp/calc-performance --cold "10kg to lb"   # first query, including catalog decode
+```
+
+`Tests/text-diff-performance.swift` is the same shape for `TextDiffEngine`: build it with `-O`
+against the engine, pass a token count, a workload (`dense`, `sparse`, `equal`, `empty`) and an
+iteration count for timings, or `--probe` to diff every chunk between two builds.
 
 `Signposts.interval` owns an explicit `defer` around the wrapped work on purpose. The obvious spelling
 leaks the interval when the work throws, because the `.end` emit is skipped on the throw path and the
@@ -218,6 +261,17 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 - Palette hotkey opens the launcher; pressing it again closes it; Escape clears a non-empty query,
   then hides on a second press; clicking away closes it
+- Search a mode command (Clipboard History, Search Emoji, Search Quicklinks, Search Files, AI Chat)
+  and run it: Escape returns to the launcher **with the query still typed and the row still
+  selected**, and the next press clears it. The same screen from its own global hotkey hides the
+  palette instead, and shows its own header icon rather than a back chevron
+- ⌘⎋ from any depth lands on an empty root search with the window still open — **must be checked on
+  a real keyboard**: macOS claims the chord, so `CommandEscapeTap` is the only thing that delivers it
+  and it needs Accessibility granted to the running build. With the palette closed, ⌘⎋ still does
+  whatever macOS does with it
+- A bare ⌫ in an empty field walks the same path Escape does
+- General ▸ Escape Key Behavior set to `Close window and pop to root`: Escape on any screen closes
+  the window, and reopening lands on the root search whatever Pop to Root Search says
 - Reopening focuses the search field with an empty query, in the same position and at the same size
 - Compact mode: typing expands it, and the search bar does **not** shift vertically during the swap
 - With a CJK IME: the placeholder clears as soon as composition starts and the composing text never
@@ -229,7 +283,7 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - With a calculation typed, the calculator card is first and is selected first
 - Section headers appear in order: Favorites, Applications, System Settings, Quicklinks, Snippets,
   System Actions, Window Management, Custom Commands, Commands
-- ⌘K opens the Actions menu; ↑/↓ move it, ↵ activates, Escape closes the menu rather than the palette
+- With a non-ASCII input source active, ⌘K opens Actions; ↑/↓ move it, ↵ activates, Escape closes it
 - While a menu is open, typing does **not** change the query and the caret is hidden
 - Tab toggles launcher ↔ clipboard; bare Backspace on an empty query backs out of a sub-screen
 - Launching an app focuses it; escaping the palette returns focus to the app you came from
@@ -246,6 +300,9 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - ↵ pastes into the previous app; ⌥↵ pastes without closing the palette
 - A copy from an excluded app (Settings ▸ Clipboard ▸ Disabled Applications) is **not** recorded
 - Password-manager copies are still not recorded
+- Off (Settings ▸ Clipboard ▸ Enable Clipboard History): nothing new is recorded, the launcher row
+  and its shortcut are gone, the menu-bar row is gone, and Tab rings straight past the screen
+- Off then on again: existing clips come back; Clear history erases them while it is still off
 
 ### Launcher and icons
 
@@ -313,7 +370,10 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
   creates
 - Empty switcher search reads the complete recent list; title and body searches rank correctly and a
   superseded query never publishes
-- Inline rename updates the Markdown filename without changing source; collisions receive a suffix
+- An Untitled note titles itself from its first line as it is typed, in the title bar and — after the
+  autosave — in the browse list; naming it replaces that, and clearing the name brings it back
+- Inline rename updates the Markdown filename without changing source, and starts from that filename
+  even where the row shows a derived title; collisions receive a suffix
 - Delete confirms through Tinycast, moves the file to Trash, and selecting another note never loses an
   unsaved edit
 - An existing `Floating Note.md` appears as an ordinary note without conversion
@@ -370,12 +430,16 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Adding or deleting an event in Calendar.app updates an open palette without a reopen
 - A meeting with no link is listed and searchable, and answers Open in Calendar rather than Join
 - Import a backup taken with Calendar on: it comes back **off**, and no calendar toggle travels
-- Menu bar on Never: the item is the plain icon; on 5 minutes the title and countdown appear at T-5
-  and step on the minute boundary, not on a keystroke
+- Calendar in Menu Bar on Disabled: the calendar item is gone and Tinycast's own item is unaffected;
+  turning `Show in menu bar` off leaves an enabled calendar item in place, and both off leaves neither
+- On Meeting Title with Show Upcoming Events at 5 minutes, the title and countdown appear at T-5 and
+  step on the minute boundary, not on a keystroke
 - `Only show events with meetings` hides a linkless event and shows it again when unchecked
 - Hide Current Event on Automatically clears the entry at the start and hands the space to the next
   event inside its lead time; on 5 minutes it lingers counting up, then clears
-- Clicking the menu bar item opens the menu with `Join <title>` on top — a bare click never joins
+- Clicking the calendar item opens `Join <title>`, `Open in Calendar...`, `My Schedule` and
+  `Calendar Settings...` and nothing else; the second opens that event in Calendar.app, while a bare
+  click never joins
 - Camera Preview on: ↵ on the join card opens the panel **already showing live video** — no black
   frame, no blank mid-preview; ↵ joins, Esc drops the join; the camera light goes out with the
   panel, and the first run prompts once, before any panel appears
@@ -406,8 +470,14 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 - Every pane renders and the sidebar switches without flicker
 - A feature switch takes effect in the launcher immediately; every setting survives relaunch
-- Export produces a file; import applies it and reports a sensible summary
+- Export produces a `.tinycast`; import applies it and reports a per-category summary
+- Untick a category on export, and the import picker greys that row out rather than offering it
+- Untick a category on **import** and confirm it did not arrive, while the ticked ones did
+- An image clip round-trips and still renders; the archive can then be deleted without breaking it
+- A file whose `manifest.json` `format` was hand-edited is refused **with a message naming it**
+- Cancelling the save panel leaves nothing in `~/Library/Caches/com.tinycast.app.dev/backup-staging/`
 - **`snippetsEnabled` is not in the exported file**, and importing does not enable snippets
+- Nothing in the extracted tree names a Keychain item, an extension, or an AI conversation
 
 ### Clean install
 

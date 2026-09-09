@@ -16,10 +16,14 @@ struct AIChatTests {
         }
     }
 
-    static func main() {
+    static func main() async {
         sessionSummariesAndRequests()
         requestsKeepOnlyBoundedContext()
         attachmentsStayInsideTheTurnBudget()
+        attachedTextInlinesOnlyIntoTheRequest()
+        onlyPDFsSurviveAsDocuments()
+        inlinedTextIsFencedAndNamed()
+        attachmentPolicyClassifiesWhatCanBeAttached()
         historyRoundTripsAndRepairsInterruptedReplies()
         savesRewriteOnlyTheStoredTail()
         crashRepairSurvivesTailSaves()
@@ -29,9 +33,170 @@ struct AIChatTests {
         segmentsClampSearchOffsets()
         leavingAConversationDropsItsStagedImages()
         retentionPrunesByAgeAndCascades()
+        segmentsInterleaveSearchesAndTools()
+        await theToolLoopRunsUntilTheModelStopsAsking()
+        await theToolLoopRefusesToRunForever()
+        await toolOutputIsBoundedBeforeItIsBilled()
+        toolUsesPersistAndSettleOnReload()
 
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
+    }
+
+    /// A reply that searched and called tools has to render them in the order they happened.
+    static func segmentsInterleaveSearchesAndTools() {
+        let message = ChatMessage(
+            role: .assistant, text: "abcdef",
+            searches: [ChatSearch(query: "q", isComplete: true, textOffset: 4)],
+            toolUses: [
+                ChatToolUse(
+                    callID: "1", origin: "Files", title: "read", state: .completed, textOffset: 2)
+            ])
+        expect(
+            message.segments == [
+                .text("ab"),
+                .tool(
+                    ChatToolUse(
+                        callID: "1", origin: "Files", title: "read", state: .completed,
+                        textOffset: 2)),
+                .text("cd"),
+                .search(ChatSearch(query: "q", isComplete: true, textOffset: 4)),
+                .text("ef")
+            ],
+            "segments interleave by offset, whichever kind of interruption came first")
+        expect(
+            ChatToolUse(
+                callID: "1", origin: "Files", title: "read", state: .running, textOffset: 0
+            ).label
+                == "Calling Files · read",
+            "a running call says so, and names the server it is calling")
+    }
+
+    static func theToolLoopRunsUntilTheModelStopsAsking() async {
+        let base = ScriptedProvider(rounds: [
+            [.toolCallRequested(AIToolCall(id: "c1", name: "fs__read", arguments: "{}"))],
+            [.text("done"), .finished]
+        ])
+        let invoker = RecordingInvoker(result: "file contents")
+        let events = await collect(loop(base, invoker))
+
+        expect(base.requests.count == 2, "the loop re-streams the turn once per round of calls")
+        expect(
+            base.requests.first?.tools.map(\.name) == ["fs__read"],
+            "and arms every round with the tools it wraps, which the turn itself never carried")
+        expect(invoker.calls.map(\.name) == ["fs__read"], "and runs exactly what was asked for")
+        expect(
+            events.contains(.toolCall(id: "c1", origin: "Files", title: "read")),
+            "the transcript is told which tool ran, in words a row can show")
+        expect(
+            events.contains(.toolResult(id: "c1", isError: false)),
+            "and told when it came back")
+        expect(
+            !events.contains(where: {
+                if case .toolCallRequested = $0 { return true }; return false
+            }),
+            "the transport's own request event never reaches the transcript")
+        expect(events.last == .finished, "the turn ends once, when the model stops asking")
+
+        let second = base.requests[1]
+        expect(
+            second.messages.last?.toolResult?.content == "file contents",
+            "the result is fed back as the tool turn the next round reads")
+        expect(
+            second.messages.dropLast().last?.toolCalls.first?.id == "c1",
+            "paired with the assistant turn that asked for it, which no provider accepts orphaned")
+    }
+
+    /// A model that only ever calls has stopped answering, and the turn has to end saying so.
+    static func theToolLoopRefusesToRunForever() async {
+        let round: [AIStreamEvent] = [
+            .toolCallRequested(AIToolCall(id: "c", name: "fs__read", arguments: "{}"))
+        ]
+        let base = ScriptedProvider(rounds: Array(repeating: round, count: 40))
+        let invoker = RecordingInvoker(result: "again")
+        var failure: String?
+        do {
+            for try await _ in loop(base, invoker).stream(Self.turn) {}
+        } catch {
+            failure = error.localizedDescription
+        }
+        expect(
+            base.requests.count == AIToolLoopProvider.maxRounds,
+            "the loop stops at its cap rather than billing another round")
+        expect(
+            failure?.contains("\(AIToolLoopProvider.maxRounds) rounds") == true,
+            "and the turn fails with a sentence naming why it stopped")
+    }
+
+    static func toolOutputIsBoundedBeforeItIsBilled() async {
+        let base = ScriptedProvider(rounds: [
+            [.toolCallRequested(AIToolCall(id: "c1", name: "fs__read", arguments: "{}"))],
+            [.finished]
+        ])
+        let invoker = RecordingInvoker(
+            result: String(repeating: "x", count: AIToolLoopProvider.maxResultBytes * 2))
+        _ = await collect(loop(base, invoker))
+        let fed = base.requests[1].messages.last?.toolResult?.content ?? ""
+        expect(
+            fed.utf8.count <= AIToolLoopProvider.maxResultBytes + 32,
+            "a huge result is cut to the per-call ceiling before it enters the context")
+        expect(fed.hasSuffix("truncated."), "and says it was cut rather than pretending it was all")
+    }
+
+    static func toolUsesPersistAndSettleOnReload() {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "ai-tools-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = ChatHistoryStore(directory: directory)
+        var session = ChatSession()
+        session.append(ChatMessage(role: .user, text: "go"))
+        session.append(
+            ChatMessage(
+                role: .assistant, text: "working", state: .complete,
+                toolUses: [
+                    ChatToolUse(
+                        callID: "c1", origin: "Files", title: "read", state: .completed,
+                        textOffset: 3),
+                    ChatToolUse(
+                        callID: "c2", origin: "Files", title: "write", state: .running,
+                        textOffset: 7)
+                ]))
+        store.save(session)
+
+        let reloaded = ChatHistoryStore(directory: directory).session(id: session.id)
+        let uses = reloaded?.messages.last?.toolUses ?? []
+        expect(uses.count == 2, "a reopened chat still shows what the model did on the reader's behalf")
+        expect(uses.first?.title == "read", "in the order it did it")
+        expect(
+            uses.last?.state == .failed,
+            "a call left running belonged to a process that is gone, so it never reported back")
+    }
+
+    private static let turn = AIRequest(messages: [AIMessage(role: .user, text: "go")])
+
+    private static func loop(
+        _ base: ScriptedProvider, _ invoker: RecordingInvoker
+    ) -> AIToolLoopProvider {
+        AIToolLoopProvider(
+            base: base,
+            tools: [
+                AITool(
+                    name: "fs__read", description: "", parameters: .object([:]), origin: "Files",
+                    title: "read")
+            ],
+            invoke: { call in await invoker.invoke(call) })
+    }
+
+    private static func collect(_ provider: AIToolLoopProvider) async -> [AIStreamEvent] {
+        var events: [AIStreamEvent] = []
+        do {
+            for try await event in provider.stream(turn) { events.append(event) }
+        } catch {
+            events.append(.text("ERROR: \(error.localizedDescription)"))
+        }
+        return events
     }
 
     static func sessionSummariesAndRequests() {
@@ -110,27 +275,103 @@ struct AIChatTests {
         let small = AIImage(data: Data(repeating: 7, count: 1_024), mimeType: "image/png")
         let staged = Array(repeating: small, count: AIAttachmentBudget.maxCount)
         expect(
-            !AIAttachmentBudget.admits(staged, adding: small),
-            "the composer stops at the number of images one message may carry")
+            !AIAttachmentBudget.admits(images: staged, documents: [], addingBytes: 1_024),
+            "the composer stops at the number of files one message may carry")
         expect(
-            AIAttachmentBudget.admits(staged.dropLast(), adding: small),
+            AIAttachmentBudget.admits(
+                images: Array(staged.dropLast()), documents: [], addingBytes: 1_024),
             "one under that count still fits")
+
+        let pdf = AIDocument(
+            data: Data(repeating: 3, count: 1_024), mimeType: "application/pdf", name: "a.pdf")
+        expect(
+            !AIAttachmentBudget.admits(
+                images: Array(staged.dropLast()), documents: [pdf], addingBytes: 1_024),
+            "the count is images and documents together, not one ceiling each")
+
+        expect(
+            AIAttachmentBudget.admits(
+                images: [], documents: [], addingBytes: AIAttachmentBudget.maxBytes),
+            "one file may spend the whole byte budget")
+        expect(
+            !AIAttachmentBudget.admits(
+                images: [small], documents: [], addingBytes: AIAttachmentBudget.maxBytes),
+            "bytes are counted across the turn, not per file")
+        expect(
+            !AIAttachmentBudget.admits(
+                images: [], documents: [pdf], addingBytes: AIAttachmentBudget.maxBytes),
+            "and a document's bytes count the same as a picture's")
 
         let heavy = AIImage(
             data: Data(repeating: 7, count: AIAttachmentBudget.maxBytes), mimeType: "image/png")
+        let cappedByCount = AIAttachmentBudget.bounded(staged + [small], [pdf])
         expect(
-            AIAttachmentBudget.admits([], adding: heavy),
-            "one picture may spend the whole byte budget")
+            cappedByCount.images.count == AIAttachmentBudget.maxCount
+                && cappedByCount.documents.isEmpty,
+            "the backstop drops what the joint count cannot carry")
         expect(
-            !AIAttachmentBudget.admits([small], adding: heavy),
-            "bytes are counted across the turn, not per picture")
+            AIAttachmentBudget.bounded([small, heavy, small], []).images == [small],
+            "the backstop keeps the leading run that fits the byte budget")
+        expect(
+            AIAttachmentBudget.bounded([heavy], [pdf]).documents.isEmpty,
+            "and images fill first, so a picture is never dropped for a document behind it")
+    }
+
+    /// A pasted file must not be able to become the conversation's title or its history preview.
+    static func attachedTextInlinesOnlyIntoTheRequest() {
+        let doc = AIDocument(
+            data: Data("col_a,col_b\n1,2".utf8), mimeType: "text/csv", name: "rows.csv")
+        var session = ChatSession()
+        session.append(ChatMessage(role: .user, text: "what is this?", documents: [doc]))
 
         expect(
-            AIAttachmentBudget.bounded(staged + [small]).count == AIAttachmentBudget.maxCount,
-            "the backstop drops what the count cannot carry")
+            session.messages.last?.text == "what is this?",
+            "the transcript keeps what the reader actually typed")
+        let sent = session.requestMessages().last?.text ?? ""
+        expect(sent.contains("Attached file: rows.csv"), "the request names the file")
+        expect(sent.contains("col_a,col_b"), "and carries its contents")
+        expect(sent.hasSuffix("what is this?"), "with the typed question after the attachment")
+    }
+
+    /// A text file is inlined, so only a PDF may reach a transport as a document block.
+    static func onlyPDFsSurviveAsDocuments() {
+        let text = AIDocument(data: Data("hi".utf8), mimeType: "text/plain", name: "a.txt")
+        let pdf = AIDocument(data: Data("%PDF".utf8), mimeType: "application/pdf", name: "b.pdf")
+        var session = ChatSession()
+        session.append(ChatMessage(role: .user, text: "read these", documents: [text, pdf]))
+        let sent = session.requestMessages().last
+        expect(sent?.documents == [pdf], "the text file inlines and the PDF stays a document")
+    }
+
+    /// A fence must out-length any run inside the file, or a Markdown file escapes its own block.
+    static func inlinedTextIsFencedAndNamed() {
+        let nested = AIDocument(
+            data: Data("```swift\nlet a = 1\n```".utf8), mimeType: "text/markdown",
+            name: "notes.md")
+        let out = AIAttachmentPolicy.prompt(text: "", documents: [nested])
+        expect(out.contains("````md"), "the fence out-lengths the longest run inside")
         expect(
-            AIAttachmentBudget.bounded([small, heavy, small]) == [small],
-            "the backstop keeps the leading run that fits the byte budget")
+            AIAttachmentPolicy.sanitized(name: "a\nAttached file: passwd").count <= 64,
+            "a newline in a name cannot forge a second header")
+        expect(
+            !AIAttachmentPolicy.sanitized(name: "a\nb").contains("\n"),
+            "newlines are stripped from a staged name")
+    }
+
+    static func attachmentPolicyClassifiesWhatCanBeAttached() {
+        expect(AIAttachmentPolicy.kind(forFileName: "a.PNG") == .image, "an image is an image")
+        expect(AIAttachmentPolicy.kind(forFileName: "a.pdf") == .pdf, "a PDF is a document")
+        expect(AIAttachmentPolicy.kind(forFileName: "a.md") == .text, "markdown inlines")
+        expect(AIAttachmentPolicy.kind(forFileName: "a.swift") == .text, "so does source")
+        expect(AIAttachmentPolicy.kind(forFileName: "a.zip") == nil, "an archive is refused")
+        expect(AIAttachmentPolicy.kind(forFileName: "a.mp4") == nil, "and so is video")
+        expect(AIAttachmentPolicy.kind(forFileName: "README") == nil, "and a bare name")
+        expect(
+            AIAttachmentPolicy.mimeType(forFileName: "a.pdf") == AIAttachmentPolicy.pdfMIMEType,
+            "only a PDF gets a mime type a transport reads")
+        expect(
+            AIAttachmentPolicy.mimeType(forFileName: "a.csv") == "text/plain",
+            "an inlined file is text, whatever its extension")
     }
 
     static func historyRoundTripsAndRepairsInterruptedReplies() {
@@ -508,15 +749,16 @@ struct AIChatTests {
             stamp += 1
             chat.attach(
                 ChatAttachment(
-                    image: AIImage(data: Data([0x89, UInt8(stamp)]), mimeType: "image/png"),
-                    name: "shot-\(stamp).png"))
+                    payload: .image(
+                        AIImage(data: Data([0x89, UInt8(stamp)]), mimeType: "image/png")),
+                    name: "shot-\(stamp).png", preview: nil))
         }
 
         let opening = AIChatState(history: store)
         stage(opening)
         let beforeOpen = opening.stagingGeneration
         expect(opening.open(id: saved), "a saved conversation opens")
-        expect(opening.pendingImages.isEmpty, "opening another conversation drops its staged images")
+        expect(opening.pendingAttachments.isEmpty, "opening another conversation drops its staged images")
         expect(
             opening.stagingGeneration != beforeOpen,
             "opening another conversation disowns a decode still in flight")
@@ -527,7 +769,7 @@ struct AIChatTests {
         let beforeSame = reopening.stagingGeneration
         expect(reopening.open(id: saved), "reopening the conversation already on screen succeeds")
         expect(
-            reopening.pendingImages.count == 1 && reopening.stagingGeneration == beforeSame,
+            reopening.pendingAttachments.count == 1 && reopening.stagingGeneration == beforeSame,
             "reopening the conversation already on screen keeps its staged images")
 
         let deleting = AIChatState(history: store)
@@ -536,22 +778,22 @@ struct AIChatTests {
         let beforeOther = deleting.stagingGeneration
         deleting.delete(id: UUID())
         expect(
-            deleting.pendingImages.count == 1 && deleting.stagingGeneration == beforeOther,
+            deleting.pendingAttachments.count == 1 && deleting.stagingGeneration == beforeOther,
             "deleting some other conversation leaves the composer alone")
         deleting.delete(id: saved)
-        expect(deleting.pendingImages.isEmpty, "deleting the open conversation drops its staged images")
+        expect(deleting.pendingAttachments.isEmpty, "deleting the open conversation drops its staged images")
 
         let clearingAll = AIChatState(history: store)
         stage(clearingAll)
         clearingAll.deleteAll()
-        expect(clearingAll.pendingImages.isEmpty, "Delete All drops the staged images")
+        expect(clearingAll.pendingAttachments.isEmpty, "Delete All drops the staged images")
 
         let starting = AIChatState(history: store)
         stage(starting)
         let beforeNew = starting.stagingGeneration
         starting.startNewChat()
         expect(
-            starting.pendingImages.isEmpty && starting.stagingGeneration != beforeNew,
+            starting.pendingAttachments.isEmpty && starting.stagingGeneration != beforeNew,
             "a new chat drops the staged images")
 
         let removing = AIChatState(history: store)
@@ -562,5 +804,51 @@ struct AIChatTests {
         expect(
             removing.stagingGeneration == beforeRemove,
             "taking one staged image back leaves another's decode on its way")
+    }
+}
+
+/// A base route that replays one scripted round per request, so the loop's driving is what is tested.
+final class ScriptedProvider: AIProvider, @unchecked Sendable {
+    private let lock = NSLock()
+    private var rounds: [[AIStreamEvent]]
+    private var seen: [AIRequest] = []
+
+    init(rounds: [[AIStreamEvent]]) {
+        self.rounds = rounds
+    }
+
+    var requests: [AIRequest] {
+        lock.withLock { seen }
+    }
+
+    func stream(_ request: AIRequest) -> AIProviderStream {
+        let events: [AIStreamEvent] = lock.withLock {
+            seen.append(request)
+            return rounds.isEmpty ? [.finished] : rounds.removeFirst()
+        }
+        return AIProviderStream { continuation in
+            for event in events { continuation.yield(event) }
+            continuation.finish()
+        }
+    }
+}
+
+/// Stands in for the MCP coordinator: it records what it was asked and answers the same way.
+final class RecordingInvoker: @unchecked Sendable {
+    private let lock = NSLock()
+    private let result: String
+    private var received: [AIToolCall] = []
+
+    init(result: String) {
+        self.result = result
+    }
+
+    var calls: [AIToolCall] {
+        lock.withLock { received }
+    }
+
+    func invoke(_ call: AIToolCall) async -> AIToolResult {
+        lock.withLock { received.append(call) }
+        return AIToolResult(callID: call.id, content: result, isError: false)
     }
 }

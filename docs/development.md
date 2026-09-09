@@ -9,6 +9,8 @@ verifying a change is [testing.md](testing.md).
 - Xcode 26 — it provides the SwiftUI macro plugin and the SDK.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen), and for linting:
   `brew install swiftlint`.
+- Node, for the generators and for the two stub servers `run-tests.sh` drives. It is the only
+  scripting runtime here — building the app still needs none of it.
 
 ## First-time setup
 
@@ -51,8 +53,7 @@ nor clobber an installed app's state, and both run side by side.
 
 **What earns a place in Caches is refetchable, and nothing else.** Anything the user would notice the
 loss of goes in Application Support: `~/Library/Caches` is excluded from Time Machine and the system
-reclaims it under disk pressure without saying so. `Tinycast/Migration/StorageRelocation.swift` moves
-an older layout across on first launch, and is deleted on 2026-09-05.
+reclaims it under disk pressure without saying so.
 
 Consequences worth knowing:
 

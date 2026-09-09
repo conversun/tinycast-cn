@@ -17,7 +17,7 @@ events as searchable launcher entries.
   after the moment the switch was armed. Both are why `AutoJoinPolicy` takes `armedAt` and the
   already-joined set rather than reading a clock of its own.
 - **The camera settles before the panel opens, and stops after it closes.**
-  `CameraPreviewSession.start()` resolves access and blocks on `startRunning` first, then hands
+  `CameraSession.start()` resolves access and blocks on `startRunning` first, then hands
   `CameraPreviewController` a settled `Feed` — so the panel's first frame is live video rather than a
   stage it has to swap out, and the TCC prompt never takes key from a panel already up.
   `stop()` runs from the fade-out's completion, so the camera light never outlives the preview but
@@ -35,6 +35,9 @@ events as searchable launcher entries.
   go through it, so they cannot drift apart. Because an event ending changes nothing in EventKit,
   the filter alone is not enough for the launcher slice: `CalendarCoordinator` republishes it on the
   minute boundary and on every summon.
+- **The menu bar's `Today` horizon follows the same empty-state rule.** It carries any remaining
+  event that starts today, plus an event within 30 minutes after midnight; only then does the title
+  mode read `No upcoming events`.
 - **`calendarEnabled` doubles as consent**, so it is in `SettingsBackupCoverage.deliberatelyExcluded`
   and only `CalendarCoordinator.setCalendarEnabled` may write it. Tinycast's own dialog comes first,
   the macOS prompt second, and only from the gesture that asked.
@@ -122,6 +125,14 @@ All five leave the launcher when the feature is off **or** when "Show in launche
 `CalendarCoordinator.applyEnabled`, the `applyQuicklinksPresence` twin. Their shortcuts, the join
 card and the menu bar are unaffected: only launcher search is.
 
+The Calendar settings can limit the individual meeting entries in launcher search to the next 1, 3,
+or 5 meetings, or leave them all visible. New installations default to the next 3 meetings so a busy
+calendar does not crowd out apps and commands.
+
+For the menu bar, **Keep visible — show time left** leaves a started meeting up until it ends: it
+changes from `Now` during the first five minutes to its remaining time. The other choices preserve
+the option to hide a current event immediately or after a chosen delay.
+
 | Command | Does | Bindable |
 | --- | --- | --- |
 | Join Next Meeting | Opens the link for the carded, running, or next meeting. | yes |
@@ -164,13 +175,24 @@ which is `[start - lead, start)` for **Automatically** and `[start - lead, min(s
 for the timed options. Because the earliest qualifying event wins, one hiding hands the space to the
 next with no extra logic.
 
-`MenuBarLabel` reads the coordinator rather than the stores, which is what scopes Observation to the
-label instead of re-running the whole `MenuBarExtra` scene. It falls back to the app's own glyph when
-nothing is due, so the item never disappears out from under the user, and the title is capped at
-`MenuBarSummary.titleCap` characters — a hard cap is the only thing that bounds a menu bar.
+**The calendar's item and Tinycast's own item are two independent `MenuBarExtra` scenes**, each
+inserted by one preference and reading nothing off the other: `showInMenuBar` on General for
+Tinycast's, `calendarMenuBarDisplay` here for the calendar's. Either may be the only one in the menu
+bar, both may be, or neither. Dragging the calendar item out writes `.disabled`, which is what the
+picker already said — it never touches `showInMenuBar`.
 
-A click opens the usual menu, with `Join <title>` added on top. **A bare click never joins**: the
-menu bar is not a button, and a mis-click there would open a call.
+The display choice is **Disabled**, **Meeting Icon**, or **Meeting Title**; the title reads
+`title • in X min` and is capped at `MenuBarSummary.titleCap` characters — a hard cap is the only
+thing that bounds a menu bar. `CalendarMenuBarLabel` reads the coordinator rather than the stores,
+which scopes Observation to the label instead of re-running either scene. It falls back to a calendar
+glyph when nothing is due, so the calendar item never disappears out from under the user. In **Meeting
+Title** mode, once no event remains today it instead reads `No upcoming events`.
+
+`CalendarMenuBarMenu` lists calendar actions only — `Join <title>` and `Open in Calendar...` for the
+displayed event, then `My Schedule` and `Calendar Settings...` — so the two menus never repeat each
+other. `Join` is absent for a linkless appointment rather than opening Calendar under a name that
+lies. **A bare click never joins**: the menu bar is not a button, and a mis-click there would open a
+call.
 
 ## Auto join and the preview
 
@@ -194,8 +216,9 @@ join(meeting)
 ```
 
 **The preview is itself a confirmation**, so it stands in for one when both are on rather than asking
-twice. `CameraPreviewPanel` sits at `.floating`, below a dialog's `.modalPanel`, so a failure report
-still lands on top of it.
+twice. `CameraPanel` sits at `.floating`, below a dialog's `.modalPanel`, so a failure report
+still lands on top of it. The session, the panel and the stage are the `Camera` feature's — see
+[camera.md](camera.md); only the join-specific controller and footer live here.
 
 ## Settings
 
@@ -219,8 +242,10 @@ and the empty schedule reads `MeetingSpan.orPhrase` off the store that did the q
 placeholder names no days at all: it is a static `PaletteMode` string, and one that advertised a span
 it could not read would be wrong half the time.
 
-Both menu-bar enums put their default at `rawValue == 0`, so `defaults.integer(forKey:)` returning 0
-for an unset key lands on `.never` and `.automatically` rather than fighting them.
+`CalendarMenuBarDisplay` and `MenuBarEvents` both put their default at `rawValue == 0`, so an unset
+preference lands on `.disabled` and `.today` rather than fighting them. `MenuBarEvents` has no `Never`:
+`.disabled` is the one switch that takes the item out of the menu bar, and a second one would only
+disagree with it.
 
 The Permissions pane shows calendar access alongside Accessibility, but only ever opens System
 Settings: the Calendar pane's own switch is the one place that may prompt.

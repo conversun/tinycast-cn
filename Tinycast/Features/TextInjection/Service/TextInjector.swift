@@ -18,23 +18,75 @@ enum AccessibilityReplacement: Equatable {
     case unavailable
     case rejected
 
-    /// Only `.unavailable` falls back to events; `.rejected` means the text moved, so fail closed.
+    /// `.rejected` means the document is not the one we measured, so events would edit the wrong text.
     var fallsBackToEvents: Bool { self == .unavailable }
+}
+
+/// The two judgements the Accessibility tier makes, kept pure so the harness can drive both.
+enum AccessibilityReplacementPolicy {
+    enum KeywordState: Equatable {
+        case matched(NSRange)
+        case pending
+        case rejected
+    }
+
+    /// Too little text yet is a renderer still catching up; enough text but wrong is a real mismatch.
+    static func keywordState(
+        value: String, selectedRange: NSRange, keyword: String
+    ) -> KeywordState {
+        guard selectedRange.length == 0,
+            let selectedStringRange = Range(selectedRange, in: value)
+        else { return .rejected }
+        let beforeCursor = value[..<selectedStringRange.lowerBound]
+        guard beforeCursor.count >= keyword.count else { return .pending }
+        let start = beforeCursor.index(beforeCursor.endIndex, offsetBy: -keyword.count)
+        guard beforeCursor[start...].lowercased() == keyword.lowercased() else { return .rejected }
+        return .matched(NSRange(start..<beforeCursor.endIndex, in: value))
+    }
+
+    /// Chromium answers `.success` and applies nothing, so the value has to read back as we wrote it.
+    static func confirmsReplacement(
+        originalValue: String,
+        replacementRange: NSRange,
+        insertedText: String,
+        observedValue: String?
+    ) -> Bool {
+        guard let observedValue,
+            let stringRange = Range(replacementRange, in: originalValue)
+        else { return false }
+        var expected = originalValue
+        expected.replaceSubrange(stringRange, with: insertedText)
+        return observedValue == expected
+    }
 }
 
 @MainActor
 final class DeliveryCompletion {
-    private let callback: @MainActor () -> Void
+    private let onDelivered: @MainActor () -> Void
+    private let onFailed: @MainActor () -> Void
     private(set) var isConfirmed = false
+    private var isSettled = false
 
-    init(callback: @escaping @MainActor () -> Void = {}) {
-        self.callback = callback
+    init(
+        onDelivered: @escaping @MainActor () -> Void = {},
+        onFailed: @escaping @MainActor () -> Void = {}
+    ) {
+        self.onDelivered = onDelivered
+        self.onFailed = onFailed
     }
 
     func confirm() {
-        guard !isConfirmed else { return }
+        guard !isSettled else { return }
+        isSettled = true
         isConfirmed = true
-        callback()
+        onDelivered()
+    }
+
+    /// Driven from a `defer`, so a delivery that returned early still says so instead of vanishing.
+    func settle() {
+        guard !isSettled else { return }
+        isSettled = true
+        onFailed()
     }
 }
 
@@ -138,11 +190,12 @@ final class TextInjector {
     func replaceSelection(
         with text: String,
         in targetApp: NSRunningApplication?,
-        onDelivered: @escaping @MainActor () -> Void = {}
+        onDelivered: @escaping @MainActor () -> Void = {},
+        onFailed: @escaping @MainActor () -> Void = {}
     ) {
         deliver(
             InjectedText(text), targetApp: targetApp, expectedKeyword: nil, keywordLength: 0,
-            automaticGeneration: nil, onDelivered: onDelivered)
+            automaticGeneration: nil, onDelivered: onDelivered, onFailed: onFailed)
     }
 
     /// A `changeCount` that never moves means nothing was selected, not that the old clipboard won.
@@ -195,7 +248,8 @@ final class TextInjector {
         expectedKeyword: String?,
         keywordLength: Int,
         automaticGeneration: AutomaticGeneration?,
-        onDelivered: @escaping @MainActor () -> Void = {}
+        onDelivered: @escaping @MainActor () -> Void = {},
+        onFailed: @escaping @MainActor () -> Void = {}
     ) {
         activate(targetApp)
         if let automaticGeneration {
@@ -205,7 +259,10 @@ final class TextInjector {
                     targetApp: targetApp)
             else { return }
         } else {
-            guard prepareInteractiveExpansion(targetApp: targetApp) else { return }
+            guard prepareInteractiveExpansion(targetApp: targetApp) else {
+                onFailed()
+                return
+            }
         }
 
         deliveryQueue.enqueue(isAutomatic: automaticGeneration != nil) { [weak self] in
@@ -216,7 +273,7 @@ final class TextInjector {
                 expectedKeyword: expectedKeyword,
                 keywordLength: keywordLength,
                 automaticGeneration: automaticGeneration,
-                onDelivered: onDelivered)
+                completion: DeliveryCompletion(onDelivered: onDelivered, onFailed: onFailed))
         }
     }
 
@@ -226,8 +283,9 @@ final class TextInjector {
         expectedKeyword: String?,
         keywordLength: Int,
         automaticGeneration: AutomaticGeneration?,
-        onDelivered: @escaping @MainActor () -> Void
+        completion: DeliveryCompletion
     ) async {
+        defer { completion.settle() }
         guard finishPendingPasteboardOwnership(),
             await activateAndWaitForTarget(
                 targetApp,
@@ -238,12 +296,12 @@ final class TextInjector {
                 promptForInteractiveAccessibility: true)
         else { return }
 
-        let completion = DeliveryCompletion(callback: onDelivered)
-        let accessibilityReplacement = replaceUsingAccessibility(
+        let accessibilityReplacement = await replaceUsingAccessibility(
             injected,
             targetApp: targetApp,
             expectedKeyword: expectedKeyword,
-            keywordLength: keywordLength)
+            keywordLength: keywordLength,
+            automaticGeneration: automaticGeneration)
         if accessibilityReplacement == .delivered {
             completion.confirm()
             return
@@ -314,7 +372,7 @@ final class TextInjector {
                 automaticGeneration: automaticGeneration,
                 targetApp: targetApp,
                 promptForInteractiveAccessibility: false),
-            await postDeletionEvents(
+            await postEventGroups(
                 deletionEvents,
                 targetApp: targetApp,
                 automaticGeneration: automaticGeneration),
@@ -347,22 +405,22 @@ final class TextInjector {
                 automaticGeneration: automaticGeneration,
                 targetApp: targetApp,
                 promptForInteractiveAccessibility: false),
-            await postDeletionEvents(
+            await postEventGroups(
                 deletionEvents,
                 targetApp: targetApp,
                 automaticGeneration: automaticGeneration),
             await waitAfterKeywordDeletion(keywordLength),
-            deliveryIsAllowed(
-                automaticGeneration: automaticGeneration,
+            await postEventGroups(
+                insertionEvents,
                 targetApp: targetApp,
-                promptForInteractiveAccessibility: false)
+                automaticGeneration: automaticGeneration)
         else { return false }
 
-        post(insertionEvents, targetApp: targetApp)
         return await wait(for: .milliseconds(100))
     }
 
-    private func postDeletionEvents(
+    /// Each group is one keystroke, spaced so a target that stops accepting them halts the rest.
+    private func postEventGroups(
         _ events: [[CGEvent]],
         targetApp: NSRunningApplication?,
         automaticGeneration: AutomaticGeneration?
@@ -416,7 +474,7 @@ final class TextInjector {
             break
         case .failed:
             // Still ours, so leave `activePasteboardLease` in place for the retry below.
-            return
+            if lease.isOwned { return }
         }
         if activePasteboardLease === lease { activePasteboardLease = nil }
     }
@@ -484,57 +542,150 @@ final class TextInjector {
         return false
     }
 
+    private struct AccessibilityTarget {
+        let element: AXUIElement
+        let value: String
+        let originalRange: NSRange
+        let replacementRange: NSRange
+    }
+
+    private enum AccessibilityTargetState {
+        case ready(AccessibilityTarget)
+        case pending
+        case unavailable
+        case rejected
+    }
+
+    /// Rule 1: a renderer surface answers about its own model, so it is never written to over AX.
     private func replaceUsingAccessibility(
         _ injected: InjectedText,
         targetApp: NSRunningApplication?,
         expectedKeyword: String?,
-        keywordLength: Int
-    ) -> AccessibilityReplacement {
-        guard let targetApp,
-            let element = AccessibilityText.focusedElement(in: targetApp),
-            isAttributeSettable(kAXSelectedTextRangeAttribute, in: element),
-            isAttributeSettable(kAXSelectedTextAttribute, in: element),
-            let value = stringValue(in: element),
-            let originalRange = selectedRange(in: element)
-        else { return .unavailable }
-        guard let selectedStringRange = Range(originalRange, in: value) else {
-            return .rejected
+        keywordLength: Int,
+        automaticGeneration: AutomaticGeneration?
+    ) async -> AccessibilityReplacement {
+        guard let targetApp else { return .unavailable }
+        let state = await accessibilityTarget(
+            in: targetApp,
+            expectedKeyword: expectedKeyword,
+            keywordLength: keywordLength,
+            automaticGeneration: automaticGeneration)
+        guard case .ready(let target) = state else {
+            if case .rejected = state { return .rejected }
+            return .unavailable
         }
 
-        let replacementRange: NSRange
-        if keywordLength > 0 {
-            guard originalRange.length == 0,
-                let expectedKeyword,
-                value[..<selectedStringRange.lowerBound].count >= keywordLength
-            else { return .rejected }
-            let cursor = selectedStringRange.lowerBound
-            let start = value.index(cursor, offsetBy: -keywordLength)
-            let actualKeyword = String(value[start..<cursor]).lowercased()
-            guard actualKeyword == expectedKeyword.lowercased() else { return .rejected }
-            replacementRange = NSRange(start..<cursor, in: value)
-        } else {
-            replacementRange = originalRange
+        guard setSelectedRange(target.replacementRange, in: target.element) else {
+            return .unavailable
         }
-
-        guard setSelectedRange(replacementRange, in: element) else { return .unavailable }
         guard
             AXUIElementSetAttributeValue(
-                element,
+                target.element,
                 kAXSelectedTextAttribute as CFString,
                 injected.text as CFString) == .success
         else {
-            _ = setSelectedRange(originalRange, in: element)
-            return .rejected
+            _ = setSelectedRange(target.originalRange, in: target.element)
+            return .unavailable
+        }
+
+        let observed = stringValue(in: target.element)
+        guard
+            AccessibilityReplacementPolicy.confirmsReplacement(
+                originalValue: target.value,
+                replacementRange: target.replacementRange,
+                insertedText: injected.text,
+                observedValue: observed)
+        else {
+            _ = setSelectedRange(target.originalRange, in: target.element)
+            // An untouched value is a tier that did nothing; anything else moved text we cannot name.
+            return observed == target.value ? .unavailable : .rejected
         }
 
         let cursorOffset = min(injected.cursorOffsetFromEnd ?? 0, injected.text.count)
         let cursorIndex = injected.text.index(injected.text.endIndex, offsetBy: -cursorOffset)
         let insertedPrefixLength = injected.text[..<cursorIndex].utf16.count
         _ = setSelectedRange(
-            NSRange(location: replacementRange.location + insertedPrefixLength, length: 0),
-            in: element)
+            NSRange(location: target.replacementRange.location + insertedPrefixLength, length: 0),
+            in: target.element)
         return .delivered
     }
+
+    /// Rule 2: a renderer applies the keystroke before it says so, so a short lag is not a mismatch.
+    private func accessibilityTarget(
+        in targetApp: NSRunningApplication,
+        expectedKeyword: String?,
+        keywordLength: Int,
+        automaticGeneration: AutomaticGeneration?
+    ) async -> AccessibilityTargetState {
+        for attempt in 0..<Self.accessibilityConvergenceAttempts {
+            let state = inspectAccessibilityTarget(
+                in: targetApp,
+                expectedKeyword: expectedKeyword,
+                keywordLength: keywordLength)
+            guard case .pending = state else { return state }
+            guard attempt < Self.accessibilityConvergenceAttempts - 1,
+                automaticGeneration != nil,
+                deliveryIsAllowed(
+                    automaticGeneration: automaticGeneration,
+                    targetApp: targetApp,
+                    promptForInteractiveAccessibility: false),
+                await wait(for: Self.accessibilityConvergenceInterval)
+            else { return .unavailable }
+        }
+        return .unavailable
+    }
+
+    private func inspectAccessibilityTarget(
+        in targetApp: NSRunningApplication,
+        expectedKeyword: String?,
+        keywordLength: Int
+    ) -> AccessibilityTargetState {
+        guard let element = AccessibilityText.focusedElement(in: targetApp),
+            !usesTextMarkerSelection(element),
+            isAttributeSettable(kAXSelectedTextRangeAttribute, in: element),
+            isAttributeSettable(kAXSelectedTextAttribute, in: element),
+            let value = stringValue(in: element),
+            let originalRange = selectedRange(in: element)
+        else { return .unavailable }
+
+        guard keywordLength > 0 else {
+            // Offsets its own value cannot address are a broken tier, not proof the document moved.
+            guard Range(originalRange, in: value) != nil else { return .unavailable }
+            return .ready(
+                AccessibilityTarget(
+                    element: element, value: value, originalRange: originalRange,
+                    replacementRange: originalRange))
+        }
+        guard let expectedKeyword, expectedKeyword.count == keywordLength else { return .rejected }
+        switch AccessibilityReplacementPolicy.keywordState(
+            value: value, selectedRange: originalRange, keyword: expectedKeyword)
+        {
+        case .matched(let replacementRange):
+            return .ready(
+                AccessibilityTarget(
+                    element: element, value: value, originalRange: originalRange,
+                    replacementRange: replacementRange))
+        case .pending: return .pending
+        case .rejected: return .rejected
+        }
+    }
+
+    /// Web content and Monaco expose selection only as markers; their `AXValue` trails or is empty.
+    private func usesTextMarkerSelection(_ element: AXUIElement) -> Bool {
+        var value: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(
+                element,
+                kAXSelectedTextMarkerRangeAttribute as CFString,
+                &value) == .success,
+            let value
+        else { return false }
+        return CFGetTypeID(value) == AXTextMarkerRangeGetTypeID()
+    }
+
+    /// A renderer converges in single-digit milliseconds; past this it was never going to.
+    private static let accessibilityConvergenceAttempts = 8
+    private static let accessibilityConvergenceInterval = Duration.milliseconds(5)
 
     private func waitForPasteConfirmation(
         previousState: AccessibilityTextState?,
@@ -574,6 +725,7 @@ final class TextInjector {
     ) -> AccessibilityTextState? {
         guard let targetApp,
             let element = AccessibilityText.focusedElement(in: targetApp),
+            !usesTextMarkerSelection(element),
             let value = stringValue(in: element),
             let selectedRange = selectedRange(in: element)
         else { return nil }
@@ -639,10 +791,19 @@ final class TextInjector {
         return AccessibilityText.selection(in: targetApp)
     }
 
-    private func makeUnicodeEvents(_ text: String) -> [CGEvent]? {
+    private func makeUnicodeEvents(_ text: String) -> [[CGEvent]]? {
         guard !text.isEmpty else { return [] }
+        var groups: [[CGEvent]] = []
+        for chunk in UnicodeTypingChunk.split(text) {
+            guard let pair = makeUnicodeEvent(chunk) else { return nil }
+            groups.append(pair)
+        }
+        return groups
+    }
+
+    private func makeUnicodeEvent(_ chunk: [UniChar]) -> [CGEvent]? {
         let source = CGEventSource(stateID: .combinedSessionState)
-        var characters = Array(text.utf16)
+        var characters = chunk
         guard
             let down = CGEvent(
                 keyboardEventSource: source,
@@ -731,6 +892,27 @@ final class TextInjector {
     }
 }
 
+/// Blink keeps one key event's text in a fixed four-unit array, so Chromium drops everything past it.
+enum UnicodeTypingChunk {
+    static let maxUTF16Units = 4
+
+    /// Split on scalar boundaries: a lone surrogate half is not text, and a scalar always fits four.
+    static func split(_ text: String) -> [[UniChar]] {
+        var chunks: [[UniChar]] = []
+        var current: [UniChar] = []
+        current.reserveCapacity(maxUTF16Units)
+        for scalar in text.unicodeScalars {
+            if current.count + UTF16.width(scalar) > maxUTF16Units {
+                chunks.append(current)
+                current = []
+            }
+            UTF16.encode(scalar) { current.append($0) }
+        }
+        if !current.isEmpty { chunks.append(current) }
+        return chunks
+    }
+}
+
 enum PasteConfirmationPolicy {
     static func acceptsUnconfirmedDelivery(
         attempt: Int,
@@ -811,8 +993,7 @@ final class TemporaryPasteboardLease {
 
     private let pasteboard: any PasteboardAccess
     private let ownedChangeCount: Int
-    private let originalStringData: Data
-    private let temporaryItem: NSPasteboardItem
+    private let original: PasteboardSnapshot
     private var isFinished = false
 
     var isOwned: Bool {
@@ -822,13 +1003,11 @@ final class TemporaryPasteboardLease {
     private init(
         pasteboard: any PasteboardAccess,
         ownedChangeCount: Int,
-        originalStringData: Data,
-        temporaryItem: NSPasteboardItem
+        original: PasteboardSnapshot
     ) {
         self.pasteboard = pasteboard
         self.ownedChangeCount = ownedChangeCount
-        self.originalStringData = originalStringData
-        self.temporaryItem = temporaryItem
+        self.original = original
     }
 
     static func begin(
@@ -837,16 +1016,14 @@ final class TemporaryPasteboardLease {
         onMutation: (Int) -> Void = { _ in }
     ) -> TemporaryPasteboardLease? {
         guard let snapshot = PasteboardSnapshot(pasteboard: pasteboard),
-            let temporaryItems = snapshot.items(replacingFirstStringWith: text),
+            let temporaryItem = PasteboardSnapshot.temporaryItem(carrying: text),
             let originalItems = snapshot.pasteboardItems(),
-            let originalStringData = snapshot.firstStringData,
-            let temporaryItem = temporaryItems.first,
             pasteboard.changeCount == snapshot.changeCount
         else { return nil }
 
         pasteboard.clearContents()
-        guard pasteboard.writeObjects(temporaryItems) else {
-            if pasteboard.writeObjects(originalItems) {
+        guard pasteboard.writeObjects([temporaryItem]) else {
+            if originalItems.isEmpty || pasteboard.writeObjects(originalItems) {
                 onMutation(pasteboard.changeCount)
             }
             return nil
@@ -856,29 +1033,21 @@ final class TemporaryPasteboardLease {
         return TemporaryPasteboardLease(
             pasteboard: pasteboard,
             ownedChangeCount: ownedChangeCount,
-            originalStringData: originalStringData,
-            temporaryItem: temporaryItem)
+            original: snapshot)
     }
 
+    /// The lent board holds nothing of the original, so restoring rewrites the snapshot whole.
     func restoreIfOwned() -> RestoreResult {
         guard !isFinished else { return .superseded }
         guard pasteboard.changeCount == ownedChangeCount else {
             isFinished = true
             return .superseded
         }
-        guard temporaryItem.setData(originalStringData, forType: .string) else {
-            if pasteboard.changeCount != ownedChangeCount {
-                isFinished = true
-                return .superseded
-            }
-            return .failed
-        }
-        guard pasteboard.changeCount == ownedChangeCount else {
-            isFinished = true
-            return .superseded
-        }
+        guard let items = original.pasteboardItems() else { return .failed }
+        pasteboard.clearContents()
         isFinished = true
-        return .restored(changeCount: ownedChangeCount)
+        guard items.isEmpty || pasteboard.writeObjects(items) else { return .failed }
+        return .restored(changeCount: pasteboard.changeCount)
     }
 }
 
@@ -911,26 +1080,21 @@ struct PasteboardSnapshot {
         self.changeCount = changeCount
     }
 
+    /// A kept `public.html` is the flavour a Chromium editor prefers, so we lend the text alone.
+    static func temporaryItem(carrying text: String) -> NSPasteboardItem? {
+        let item = NSPasteboardItem()
+        guard item.setString(text, forType: .string),
+            item.setData(Data(), forType: ClipboardManager.internalType)
+        else { return nil }
+        return item
+    }
+
     func pasteboardItems() -> [NSPasteboardItem]? {
-        makePasteboardItems(firstString: nil)
-    }
-
-    func items(replacingFirstStringWith text: String) -> [NSPasteboardItem]? {
-        guard firstStringData != nil else { return nil }
-        return makePasteboardItems(firstString: text)
-    }
-
-    private func makePasteboardItems(firstString: String?) -> [NSPasteboardItem]? {
         var pasteboardItems: [NSPasteboardItem] = []
         pasteboardItems.reserveCapacity(items.count)
-        for (index, item) in items.enumerated() {
+        for item in items {
             let pasteboardItem = NSPasteboardItem()
-            if index == 0, let firstString {
-                guard pasteboardItem.setString(firstString, forType: .string),
-                    pasteboardItem.setData(Data(), forType: ClipboardManager.internalType)
-                else { return nil }
-            }
-            for value in item.values where index != 0 || firstString == nil || value.type != .string {
+            for value in item.values {
                 guard pasteboardItem.setData(value.data, forType: value.type) else { return nil }
             }
             pasteboardItems.append(pasteboardItem)

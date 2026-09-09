@@ -8,11 +8,11 @@ struct FileSearchSettingsView: View {
         return Form {
             Section {
                 Toggle(isOn: $settings.fileSearchEnabled) {
-                    Text("Enable File Search")
+                    SettingsRowTitle(.fileSearchFileSearch, "Enable File Search")
                     Text("Find files and folders through the system Spotlight index, only on demand.")
                 }
             } header: {
-                Text("File Search")
+                SettingsSectionHeader(.fileSearchFileSearch)
             }
 
             SearchFilesCommandSection()
@@ -23,6 +23,7 @@ struct FileSearchSettingsView: View {
                 .settingsEnabled(settings.fileSearchEnabled)
         }
         .formStyle(.grouped)
+        .settingsScrollTarget(.fileSearch)
     }
 }
 
@@ -39,7 +40,7 @@ private struct SearchFilesCommandSection: View {
                     Image(systemName: CommandID.searchFiles.sfSymbol)
                         .frame(width: Theme.Size.settingsRowIcon)
                 } trailing: {
-                    ShortcutRecorder(action: .searchFiles)
+                    ShortcutRecorder(action: .command(.searchFiles))
                     Toggle("", isOn: visibilityBinding(entry))
                         .labelsHidden()
                         .toggleStyle(.checkbox)
@@ -47,7 +48,7 @@ private struct SearchFilesCommandSection: View {
                 }
             }
         } header: {
-            Text("Commands")
+            SettingsSectionHeader(.fileSearchCommands)
         } footer: {
             Text("The shortcut works even when the command is hidden from the launcher.")
                 .font(.caption)
@@ -89,7 +90,7 @@ private struct FileSearchScopesSection: View {
                 }
             }
         } header: {
-            Text("Search Scopes")
+            SettingsSectionHeader(.fileSearchSearchScopes)
         } footer: {
             Text(
                 """
@@ -178,7 +179,7 @@ private struct FileSearchIgnoreSection: View {
             TextField("Add pattern…", text: $draft)
                 .onSubmit(addPattern)
         } header: {
-            Text("Ignore Patterns")
+            SettingsSectionHeader(.fileSearchIgnorePatterns)
         } footer: {
             Text(
                 """

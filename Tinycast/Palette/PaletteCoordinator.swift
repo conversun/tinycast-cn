@@ -33,36 +33,47 @@ final class PaletteCoordinator {
             ? windowController.previousApp : NSWorkspace.shared.frontmostApplication
     }
 
+    /// Up and pointed at `mode`, which is the state a mode command's second invocation closes.
+    func isShowing(_ mode: PaletteMode) -> Bool {
+        windowController.isVisible && palette.mode == mode
+    }
+
     func togglePalette() {
-        if windowController.isVisible, palette.mode == .launcher {
+        if isShowing(.launcher) {
             hidePalette()
         } else {
             showPalette(mode: .launcher, restoreAnyMode: true)
         }
     }
 
-    func toggleClipboard() {
-        if windowController.isVisible, palette.mode == .clipboard {
+    /// A carried query always opens: it is new input, not the second press that would close.
+    func togglePalette(mode: PaletteMode, seeding query: String? = nil) {
+        if isShowing(mode), query == nil {
             hidePalette()
         } else {
-            showPalette(mode: .clipboard)
+            showPalette(mode: mode, seeding: query)
         }
     }
 
-    func toggleEmoji() {
-        if windowController.isVisible, palette.mode == .emoji {
-            hidePalette()
+    /// A palette already up is being navigated, not summoned: the screen under it is the back step.
+    func navigate(to mode: PaletteMode) {
+        if windowController.isVisible, palette.mode != mode {
+            palette.push(mode: mode)
         } else {
-            showPalette(mode: .emoji)
+            palette.prepare(mode: mode)
         }
     }
 
     /// Shows the palette, honoring Pop to Root Search. See docs/features/palette.md#state-flow.
-    func showPalette(mode: PaletteMode, restoreAnyMode: Bool = false) {
+    func showPalette(
+        mode: PaletteMode, restoreAnyMode: Bool = false, seeding query: String? = nil
+    ) {
         let preserved = windowController.consumePreservedState()
-        if !(preserved && (restoreAnyMode || palette.mode == mode)) {
-            palette.prepare(mode: mode)
+        // A carried query always opens the screen fresh: restoring the previous one would drop it.
+        if query != nil || !(preserved && (restoreAnyMode || palette.mode == mode)) {
+            navigate(to: mode)
         }
+        if let query { palette.query = query }
         windowController.show()
         if palette.mode == .fileSearch { fileSearch.search(palette.query) }
         // Re-scan on open so an app uninstalled since the last scan drops out of the launcher.
@@ -72,6 +83,11 @@ final class PaletteCoordinator {
     func hidePalette(restoreFocus: Bool = true) {
         fileSearch.cancel()
         windowController.hide(restoreFocus: restoreFocus)
+    }
+
+    /// Reset to the root search now rather than after the Pop to Root Search delay.
+    func popToRootNow() {
+        windowController.popToRootNow()
     }
 
     /// True for the slim compact bar: compact on, launcher root, empty, not overflowed.

@@ -2056,6 +2056,19 @@ $|dollar sign|xc|0|比索 美元 金钱 usd money currency|美元符号
 №|numero sign|xs|0|number|
 ¡|inverted exclamation mark|xs|0|倒置 惊叹号 感叹 感叹号 猛撞 spanish punctuation|倒置的感叹号
 ¿|inverted question mark|xs|0|倒置 疑问 问号 spanish punctuation|倒置的问号
+◉|fisheye|xs|0|bullseye target circle dot|包含实心圆圈的空心圆圈
+◎|bullseye|xs|0|target circle ring|同心圆
+#|number sign|xs|0|主题符号 编号 hash pound sharp|井号
+*|asterisk|xs|0|星形 通配符 star multiply wildcard|星号
+@|at sign|xs|0|单价记号 at arobase email|@ 符号
+&|ampersand|xs|0|和 等 and|与号
+%|percent sign|xs|0|百分比 percent modulo|百分号
+⁉|exclamation question mark|xs|0|！ ！？ ？ 叹号 叹号加问号 interrobang surprise|感叹疑问号
+‼|double exclamation mark|xs|0|！ ！！ 两个 双叹号 叹号 bang emphasis|双感叹号
+℗|sound recording copyright|xs|0|录音 版权 音频 phonogram copyright publishing|录音版权
+℠|service mark|xs|0|servicemark trademark|
+ª|feminine ordinal indicator|xs|0|feminine ordinal spanish|
+º|masculine ordinal indicator|xs|0|masculine ordinal spanish portuguese|
 ※|reference mark|xj|0|kome komejirushi note footnote annotation|参考标记
 〃|ditto mark|xj|0|same repeat above|
 〄|japanese industrial standard symbol|xj|0|jis|
@@ -2102,5 +2115,28 @@ $|dollar sign|xc|0|比索 美元 金钱 usd money currency|美元符号
 ﹂|vertical right corner bracket|xj|0|tategaki kagi quote close|
 ﹃|vertical left white corner bracket|xj|0|tategaki quote open|
 ﹄|vertical right white corner bracket|xj|0|tategaki quote close|
+⌘|command key|xk|0|cmd looped square place of interest|
+⌥|option key|xk|0|opt alt|
+⌃|control key|xk|0|ctrl caret up arrowhead|
+⎋|escape key|xk|0|esc|
+⏎|return key|xk|0|enter newline carriage|
+⌤|enter key|xk|0|enter numpad|
+⌫|delete key|xk|0|backspace erase backward|
+⌦|forward delete key|xk|0|delete forward fn|
+⇥|tab key|xk|0|tab right|头带杠的向右箭头
+⇤|backtab key|xk|0|shift tab left|头带杠的向左箭头
+⇱|home key|xk|0|home corner|
+⇲|end key|xk|0|end corner|
+⇞|page up key|xk|0|pgup page up|带双删除线的向上箭头
+⇟|page down key|xk|0|pgdn page down|带双删除线的向下箭头
+⏏|eject key|xk|0|向上三角 弹出 eject media disk|推出按钮
+⌧|clear key|xk|0|clear numpad|
+⎙|print screen key|xk|0|print screen sysrq|
+␣|space symbol|xk|0|space blank open box|
+⌀|diameter sign|xk|0|diameter engineering average|
+⌂|house|xk|0|home house|
+⌨|keyboard|xk|0|打字 按键 电脑 输入 keyboard|键盘
+⚙|gear|xk|0|传动 工具 机械 零件 settings cog preferences|齿轮
+|apple logo|xk|0|apple logo private|
 """
 }

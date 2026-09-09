@@ -39,6 +39,12 @@ provider protocol and the connections behind it.
 - **Quick Actions route themselves.** `quickActionModel` is a second routing decision, defaulting to
   Apple Intelligence and falling back to chat's model. A shortcut pressed all day should not bill an
   API every time, and that is not a choice chat's default can make on its behalf.
+- **Installed providers are ordinary routes.** The model picker reads the same live Codex, Claude and
+  OpenCode catalogs as AI Settings. Execution still goes through `AIProviderFactory`, so Quick Actions
+  inherit the same installed login, tool restrictions and process cleanup without owning CLI logic.
+- **The model picker is the AI picker.** Both panes render `AIModelOption.groupedCatalog`, with the
+  same provider sections, model labels and provider-supported reasoning levels. An installed-model
+  selection stores its effort in `quickActionModel`, independently of chat's effort.
 - **The reader's own text gets permissive guardrails.** `AppCore.quickActionProvider()` asks for
   `SystemLanguageModel.Guardrails.permissiveContentTransformations`. The default filter is tuned for
   a model writing fresh prose and refuses to transform text somebody already wrote, which is the
@@ -55,8 +61,8 @@ provider protocol and the connections behind it.
 
 `QuickAction` is the extensibility story: a fifth action is one case there, its prompt in
 `QuickActionPrompt`, and one `CommandID` case for its launcher row. The shortcut, the settings row
-and the panel all read `allCases`, `HotKeyAction.quickAction(QuickAction)` is parameterised so the
-hotkey enum never changes again, and `CommandID.init(_ action:)` is exhaustive over `QuickAction`, so
+and the panel all read `allCases`, its shortcut is the `HotKeyAction.command(CommandID)` its launcher
+row already has, and `CommandID.init(_ action:)` is exhaustive over `QuickAction`, so
 a fifth cannot compile without a launcher command of its own.
 
 | Action | Engine | Default result | Diff |
@@ -139,6 +145,8 @@ bar leaves text about 60% visible behind the title.
 
 `TextDiffEngine` shows what changed when the output is the input, edited. Its LCS matrix is
 quadratic, so past `maxTokens` a side it degrades to whole-text rather than asking for gigabytes.
+At the cap the matrix is the feature's largest allocation, so its cells are `UInt16` rather than
+`Int` — no LCS length can exceed `maxTokens`, and the six bytes an `Int` adds are 96 MB of zeroes.
 
 ## Reading the selection
 
@@ -168,14 +176,24 @@ selected"; otherwise the app told us nothing either way and says so.
 cancel, because a shortcut is an explicit gesture rather than an expansion the app decided to
 attempt. Its serial delivery queue is what stops two features fighting over the pasteboard lease.
 
-The Accessibility tier replaces the live selection atomically. The event tiers behind it type or
-paste over it, which every app treats as replacing a selection — but that is the target app's
-behaviour rather than something Tinycast asserts, so it is the part worth checking by hand.
+The Accessibility tier replaces the live selection atomically, under the five-rule delivery contract
+in [snippets.md](snippets.md#text-delivery-and-pasteboard-safety) — Quick Actions simply enter it with
+no keyword, so rule 2 never applies. The event tiers behind it type or paste over the selection, which
+every app treats as replacing it — but that is the target app's behaviour rather than something
+Tinycast asserts, so it is the part worth checking by hand.
+
+**A replacement that never lands says so, and keeps the reply.** Every tier can decline, and a shortcut
+that quietly did nothing is indistinguishable from a shortcut that is not bound. `DeliveryCompletion`
+now settles either way, so a delivery that returned early reports failure exactly once; Quick Actions
+put the generated text on the clipboard and raise a HUD rather than dropping it. Snippets pass no
+failure handler, so automatic expansion stays silent as before.
 
 ### Manual sweep
 
-- Select text in Safari, Chrome, Slack, Mail, Notes, VS Code and Terminal, press Fix Grammar, and
-  confirm the selection is **replaced** rather than appended to.
+- Select text in Safari, Chrome, Brave, Slack, Mail, Notes, VS Code and Terminal, press Fix Grammar,
+  and confirm the selection is **replaced** rather than appended to.
+- In a Chromium target, run one on a **short** selection whose result stays under 100 characters on
+  one line: the whole result lands, not its first four characters.
 - Replace mode, with a slow route selected: the message pill says `Fixing Grammar…` with a blue
   spinner while the model works, and the result message takes its place.
 - Run one from the launcher (⌘Space → "Fix Grammar") with text selected behind it: the palette
@@ -190,4 +208,5 @@ behaviour rather than something Tinycast asserts, so it is the part worth checki
 - Translate into a language that has not been downloaded: the panel offers the download, then
   translates.
 - Revoke Accessibility while enabled: a HUD explains instead of failing silently.
-- Harness: `quick-action-test` (action metadata, prompt boundaries, preview choices, diffs).
+- Harnesses: `quick-action-test` (action metadata, prompt boundaries, preview choices, diffs) and
+  `text-diff-test` (exact chunks, Unicode, ties, token boundaries and fast paths).

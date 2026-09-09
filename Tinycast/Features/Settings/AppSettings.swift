@@ -2,8 +2,9 @@ import SwiftUI
 
 /// Keys shared between `@AppStorage` sites, so app and Settings bind to the same one.
 enum SettingsKey {
-    /// Menu-bar icon visibility — read by `MenuBarExtra(isInserted:)` and the Settings toggle.
+    /// The launcher icon's visibility — read by its `MenuBarExtra` and the General toggle.
     static let showInMenuBar = "showInMenuBar"
+    static let calendarMenuBarDisplay = "calendarMenuBarDisplay"
 }
 
 /// Delay before a closed palette pops to root; an unset key reads as `.immediately`.
@@ -39,9 +40,10 @@ enum JoinWindow: Int, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Zero is the default `integer(forKey:)` also returns unset, so absence reads as Never.
+/// How early the calendar item picks the next event up. Zero, which `integer(forKey:)` also
+/// returns unset, keeps it for the rest of today.
 enum MenuBarEvents: Int, CaseIterable, Identifiable, Sendable {
-    case never = 0
+    case today = 0
     case two = 2
     case five = 5
     case ten = 10
@@ -49,14 +51,50 @@ enum MenuBarEvents: Int, CaseIterable, Identifiable, Sendable {
 
     var id: Int { rawValue }
 
+    var title: String { self == .today ? "Today" : "\(rawValue) minutes before" }
+}
+
+/// The calendar's independent menu-bar presence. Zero matches an unset preference.
+enum CalendarMenuBarDisplay: Int, CaseIterable, Identifiable, Sendable {
+    case disabled = 0
+    case meetingIcon = 1
+    case meetingTitle = 2
+
+    var id: Int { rawValue }
+
     var title: String {
-        self == .never
-            ? String(localized: "Never") : String(localized: "\(rawValue) minutes before")
+        switch self {
+        case .disabled: "Disabled"
+        case .meetingIcon: "Meeting Icon"
+        case .meetingTitle: "Meeting Title"
+        }
     }
 }
 
 /// How long a started event holds the menu bar. Zero, the default, means it goes as it starts.
+enum CalendarLauncherLimit: Int, CaseIterable, Identifiable, Sendable {
+    case one = 1
+    case three = 3
+    case five = 5
+    case all = 0
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .one: "1 next"
+        case .three: "3 next"
+        case .five: "5 next"
+        case .all: "All"
+        }
+    }
+
+    var maximum: Int? { self == .all ? nil : rawValue }
+}
+
+/// Whether a started event remains in the menu bar long enough to show its time left.
 enum HideCurrentEvent: Int, CaseIterable, Identifiable, Sendable {
+    case dontHide = -1
     case automatically = 0
     case afterFive = 5
     case afterTen = 10
@@ -65,12 +103,15 @@ enum HideCurrentEvent: Int, CaseIterable, Identifiable, Sendable {
     var id: Int { rawValue }
 
     var title: String {
-        self == .automatically
-            ? String(localized: "Automatically") : String(localized: "After \(rawValue) minutes")
+        switch self {
+        case .dontHide: "Keep visible — show time left"
+        case .automatically: "Automatically"
+        default: "After \(rawValue) minutes"
+        }
     }
 
-    /// Nil is "hide at the start"; `MenuBarSummary` reads it that way.
-    var minutes: Int? { self == .automatically ? nil : rawValue }
+    var hidesAtStart: Bool { self == .automatically }
+    var minutes: Int? { rawValue > 0 ? rawValue : nil }
 }
 
 @MainActor
@@ -84,6 +125,11 @@ final class AppSettings {
         didSet { defaults.set(searchScopes, forKey: Key.searchScopes.rawValue) }
     }
 
+    /// Ships on, unlike every other feature switch: a launcher is expected to keep history.
+    var clipboardEnabled: Bool {
+        didSet { defaults.set(clipboardEnabled, forKey: Key.clipboardEnabled.rawValue) }
+    }
+
     var clipboardRetention: ClipboardRetention {
         didSet {
             defaults.set(clipboardRetention.rawValue, forKey: Key.clipboardRetention.rawValue)
@@ -93,6 +139,14 @@ final class AppSettings {
     /// Bundle IDs never recorded from; ordered, so the Settings list stays stable.
     var clipboardDisabledApps: [String] {
         didSet { defaults.set(clipboardDisabledApps, forKey: Key.clipboardDisabledApps.rawValue) }
+    }
+
+    /// What ↵ does on a clipboard entry; ⌘↵ always does the other one.
+    var clipboardDefaultAction: ClipboardDefaultAction {
+        didSet {
+            defaults.set(
+                clipboardDefaultAction.rawValue, forKey: Key.clipboardDefaultAction.rawValue)
+        }
     }
 
     var launchAtLogin: Bool {
@@ -123,6 +177,11 @@ final class AppSettings {
     /// How long a closed palette keeps its state before popping back to the root launcher.
     var popToRootTimeout: PopToRootTimeout {
         didSet { defaults.set(popToRootTimeout.rawValue, forKey: Key.popToRootTimeout.rawValue) }
+    }
+
+    /// Whether Escape walks back through the screens the palette opened, or just closes it.
+    var escapeKeyBehavior: EscapeKeyBehavior {
+        didSet { defaults.set(escapeKeyBehavior.rawValue, forKey: Key.escapeKeyBehavior.rawValue) }
     }
 
     /// Follow macOS, or pin Tinycast to one appearance. Applied by `AppCore.applyAppearance()`.
@@ -196,6 +255,10 @@ final class AppSettings {
         didSet { defaults.set(notesEnabled, forKey: Key.notesEnabled.rawValue) }
     }
 
+    /// Off by default: connecting a server is consent to run code Tinycast did not write.
+    var mcpEnabled: Bool {
+        didSet { defaults.set(mcpEnabled, forKey: Key.mcpEnabled.rawValue) }
+    }
     var aiEnabled: Bool {
         didSet { defaults.set(aiEnabled, forKey: Key.aiEnabled.rawValue) }
     }
@@ -272,6 +335,12 @@ final class AppSettings {
         }
     }
 
+    var calendarLauncherLimit: CalendarLauncherLimit {
+        didSet {
+            defaults.set(calendarLauncherLimit.rawValue, forKey: Key.calendarLauncherLimit.rawValue)
+        }
+    }
+
     /// Narrows the fetch itself rather than what is shown, so every surface reads the same days.
     var calendarIncludesTomorrow: Bool {
         didSet {
@@ -301,6 +370,13 @@ final class AppSettings {
         didSet { defaults.set(menuBarEvents.rawValue, forKey: Key.menuBarEvents.rawValue) }
     }
 
+    var calendarMenuBarDisplay: CalendarMenuBarDisplay {
+        didSet {
+            defaults.set(
+                calendarMenuBarDisplay.rawValue, forKey: Key.calendarMenuBarDisplay.rawValue)
+        }
+    }
+
     var menuBarLinkedEventsOnly: Bool {
         didSet {
             defaults.set(
@@ -327,9 +403,17 @@ final class AppSettings {
         }
     }
 
-    /// Points between tiled windows and the screen edge; `WindowLayout` caps it.
+    /// Points between tiled windows and the screen edge; `WindowPlacementEngine` caps it.
     var windowGap: Int {
         didSet { defaults.set(windowGap, forKey: Key.windowGap.rawValue) }
+    }
+
+    /// Its own flag: hiding 34 command rows must not also hide the layouts you wrote.
+    var windowLayoutsShowInLauncher: Bool {
+        didSet {
+            defaults.set(
+                windowLayoutsShowInLauncher, forKey: Key.windowLayoutsShowInLauncher.rawValue)
+        }
     }
 
     /// Re-triggering a half steps it through ⅓ and ⅔ instead of re-applying the same frame.
@@ -377,6 +461,10 @@ final class AppSettings {
     }
 
     init() {
+        // The only feature switch that defaults on, so absence has to outrank a stored `false`.
+        clipboardEnabled =
+            defaults.object(forKey: Key.clipboardEnabled.rawValue) == nil
+            || defaults.bool(forKey: Key.clipboardEnabled.rawValue)
         // `integer(forKey:)` returns 0 when unset, which no case matches.
         clipboardRetention =
             ClipboardRetention(rawValue: defaults.integer(forKey: Key.clipboardRetention.rawValue))
@@ -385,6 +473,9 @@ final class AppSettings {
         clipboardDisabledApps =
             defaults.stringArray(forKey: Key.clipboardDisabledApps.rawValue)
             ?? ["com.apple.keychainaccess", "com.apple.Passwords"]
+        clipboardDefaultAction =
+            defaults.string(forKey: Key.clipboardDefaultAction.rawValue)
+            .flatMap(ClipboardDefaultAction.init) ?? .paste
         launchAtLogin = LaunchAtLogin.isEnabled
         hyperKey =
             defaults.string(forKey: Key.hyperKey.rawValue).flatMap(HyperKeyPhysicalKey.init)
@@ -402,6 +493,9 @@ final class AppSettings {
         popToRootTimeout =
             PopToRootTimeout(rawValue: defaults.integer(forKey: Key.popToRootTimeout.rawValue))
             ?? .immediately
+        escapeKeyBehavior =
+            defaults.string(forKey: Key.escapeKeyBehavior.rawValue).flatMap(EscapeKeyBehavior.init)
+            ?? .navigateBackOrClose
         appearance =
             defaults.string(forKey: Key.appearance.rawValue).flatMap(AppAppearance.init) ?? .system
         compactMode = defaults.bool(forKey: Key.compactMode.rawValue)
@@ -429,6 +523,7 @@ final class AppSettings {
             defaults.stringArray(forKey: Key.fileSearchIgnorePatterns.rawValue) ?? []
         notesEnabled = defaults.bool(forKey: Key.notesEnabled.rawValue)
         aiEnabled = defaults.bool(forKey: Key.aiEnabled.rawValue)
+        mcpEnabled = defaults.bool(forKey: Key.mcpEnabled.rawValue)
         customCommandsEnabled = defaults.bool(forKey: Key.customCommandsEnabled.rawValue)
         // These default on, so absence must be distinguished from a stored `false`.
         customCommandsShowInLauncher =
@@ -458,6 +553,10 @@ final class AppSettings {
         calendarShowInLauncher =
             defaults.object(forKey: Key.calendarShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.calendarShowInLauncher.rawValue)
+        calendarLauncherLimit =
+            defaults.object(forKey: Key.calendarLauncherLimit.rawValue)
+            .flatMap { $0 as? Int }
+            .flatMap(CalendarLauncherLimit.init(rawValue:)) ?? .three
         calendarIncludesTomorrow =
             defaults.object(forKey: Key.calendarIncludesTomorrow.rawValue) == nil
             || defaults.bool(forKey: Key.calendarIncludesTomorrow.rawValue)
@@ -470,13 +569,18 @@ final class AppSettings {
         cameraPreview = defaults.bool(forKey: Key.cameraPreview.rawValue)
         // Both default to their zero case, so an unset key needs no presence check.
         menuBarEvents =
-            MenuBarEvents(rawValue: defaults.integer(forKey: Key.menuBarEvents.rawValue)) ?? .never
+            MenuBarEvents(rawValue: defaults.integer(forKey: Key.menuBarEvents.rawValue)) ?? .today
+        calendarMenuBarDisplay =
+            CalendarMenuBarDisplay(
+                rawValue: defaults.integer(forKey: Key.calendarMenuBarDisplay.rawValue))
+            ?? .disabled
         menuBarLinkedEventsOnly =
             defaults.object(forKey: Key.menuBarLinkedEventsOnly.rawValue) == nil
             || defaults.bool(forKey: Key.menuBarLinkedEventsOnly.rawValue)
         hideCurrentEvent =
-            HideCurrentEvent(rawValue: defaults.integer(forKey: Key.hideCurrentEvent.rawValue))
-            ?? .automatically
+            defaults.object(forKey: Key.hideCurrentEvent.rawValue)
+            .flatMap { $0 as? Int }
+            .flatMap(HideCurrentEvent.init(rawValue:)) ?? .dontHide
         windowManagementEnabled = defaults.bool(forKey: Key.windowManagementEnabled.rawValue)
         windowManagementShowInLauncher =
             defaults.object(forKey: Key.windowManagementShowInLauncher.rawValue) == nil
@@ -484,6 +588,9 @@ final class AppSettings {
         // Unset reads as 0, which is the intended default anyway — no gap.
         windowGap = defaults.integer(forKey: Key.windowGap.rawValue)
         windowCycleOnRepeat = defaults.bool(forKey: Key.windowCycleOnRepeat.rawValue)
+        windowLayoutsShowInLauncher =
+            defaults.object(forKey: Key.windowLayoutsShowInLauncher.rawValue) == nil
+            || defaults.bool(forKey: Key.windowLayoutsShowInLauncher.rawValue)
         quicklinksEnabled = defaults.bool(forKey: Key.quicklinksEnabled.rawValue)
         quicklinksShowInLauncher =
             defaults.object(forKey: Key.quicklinksShowInLauncher.rawValue) == nil

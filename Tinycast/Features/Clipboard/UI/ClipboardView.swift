@@ -135,7 +135,7 @@ private struct ClipboardRow: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.lg) {
-            thumbnail
+            thumbnail(item.colorValue)
             Text(previewText)
                 .font(Theme.Typography.menuRow)
                 .lineLimit(1)
@@ -163,27 +163,51 @@ private struct ClipboardRow: View {
         case .text:
             return String((item.text ?? "").prefix(200)).trimmingCharacters(
                 in: .whitespacesAndNewlines)
-        case .image: return "Image".localizedUI
+        case .image: return String(localized: "Image")
+        case .file: return item.filePath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? String(localized: "File")
         }
     }
 
     @ViewBuilder
-    private var thumbnail: some View {
+    private func thumbnail(_ color: ColorValue?) -> some View {
         switch item.kind {
         case .text:
-            glyphTile("doc.text")
+            // A colour states itself, so it takes the tile a glyph would otherwise fill.
+            if let color {
+                ColorSwatch(color: color)
+                    .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
+            } else {
+                glyphTile("doc.text")
+            }
         case .image:
             AsyncThumbnail(url: imageURL, maxPixel: 64) { image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
                     .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
                     .clipShape(
                         RoundedRectangle(cornerRadius: Theme.Radius.thumbnail, style: .continuous))
             } placeholder: {
                 glyphTile("photo")
             }
+        case .file:
+            AsyncThumbnail(url: fileURL, maxPixel: 64, source: .file) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: Theme.Radius.thumbnail, style: .continuous))
+            } placeholder: {
+                glyphTile(fileKind.systemImage)
+            }
         }
+    }
+
+    private var fileURL: URL? { item.filePath.map { URL(fileURLWithPath: $0) } }
+
+    private var fileKind: ClipboardFileKind {
+        item.filePath.map { ClipboardFileKind.of(path: $0) } ?? .other
     }
 
     /// A symbol on a rounded tile, sized so text and image rows share one shape.
@@ -202,8 +226,29 @@ private struct ClipboardRow: View {
 
 /// A downsampled thumbnail, decoding misses off the main thread.
 private struct AsyncThumbnail<Content: View, Placeholder: View>: View {
+    /// ImageIO for a blob we hold; QuickLook for a referenced file, which may be any type.
+    enum Source {
+        case image
+        case file
+
+        func cached(_ url: URL, maxPixel: CGFloat) -> NSImage? {
+            switch self {
+            case .image: return ImageThumbnail.cached(url, maxPixel: maxPixel)
+            case .file: return FilePreviewThumbnail.cached(url, maxPixel: maxPixel)
+            }
+        }
+
+        func loadAsync(_ url: URL, maxPixel: CGFloat) async -> NSImage? {
+            switch self {
+            case .image: return await ImageThumbnail.loadAsync(url, maxPixel: maxPixel)
+            case .file: return await FilePreviewThumbnail.loadAsync(url, maxPixel: maxPixel)
+            }
+        }
+    }
+
     let url: URL?
     let maxPixel: CGFloat
+    var source: Source = .image
     @ViewBuilder let content: (Image) -> Content
     @ViewBuilder let placeholder: () -> Placeholder
 
@@ -222,20 +267,17 @@ private struct AsyncThumbnail<Content: View, Placeholder: View>: View {
                 image = nil
                 return
             }
-            if let hit = ImageThumbnail.cached(url, maxPixel: maxPixel) {
+            if let hit = source.cached(url, maxPixel: maxPixel) {
                 image = hit
                 return
             }
             image = nil  // show the placeholder while a new image decodes
-            image = await ImageThumbnail.loadAsync(url, maxPixel: maxPixel)
+            image = await source.loadAsync(url, maxPixel: maxPixel)
         }
     }
 }
 
 struct ClipboardPreview: View {
-    /// The preview pane is ~460pt wide, so 900px stays crisp at 2× without over-decoding.
-    private static let previewMaxPixel: CGFloat = 900
-
     let item: ClipboardItem?
     @Environment(ClipboardStore.self) private var store
 
@@ -256,17 +298,22 @@ struct ClipboardPreview: View {
     private func content(for item: ClipboardItem) -> some View {
         switch item.kind {
         case .text:
-            ScrollView {
-                Text(item.text ?? "")
-                    .font(.system(.subheadline, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            if let color = item.colorValue {
+                ColorPreview(color: color, text: item.text ?? "")
+            } else {
+                ScrollView {
+                    Text(item.text ?? "")
+                        .font(.system(.subheadline, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
             }
         case .image:
-            AsyncThumbnail(url: store.imageURL(for: item), maxPixel: Self.previewMaxPixel) { image in
+            AsyncThumbnail(url: store.imageURL(for: item), maxPixel: Theme.Size.clipboardPreviewPixel) {
+                image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
                     .clipShape(
                         RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
                     )
@@ -278,6 +325,8 @@ struct ClipboardPreview: View {
                 Image(systemName: "photo").font(.system(.largeTitle))
                     .symbolRenderingMode(.hierarchical).foregroundStyle(.tertiary)
             }
+        case .file:
+            if let path = item.filePath { FilePreviewStage(path: path) }
         }
     }
 }
@@ -294,6 +343,7 @@ private struct ClipboardInfoSection: View {
         var words: Int?
         var pixelSize: CGSize?
         var fileBytes: Int?
+        var typeName: String?
     }
 
     private struct InfoRow: Identifiable {
@@ -322,14 +372,14 @@ private struct ClipboardInfoSection: View {
                 ForEach(rows) { row in
                     if row.id != rows.first?.id { Divider() }
                     HStack(spacing: Theme.Spacing.sm) {
-                        Text(row.label).foregroundStyle(.secondary)
+                        Text(row.label.localizedUI).foregroundStyle(.secondary)
                         Spacer(minLength: Theme.Spacing.lg)
                         if let icon = row.icon {
                             Image(nsImage: icon)
                                 .resizable()
                                 .frame(width: 20, height: 20)
                         }
-                        Text(row.value).lineLimit(1).truncationMode(.middle)
+                        Text(row.value.localizedUI).lineLimit(1).truncationMode(.middle)
                     }
                     .font(.callout)
                     .padding(.vertical, Theme.Spacing.sm)
@@ -347,12 +397,17 @@ private struct ClipboardInfoSection: View {
         }
         switch item.kind {
         case .text:
-            rows.append(InfoRow(label: "Type".localizedUI, value: "Text".localizedUI))
-            if let characters = details.characters {
-                rows.append(InfoRow(label: "Characters".localizedUI, value: characters.formatted()))
-            }
-            if let words = details.words {
-                rows.append(InfoRow(label: "Words".localizedUI, value: words.formatted()))
+            // What the entry *is*, which is what the type filter files it under.
+            let isColor = item.colorValue != nil
+            rows.append(InfoRow(label: "Type", value: isColor ? "Color" : "Text"))
+            // A colour's own notations are the pane above; its length is not what you came for.
+            if !isColor {
+                if let characters = details.characters {
+                    rows.append(InfoRow(label: "Characters", value: characters.formatted()))
+                }
+                if let words = details.words {
+                    rows.append(InfoRow(label: "Words", value: words.formatted()))
+                }
             }
         case .image:
             rows.append(InfoRow(label: "Type".localizedUI, value: "Image".localizedUI))
@@ -364,6 +419,18 @@ private struct ClipboardInfoSection: View {
                 rows.append(
                     InfoRow(
                         label: "Size".localizedUI, value: Int64(bytes).formatted(.byteCount(style: .file))))
+            }
+        case .file:
+            let path = item.filePath ?? ""
+            rows.append(
+                InfoRow(
+                    label: "Type",
+                    value: details.typeName ?? ClipboardFileKind.of(path: path).title))
+            rows.append(InfoRow(label: "Path", value: (path as NSString).abbreviatingWithTildeInPath))
+            if let bytes = details.fileBytes {
+                rows.append(
+                    InfoRow(
+                        label: "Size", value: Int64(bytes).formatted(.byteCount(style: .file))))
             }
         }
         rows.append(
@@ -381,8 +448,10 @@ private struct ClipboardInfoSection: View {
     }
 
     private func loadDetails() async {
-        let text = item.text
+        // Only a text entry: a file's `text` is its path, and counting its words says nothing.
+        let text = item.kind == .text ? item.text : nil
         let url = imageURL
+        let filePath = item.filePath
         details = await Task.detached(priority: .userInitiated) {
             var details = Details()
             if let text {
@@ -392,6 +461,12 @@ private struct ClipboardInfoSection: View {
             if let url {
                 details.pixelSize = ImageThumbnail.pixelSize(of: url)
                 details.fileBytes = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize
+            }
+            if let filePath {
+                let fileURL = URL(fileURLWithPath: filePath)
+                let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .contentTypeKey])
+                details.fileBytes = values?.fileSize
+                details.typeName = values?.contentType?.localizedDescription
             }
             return details
         }.value

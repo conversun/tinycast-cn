@@ -18,7 +18,7 @@ struct QuickActionsSettingsView: View {
         Form {
             Section {
                 Toggle(isOn: enabledBinding) {
-                    Text("Enable Quick Actions")
+                    SettingsRowTitle(.quickActionsQuickActions, "Enable Quick Actions")
                     Text(
                         ("Act on the text you have selected in any app. Nothing is read until you "
                             + "press a shortcut.").localizedUI)
@@ -37,7 +37,7 @@ struct QuickActionsSettingsView: View {
                     }
                 }
             } header: {
-                Text("Quick Actions")
+                SettingsSectionHeader(.quickActionsQuickActions)
             }
 
             Group {
@@ -48,6 +48,7 @@ struct QuickActionsSettingsView: View {
             .settingsEnabled(appSettings.quickActionsEnabled)
         }
         .formStyle(.grouped)
+        .settingsScrollTarget(.quickActions)
         .onReceive(refreshTimer) { _ in isTrusted = Permissions.isAccessibilityTrusted() }
         .sheet(item: $editingAction) { action in
             InstructionsEditorSheet(
@@ -62,7 +63,16 @@ struct QuickActionsSettingsView: View {
             store.resolveModel(
                 appleIntelligenceAvailable: aiSettings.isAppleIntelligenceAvailable(),
                 fallback: aiSettings.defaultModel)
+            core.applyInstalledAILifecycle()
         }
+        .onChange(of: appSettings.aiEnabled) { repairInstalledModel() }
+        .onChange(of: aiSettings.enabledInstalledProviders) {
+            core.applyInstalledAILifecycle()
+            repairInstalledModel()
+        }
+        .onChange(of: core.chatGPTSubscription.models) { repairInstalledModel() }
+        .onChange(of: core.chatGPTSubscription.phase) { repairInstalledModel() }
+        .onChange(of: core.installedAI.statuses) { repairInstalledModel() }
     }
 
     private var actionsSection: some View {
@@ -73,7 +83,9 @@ struct QuickActionsSettingsView: View {
                         .frame(width: Theme.Size.settingsRowIcon)
                 } trailing: {
                     if !action.usesTranslationFramework {
-                        Button { editingAction = action } label: {
+                        Button {
+                            editingAction = action
+                        } label: {
                             SymbolImage(
                                 name: "pencil", size: Theme.Size.quickActionHeaderIcon)
                         }
@@ -81,7 +93,7 @@ struct QuickActionsSettingsView: View {
                         .help("Edit \(action.title) instructions")
                         .accessibilityLabel("Edit \(action.title) instructions")
                     }
-                    ShortcutRecorder(action: .quickAction(action), isQuiet: true)
+                    ShortcutRecorder(action: .command(CommandID(action)), isQuiet: true)
                     Picker("", selection: previewBinding(action)) {
                         Text("Replace").tag(false)
                         Text("Preview").tag(true)
@@ -99,7 +111,7 @@ struct QuickActionsSettingsView: View {
                 }
             }
         } header: {
-            Text("Actions")
+            SettingsSectionHeader(.quickActionsActions)
         } footer: {
             Text(
                 ("Replace puts the result straight into your document — undo in the app you were in "
@@ -113,21 +125,20 @@ struct QuickActionsSettingsView: View {
 
     private var modelSection: some View {
         Section {
-            if modelChoices.isEmpty {
-                Label("No AI provider configured", systemImage: "sparkles")
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker(selection: modelBinding) {
-                    ForEach(modelChoices) { choice in
-                        Text(choice.menuTitle).tag(Optional(choice.selection))
-                    }
-                } label: {
-                    Text("Model")
+            AIModelSelectionRows(
+                selection: store.model,
+                select: store.select,
+                modelLabel: {
+                    SettingsRowTitle(.quickActionsModel, "Model")
                     Text("Used by every action except Translate.")
+                },
+                effortLabel: {
+                    SettingsRowTitle(.quickActionsModel, "Reasoning effort")
+                    Text("Applied when the selected model supports reasoning effort.")
                 }
-            }
+            )
         } header: {
-            Text("Model")
+            SettingsSectionHeader(.quickActionsModel)
         } footer: {
             Text(
                 ("Separate from chat's model on purpose: a shortcut you press all day should not "
@@ -146,11 +157,11 @@ struct QuickActionsSettingsView: View {
                     Text(TextTranslator.displayName(of: $0)).tag($0.minimalIdentifier)
                 }
             } label: {
-                Text("Translate to")
+                SettingsRowTitle(.quickActionsTranslate, "Translate to")
                 Text("The panel can still translate into another language once it is open.")
             }
         } header: {
-            Text("Translate")
+            SettingsSectionHeader(.quickActionsTranslate)
         } footer: {
             Text(
                 "Translation uses Apple's own translator on this Mac, so it costs nothing and ".localizedUI
@@ -183,22 +194,45 @@ struct QuickActionsSettingsView: View {
             set: { visibility.setItemVisible($0, for: entry) })
     }
 
-    private var modelBinding: Binding<AIModelSelection?> {
-        Binding(get: { store.model }, set: { store.select($0) })
-    }
-
     private var languageBinding: Binding<String> {
         Binding(
             get: { store.settings.targetLanguage },
             set: { store.settings.targetLanguage = $0 })
     }
 
-    /// The same routes chat offers, flattened: Quick Actions has no reason to group them.
     private var modelChoices: [AIModelOption] {
-        AIModelOption.catalog(
-            appleIntelligence: aiSettings.isAppleIntelligenceAvailable(),
-            chatGPT: core.chatGPTSubscription.models,
-            connections: aiSettings.connections)
+        AIModelOption.availableGroups(
+            settings: aiSettings, subscription: core.chatGPTSubscription,
+            installedAI: core.installedAI
+        )
+        .flatMap(\.options)
+    }
+
+    private func repairInstalledModel() {
+        // Catalog rows name a route without an effort; a repaired selection must carry the default.
+        let options = modelChoices.map {
+            AIModelOption.withDefaultEffort(
+                $0.selection, settings: aiSettings, subscription: core.chatGPTSubscription,
+                installedAI: core.installedAI)
+        }
+        var unavailable = Set<AIModelSource>()
+        if !aiSettings.enabledInstalledProviders.contains(.codex)
+            || core.chatGPTSubscription.phase == .signedOut
+            || core.chatGPTSubscription.phase.isUnavailable
+        {
+            unavailable.insert(.codex)
+        }
+        for kind in [InstalledAIKind.claude, .openCode] {
+            let phase = core.installedAI.status(for: kind).phase
+            guard
+                !aiSettings.enabledInstalledProviders.contains(kind)
+                    || phase == .signInRequired || phase == .notInstalled
+            else { continue }
+            unavailable.insert(kind.source)
+        }
+        store.repairInstalledModel(
+            available: options, unavailableSources: unavailable,
+            fallback: aiSettings.defaultModel)
     }
 
     private struct InstructionsEditorSheet: View {

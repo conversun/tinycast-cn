@@ -34,6 +34,10 @@ enum Theme {
         /// The dialog and HUD surface, so a dialog reads as a sibling of the palette.
         static let dialog: CGFloat = 20
         static let thumbnail: CGFloat = 6
+        /// A shape small enough that `thumbnail` would round it into a circle.
+        static let glyph: CGFloat = 2
+        /// A pill holding a square thumbnail; a full capsule fights the thumbnail's own corners.
+        static let attachmentChip: CGFloat = 8
         static let card: CGFloat = 10
         static let keyCap: CGFloat = 6
         /// Settings shortcut-recorder keycap — smaller than the palette's `keyCap` chip.
@@ -118,11 +122,13 @@ enum Theme {
         static let clipboardListWidth: CGFloat = 290
         static let emojiCell: CGFloat = 56
         static let menuWidth: CGFloat = 276
-        /// The clipboard type filter's menu; `menuWidth` is far too wide for five short rows.
+        /// The clipboard type filter's menu; `menuWidth` is far too wide for six short rows.
         static let clipboardFilterMenuWidth: CGFloat = 200
         /// Stated, not padded: the cap below counts rows, so a capped menu would land mid-row.
         static let menuRowHeight: CGFloat = menuIcon + Spacing.md * 2
         static let menuRowSpacing: CGFloat = 1
+        /// Stated, not measured: `viewportHeight` counts headers, so a capped menu lands on a row.
+        static let menuSectionHeader: CGFloat = 16
         /// Six rows and half of the seventh, so a capped menu reads as scrollable, not clipped.
         static let menuVisibleRows: CGFloat = 6.5
         /// Rounded: a half-row of an odd pitch lands the glass edge on a half pixel.
@@ -135,9 +141,19 @@ enum Theme {
         static let menuBrandIcon: CGFloat = 14
         /// The same mark in a header bar button, matched to the callout symbol beside it.
         static let barBrandIcon: CGFloat = 12
-        /// A sent image in the transcript; a staged one is a glyph in a pill by the search text.
+        /// A sent image in the transcript; a staged one is a small preview in a composer pill.
         static let chatImageThumb: CGFloat = 96
         static let chatAttachmentGlyph: CGFloat = 16
+        /// A staged file's preview in its pill, kept under the pill's height so it reads inside it.
+        static let chatAttachmentThumb: CGFloat = 18
+        /// The pill's remove button; small, but the whole reason a mispaste is recoverable.
+        static let chatAttachmentRemove: CGFloat = 14
+        /// Tighter than the gap inside the pill, so the thumbnail reads as filling it.
+        static let chatAttachmentInset: CGFloat = 3
+        /// The clipboard preview's player; `VideoPlayer` expands unbounded without a height.
+        static let clipboardMediaHeight: CGFloat = 260
+        /// The preview pane is ~460pt wide, so 900px stays crisp at 2× without over-decoding.
+        static let clipboardPreviewPixel: CGFloat = 900
         /// Opening size and the resize floor; tall enough that the sidebar's rows never scroll.
         static let settingsWindow = CGSize(width: 860, height: 700)
         /// Settings sidebar: a fixed column, wide enough for "Window Management".
@@ -145,6 +161,26 @@ enum Theme {
         /// The narrowest the pane column may get before a grouped row's control starts colliding.
         static let settingsDetailMinimum: CGFloat = 420
         static let settingsRowIcon: CGFloat = 20
+        /// The sidebar's search field; matches a grouped `Form` row's control height.
+        static let settingsSearchField: CGFloat = 28
+        /// The layout editor. Height is stated so selecting an entry cannot resize the sheet.
+        static let layoutEditorSheet = CGSize(width: 900, height: 660)
+        /// The inspector column; the preview takes the rest, keeping the split two-to-one.
+        static let layoutInspectorColumn: CGFloat = 300
+        /// The entry dropdown's list, wider than its button so a long app name still reads.
+        static let layoutEntryPopover: CGFloat = 260
+        /// An app icon inside a preview rect, small enough a narrow window still shows one.
+        static let layoutPreviewIcon: CGFloat = 22
+        /// A numbered display tab under the preview.
+        static let layoutDisplayTab: CGFloat = 24
+        /// Every inspector control — field, dropdown, add button — sits on this one height.
+        static let layoutControlHeight: CGFloat = 28
+        /// The unit slot in a numeric field, stated so "%" and "pt" put their digits on one x.
+        static let layoutFieldUnit: CGFloat = 16
+        static let layoutPositionGlyph = CGSize(width: 26, height: 19)
+        static let layoutPositionStroke: CGFloat = 1.5
+        /// A position cell's clickable row; the glyph floats inside it, so the whole cell hits.
+        static let layoutPositionCell: CGFloat = 34
         /// Settings editor modals (Custom Commands, Snippets): fixed width, intrinsic height.
         static let editorSheetWidth: CGFloat = 480
         /// Label column of an extension's `Form`, so every field's input starts on one line.
@@ -162,6 +198,8 @@ enum Theme {
         static let dialogIcon: CGFloat = 32
         /// 16:9 at the dialog's own width, so the two surfaces read as siblings.
         static let cameraPreview = CGSize(width: 420, height: 236)
+        /// 16:9 again, wider: the standalone camera is the surface, not a confirmation on one.
+        static let cameraStage = CGSize(width: 560, height: 315)
         /// Wider than a dialog: a Quick Action's result is prose to read, not a sentence to answer.
         static let quickActionPanel: CGFloat = 520
         /// Matched to the title's cap height; a row-sized glyph beside it reads as an error.
@@ -191,8 +229,14 @@ enum Theme {
         static let exit: TimeInterval = 0.12
         /// Fade-in/out for a hover `Tooltip`.
         static let tooltip: TimeInterval = 0.15
+        /// A control lighting up under the pointer; short enough to feel like a response.
+        static let hover: TimeInterval = 0.12
         static let copyFeedback: TimeInterval = 1.2
         static let chatFooter: TimeInterval = 0.12
+        /// A Settings search result scrolling its section into view, then the pulse that marks it.
+        static let settingsReveal: TimeInterval = 0.28
+        static let settingsFlash: TimeInterval = 2.0
+        static let settingsFlashOut: TimeInterval = 0.6
     }
 
     /// System text styles (not hardcoded sizes) so the UI honors Dynamic Type.
@@ -267,7 +311,21 @@ enum Theme {
         static let cardFill = ramp(dark: 0.05, light: 0.04)
         static let cardStroke = ramp(dark: 0.10, light: 0.10)
         /// White in both: the frost brightens glass, and light glass needs more to read at all.
+        /// A window on the preview's plate. White in both, since the plate is always dark.
+        static let layoutPreviewWindow = adaptive(
+            dark: .srgbInk(1, alpha: 0.22), light: .srgbInk(1, alpha: 0.28))
+        /// The selected one, lifted enough to read as chosen before the accent stroke is seen.
+        static let layoutPreviewWindowSelected = adaptive(
+            dark: .srgbInk(1, alpha: 0.38), light: .srgbInk(1, alpha: 0.44))
+        /// The preview's plate: a display is dark in both appearances, so `adaptive`, not `ramp`.
+        static let layoutPreviewGround = adaptive(
+            dark: .srgbInk(0, alpha: 0.55), light: .srgbInk(0, alpha: 0.50))
         static let glassFrost = adaptive(dark: .srgbInk(1, alpha: 0.05), light: .srgbInk(1, alpha: 0.25))
+        /// The pill behind the header of the section a Settings search jumped to.
+        static let searchFlash = Color.accentColor.opacity(0.35)
+        /// The two squares of a checkerboard, behind a colour with alpha to show.
+        static let checkerLight = Color(nsColor: .srgbInk(1, alpha: 0.22))
+        static let checkerDark = Color(nsColor: .srgbInk(0, alpha: 0.22))
         /// The violet of the app mark, used only to tint the About support callout.
         static let brand = Color(red: 0.525, green: 0.231, blue: 1.0)
         /// The palette's drop guides while dragging, and once a release would snap it home.

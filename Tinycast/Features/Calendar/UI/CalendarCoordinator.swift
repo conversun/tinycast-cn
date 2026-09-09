@@ -51,13 +51,22 @@ final class CalendarCoordinator {
     /// Live rather than clock-driven: a chord reads this with nothing ticking.
     var agenda: [MeetingEvent] { UpcomingWindow.agenda(from: store.events, now: Date()) }
 
+    /// The calendar label keeps its plain icon until today's events are exhausted, with a small
+    /// grace across midnight for a meeting that starts imminently.
+    var hasUpcomingMenuBarEvent: Bool {
+        MenuBarSummary.hasUpcomingEvent(from: store.events, now: clock.now)
+    }
+
     /// The event the menu bar carries, or nil for the plain icon.
     var menuBarEvent: MeetingEvent? {
-        guard settings.calendarEnabled, settings.menuBarEvents != .never else { return nil }
+        guard settings.calendarEnabled, settings.calendarMenuBarDisplay != .disabled else {
+            return nil
+        }
         let summary = MenuBarSummary(
-            leadMinutes: settings.menuBarEvents.rawValue,
+            leadMinutes: settings.menuBarEvents == .today ? nil : settings.menuBarEvents.rawValue,
             hideAfterMinutes: settings.hideCurrentEvent.minutes,
-            linkedOnly: settings.menuBarLinkedEventsOnly)
+            linkedOnly: settings.menuBarLinkedEventsOnly,
+            hideCurrentAtStart: settings.hideCurrentEvent.hidesAtStart)
         return summary.event(from: store.events, now: clock.now)
     }
 
@@ -119,7 +128,8 @@ final class CalendarCoordinator {
     func applyClock() {
         armAutoJoin()
         let watched =
-            paletteVisible || settings.menuBarEvents != .never || settings.autoJoinMeetings
+            paletteVisible || settings.calendarMenuBarDisplay != .disabled
+            || settings.autoJoinMeetings
         guard settings.calendarEnabled, watched else {
             clock.stop()
             return
@@ -162,7 +172,9 @@ final class CalendarCoordinator {
             appIndex.setMeetings([])
             return
         }
-        appIndex.setMeetings(agenda.map(Self.entry(for:)))
+        let meetings =
+            settings.calendarLauncherLimit.maximum.map { Array(agenda.prefix($0)) } ?? agenda
+        appIndex.setMeetings(meetings.map(Self.entry(for:)))
     }
 
     private static func entry(for meeting: MeetingEvent) -> AppEntry {
@@ -305,7 +317,7 @@ final class CalendarCoordinator {
     }
 
     func showSchedule() {
-        paletteCoordinator.showPalette(mode: .schedule)
+        paletteCoordinator.togglePalette(mode: .schedule)
     }
 
     /// A miss is transient, so it reports through the HUD rather than a dialog needing dismissal.

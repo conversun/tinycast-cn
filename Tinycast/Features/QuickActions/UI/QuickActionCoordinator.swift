@@ -36,8 +36,10 @@ final class QuickActionCoordinator {
         appIndex.setCommandsVisible(Self.launcherCommands, settings.quickActionsEnabled)
         guard settings.quickActionsEnabled else {
             cancel()
+            core.applyInstalledAILifecycle()
             return
         }
+        core.applyInstalledAILifecycle()
         store.resolveModel(
             appleIntelligenceAvailable: core.aiSettings.isAppleIntelligenceAvailable(),
             fallback: core.aiSettings.defaultModel)
@@ -180,10 +182,20 @@ final class QuickActionCoordinator {
             })
     }
 
+    /// A replacement that never lands would otherwise lose the reply, so the clipboard keeps it.
     private func deliver(_ text: String, to target: NSRunningApplication?, action: QuickAction) {
-        injector.replaceSelection(with: text, in: target) { [weak self] in
-            self?.core.showMessage(String(format: "%@ applied".localizedUI, action.title.localizedUI))
-        }
+        injector.replaceSelection(
+            with: text, in: target,
+            onDelivered: { [weak self] in self?.core.showMessage(String(localized: "\(action.title.localizedUI) applied")) },
+            onFailed: { [weak self] in
+                Paster.copyPlainText(text)
+                self?.core.showMessage(
+                    String(
+                        localized:
+                            "\(action.title.localizedUI) couldn’t replace the selection — copied instead"
+                    ),
+                    tone: .danger)
+            })
     }
 
     /// A failure the reader cannot see is a hotkey that silently did nothing.

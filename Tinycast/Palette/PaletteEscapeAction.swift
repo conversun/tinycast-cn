@@ -3,18 +3,23 @@ import Foundation
 /// Ordered like a bare backspace: a screen is only left once the search field is empty.
 enum PaletteEscapeAction: Equatable {
     case closeMenu
+    case leaveArgumentField
     case clearQuery
     case exitExtensionScreen
-    case exitToLauncher
+    case goBack
     case hidePalette
 
-    static func resolve(menuOpen: Bool, query: String, mode: PaletteMode) -> Self {
+    static func resolve(
+        menuOpen: Bool, argumentFocused: Bool, query: String, mode: PaletteMode,
+        canGoBack: Bool, behavior: EscapeKeyBehavior
+    ) -> Self {
         if menuOpen { return .closeMenu }
+        // An argument field is a step deeper than the query, so it is left before anything clears.
+        if argumentFocused { return .leaveArgumentField }
         if !query.isEmpty { return .clearQuery }
+        guard behavior == .navigateBackOrClose else { return .hidePalette }
         // An extension pops its own navigation stack before the command is left.
         if mode == .extensionCommand { return .exitExtensionScreen }
-        // Chat is a surface of its own, so leaving it lands on the launcher, not on nothing.
-        if mode == .ai { return .exitToLauncher }
-        return .hidePalette
+        return canGoBack ? .goBack : .hidePalette
     }
 }

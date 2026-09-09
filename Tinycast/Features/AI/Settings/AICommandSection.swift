@@ -13,7 +13,7 @@ struct AICommandSection: View {
                     Image(systemName: CommandID.aiChat.sfSymbol)
                         .frame(width: Theme.Size.settingsRowIcon)
                 } trailing: {
-                    ShortcutRecorder(action: .aiChat)
+                    ShortcutRecorder(action: .command(.aiChat))
                     Toggle("", isOn: visibilityBinding(entry))
                         .labelsHidden()
                         .toggleStyle(.checkbox)
@@ -21,7 +21,7 @@ struct AICommandSection: View {
                 }
             }
         } header: {
-            Text("Commands")
+            SettingsSectionHeader(.aiCommands)
         } footer: {
             Text("The shortcut works even when the command is hidden from the launcher.")
                 .font(.caption)

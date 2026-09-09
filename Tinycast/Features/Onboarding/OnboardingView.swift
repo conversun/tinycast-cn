@@ -399,7 +399,7 @@ final class OnboardingModel {
             do {
                 let outcome = try await BackupActions.importRaycast(
                     core: core, file: file, passphrase: passphrase, options: selection)
-                status = .success(BackupActions.raycastSummaryText(outcome))
+                status = .success(BackupActions.raycastText(outcome))
                 passphrase = ""
             } catch {
                 status = .failure(error.localizedDescription)

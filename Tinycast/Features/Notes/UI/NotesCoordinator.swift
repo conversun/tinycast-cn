@@ -104,8 +104,13 @@ final class NotesCoordinator {
         await store.flush()
     }
 
-    func show() {
-        request(.editor)
+    /// The command is a toggle, like every other surface: a second press puts the panel away.
+    func toggle() {
+        if windowController.isVisible {
+            hide()
+        } else {
+            request(.editor)
+        }
     }
 
     func createNote() {
@@ -189,6 +194,7 @@ final class NotesCoordinator {
         select(id)
     }
 
+    /// Renaming edits the filename, so the field starts from that and never from a derived line.
     func beginSwitcherRename(_ summary: NoteSummary) {
         switcherRename.begin(id: summary.id, title: summary.title)
     }
@@ -248,7 +254,7 @@ final class NotesCoordinator {
     }
 
     func trash(_ id: NoteID) {
-        guard let title = store.summaries.first(where: { $0.id == id })?.title else { return }
+        guard let title = store.summaries.first(where: { $0.id == id })?.displayTitle else { return }
         runOperation { [weak self] generation in
             guard let self else { return }
             let confirmed = await core.confirm(

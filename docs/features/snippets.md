@@ -117,7 +117,7 @@ so a migrated snippet keeps working.
 | `{date format="yyyy-MM-dd"}`               | Any `DateFormatter` format                                                                                                                                                                                         |
 | `{date locale="fr-FR"}`                    | Renders in another locale; cannot be combined with `format`                                                                                                                                                        |
 | `{time offset="+3h +30m"}`                 | Signed offsets, space-separated: `m` minutes, `h` hours, `d` days, `M` months, `y` years                                                                                                                           |
-| `{argument}`                               | An argument named `Argument`                                                                                                                                                                                       |
+| `{argument}` · `{query}`                   | An argument named `Argument`. `{query}` is Raycast's spelling, accepted on the way in; `{argument}` is the canonical one and the only one **Insert…** writes                                                         |
 | `{argument name="Recipient"}`              | A named argument requested before expansion                                                                                                                                                                        |
 | `{argument default="Hi"}`                  | Optional argument — the default expands without prompting                                                                                                                                                          |
 | `{argument options="a, b, c"}`             | The prompt offers a picker instead of a text field                                                                                                                                                                 |
@@ -238,25 +238,66 @@ not report completion and therefore cannot show it.
 
 ## Text delivery and pasteboard safety
 
-The preferred path is one atomic Accessibility replacement. Tinycast requires a focused element with
-readable text plus writable selected-range and selected-text attributes. For an automatic expansion it
-also verifies that the exact captured keyword is immediately before the cursor before replacing it.
-An Accessibility mismatch is rejected rather than guessed.
+Delivery is one contract, in this order, and every clause below is a rule in it.
 
-Some editors grant Accessibility but do not expose writable text attributes. In that case Tinycast
-falls back to tagged keyboard events while keeping the same permission, consent, Secure Event Input,
-target-app and cancellation gates. The fallback deletes the keyword first, waits for deletion to
-settle, then inserts the expansion. Short single-line expansions of at most 100 characters use Unicode
-keyboard events.
+1. The focused element exposes `AXSelectedTextMarkerRange` → a renderer surface. Skip Accessibility.
+2. The keyword is not at the caret yet → wait, up to 40 ms. Never arrives → events. Wrong → refuse.
+3. Write over Accessibility, read the value back. Matches → done. Unchanged → events. Moved some
+   other way → refuse.
+4. Events: delete the keyword, then paste (long or multiline) or type in four-unit keystrokes.
+5. Nothing landed → say so.
 
-Longer or multiline fallback text uses a temporary paste only when the existing pasteboard's first
-item has plain text that can be restored without another pasteboard write. Tinycast snapshots every
-item, type and data payload, takes temporary ownership with the same item shape, and changes only the
-first plain-text payload. Restoration mutates that owned item back in place; it never clears the
-clipboard before a fallible restore. The pasteboard change count is checked before restoration, so a
-newer copy is never overwritten. Empty, image-first, unreadable or otherwise unsafe pasteboards use
-the Unicode-event fallback instead. The clipboard poller synchronizes to Tinycast's ownership changes
-so temporary or restored text is not added as new history.
+**Rule 1: a renderer's Accessibility surface is not authoritative.** Chromium and Monaco publish
+selection as opaque text markers, and their `AXValue` either trails the editor by a few milliseconds
+or — in VSCodium — stays empty and caret-zero indefinitely while the real editor holds the text. A
+marker range is the reliable tell, so those targets never take the Accessibility write at all.
+`accessibilityTextState` skips them for the same reason: a value that never moves cannot confirm a
+paste either.
+
+**Rule 2: too little text is not the same as the wrong text.** `AccessibilityReplacementPolicy`
+`.pending` means the value is shorter than the keyword — the renderer has not caught up — and is
+retried for up to eight 5 ms passes. `.rejected` means there was enough text and it was not the
+keyword, which is a genuine mismatch and stops delivery. Only an automatic expansion waits; an
+interactive one has no keyword race to lose. The convergence window is why an empty Monaco snapshot
+falls through to events instead of reading as a mismatch.
+
+**Rule 3: a `kAXErrorSuccess` from the setter is not evidence.** Chromium answers success and applies
+nothing. `confirmsReplacement` rebuilds the exact string the write should have produced and compares
+it to what the element reports. An unchanged value is `.unavailable`, so the event tiers still get
+their turn instead of an "applied" message over untouched text; a value that changed into something
+we did not write is `.rejected`, because events would then edit a document we can no longer describe.
+
+**Rule 4** keeps the same permission, consent, Secure Event Input, target-app and cancellation gates.
+The fallback deletes the keyword first, waits for deletion to settle, then inserts the expansion.
+Short single-line expansions of at most 100 characters use Unicode keyboard events.
+
+**A Unicode keystroke carries at most four UTF-16 units.** Blink stores one key event's text in a
+fixed `WebKeyboardEvent::kTextLengthCap` array, so a Chromium target — Brave, Chrome, Electron, VS
+Code, Slack — silently drops everything past the fourth unit of a single event. `UnicodeTypingChunk`
+splits the text into four-unit keystrokes on scalar boundaries, because a lone surrogate half is not
+text and a scalar never exceeds four units on its own. The chunks post through the same spaced,
+re-gated loop the deletions use, so a target that goes away mid-word stops the rest.
+
+Longer or multiline fallback text uses a temporary paste. Tinycast snapshots every item, type and data
+payload, then **lends a board holding nothing but the expansion** — one item carrying the plain text
+and Tinycast's own marker type — and restores by rewriting the snapshot whole.
+
+**The loan carries no other flavour of the old clipboard.** Keeping the original item's shape and
+swapping only its `.string` would leave `public.html`, `public.rtf` and the rest describing the
+*previous* copy, and a rich-text editor prefers those: ChatGPT's ProseMirror composer takes Chromium's
+`text/html` over its `text/plain`, so a snippet pasted over an HTML-bearing clipboard inserted the
+previous copy instead. A representation Tinycast cannot rewrite to mean the expansion is one it must
+not lend, and the whitelist of text-bearing UTIs it *could* rewrite would never be complete. Rewriting
+the snapshot therefore clears before a fallible write — the risk a same-shape loan bought off — which
+is the trade a correct paste is worth, and the items are built from the in-memory snapshot before the
+clear so the write has nothing left to fail on.
+
+An empty or image-only clipboard lends the same single item; declining the loan there would have sent
+a long multiline expansion down the keystroke path a character at a time. The pasteboard change count
+is checked before restoration, so a newer copy is never overwritten, and the clipboard poller
+synchronizes to Tinycast's ownership changes so temporary or restored text is not added as new history.
+Because the marker type lives only on the lent item, a restored clipboard carries none of it, and the
+poller keeps seeing the user's own copy.
 
 When Accessibility text state is readable, a long paste waits for evidence that the target changed.
 If the editor cannot expose post-paste text state, a successfully posted paste is accepted only after
@@ -266,6 +307,13 @@ once only after the Accessibility replacement or event fallback (including reque
 finishes successfully. Disabling automatic expansion or
 terminating the app cancels pending delivery and deferred cursor movement; termination also completes
 any pasteboard restoration still owned by Tinycast.
+
+**Rule 5, and the keystroke that outruns it.** An automatic expansion is speculative, so the reader's
+next real keystroke or click cancels whatever is still in flight — the listener reports every
+non-ignored input to `cancelAutomaticExpansion`, and Tinycast's own tagged synthetic events classify
+as `.ignored`, so a fallback never cancels itself. Delivery then settles exactly once either way:
+Quick Actions raise a HUD and keep the reply on the clipboard, while snippets pass no failure handler
+and stay as silent as before, because a speculative expansion that declined is not news.
 
 ## External edits and conflicts
 
@@ -292,3 +340,18 @@ main-actor watcher against temporary roots:
 ```sh
 ./Scripts/run-tests.sh snippets-test
 ```
+
+The delivery contract's two judgements — `keywordState` and `confirmsReplacement` — are pure, so the
+harness drives renderer lag, a genuine mismatch, an empty editor snapshot, a false-success setter and
+a write that landed elsewhere without an editor in the room. The tiers themselves are not: which rule
+a given app takes is a manual check.
+
+### Manual sweep
+
+- Type a keyword in the **ChatGPT composer inside a Chromium browser**: it expands. This is rule 1 and
+  rule 4 together — the composer is skipped over Accessibility and typed into in four-unit keystrokes.
+- Type one in a **VSCodium editor pane**: it expands, where the Accessibility value stays empty.
+- Type one in **Notes or Mail**: still the atomic Accessibility replacement, not events.
+- Type a keyword, then keep typing before the expansion lands: the expansion is abandoned rather than
+  landing mid-word.
+- Type a keyword whose text the app changed underneath it: refused, with the keyword left alone.

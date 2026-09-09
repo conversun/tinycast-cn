@@ -3,7 +3,7 @@ import SwiftUI
 /// One category's Settings sections; never filters by visibility, so hidden rows stay listed.
 struct LauncherItemsSection: View {
     let kind: AppEntry.Kind
-    let header: String
+    let anchor: SettingsAnchor
     let searchPrompt: String
 
     @Environment(AppIndex.self) private var appIndex
@@ -21,12 +21,11 @@ struct LauncherItemsSection: View {
     var body: some View {
         Section {
             Toggle(isOn: enabledBinding) {
-                Text("Enable \(header.localizedUI)")
+                SettingsRowTitle(anchor, "Enable \(anchor.title)")
                 Text("Off hides them all and stops their shortcuts. Uncheck one below to hide just that one.")
             }
         } header: {
-            // A String parameter takes Text's verbatim overload; the callers pass keys.
-            Text(header.localizedUI)
+            SettingsSectionHeader(anchor)
         }
 
         Section {

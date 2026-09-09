@@ -42,7 +42,7 @@ These are the things that quietly break the look if changed. Preserve them unles
 - **An icon is drawn for a surface *and* a system icon style, and both move under you.** macOS restyles the icons `NSWorkspace` hands out when System Settings → Appearance → **Icon & widget style** changes, so `IconStyleMonitor` and Tinycast's own appearance both call `IconCache.invalidateStyled()`. **The monitor may not invalidate on the notification itself.** AppKit posts `NSWorkspaceIconAppearanceConfigurationDidChange` before IconServices has swapped what `NSWorkspace` vends — measured at 25–120ms behind, jittering run to run — and the images it hands back are live objects macOS restyles in place, so flattening one on the signal freezes the *outgoing* style into a bitmap nothing ever invalidates again. `IconStyleMonitor` therefore polls `IconCache.styleFingerprint()` until the pixels actually move, and only then invalidates. Waiting also sidesteps the cost: re-flattening every icon the instant a restyle begins forces a cold IconServices regeneration, measured at 160× the settled draw cost. That drops the cached bitmaps, bumps every cache key so an in-flight decode cannot repopulate a stale one, and moves `IconCache.style.generation`. **Any view that draws an icon must key its fetch on that generation** — wrap the view's own key in `IconRequest`, or call `IconCache.observeStyle()` where the icon is resolved synchronously in a `body`. It is reached through `IconCache` rather than injected precisely because icons are drawn in menus, popovers and every list, where a missed injection would be a silent staleness bug.
 - **No hard dividers between the list and the bars.** The header and bottom bar are `safeAreaInset` overlays with no background; separation comes from `edgeDissolve()`, nothing else. (One deliberate exception: the vertical hairline between the clipboard list and its preview pane.)
 - **The panel corner is clipped once, at the root.** `RootPaletteView.body` ends with `.background(panelScrim) → .background(VisualEffectView()) → .clipShape(RoundedRectangle(26, .continuous))`. Keep that order; the scrim goes _over_ the vibrancy, and the clip is last.
-- **Don't use the native scroll edge effect.** Inside a transparent panel it renders a hard-bounded rectangle. Use `edgeDissolve()`, or a gradient `mask` where a surface owns its own fade — `scrollEdgeEffectStyle` draws a *material* where a scroll view meets a safe area, so over a panel that already has `panelScrim` + `VisualEffectView` it composites to nothing. Tried and rejected on `QuickActionResultView`, with and without `safeAreaBar`.
+- **Don't use the native scroll edge effect.** Inside a transparent panel it renders a hard-bounded rectangle. Use `edgeDissolve()`, or a gradient `mask` where a surface owns its own fade — `scrollEdgeEffectStyle` draws a *material* where a scroll view meets a safe area, so over a panel that already has `panelScrim` + `VisualEffectView` it composites to nothing. Tried and rejected on `QuickActionResultView`, with and without `safeAreaBar`. This is a rule about the borderless panels; the Settings window is a titled `NSWindow` whose system titlebar draws the band itself (see "Settings").
 - **Test over a light desktop.** Transparency and corner masking bugs only show over bright wallpaper. Dark wallpaper hides them.
 - **No `NSAlert`, no `NSSlider`, no system popovers.** Every confirmation, failure report, value prompt and transient readout is Tinycast's own SwiftUI surface (see "Dialogs & HUD"). An Aqua alert on an alpha-over-vibrancy app reads as a different product, and its `runModal` run loop keeps Carbon hotkeys firing underneath.
 - **A dialog has three independent axes; never let one infer another.** The **icon** (`DialogRequest.symbol`, required) is always the *subject's* own glyph — a command being confirmed uses its `SystemAction.sfSymbol`, so the Restart dialog shows the same icon as the Restart row. Tone never picks an icon. The **tone** (`DialogTone`: `.neutral` / `.success` / `.danger`) tints only that glyph. The **button** takes its color from `DialogAction.Role` (`.standard` white / `.destructive` red / `.cancel` secondary), so a red-glyph security warning can still carry a plain white button — as "Import executable commands?" does.
@@ -284,7 +284,7 @@ All lists share one row grammar so launcher and clipboard look identical:
 
 - `HStack(spacing: lg)`: leading 24pt icon/thumbnail, title (`.body`, `lineLimit(1)`), optional trailing keycaps/kind label, `Spacer`. Insets: `.horizontal md`, `.vertical sm`.
 - **The leading slot is always `Theme.Size.rowIcon`, whatever fills it.** A glyph smaller than an app icon — the uninstall list's 16pt checkbox — is centred _inside_ that 24pt slot rather than sizing the slot to itself. Every list then starts its title at the same x, so switching palette modes doesn't jog the column sideways. The slot doubles as the hit target.
-- Background is a `RoundedRectangle(row, .continuous)` filled by `fill`: **selection → hover → clear**, in that precedence. This `fill` computed property is copy-identical across `AppRow`, `ClipboardRow`, `CalculatorCard` and `UninstallRow` — keep them in sync.
+- Background is a `RoundedRectangle(row, .continuous)` filled by `fill`: **selection → hover → clear**, in that precedence. This `fill` computed property is copy-identical across `AppRow`, `ClipboardRow` and `UninstallRow` — keep them in sync. The launcher's lead cards don't restate it: `.leadCard(selected:)` (`Features/Launcher/UI/LeadCard.swift`) owns their fill and hover, so a card can't answer a selection differently from its siblings.
 - **Hover state lives on the row**, not the list, so a mouse sweep repaints only the rows entering/leaving (a list-level hover rebuilds every row per move — don't do that).
 - **Hover is armed by pointer movement, not by the pointer's position** (`armedHover`, `Palette/HoverArming.swift`). A palette shown under a resting pointer lights nothing, and keys or a scroll drop the highlight until the pointer moves clear of the slop radius around where it stood — a row must never light up because it *slid under* a still pointer. Two measured facts the rule rests on: SwiftUI fires hover phases for rows arriving under a stationary pointer, but **not** for a lit row that merely shifts, so `PaletteState.hoverDisarmToken` clears what is already lit; and a wheel gesture ends with a mouse-moved event carrying no displacement, so *event type is not evidence the pointer moved*. `Tests/hover-arming-test.swift` pins both halves.
 - **Scroll moves only on keyboard nav/reset**, driven by a `ScrollIntent` (`DesignSystem/Scrolling/ScrollIntent.swift`) — mouse selection targets a visible row and never yanks scroll. `.top` scrolls to the origin anchor that `scrollOriginAnchor()` installs — a zero-height overlay applied to the scrolled content _after_ its padding, so it marks offset 0 without joining the layout and the restored origin is exact (targeting the first row instead leaves the top padding hidden under the header); it is restated when the header's inset settles after mount, which moves the resting offset. A `.follow` that lands on flat index 0 restores the origin instead, so that row's section header comes back into view. One intent state serves every mode — they never coexist.
@@ -522,13 +522,109 @@ system-drawn and a pane reads exactly as macOS System Settings does.
   ride under the last row.
 - **The pane's own title is not in the pane.** `SettingsToolbarController` puts it in the titlebar,
   seated in the detail column by `.sidebarTrackingSeparator`.
+- **Settings is the one window that keeps the system titlebar.** `AppWindowController` builds every
+  window with `titlebarAppearsTransparent = true`, which opts the titlebar out of the system's glass
+  band; `SettingsToolbarController.install(in:)` sets it back to `false`, so the band and its scroll
+  edge effect are drawn by AppKit as a pane's `Form` scrolls under it. `.fullSizeContentView` and
+  `titlebarSeparatorStyle = .none` stay — the content still runs under the bar, and a hairline would
+  split the surface the band unifies. It also clears `isMovableByWindowBackground`: stock Settings
+  isn't dragged by its content. Onboarding, Updates, Support and Command Output keep the transparent
+  titlebar they were tuned for. Never hand-draw a header band; a main surface takes the system's
+  material, not `glassEffect`.
 - `SettingsComponents.swift` holds only what more than one pane needs: **`SettingsRow`**,
   **`FeatureSwitchSection`** (a feature's master switch plus its launcher-visibility companion) and
   **`SettingsFilterField`** (the filter row above a long list). `Onboarding/OnboardingCard.swift`
   keeps the older hand-drawn card, which that window still uses.
+- **The sidebar searches every pane *and* its rows.** `SettingsSearchField` sits above the list and
+  swaps it for a flat, ranked result list; each result carries the pane's `systemImage`, the row's
+  title and a `Pane › Section` breadcrumb, and arrowing through them moves the pane, as System
+  Settings does. Selection runs through `SettingsNavigationState.select`, so a result is an ordinary
+  navigation the Back/Forward chevrons can walk. **A row result also reveals its section**: the pane
+  scrolls the matched setting to centre and pulses its own name once (`Colors.searchFlash`) before
+  settling; a result no single row answers pulses the section's header instead.
+  It is a **second `List`**, keyed by
+  `SettingsSearchEntry.ID`, so result identities never share a selection namespace with `SettingsTab`.
+  ⌘F focuses the field, Escape clears it.
+- **`SettingsSearchCatalog` is hand-written, and that is the only option.** A `Form` cannot be asked
+  what rows it holds, so a new row is searchable only once it is listed there — with its anchor, its
+  title and the keywords the title doesn't contain ("caps lock" for Hyper Key).
+  Matching reuses `FuzzyMatch` (`Launcher/Model/SearchRelevance.swift`), multi-term like `NoteSearch`:
+  every term must hit the title, the breadcrumb or a keyword, a title hit outranks the rest, and a
+  pane outranks its own rows so a bare "clipboard" lands on the pane. `Tests/settings-history-test.swift`
+  pins that every pane is covered and that identities are unique; row-level drift is caught in review.
+  **Match ranges are deliberately not highlighted** — `FuzzyMatch` returns tier and score only.
+- **`SettingsAnchor` names a section once, so the catalog and the pane cannot disagree.** An entry
+  takes its pane *from* the anchor, so a row filed under the wrong pane won't compile.
+  `SettingsSectionHeader(_:)` in a section's `header:` supplies the name and the id a group result
+  scrolls to; `SettingsRowTitle(_:_:)` stands in for the `Text` of a row's own label and does the
+  same for one setting. A section with no header of its own takes `.settingsAnchor(_:)`, an id and
+  nothing else. **A catalog entry is `.init(anchor, title)` for one row and `.init(group:_:)` when
+  no single row answers it** — a list, a section's master switch, a button that lives in another
+  row's trailing edge. The half the compiler can't reach — a target nothing declares, which
+  navigates and then sits there — is caught by `Scripts/check-settings-search.js`, run from
+  `Scripts/lint.sh`. **Add the entry and its marker together, or lint will say so.**
+- **The reveal lives in two modifiers, never in a pane** (`SettingsScrollTarget.swift`).
+  `.settingsScrollTarget()` on a pane's `Form` holds the `ScrollViewReader` and one `.task(id:)` keyed
+  on the request, so a second jump cancels the first mid-pulse and the pane releases the request when
+  it settles; `.settingsAnchor(_:)` on a `Section` supplies the `.id` and paints the wash, reading
+  which anchor is lit from `\.settingsFlash` rather than having it threaded down.
+  `SettingsScrollRequest` carries a token because picking the same result twice has to scroll again
+  rather than compare equal and do nothing.
+- **The pulse is a pill on the name, and nothing around it is touched.** A grouped `Form` applies a
+  `.background` to a row's whole *content* box, so lighting a section — or a row — paints ragged
+  blocks at the width of every label, button and footer paragraph in it. (`.listRowBackground` is a
+  no-op here, at section and at row level, and `.overlay` strokes every row separately.) Putting the
+  pill on the label instead is one fixed shape nothing can render badly, it leaves each row's
+  subtitle and control alone, and it marks exactly the words the result row showed.
+- **The light is the window's, not the pane's** (`SettingsNavigationState.flashing`). Both panes are
+  briefly alive across a swap, so a pane-local `@State` pulse dies with the pane that lit it, and an
+  `@Environment` value doesn't reliably repaint an already-realized `Form` row. Two rules fall out:
+  a cancelled reveal returns *without* ending the pulse, since cancellation means a later jump owns
+  the light now; and `scrollRequest` is released only once the pulse is over, because it keys the
+  pane's `.task(id:)` and clearing it early cancels the very task doing the revealing.
+- **The sidebar's field is not `SettingsFilterField`.** That one is borderless because it lives inside
+  a `Form` row; the sidebar's is a glass capsule — `.frosted(in: Capsule())` at
+  `Size.settingsSearchField`, lensing the sidebar's own vibrancy — and lives in `Features/Settings/`,
+  having one call site. **The glass goes on a background layer, not on the content**
+  (`.background { Color.clear.frosted(in: Capsule()) }`): `frosted` ends in `.tint(.clear)`, which a
+  `TextField` descendant would inherit as an invisible caret.
+  `.searchable(placement: .sidebar)` renders nothing here — it needs a SwiftUI `NavigationSplitView`,
+  and this sidebar is an `NSHostingController` in a real `NSSplitViewController`.
 - **A `Form` realizes every row it is handed.** `LauncherItemsSection` therefore holds its items in
   a `LazyVStack` inside one Form row — 400 apps cost 55 ms and 69 views that way against 750 ms and
   2040 eager. Any other unbounded list must do the same.
+
+### The window-layout editor
+
+`Theme.Size.layoutEditorSheet` is **900 × 660, both stated**. The width less
+`layoutInspectorColumn` (300) leaves the preview two thirds of the sheet, and the canvas is greedy
+inside it — a fixed preview box would spend that third on margin. **The height is stated because the
+inspector grows**: picking an app reveals Argument, Size, Offset and Position, and an intrinsic
+sheet would jump out from under the pointer mid-click. The inspector scrolls if it ever overflows.
+
+Every inspector control — text field, dropdown, add button — is one `layoutFieldChrome`: a
+`Radius.barControl` rounded rect at `layoutControlHeight`, `cardFill` on `cardStroke`, accent-stroked
+while focused. A numeric field fills its half of the row rather than sizing to a stated width, so a
+value can never be cropped, and `layoutFieldUnit` keeps "%" and "pt" on one x.
+
+**The entry dropdown is a button and a popover, not a `Menu`**: a menu label stretches an `NSImage`
+out of aspect, which is what made the app icon smear. The rest of the app already picks apps this
+way (`AppPickerPopover`).
+
+In the position grid the **glyph floats in a wider cell** carrying the `contentShape`, so a click
+anywhere in the cell lands — a bare stroke is hittable only on the line itself. Each anchor's block
+takes half a pinned axis and all of a spanned one, which is what makes nine cells nine silhouettes
+rather than nine identical rectangles.
+
+`layoutPreviewGround` is **`adaptive`, never `ramp`**: a drawn display is dark in both appearances,
+and a ramp would invert it in Light. `layoutPreviewWindow` is white in both for the same reason — it
+sits on that always-dark plate. `Radius.glyph` (2) exists because `thumbnail` rounds a 10 pt square
+into a circle.
+
+The Save button draws a `⌘ ↵` cap, which the no-caps-on-buttons rule above otherwise forbids. That
+rule guards against a printed cap drifting from what `DialogPanel.sendEvent` handles separately; here
+the cap and the behaviour come from one `.keyboardShortcut`, so the drift is structurally impossible.
+See [features/window-layouts.md](features/window-layouts.md#the-editor).
 
 ### The shortcut recorder callout
 
@@ -552,7 +648,7 @@ shortcut"), live held modifiers, and conflict (rejected caps + owner, orange).
 - **`KeyCapChip.Scale`** is `compact` / `standard` / `hero` — three tokenised sizes, no stray frames.
 - `allowsHitTesting(false)`: clicks fall through to the capture session's mouse monitor, which closes it.
 
-The calculator's inline `CalculatorCard` reuses this card language (`cardFill` + `cardStroke`) rather than the row language, since it's a highlighted answer, not a list item. A value answer is a **two-column** layout: a source column (input echo) and a target column (result), separated by a centered `arrow.right` glyph (no divider line). Each column optionally carries a word-name **badge pill** beneath its value (`keyCap` font, `controlSurface` fill, `keyCap` radius) — `Expression`→`Result` for scalar arithmetic, unit or currency names for typed results (`Expression`→`Kilograms`), and moment labels for a date/time calc (`12:18 AM`→`9:00 AM`, `Friday, 24 July`→`Friday, 9 April, 2027`). A trailing operator keeps the last complete result and its badge visible while the next operand is being typed.
+The calculator's inline `CalculatorCard` reuses this card language (`cardFill` + `cardStroke`) rather than the row language, since it's a highlighted answer, not a list item. A value answer is a **two-column** layout: a source column (input echo) and a target column (result), separated by a centered `arrow.right` glyph (no divider line). `LeadCardColumn` is that column, pill included, so the colour card is built from the same part rather than a copy of it. Each column optionally carries a word-name **badge pill** beneath its value (`keyCap` font, `controlSurface` fill, `keyCap` radius) — `Expression`→`Result` for scalar arithmetic, unit or currency names for typed results (`Expression`→`Kilograms`), and moment labels for a date/time calc (`12:18 AM`→`9:00 AM`, `Friday, 24 July`→`Friday, 9 April, 2027`). A trailing operator keeps the last complete result and its badge visible while the next operand is being typed.
 
 ---
 

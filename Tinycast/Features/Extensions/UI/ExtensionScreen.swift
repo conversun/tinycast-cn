@@ -5,7 +5,7 @@ import SwiftUI
 struct ExtensionScreen: Equatable {
     enum Kind: Equatable {
         case list
-        case grid(columns: Int)
+        case grid(ExtensionGridLayout)
         case detail
         case form
         /// A root component Tinycast doesn't render (`MenuBarExtra`), or nothing rendered yet.
@@ -97,7 +97,7 @@ struct ExtensionScreen: Equatable {
         case "List":
             kind = .list
         case "Grid":
-            kind = .grid(columns: ExtensionScreen.gridColumns(root))
+            kind = .grid(ExtensionGridLayout(root))
         case "Detail":
             kind = .detail
         case "Form":
@@ -144,7 +144,12 @@ struct ExtensionScreen: Equatable {
         case .form:
             fields = root.children.filter { $0.type.hasPrefix("Form.") }
             rows = []
-            items = []
+            // A form's focusable fields are its selectable rows, so ↑/↓ and ⇥ walk one order.
+            var fieldItems: [Item] = []
+            for field in fields where ExtensionFormField(type: field.type).isFocusable {
+                fieldItems.append(Item(node: field, index: fieldItems.count))
+            }
+            items = fieldItems
             emptyView = nil
 
         case .detail, .unsupported:
@@ -187,22 +192,22 @@ struct ExtensionScreen: Equatable {
         return haystack.contains { FuzzyMatch.score(needle, candidate: $0) != nil }
     }
 
-    private static func gridColumns(_ root: RenderNode) -> Int {
-        if let columns = root.double("columns").map({ Int($0) }), columns > 0 { return columns }
-        // Raycast's default is 5; `itemSize` is the legacy way of saying the same thing.
-        switch root.string("itemSize") {
-        case "small": return 8
-        case "large": return 3
-        default: return 5
-        }
-    }
-
     /// The `ActionPanel` that applies to the current selection: the item's own, else the screen's.
     func actionPanel(forItemAt index: Int) -> RenderNode? {
         if items.indices.contains(index), let panel = items[index].node.node("actions") {
             return panel
         }
         return screenActions
+    }
+
+    /// Where a drawn field sits in the focus order, or nil for one that is never landed on.
+    func focusItem(for field: RenderNode) -> Item? {
+        items.first { $0.node.id == field.id }
+    }
+
+    /// The field a form opens on: the one that asked for it, else the first one there is.
+    var autoFocusedField: Int {
+        items.first { $0.node.bool("autoFocus") == true }?.index ?? 0
     }
 
     /// Submenus flatten one level with their title prefixed: the palette's menu is flat.

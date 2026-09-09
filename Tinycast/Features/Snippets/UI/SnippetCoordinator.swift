@@ -105,7 +105,7 @@ final class SnippetCoordinator {
     /// The switch gates the browser, the way Search Files re-checks its own before opening.
     func showSnippets() {
         guard settings.snippetsEnabled else { return }
-        paletteCoordinator.showPalette(mode: .snippets)
+        paletteCoordinator.togglePalette(mode: .snippets)
     }
 
     /// Opens the Snippets pane with the editor showing `record`; nil is a new snippet.
@@ -126,18 +126,20 @@ final class SnippetCoordinator {
 
     func startSnippetKeywordListener() {
         // `beginAutomaticExpansion` is the gate, so this callback doesn't re-check anything.
-        listener.start { [weak self] id, keyword, keywordLength, targetApp in
-            guard let self,
-                let generation = self.injector.beginAutomaticExpansion(
-                    targetApp: targetApp)
-            else { return }
-            self.expandSnippet(
-                id: id,
-                targetApp: targetApp,
-                expectedKeyword: keyword,
-                keywordLength: keywordLength,
-                automaticGeneration: generation)
-        }
+        listener.start(
+            onUserActivity: { [weak self] in self?.injector.cancelAutomaticExpansion() },
+            onMatch: { [weak self] id, keyword, keywordLength, targetApp in
+                guard let self,
+                    let generation = self.injector.beginAutomaticExpansion(
+                        targetApp: targetApp)
+                else { return }
+                self.expandSnippet(
+                    id: id,
+                    targetApp: targetApp,
+                    expectedKeyword: keyword,
+                    keywordLength: keywordLength,
+                    automaticGeneration: generation)
+            })
     }
 
     /// Recent copies, newest first; the live pasteboard leads, the poller may lag behind.

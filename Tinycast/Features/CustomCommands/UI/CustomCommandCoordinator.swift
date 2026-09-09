@@ -19,12 +19,14 @@ final class CustomCommandCoordinator {
     /// Built on first use; the window inside it waits for a run that actually shows output.
     private lazy var outputPresenter = CommandOutputPresenter(
         activation: activationPolicy,
-        rerun: { [unowned self] in self.runCustomCommand(id: $0) },
+        rerun: { [unowned self] in self.rerunOutput(id: $0) },
         stop: { [unowned self] in self.stopOutputRun(id: $0) },
         openSettings: { [unowned self] in self.settingsCoordinator.showSettings(tab: .commands) })
     private let activationPolicy: ActivationPolicy
     /// Superseding never touches it — only the button ends a command.
     private var liveRun: (id: UUID, stop: @Sendable () -> Void)?
+    /// The last fallback shell line, which has no library entry for the window's Rerun to find.
+    private var lastShellCommand: (id: UUID, text: String)?
 
     init(
         store: CustomCommandStore,
@@ -74,6 +76,11 @@ final class CustomCommandCoordinator {
         try store.update(draft)
     }
 
+    /// Keeps the command and its shortcut, but takes it out of every surface that could run it.
+    func setCustomCommandEnabled(_ enabled: Bool, id: UUID) {
+        store.setEnabled(enabled, id: id)
+    }
+
     func deleteCustomCommand(id: UUID) {
         guard let command = store.command(id: id) else { return }
         removeCustomCommandReferences(ids: [id], entryIDs: [command.entryID])
@@ -91,13 +98,73 @@ final class CustomCommandCoordinator {
         return count
     }
 
+    // MARK: - Importing
+
+    /// Adds a folder of Raycast script commands, skipping any name already in the library.
+    func importScriptDirectory() async {
+        guard let directory = chooseScriptDirectory() else { return }
+        let drafts = await Task.detached(priority: .userInitiated) {
+            RaycastScriptImport.scan(directory: directory)
+        }.value
+        guard !drafts.isEmpty else {
+            await core.showNotice(
+                title: "Nothing to Import",
+                message: "No Raycast script commands were found in this folder.",
+                symbol: CustomCommand.sfSymbol, tone: .neutral)
+            return
+        }
+        guard await confirmScriptImport(count: drafts.count) else { return }
+        let added = store.add(contentsOf: drafts)
+        // Everything offered was already here, so say so rather than "0 imported".
+        guard added > 0 else {
+            await core.showNotice(
+                title: "Nothing to Import",
+                message: "Every script in this folder is already in your library.",
+                symbol: CustomCommand.sfSymbol, tone: .neutral)
+            return
+        }
+        await core.showNotice(
+            title: "Scripts Imported",
+            message: importSummary(added: added, offered: drafts.count),
+            symbol: CustomCommand.sfSymbol, tone: .success)
+    }
+
+    /// An accessory app must activate first, or the panel opens behind the frontmost app.
+    private func chooseScriptDirectory() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Import"
+        panel.message = "Choose a folder of Raycast script commands."
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+
+    /// Scripts run arbitrary code, so this warns the way a backup of custom commands does.
+    private func confirmScriptImport(count: Int) async -> Bool {
+        await core.confirm(
+            title: count == 1 ? "Import 1 script?" : "Import \(count) scripts?",
+            message:
+                "Imported commands run these files with your user account. Only import scripts you "
+                + "trust.",
+            symbol: CustomCommand.sfSymbol, confirmTitle: "Import", confirmRole: .standard)
+    }
+
+    private func importSummary(added: Int, offered: Int) -> String {
+        let imported = added == 1 ? "Imported 1 command." : "Imported \(added) commands."
+        guard offered > added else { return imported }
+        return imported + " Skipped \(offered - added) already in your library."
+    }
+
     // MARK: - Running
 
     /// The one funnel for palette and hotkey, so neither form nor confirmation is bypassed.
     func runCustomCommand(id: UUID) {
         // Also the feature switch: with it off a registered hotkey must run nothing.
         guard settings.customCommandsEnabled else { return }
-        guard let command = store.command(id: id) else { return }
+        guard let command = store.command(id: id), command.isEnabled else { return }
         guard command.arguments.isEmpty else {
             argumentSession.begin(command: command)
             // Never a restored mode: this screen is always a fresh prompt, never a resumed one.
@@ -105,6 +172,26 @@ final class CustomCommandCoordinator {
             return
         }
         perform(command, arguments: [])
+    }
+
+    /// The launcher fallback: a one-off shell line, streamed into the window every run uses.
+    func runShellCommand(_ text: String) {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        if paletteCoordinator.isVisible { paletteCoordinator.hidePalette(restoreFocus: false) }
+        // Its shell config is sourced: someone typing `ll` in the launcher means their own alias.
+        // No working directory, which the runner reads as home — the only sane cwd for a launcher.
+        let command = CustomCommand(
+            name: CommandID.runShellCommand.name, command: text, loadsShellEnvironment: true,
+            showsOutput: true)
+        lastShellCommand = (command.id, text)
+        Task { await streamOutput(of: command, arguments: []) }
+    }
+
+    /// The window's Rerun. An ad-hoc shell line is not in the store, so it is repeated from here.
+    private func rerunOutput(id: UUID) {
+        guard let last = lastShellCommand, last.id == id else { return runCustomCommand(id: id) }
+        runShellCommand(last.text)
     }
 
     /// ↵ in the argument form. Returns false while more arguments remain.

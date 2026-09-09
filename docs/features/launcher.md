@@ -16,17 +16,27 @@ earliest scope wins).
   row's shortcut firing. A new category must be wired into `VisibilityStore.allowsHotKey`, or its
   chords keep running while its pane reads off.
 - **`Model/SearchRelevance.swift` is Foundation-only and pure**, so `fuzz-test` compiles the shipped
-  scorer. It owns both `FuzzyMatch` and the field bands.
-- **Searchable fields stay separate** — display name, Spotlight alternate names, owner name, bundle id
-  and executable name are never flattened into one string, because the field is what picks the band. A
-  new searchable field means a new `Band` case and a `consider` call, in priority order.
+  scorer. It owns `FuzzyMatch`, `SearchAlias` and the cell table.
+- **`Model/EntryNaming.swift` is the only place a name is decided, for every kind alike.** Criteria
+  are endless — display name, folder rename, Spotlight alternate, localization, pinyin, owning
+  extension, bundle id — but *trust* levels are not, so ranking is keyed on the role and the match
+  strength and never on which field supplied the text. A new criterion is a field on
+  `EntryNaming.Sources` and a line in `aliases(for:)`; adding a `Role` case, or a row to
+  `SearchRelevance.cell`, means the criterion was modelled wrong.
+- **`EntryNaming.aliases` runs over every kind, once per index change**, so a naming rule can never
+  apply to applications and quietly skip snippets — and nothing is built per keystroke. `AppIndex.scan`
+  names the app slice on its own, off-main: romanizing a CJK index costs ~50 ms per 1,500 entries, and
+  `publishEntries` runs on the main actor whenever any unrelated slice changes.
+- **Aliases stay separate strings** — flattening them into one blob loses the role, which is half of
+  what picks the cell.
 - **`Model/SearchScopes.swift` and `Model/LauncherRankingStore.swift` are pure too** — the ranking store
   takes its clock via `now` and its path via `fileURL`, for `scopes-test` and `ranking-test`.
 
 ## Search scopes
 
-`SearchScopes` (`Launcher/Model/SearchScopes.swift`) owns the paths; the list is user-editable in General
-Settings and persisted as `AppSettings.searchScopes`. A scope is either a directory or a single `.app`
+`SearchScopes` (`Launcher/Model/SearchScopes.swift`) owns the paths; the list is user-editable in
+Settings → Applications → Search Scopes and persisted as `AppSettings.searchScopes`.
+A scope is either a directory or a single `.app`
 bundle, stored tilde-abbreviated so the UI reads cleanly and a settings backup stays portable.
 
 Enumeration descends **one subfolder deep** — a scope's own `.app` children, plus any inside an
@@ -57,46 +67,128 @@ frecency boost (frequency plus decaying recency). The boost can reorder results 
 tier but cannot make a weaker match kind beat a stronger one. Matching strips invisible Unicode
 format scalars first, since app metadata can contain bidi/zero-width markers before the visible name.
 
-## Searchable fields
+## Searchable aliases
 
-An entry is matched on six fields kept deliberately separate — flattening them into one string would
-lose the thing that decides the ranking. `SearchRelevance.score` evaluates each independently and the
-strongest one becomes the entry's base relevance:
+Every naming criterion an entry carries lowers to one flat list of `SearchAlias` — a string plus a
+`Role` (how far it is trusted) and a `Looseness` (the weakest match it will accept).
+`SearchRelevance.quality` matches each, keeps the strongest, and that becomes the entry's base
+relevance. **Which field produced the string is not an input.** That is the whole design: a user's
+next naming demand is a new producer, not a new rung.
 
-| Band | Field                                   | Match strength                                    |
-| ---- | --------------------------------------- | ------------------------------------------------- |
-| 7    | user alias (any entry kind)             | anchored literal — exact / prefix                 |
-| 6    | display name (plus a snippet's keyword) | literal — exact / prefix / word-start / substring |
-| 5    | Spotlight alternate names, plus a user alias's word-start / substring hits | literal |
-| 4    | owner name (the extension a command came from) | literal only                               |
-| 3    | display name                            | subsequence                                       |
-| 2    | Spotlight alternate names               | subsequence                                       |
-| 1    | bundle identifier                       | literal only                                      |
-| 0    | executable name (`CFBundleExecutable`)  | literal only                                      |
+| Role | What lands in it | Looseness |
+| --- | --- | --- |
+| `.userAlias` | the alias the user typed in Tinycast, for any entry kind | literal |
+| `.name` | display name, a snippet's keyword, an `.app` bundle the user renamed on disk | fuzzy |
+| `.translation` | localizations, Spotlight alternate names, romanizations | fuzzy |
+| `.owner` | the extension a command came from | literal |
+| `.technical` | bundle identifier, `CFBundleExecutable` | literal (full id: exact) |
 
-The arithmetic is what makes that table binding. A band's offset is `rawValue * bandStride`, and:
+## The score
 
 ```
-bandStride            = 10 × FuzzyMatch.maximumScore   = 1,000,000
-FuzzyMatch.maximumScore                                =   100,000
-LauncherRankingStore.maximumBoost                      =     4,500
+total = quality + usage
+quality = cell(role, tier) + shape        shape ∈ [0, 99]
+usage   = LauncherRankingStore.usage(…)   usage ∈ [0, 2_999]
 ```
 
-So a field can never reach the band above it — the widest possible fuzzy score is a tenth of a stride —
-and the learned frecency boost is two orders of magnitude below a stride, which is what keeps learning
-reordering *within* a tier and never across one. Those three numbers are a contract, not a tuning
-parameter.
+**Every gap in the cell table is denominated in learned picks.** A gap of *g* means the weaker match
+overtakes the stronger one once the user has chosen it often enough that `usage ≥ g`. One gap is a
+firewall, and it is the only thing learning can never cross. That is the contract; the numbers below
+are it, not a tuning parameter.
 
-A _literal_ hit on a weaker field outranks a _subsequence_ hit on a stronger one. That is the point of
-the split: an alias the vendor actually declared (`Codex` for ChatGPT) must beat the incidental
-c-o-d-e…x scattered through an unrelated app's name, while a real prefix hit on a display name still
-wins outright.
+| cell | value | | cell | value |
+| --- | ---: | --- | --- | ---: |
+| `userAlias · exact` | 7_000 | | `technical · exact` | 1_400 |
+| `name · exact` | **6_500** | | `translation · substring` | 1_200 |
+| `userAlias · prefix` | 3_100 | | `owner · substring` | 1_100 |
+| `name · prefix` | 3_000 | | `name · subsequence` | 1_000 |
+| `translation · exact` | 2_700 | | `technical · prefix` | 900 |
+| `owner · exact` | 2_500 | | `translation · subsequence` | 800 |
+| `name · wordStart` | 2_400 | | `technical · wordStart` | 700 |
+| `translation · prefix` | 2_200 | | `technical · substring` | 600 |
+| `owner · prefix` | 2_000 | | | |
+| `name · substring` | 1_800 | | | |
+| `translation · wordStart` | 1_700 | | | |
+| `owner · wordStart` | 1_500 | | | |
 
-Identifier fields never subsequence-match — reverse-DNS text is a subsequence of nearly every short
+Read it two ways and both hold: fix a role and walk the tiers, or fix a tier and walk the roles —
+strictly decreasing either way. The cells `Looseness` refuses do not exist, so a literal-only role
+has no subsequence rung and the full bundle id is exact-only.
+
+Three inequalities make the table binding, each asserted in `fuzz-test` over the published constants:
+
+```
+P1 firewall    protectionFloor > poolTop + shapeSpan + maximumUsage    6_500 > 6_198
+P2 cell key    min adjacent gap (100) > shapeSpan (99)
+P3 reachable   poolBottom + maximumUsage > poolTop + shapeSpan         3_599 > 3_199
+```
+
+**P1** is the one absolute guarantee left: an exactly-typed display name or user alias, with nothing
+learned, outranks every weaker match at any usage. **P3** is the point of the redesign — anything the
+index is willing to show can be learned to the top of the unprotected pool. Before this, `.owner` sat
+two bands below `.name` (a 2,000,000 gap) against a 4,500 boost, so typing `zed` for a command owned
+by the Zed extension could never win however often it was chosen.
+
+`shape` orders candidates inside one cell: 60% how much of the name the query covered, 40% how early
+the hit sits (by absolute offset — a hit five characters in is equally deep in any name). For a
+subsequence it is the walk's contiguity score over what a run from index 0 would earn.
+
+What this deliberately gives up: **match-kind dominance below `exact` is gone.** Enough picks put an
+owner-only or subsequence hit above another entry's prefix hit. That impossibility was the bug. A
+`name · exact` collision stays unreachable forever — an installed `Zed.app` always takes `zed` — and
+the escape is a user alias, which is what P1 makes worth having.
+
+Identifier aliases never subsequence-match — reverse-DNS text is a subsequence of nearly every short
 query (`cop` ⊂ `com.apple.Photos`), which would change _which_ apps appear rather than just their
 order. For the same reason a bundle id is matched with its leading component stripped
 (`apple.Photos`, not `com.apple.Photos`): `com` alone prefixes almost every installed app. The full id
-still matches exactly, so a pasted identifier resolves.
+rides along as a second alias tightened to `Looseness.exact`, so a pasted identifier resolves and
+nothing looser can flood off it.
+
+## One fold, everywhere
+
+`FuzzyMatch.normalized` is the only text fold in the launcher: NFC precomposition, format scalars
+stripped, then `[.caseInsensitive, .diacriticInsensitive, .widthInsensitive]` with `locale: nil`.
+Matching, learned-ranking keys, alternate-name dedup, category lookup and rename dedup all call it.
+They used to disagree — the ranking store's fold omitted `.widthInsensitive`, so a full-width IME
+query matched one way and was **learned under a key nothing would ever read back**. ASCII text skips
+ICU entirely on a fast scalar check.
+
+## Names in the user's language
+
+`BundleLocalization` reads both `InfoPlist.loctable` and `<code>.lproj/InfoPlist.strings` for
+`Locale.preferredLanguages` plus English. This matters because `CFBundle` resolves only
+`InfoPlist.strings`, and every app under `/System/Applications` translates in the loctable alone — so
+all 65 of them read English on every Mac, whatever language it is set to.
+
+The user's own language wins the **display name**, so a row reads the way Finder reads it. The rest,
+English included, ride along as `.translation`. `AppDisplayName.inInfo` reads the `-macos` variant of
+each key before the bare one, the way `CFBundle` does: Image Playground's loctable spells the bare
+`CFBundleDisplayName` `Playground` and only the suffixed key `Image Playground`. A non-English user finds their app by the name they
+see *and* by the English name the vendor advertises.
+
+### Non-Latin names
+
+`ScriptRomanization` is the answer to "my app's name is not in Latin script", routed per script
+because no single transform serves them all:
+
+| Script | Rule | Example |
+| --- | --- | --- |
+| Han | ICU `.mandarinToLatin`, full reading and initials | `微信` → `weixin`, `wx` |
+| Japanese | the kana only — ICU would read the kanji as Mandarin | `メモ帳` → `memo` |
+| Hangul | ICU, plus an `l`→`r` variant, because ICU spells every ㄹ `l` | `사파리` → `sapali`, `sapari` |
+| Cyrillic | an explicit BGN table — ICU is scientific, and users are not | `Яндекс` → `yandeks`, not `andeks` |
+| everything else | ICU `.toLatin` | `Ελληνικά` → `ellenika` |
+
+It fires only when transliteration actually changes the letters: `Adobe — Creative Cloud` and
+`Café Noir` are Latin already, and minting `acc` or `cn` for them would put an accidental initialism
+above every name subsequence. **Kanji readings are not solved, only routed** — a Japanese app whose
+name is pure kanji gets a Mandarin reading, which is why the English localization is indexed too.
+
+A renamed bundle is the other half. A Finder rename never touches `CFBundleDisplayName`, so the
+on-disk basename is indexed as a `.name` alias — rename `Slack.app` to `Work Chat.app` and both find
+it. Duplicate copies dedupe by bundle id, and the losing copy lends its file name to the winner
+rather than being dropped whole.
 
 ### Owner names
 
@@ -134,6 +226,79 @@ draws the headers, `pinsFavorites` pins the Favorites prefix and hands out the �
 listing takes the first only. Opening a row from one also records nothing in `LauncherRankingStore` — a
 category word is not a search for the row that ran, and learning it would rank that row under `s`.
 
+### Contextual commands
+
+A **contextual** command is one the query itself supplies the target for, so it exists only while a
+query resolves and never sits in the index. `CommandCatalog.contextual` names them, `all` filters
+them out, and `LauncherScreen` offers the row per keystroke — ahead of the ranked matches, because
+nothing the index holds answers a typed address better. There is one today: typing a web address or
+a bare host puts **Open in Browser** on top, and activating it hands the URL to the system's default
+handler through `AppLauncher.open`.
+
+The shape a query has to have is `QuicklinkDestination.detect` returning `.web`, reused rather than
+re-written so `github.com` and `https://…` mean the same thing here as they do in a quicklink. The
+entry is an ordinary `.command`, so `VisibilityStore` still gates it — Commands off hides the row —
+and its `url` carries the destination instead of the catalog's `tinycast://` placeholder. Nothing
+learns from it and nothing pins it: `LauncherCoordinator.launch` skips `LauncherRankingStore` for a
+contextual row, the way it already skips a category listing, since a pasted URL is not a term any
+row should rank under; and ⇧⌘F is refused, because a favorite the empty query can never resolve is
+dead state a backup would then carry.
+
+The row prints `AppEntry.subtitle` beside its name — the one field for an entry whose name alone
+can't say what it acts on.
+
+### Fallbacks
+
+A **fallback** is the other half of the query-driven idea: a command the query is the input for,
+offered under a `Use “…” with…` header **below every result**, whatever the query says. A contextual
+row leads because it recognised the query; a fallback trails because nothing did.
+
+`Fallback` (`Launcher/Model/`) is the whole vocabulary — `.builtin(Builtin)` for the three shipped
+destinations and `.quicklink(UUID)` for a user's own. `Builtin` exists rather than a bare `CommandID`
+so `FallbackCoordinator.run` is **exhaustive**: a fourth built-in cannot compile without saying where
+its query goes. `Fallback.id` is deliberately the row's own `AppEntry.id`, which is what lets a stored
+order name a live row across a rename or a reinstall.
+
+| Fallback | Where the query goes | Offered when |
+| --- | --- | --- |
+| AI Chat | a fresh chat, question already sent (`AIChatCoordinator.ask`) | `aiEnabled` |
+| Search Files | the file-search screen, already narrowed | `fileSearchEnabled` |
+| Run Shell Command | `/bin/zsh`, streamed into the Command Output window | always |
+| a quicklink | its first `{argument}` | `quicklinksEnabled`, and the link has a placeholder |
+
+**A quicklink earns a fallback row by declaring a placeholder**, nothing else —
+`QuicklinkDestination.containsPlaceholder`. `openQuicklink(id:filling:)` assigns the query to the
+first declared argument and opens at once when that was the only one owed; anything still missing
+sends the row to Search Quicklinks with its header fields pre-filled (see
+[quicklinks.md](quicklinks.md#arguments)). The seed never fills the **selection** field: that one is
+not an `{argument}` and is resolved by replacing the context, so seeding it through `userArguments`
+would silently do nothing.
+
+**Run Shell Command carries its own switch, not the custom-command library's.** Turning off Custom
+Commands hides a library of saved commands; it says nothing about a shell line someone types
+deliberately. The fallback's checkbox is the switch. The run is an ad-hoc `CustomCommand` that is
+never stored — same streaming window, same Stop button — so `CustomCommandCoordinator` keeps
+`lastShellCommand` for the window's Rerun, which has no library entry to look up. It sources the
+shell config (`ll` should mean the reader's own alias) and takes the runner's default home directory.
+
+**The order and the checkboxes are not in a settings backup.** The fallback list is where an import
+could arm shell execution from the launcher, which is the line `snippetsEnabled` already draws:
+a flag that grants a capability is never carried by a backup.
+
+`FallbackStore` is a thin persistence shell over `Fallback.ordered(_:by:)`, which is pure and covered
+by `fallback-test`: stored ids first, then anything the order has never seen, and a stored id with
+nothing behind it — a deleted quicklink — is skipped rather than resurrected. Settings ▸ Fallbacks
+lists exactly `FallbackCoordinator.available`, so a fallback whose feature is off is absent from the
+pane as well as from the launcher, and reorders through ↑/↓ buttons like a favorite rather than
+introducing this codebase's first drag-reorder.
+
+**A fallback row is not a result, and `LauncherScreen.Row` says so.** `.fallback` is its own case
+with a `fallback-` prefixed id, because AI Chat can be a ranked hit *and* a fallback in the same
+list, and two rows sharing one id would collapse in `ForEach`. That is also why `LauncherList` takes
+a `selectedRowID` rather than an entry id. Nothing about a fallback row is learned, pinned or
+revealed: `activate` routes to `FallbackCoordinator.run` instead of `LauncherCoordinator.launch`, and
+`FallbackActionsMenu` offers only running it and opening the pane.
+
 ### User aliases
 
 `AliasStore` (`Launcher/Service/`) keeps one user-chosen alias per entry, keyed by `preferenceKey`
@@ -142,7 +307,7 @@ can carry one. An alias is deliberate in a way no vendor field is, so a hit **fr
 exact or prefix — occupies the top band and ranks its entry first. A hit *inside* the alias ranks
 with the Spotlight aliases instead (`term` inside `iterm` must not beat Terminal's own prefix),
 and a subsequence of a short alias would be noise, so it never matches at all. `AppIndex` folds the
-alias into `SearchFields.userAlias` at rank time, keying its memos on the store's revision.
+alias in as a `.userAlias` at rank time, keying its memos on the store's revision.
 
 A launcher row shows its entry's alias as a small chip after the name, so what a badge-bearing
 result will answer to is visible without opening anything.
@@ -165,45 +330,86 @@ with the entry's other per-entry preferences.
 `SpotlightNames` reads `kMDItemAlternateNames` — the aliases macOS itself knows an app by, which no
 Info.plist key exposes: `iBooks` for Books, `iCal` for Calendar, `Address Book` for Contacts,
 `System Preferences` for System Settings, `browser` / `浏览器` / `사파리` for Safari. `MDItem.h` exports
-no constant for the attribute, so it is named directly.
+no constant for either attribute it reads, so both are named directly.
 
-Spotlight mixes junk in with the real aliases, and `SearchFields.usableAlternateNames` (pure, covered
+It also reads `kMDItemDisplayName`, the app's name in the system language, because nothing else
+supplies it (#371). Every app under `/System/Applications` keeps its translations in one
+`Contents/Resources/InfoPlist.loctable` and none ships an `InfoPlist.strings`, so `CFBundle` resolves
+all 65 of them to `en` whatever the system language is — which is why the row label reads English
+without being pinned there, and why without this a Portuguese Mac finds Find My as `Find My` and never
+as `Buscar`. It measures 12 bundles carrying alternates under `en` against 49 under `pt-BR`. The value
+is a file name, so its `.app` comes off first; on an English Mac it then equals the display name, and
+`EntryNaming.aliases` drops whatever repeats a name the entry already carries, so nothing is indexed
+twice. Both attributes ride the one `MDItem`
+the pass already creates, so the cost below is unchanged.
+
+**A row is labelled the way Finder labels it: the localized name if the bundle ships one, and
+otherwise the file name.** `CFBundleDisplayName` is deliberately *not* the label — LaunchServices
+ignores one that disagrees with the file name, so an app cannot present itself under a name its
+folder does not carry, and neither should a launcher row. Visual Studio Code is the case that shows
+it: `Code.app` would be labelled `Code`, but the folder, Finder, the Dock and the user all say
+`Visual Studio Code`. Over the 83 bundles in the default scopes this rule matches
+`FileManager.displayName` exactly; labelling by `CFBundleDisplayName` misses on that one.
+
+The declared name is not thrown away — it rides along as a `strongName`, so `code` still finds it at
+`name · exact`. Leave `Bundle.installedAppName` on `object(forInfoDictionaryKey:)` where it is still
+read: forcing an English label out of `infoDictionary` looks equivalent and is not, because FindMy's
+raw `Info.plist` names it `FindMy` while `Find My` lives only in the loctable.
+
+Spotlight mixes junk in with the real aliases, and `EntryNaming.usable` (pure, covered
 by the harness) drops it: every bundle lists its own `<Name>.app` file name, several system apps ship
 untranslated `ALTERNATE_NAME_1` placeholders, and some just repeat the display name. Indexing those
 would make `app` match the entire index.
 
-A Spotlight round trip costs ~0.8 ms per bundle cold — 76 ms over the default scopes — and the scan
-reruns on every launcher open, so `SpotlightNames.Cache` memoizes per bundle path and re-reads only
-when the bundle's modification date moves, taking later passes to ~0.2 ms. Each pass is seeded from
-the last and keeps only what it looked at, so uninstalled apps fall out instead of accumulating.
-`.appex` Settings panes carry no alternate names, so `SettingsPaneScanner` doesn't ask.
+A Spotlight round trip costs ~0.8 ms per bundle cold and the loctable read ~0.2 ms, and the scan
+reruns on every launcher open — so `BundleNameCache` memoizes **both** per bundle path and re-reads
+only when the bundle's modification date moves. Caching one and not the other leaves most of a warm
+pass uncached. Each pass is seeded from the last and keeps only what it looked at, so uninstalled apps
+fall out instead of accumulating; a changed system language drops the whole table, because the names
+in it are in the old one. `.appex` Settings panes carry no alternate names, so `SettingsPaneScanner`
+doesn't ask.
 
 ### Pinyin readings
 
-Chinese names also match their full reading and their initials: 微信 answers to `weixin` and `wx`.
-`Platform/Pinyin.swift` uses word-aware system transcription so polyphones resolve in context (高德地图 is
-`gaodeditu`, not `gaodedetu`), and returns nothing for a name with no Han characters. Readings are
-derived once per entry in `AppEntry.init`, off the main actor with the rest of the scan, so no entry
-kind can be added without them.
+`ScriptRomanization` routes its Han branch through `Platform/Pinyin.swift` rather than ICU. ICU reads
+Han a character at a time, which spells 高德地图 `gaodedetu` and 音乐 `yinle`; `Pinyin` segments words
+with `CFStringTokenizer` first, so polyphones resolve in context — `gaodeditu`, `yinyue` — and a name
+with no Han character still yields nothing. Everything downstream is upstream's: a reading is a
+`.translation` alias like any other, so it ranks under the name it romanizes and cannot be lifted
+over an exact name match by learned usage.
 
-A reading is a *derived* claim on the query rather than a name anyone declared, so it does not get a
-band of its own: it scores in the display name's band (5 literal / 3 subsequence) minus
-`SearchRelevance.romanizedPenalty`. That keeps it under a literal match of the same kind — typing
-`weixin` still puts an app actually named Weixin first — without dropping it past the kind below,
-so an exact reading still beats another app's prefix match. The dock is floored at the band offset:
-a weak subsequence scores less than the penalty, and borrowing from the offset would push the entry
-into the band beneath. The penalty is also sized above `LauncherRankingStore`'s boost cap, so learned
-ranking can reorder within the band but can never lift a reading back over the name it sits under.
+Selecting a launcher result records **one row for the submitted query** — `submittedQuery`, named
+so because a table written when the field held one row per *prefix* cannot decode here, which is the
+reset — and recall aggregates every stored query the typed one is a prefix of — so choosing WhatsApp for `wha` still surfaces it under
+`w` and `wh`, at a sixteenth of the rows. The 1,000-record cap therefore holds ~1,000 distinct habits
+rather than ~60.
 
-Selecting a launcher result records every prefix of the submitted query, so choosing WhatsApp for
-`wha` also teaches `w` and `wh`. Direct hotkeys and empty-query favorites do not affect learned
-ranking. Learned data stays on device in `launcher-ranking.json`; a result that has learned ranking
-offers a per-item reset in its Actions menu, and users can clear all learned ranking in General
-Settings.
+**The opening list stays alphabetical.** Frecency was tried there and reverted: with the learned
+apps floating to the top and the alphabet resuming below them, the section is sorted by two
+principles with nothing marking the seam, which reads as a scrambled list and moves under the user's
+muscle memory as they use it. Ranking a section needs a labelled group of its own, not a resort in
+place. So nothing is recorded or recalled under `""`, and direct hotkeys and ⌘-digit favorite
+launches still teach nothing either.
+
+Learned data stays on device in `launcher-ranking.json`; a result that has learned ranking offers a
+per-item reset in its Actions menu, and users can clear all learned ranking in General Settings.
 
 Rankings are memoized one query deep and keyed by the ranking store's revision, so a launch or reset
 invalidates the cached order. `rank` resolves the whole learned table for a query up front via
-`boosts(query:)` — one fold and one clock read per pass, not per candidate.
+`usage(query:)` — one fold and one clock read per pass, not per candidate.
+
+The frecency curve is bounded but never flat:
+
+```
+frequency  = 2_000 × (1 − (count+1)^−0.30)
+recency    =   700 × exp(−ageDays / 14)
+confidence =   300 × share × min(1, count/3)
+```
+
+`frequency` replaced a `min(3_000, log2(count+1) × 600)` that clipped at exactly 31 uses — the 49th
+launch counted the same as the 31st. `confidence` is what makes prefix recall safe: a habit under
+`zed` has the whole bucket to itself, while the same habit recalled under `z` competes with every
+other `z…` pick, so its override budget collapses on its own.
 
 ## System actions
 
@@ -274,6 +480,14 @@ so launcher rows render keycaps for them. Their per-command shortcut and visibil
 Settings › Window Management rather than a launcher-category pane of their own — the same call already
 made for snippets. The feature ships off. See
 [window-management.md](window-management.md).
+
+## Window layouts
+
+`WindowLayoutStore` supplies its slice the way custom commands do, sorted by name, published
+immediately **before** the window commands so the two read as one family. Their per-layout shortcut
+and launcher checkbox live in Settings › Window Management beside the commands', and
+`windowLayoutsShowInLauncher` takes the section and its two commands out together. See
+[window-layouts.md](window-layouts.md).
 
 ## Quicklinks
 
@@ -375,7 +589,10 @@ rather than a slot, so no favorite loses its digit to the overflow.
 
 Holding ⌘ swaps each numbered row's kind label for its chord. `PalettePanel` publishes the modifier
 into `PaletteState.commandHeld` from `.flagsChanged` and clears it in `resignKey` — not in `prepare`,
-which a re-show that preserves state skips entirely. **`AppRow` observes that flag itself**: reading
+which a re-show that preserves state skips entirely. The flag flips **400 ms after** the press, not
+on it: every ⌘ chord in the palette starts as a ⌘ press, so revealing on the down edge flashed the
+numbering under ⌘↵ and ⌘K. `noteCommandHeld` schedules the reveal and any release cancels it, so a
+chord's own tap never outlives its keystroke while a deliberate hold still lights every row. **`AppRow` observes that flag itself**: reading
 it any higher would attach it to `RootPaletteView`'s body and rebuild the whole palette on every ⌘
 press, where a row-level read re-runs only the handful of rows the `LazyVStack` has realized. The
 digit each row shows is carried on its `Row` case from the section build, so no row searches for its

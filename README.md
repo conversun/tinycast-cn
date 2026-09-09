@@ -12,47 +12,79 @@
 > 后续 `brew upgrade --cask tinycast-cn` 即可更新。装成 `Tinycast.app`，与上游 `tinycast`、
 > `tinycast-sequoia` 两个 cask 占用同一路径，因此三者互斥，只能装其一。
 
-A tiny, fully native macOS launcher — the essentials, without the bloat.
+**A tiny, fully native macOS launcher. One hotkey, everything you reach for all day, under 100 MB of
+RAM.**
 
 <p align="center">
-  <a href="https://discord.gg/v2Eeb4QQy3">
-    <img alt="Join the Tinycast Discord"
-         src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?style=flat&logo=discord&logoColor=white"></a>
-  <a href="mailto:iabueammar@gmail.com?subject=Hiring%20enquiry">
-    <img alt="Hire me — iabueammar@gmail.com"
-         src="https://img.shields.io/badge/Hire%20me-Let's%20talk-111111?style=flat&logo=gmail&logoColor=white"></a>
+  <a href="https://github.com/abue-ammar/tinycast/releases/latest">
+    <img alt="Latest release"
+         src="https://img.shields.io/github/v/release/abue-ammar/tinycast?sort=semver&style=flat&label=release&color=1F6FEB"></a>
+  <a href="https://github.com/abue-ammar/tinycast/actions/workflows/ci.yml">
+    <img alt="CI status"
+         src="https://img.shields.io/github/actions/workflow/status/abue-ammar/tinycast/ci.yml?branch=main&style=flat&label=CI"></a>
+  <img alt="Swift 6.0"
+       src="https://img.shields.io/badge/Swift-6.0-F05138?style=flat&logo=swift&logoColor=white">
+  <img alt="macOS 15 or later"
+       src="https://img.shields.io/badge/macOS-15%2B-000000?style=flat&logo=apple&logoColor=white">
   <a href="LICENSE">
     <img alt="License: AGPL-3.0"
          src="https://img.shields.io/badge/License-AGPL--3.0-3DA639?style=flat"></a>
+  <a href="https://discord.gg/v2Eeb4QQy3">
+    <img alt="Join the Tinycast Discord"
+         src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat&logo=discord&logoColor=white"></a>
+  <a href="https://buy.polar.sh/polar_cl_NDVFC20DKQpLcNawsh97QzbARBXD3WNn8v35R0mbJmT">
+    <img alt="Support Tinycast"
+         src="https://img.shields.io/badge/Support-Tip%20the%20dev-EA4AAA?style=flat&logo=polar&logoColor=white"></a>
 </p>
+
+SwiftUI and AppKit, **zero third-party dependencies**, no Electron and no telemetry. It also **runs
+real Raycast extensions**, rendered as native SwiftUI. Free, open source, and staying that way.
+
+For anything private, email [iabueammar@gmail.com](mailto:iabueammar@gmail.com).
 
 <p align="center">
   <img src="docs/screenshot.png" alt="Tinycast command palette" width="720">
 </p>
 
+## Support
+
+Tinycast is **free, and it stays that way**. If it earns a place in your daily flow, a one-off tip helps
+keep it actively maintained. GitHub Sponsors isn't available in my country, so please support here:
+
 <p align="center">
   <a href="https://buy.polar.sh/polar_cl_NDVFC20DKQpLcNawsh97QzbARBXD3WNn8v35R0mbJmT">
-    <img alt="Support Tinycast" width="320" height="64" src="docs/support-button.svg"></a>
+    <img alt="Support Tinycast" width="188" height="44" src="docs/support-button.svg"></a><br>
+  <sub>Payments are handled securely by <a href="https://polar.sh">Polar.sh</a>.</sub>
 </p>
-
-Around **5 MB on disk** and **under 100 MB of RAM** — no Electron, no telemetry, no background
-CPU churn. Just SwiftUI + AppKit with zero dependencies. It's fast because there's nothing to it.
-
-It also **runs Raycast extensions** — the real ones, rendered as native SwiftUI. No Node.js, no
-browser: JavaScriptCore ships with macOS, so that costs no extra binary size.
 
 ## Features
 
 - **App launcher** — fuzzy-search and launch anything, pin favorites, see what's running, quit an app
   or every app at once.
-- **Custom commands** — run named shell commands through fuzzy search or their own global hotkeys.
-- **Calculator** — do math, unit, live currency and crypto conversions inline, right in the palette.
-- **Clipboard history** — text and images, searchable, pasted back into the app you were using.
-- **Snippets** — reusable Markdown templates with dynamic placeholders, arguments, nested references
-  and optional keyword expansion.
 - **Global hotkey** — one shortcut summons the palette from anywhere.
 - **Per-app hotkeys** — bind a key to an app; press it to toggle (focus/hide).
+- **Search Files** — open files and folders from the folders you choose, through Spotlight, with no
+  index of our own.
+- **Clipboard history** — text and images, searchable, pasted back into the app you were using.
+- **Calculator** — do math, unit, live currency and crypto conversions inline, right in the palette.
+- **Quicklinks** — turn a URL, search, file or deeplink into a command, with placeholders for typed
+  input, the clipboard or the date.
+- **Snippets** — reusable Markdown templates with dynamic placeholders, arguments, nested references
+  and optional keyword expansion.
+- **Custom commands** — run named shell commands through fuzzy search or their own global hotkeys.
+- **Window management** — 34 Rectangle-style actions: halves, quarters, thirds, sizing, nudging,
+  display moves, fullscreen and Spaces.
+- **System actions** — lock, sleep, restart, empty trash, toggle appearance, Bluetooth, mute, hidden
+  files, and more.
+- **Calendar and meetings** — your next meeting on the empty palette and in the menu bar, one key to
+  join it, or let it join itself.
+- **Notes** — an unlimited collection of plain Markdown files in one floating editor, searchable from
+  the palette.
+- **Emoji picker** — a searchable emoji grid, one keystroke away.
+- **AI chat** — use your own key or an installed AI account, chat from the palette. Off out of the box, like every AI feature.
+- **Quick Actions** — fix grammar, rewrite, translate or summarize the selected text in any app.
 - **Raycast extensions** — run the ones you already have natively, rendered as SwiftUI.
+- **Backup and import** — export your settings to a file, or import your setup from Raycast.
 
 ## Install
 
@@ -65,9 +97,9 @@ brew install --cask tinycast-cn
 Updates come the usual way: `brew upgrade --cask tinycast-cn`. The app has no built-in updater and
 makes no network call of its own unless you turn on currency conversion.
 
-This is the Chinese build, installed as `Tinycast.app` — the same path the upstream `tinycast` and
-`tinycast-sequoia` casks own, so the cask conflicts with both. Pick one, or install the upstream
-`tinycast@beta` alongside it (that one is `Tinycast Beta.app`).
+This is the Chinese build, installed as `Tinycast.app` — the same path the upstream `tinycast`,
+`tinycast-universal` and `tinycast-sequoia` casks own, so the cask conflicts with all three. Pick
+one, or install the upstream `tinycast@beta` alongside it (that one is `Tinycast Beta.app`).
 
 Tinycast is self-signed. Installing via Homebrew clears the macOS quarantine flag for you
 automatically on every install and update, so there's nothing to run. (If you download the DMG

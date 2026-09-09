@@ -23,11 +23,14 @@ enum AppActionsMenu {
                 shortcut: "↵"
             ) { core.launcherCoordinator.launch(app, searchQuery: searchQuery) }
         ]
-        items.append(
-            PopoverMenuItem(
-                title: favorites.isFavorite ? "Remove from Favorites" : "Add to Favorites",
-                systemImage: favorites.isFavorite ? "star.slash" : "star", shortcut: "⇧⌘F",
-                action: favorites.toggle))
+        // A query-driven row lives only for its query, so pinning it would favorite nothing.
+        if !CommandCatalog.isQueryDriven(app) {
+            items.append(
+                PopoverMenuItem(
+                    title: favorites.isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                    systemImage: favorites.isFavorite ? "star.slash" : "star", shortcut: "⇧⌘F",
+                    action: favorites.toggle))
+        }
         if favorites.canMoveUp {
             items.append(
                 PopoverMenuItem(
@@ -82,6 +85,22 @@ enum AppActionsMenu {
                 })
         }
         if app.kind == .extensionCommand {
+            if core.extensions.isBackgroundSchedulable(for: app) {
+                let enabled = core.extensions.isBackgroundEnabled(for: app)
+                items.append(
+                    PopoverMenuItem(
+                        title: enabled ? "Disable Background Refresh" : "Enable Background Refresh",
+                        systemImage: enabled ? "pause.circle" : "play.circle"
+                    ) {
+                        core.extensions.toggleBackgroundRefresh(for: app)
+                    })
+                if enabled {
+                    items.append(
+                        PopoverMenuItem(title: "Refresh Now", systemImage: "arrow.clockwise") {
+                            core.extensions.refreshNow(app)
+                        })
+                }
+            }
             items.append(
                 PopoverMenuItem(title: "Configure Extension", systemImage: "slider.horizontal.3") {
                     core.extensionCoordinator.showExtensionSettings(for: app)

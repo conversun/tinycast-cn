@@ -236,6 +236,8 @@ struct QuicklinkEditorSheet: View {
         let draft = Quicklink(
             id: existing?.id ?? UUID(), name: name, link: link,
             openWithBundleID: openWithBundleID, iconSymbol: iconSymbol,
+            // The pane's row owns the checkbox; an edit carries the flag rather than resetting it.
+            isEnabled: existing?.isEnabled ?? true,
             showsInRootSearch: showsInRootSearch,
             // Re-pinning keeps the original stamp, so saving an edit doesn't move the row.
             pinnedAt: isPinned ? (existing?.pinnedAt ?? Date()) : nil,

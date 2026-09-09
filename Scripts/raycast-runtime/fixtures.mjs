@@ -32,9 +32,9 @@ function compile(source) {
 
 const wait = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function run(name, source, mode, verify) {
+async function run(name, source, mode, verify, options) {
   console.log(`\n▶ ${name}`);
-  const harness = createHarness();
+  const harness = createHarness(options);
   harness.boot(bootConfig());
   const code = compile(source);
   harness.start("s1", code, "/fixtures/cmd.js", "/fixtures", mode, {});
@@ -172,9 +172,18 @@ import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
 import { Buffer } from "node:buffer";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Detail } from "@raycast/api";
 
 export default function Command() {
+  const errorCode = (fn) => {
+    try {
+      fn();
+      return "none";
+    } catch (error) {
+      return error.code ?? error.name;
+    }
+  };
   const parts = [
     path.join("/a/b", "../c", "d.txt"),
     path.extname("x/y/file.tar.gz"),
@@ -186,6 +195,41 @@ export default function Command() {
     Buffer.from("hello").toString("base64"),
     Buffer.from("aGVsbG8=", "base64").toString("utf8"),
     new TextDecoder().decode(new TextEncoder().encode("héllo")),
+    fileURLToPath("file:///Applications/Tinycast%20Beta.app"),
+    fileURLToPath(new URL("file:///tmp/%ED%95%9C%EA%B8%80.txt")),
+    fileURLToPath("file://localhost/tmp/a?query=ignored#fragment"),
+    fileURLToPath("file:///tmp/a%5Cb"),
+    fileURLToPath("file:tmp/a"),
+    fileURLToPath("file:///tmp/%2e%2e/a"),
+    fileURLToPath("file://%6cocalhost/tmp/a"),
+    fileURLToPath("file:///tmp//a"),
+    fileURLToPath(new URL("file:///tmp/a///b")),
+    fileURLToPath("file:///tmp/a//../b"),
+    fileURLToPath("file:///C:/.."),
+    new URL(
+      "file:///tmp/a?query=" +
+        String.fromCharCode(92) +
+        "keep#fragment=" +
+        String.fromCharCode(92) +
+        "keep",
+    ).href,
+    new URL("https://example.com/C:/..").href,
+    fileURLToPath("file:///a:folder/.."),
+    new URL("..", "file:///a:folder/child").href,
+    new URL("..", "https://example.com/C:/child").href,
+    pathToFileURL("/tmp/My Image.png").href,
+    pathToFileURL("/tmp/a#b.png").href,
+    fileURLToPath(pathToFileURL("/tmp/a#b.png")),
+    fileURLToPath(pathToFileURL("/tmp/a?b.png")),
+    fileURLToPath(pathToFileURL("/Applications/Tinycast Beta.app")),
+    errorCode(() => fileURLToPath("file:///tmp/a%2Fb")),
+    errorCode(() => fileURLToPath("file://a%2Fb/tmp/a")),
+    errorCode(() => fileURLToPath("file://example.com/tmp/a")),
+    errorCode(() => fileURLToPath("https://example.com/a")),
+    errorCode(() => fileURLToPath({})),
+    errorCode(() => fileURLToPath("file://user@localhost/tmp/a")),
+    errorCode(() => fileURLToPath("file://localhost:/tmp/a")),
+    errorCode(() => fileURLToPath("file:///C:/a", { windows: true })),
   ];
   return <Detail markdown={parts.join("\\n")} />;
 }
@@ -210,6 +254,109 @@ export default async function Command() {
     bytes: Array.from(await new Response(new Uint8Array([104, 105])).bytes()),
     byteLength: (await new Response("héllo").arrayBuffer()).byteLength,
   };
+}
+`;
+
+// A child's output arrives in one go once the process has already exited, so both ways of reading a
+// stream have to work after the fact: `execa` async-iterates stdout, others attach a `data` listener.
+const spawnSource = `
+import { spawn } from "node:child_process";
+
+export default async function Command() {
+  const iterated = [];
+  const child = spawn("/bin/echo", ["hello"]);
+  for await (const chunk of child.stdout) iterated.push(chunk.toString());
+
+  const late = await new Promise((resolve) => {
+    const other = spawn("/bin/echo", ["world"]);
+    other.on("close", () => {
+      const chunks = [];
+      other.stdout.on("data", (chunk) => chunks.push(chunk.toString()));
+      other.stdout.on("end", () => resolve(chunks.join("")));
+    });
+  });
+
+  globalThis.__spawn = { iterated: iterated.join(""), late };
+}
+`;
+
+// node-fetch travels inside `@raycast/utils` and drives `http.request` rather than global `fetch`,
+// then reads the response back by async-iterating a stream it pipes through a `PassThrough`.
+const httpSource = `
+import http from "node:http";
+import stream, { PassThrough, pipeline } from "node:stream";
+
+export default async function Command() {
+  globalThis.__http = await new Promise((resolve, reject) => {
+    const request = http.request(
+      "https://example.test/data",
+      { method: "post", headers: { "X-Probe": ["one", "two"], "Accept-Encoding": "gzip, deflate, br" } },
+      async (response) => {
+        const body = pipeline(response, new PassThrough(), () => {});
+        const chunks = [];
+        for await (const chunk of body) chunks.push(chunk.toString());
+        resolve({
+          status: response.statusCode,
+          statusText: response.statusMessage,
+          contentType: response.headers["content-type"],
+          decoding: [response.headers["content-encoding"], response.headers["content-length"]],
+          isStream: body instanceof stream,
+          text: chunks.join(""),
+        });
+      },
+    );
+    request.on("error", reject);
+    request.end("ping");
+  });
+}
+`;
+
+// The Homebrew extension streams its package index to disk rather than buffering it: it guards on
+// `response.body`, counts bytes through a `TransformStream`, and pipes the result into a file — then
+// reads it back through a `Transform`. Issue #429: `Response` had no `body`, so it failed at "HTTP 200".
+const streamSource = `
+import fs from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Readable, Transform, Writable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+export default async function Command() {
+  const target = join(tmpdir(), "tinycast-fixture-index.json");
+  const response = await fetch("https://example.test/index.json");
+  if (!response.ok || !response.body) throw new Error(\`HTTP \${response.status}: \${response.statusText}\`);
+
+  let observed = 0;
+  const counter = new TransformStream({
+    transform(chunk, controller) {
+      observed += chunk.length;
+      controller.enqueue(chunk);
+    },
+  });
+  const sink = fs.createWriteStream(target);
+  await pipeline(Readable.fromWeb(response.body.pipeThrough(counter)), sink);
+
+  const upper = new Transform({
+    transform(chunk, encoding, done) {
+      done(null, chunk.toString().toUpperCase());
+    },
+  });
+  const read = [];
+  const collect = new Writable({
+    write(chunk, encoding, done) {
+      read.push(chunk.toString());
+      done(null);
+    },
+  });
+  await pipeline(fs.createReadStream(target), upper, collect);
+
+  globalThis.__stream = {
+    observed,
+    bytesWritten: sink.bytesWritten,
+    onDisk: fs.readFileSync(target, "utf8"),
+    piped: read.join(""),
+  };
+  fs.unlinkSync(target);
 }
 `;
 
@@ -409,6 +556,35 @@ export async function runFixtures() {
       "aGVsbG8=",
       "hello",
       "héllo",
+      "/Applications/Tinycast Beta.app",
+      "/tmp/한글.txt",
+      "/tmp/a",
+      "/tmp/a\\b",
+      "/tmp/a",
+      "/a",
+      "/tmp/a",
+      "/tmp//a",
+      "/tmp/a///b",
+      "/tmp/a/b",
+      "/C:/",
+      String.raw`file:///tmp/a?query=\keep#fragment=\keep`,
+      "https://example.com/",
+      "/a:folder/",
+      "file:///a:folder/",
+      "https://example.com/",
+      "file:///tmp/My%20Image.png",
+      "file:///tmp/a%23b.png",
+      "/tmp/a#b.png",
+      "/tmp/a?b.png",
+      "/Applications/Tinycast Beta.app",
+      "ERR_INVALID_FILE_URL_PATH",
+      "ERR_INVALID_URL",
+      "ERR_INVALID_FILE_URL_HOST",
+      "ERR_INVALID_URL_SCHEME",
+      "ERR_INVALID_ARG_TYPE",
+      "ERR_INVALID_URL",
+      "ERR_INVALID_URL",
+      "Error",
     ];
     expected.forEach((value, index) => check(`shim ${index}: ${value}`, markdown[index] === value, markdown[index]));
   });
@@ -423,6 +599,73 @@ export async function runFixtures() {
     check("keeps a binary body intact", equals(result.bytes, [104, 105]), JSON.stringify(result.bytes));
     check("encodes a text body as UTF-8", result.byteLength === 6, String(result.byteLength));
   });
+
+  await run("spawn's stdout survives a late reader", spawnSource, "no-view", async (harness) => {
+    const result = harness.call("globalThis.__spawn");
+    check("async iteration collects stdout", result?.iterated === "hello\n", JSON.stringify(result?.iterated));
+    check("a listener attached after exit still gets it", result?.late === "world\n", JSON.stringify(result?.late));
+  });
+
+  const httpSpecs = [];
+  await run(
+    "http.request rides the same bridge as fetch",
+    httpSource,
+    "no-view",
+    async (harness) => {
+      const result = harness.call("globalThis.__http");
+      const spec = httpSpecs[0] ?? {};
+      check("sends one request over the fetch bridge", httpSpecs.length === 1, String(httpSpecs.length));
+      check("uppercases the method", spec.method === "POST", String(spec.method));
+      check("joins a multi-valued header", spec.headers?.["x-probe"] === "one, two", JSON.stringify(spec.headers));
+      check("leaves content negotiation to the transport", spec.headers?.["accept-encoding"] === undefined);
+      check("forwards the written body", Buffer.from(spec.bodyBase64 ?? "", "base64").toString() === "ping");
+      check("reports status and message", result.status === 201 && result.statusText === "Created");
+      check("keeps the other headers", result.contentType === "application/json", String(result.contentType));
+      check("drops headers describing bytes the bridge already decoded", JSON.stringify(result.decoding) === "[null,null]", JSON.stringify(result.decoding));
+      check("the body is a Stream", result.isStream === true);
+      check("delivers the body to a late reader", result.text === '{"ok":true}', result.text);
+    },
+    {
+      stubs: {
+        "fetch.request": (args) => {
+          httpSpecs.push(args[0]);
+          return {
+            status: 201,
+            statusText: "Created",
+            headers: { "content-type": "application/json", "content-encoding": "gzip", "content-length": "31" },
+            url: "https://example.test/data",
+            bodyBase64: Buffer.from('{"ok":true}').toString("base64"),
+          };
+        },
+      },
+    },
+  );
+
+  const indexBody = JSON.stringify(Array.from({ length: 4000 }, (_, index) => ({ name: `pkg-${index}` })));
+  await run(
+    "a fetch body streams through a transform onto disk",
+    streamSource,
+    "no-view",
+    async (harness) => {
+      const result = harness.call("globalThis.__stream");
+      check("the response exposes a body stream", result !== undefined && result.observed > 0, JSON.stringify(result));
+      check("every byte reaches the transform", result?.observed === indexBody.length, `${result?.observed} of ${indexBody.length}`);
+      check("every byte reaches the file", result?.bytesWritten === indexBody.length, String(result?.bytesWritten));
+      check("the file matches the response", result?.onDisk === indexBody);
+      check("reading it back through a Transform preserves it", result?.piped === indexBody.toUpperCase());
+    },
+    {
+      stubs: {
+        "fetch.request": () => ({
+          status: 200,
+          statusText: "OK",
+          headers: { "content-type": "application/json", "content-length": String(indexBody.length) },
+          url: "https://example.test/index.json",
+          bodyBase64: Buffer.from(indexBody).toString("base64"),
+        }),
+      },
+    },
+  );
 
   await run("OAuth PKCEClient and TokenSet", oauthSource, "no-view", async (harness) => {
     const result = harness.call("globalThis.__oauthTest");

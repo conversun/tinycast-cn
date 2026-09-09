@@ -412,7 +412,38 @@ struct ExtensionTests {
                 {"id":2,"type":"Grid","props":{"columns":4},"children":[
                   {"id":3,"type":"Grid.Item","props":{"title":"One"},"children":[]}]}
                 """), query: "")
-        check("kind is grid with columns", grid.kind == .grid(columns: 4), String(describing: grid.kind))
+        check(
+            "kind is grid with columns", grid.kind == .grid(ExtensionGridLayout(columns: 4)),
+            String(describing: grid.kind))
+
+        let shaped = ExtensionScreen(
+            tree: tree(
+                """
+                {"id":2,"type":"Grid","props":{"columns":3,"aspectRatio":"16/9","fit":"fill",
+                  "inset":"lg"},"children":[
+                  {"id":3,"type":"Grid.Item","props":{"title":"One"},"children":[]}]}
+                """), query: "")
+        check(
+            "grid layout props parsed",
+            shaped.kind
+                == .grid(
+                    ExtensionGridLayout(
+                        columns: 3, aspectRatio: 16.0 / 9, fills: true, inset: .large)),
+            String(describing: shaped.kind))
+
+        let legacy = ExtensionScreen(
+            tree: tree(#"{"id":2,"type":"Grid","props":{"itemSize":"small"},"children":[]}"#),
+            query: "")
+        check("itemSize still sets columns", legacy.kind == .grid(ExtensionGridLayout(columns: 8)))
+
+        let layout = ExtensionGridLayout(columns: 5)
+        check(
+            "tile width divides the space",
+            layout.tileWidth(inWidth: 100, spacing: 5) == 16,
+            String(layout.tileWidth(inWidth: 100, spacing: 5)))
+        check("columns clamp to Raycast's range", ExtensionGridLayout(columns: 99).columns == 8)
+        check("a bad aspect ratio falls back to square", ExtensionGridLayout(aspectRatio: 0).aspectRatio == 1)
+        check("large inset insets a quarter of the tile", ExtensionGridLayout.Inset.large.fraction == 0.24)
 
         let form = ExtensionScreen(
             tree: tree(
@@ -423,8 +454,12 @@ struct ExtensionTests {
                 """), query: "")
         check("kind is form", form.kind == .form)
         check("fields collected", form.fields.count == 2)
-        check("form has no selectable rows", form.items.isEmpty)
-
+        check("only focusable fields are rows", form.items.count == 1)
+        check("the row is the field, not the separator", form.items.first?.node.id == 3)
+        check("a separator has no focus index", form.focusItem(for: form.fields[1]) == nil)
+        check(
+            "a text area keeps the vertical keys",
+            ExtensionFormField(type: "Form.TextArea").ownsVerticalKeys)
         let detail = ExtensionScreen(
             // Doubled delimiters: the heading contains `"#`, which closes a single-# string.
             tree: tree(##"{"id":2,"type":"Detail","props":{"markdown":"# Hi"},"children":[]}"##),
@@ -606,6 +641,7 @@ struct ExtensionTests {
             const React = require("react");
             const path = require("node:path");
             const crypto = require("node:crypto");
+            const { fileURLToPath, pathToFileURL } = require("node:url");
             const h = React.createElement;
             module.exports.default = function Command() {
               const [count, setCount] = React.useState(0);
@@ -620,12 +656,23 @@ struct ExtensionTests {
                 typeof AbortSignal.timeout, typeof AbortSignal.abort, typeof AbortSignal.any,
                 String(AbortSignal.timeout(5e3).aborted), AbortSignal.abort().reason.name,
               ].join(",");
+              const errorCode = (callback) => {
+                try { callback(); return "none"; } catch (error) { return error.code; }
+              };
+              const filePaths = [
+                fileURLToPath("file:///Applications/Tinycast%20Beta.app"),
+                fileURLToPath(pathToFileURL("/tmp/a#b.png")),
+                pathToFileURL("/tmp/My Image.png").href,
+                errorCode(() => fileURLToPath("file:///tmp/a%2Fb")),
+                errorCode(() => fileURLToPath("file://example.com/tmp/a")),
+                errorCode(() => fileURLToPath("https://example.com/a")),
+              ].join("\\n");
               return h(List, { navigationTitle: "Synthetic", isLoading: false },
                 h(List.Item, {
                   title: "count=" + count,
                   subtitle: path.join("/a/b", "../c"),
                   icon: Icon.Circle,
-                  accessories: [{ text: digest }, { text: abortable }],
+                  accessories: [{ text: digest }, { text: abortable }, { text: filePaths }],
                   actions: h(ActionPanel, null,
                     h(Action, { title: "Bump", onAction: () => setCount((v) => v + 10) }))
                 }));
@@ -660,8 +707,17 @@ struct ExtensionTests {
         check("toast reached the host", host.toasts == ["hello"], host.toasts.joined(separator: ","))
         check(
             "AbortSignal carries its statics",
-            ExtensionAccessoriesView_labelForTest(screen.items.first?.node.array("accessories").last)
+            ExtensionAccessoriesView_labelForTest(
+                screen.items.first?.node.array("accessories").dropFirst().first)
                 == "function,function,function,false,AbortError",
+            String(describing: screen.items.first?.node.array("accessories").dropFirst().first))
+        check(
+            "fileURLToPath decodes a path and rejects an unusable URL",
+            ExtensionAccessoriesView_labelForTest(screen.items.first?.node.array("accessories").last)
+                == "/Applications/Tinycast Beta.app\n/tmp/a#b.png\n"
+                + "file:///tmp/My%20Image.png\n"
+                + "ERR_INVALID_FILE_URL_PATH\nERR_INVALID_FILE_URL_HOST\n"
+                + "ERR_INVALID_URL_SCHEME",
             String(describing: screen.items.first?.node.array("accessories").last))
 
         // Dispatch the row's action and confirm the re-render.
@@ -837,7 +893,54 @@ struct ExtensionTests {
             failingRecorder.failures.joined(separator: "|"))
         await failing.stop(session: "s3")
 
+        await swiftHelperChecks()
         zlibChecks()
+    }
+
+    /// Raycast's `swift:` wrapper chmods its bundled helper before spawning it: store zips ship it 644.
+    @MainActor
+    static func swiftHelperChecks() async {
+        let helper = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tinycast-helper-\(UUID().uuidString)")
+        try? Data("#!/bin/sh\necho '{\"hex\":\"#FF0000\"}'\n".utf8).write(to: helper)
+        defer { try? FileManager.default.removeItem(at: helper) }
+
+        let (runtime, _, recorder) = makeRuntime()
+        try? await runtime.boot(
+            config: .current(supportDirectory: FileManager.default.temporaryDirectory))
+        let command = """
+            "use strict";
+            const { Detail } = require("@raycast/api");
+            const React = require("react");
+            const { chmod } = require("fs/promises");
+            const { spawn } = require("child_process");
+            module.exports.default = function Command() {
+              const [state, setState] = React.useState("pending");
+              React.useEffect(() => {
+                (async () => {
+                  await chmod("\(helper.path)", "755");
+                  const child = spawn("\(helper.path)", ["pick"]);
+                  const out = [];
+                  child.stdout.on("data", (chunk) => out.push(chunk.toString()));
+                  child.on("exit", (code) => setState(code + ":" + JSON.parse(out.join("")).hex));
+                })().catch((error) => setState("threw:" + error.message));
+              }, []);
+              return React.createElement(Detail, { markdown: state });
+            };
+            """
+        await runtime.start(
+            session: "sSwift", code: command, file: URL(fileURLWithPath: "/tmp/swift-helper.js"),
+            mode: .view, context: launchContext())
+        await settle(1200)
+
+        let mode = (try? FileManager.default.attributesOfItem(atPath: helper.path))
+            .flatMap { $0[.posixPermissions] as? NSNumber }
+        check("chmod applies the requested mode", mode?.intValue == 0o755, String(describing: mode))
+        check(
+            "a chmodded helper is spawnable",
+            recorder.trees.last?.activeRoot?.string("markdown") == "0:#FF0000",
+            recorder.trees.last?.activeRoot?.string("markdown") ?? "no tree")
+        await runtime.stop(session: "sSwift")
     }
 
     /// `zlib` is the one node shim with no JS-side implementation to lean on.

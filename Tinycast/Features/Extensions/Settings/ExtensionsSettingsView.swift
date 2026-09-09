@@ -21,7 +21,7 @@ struct ExtensionsSettingsView: View {
         @Bindable var settings = core.settings
         return Form {
             FeatureSwitchSection(
-                header: "Extensions",
+                anchor: .extensionsExtensions,
                 enableTitle: "Enable extensions",
                 enableSubtitle:
                     "Run Raycast extensions natively. A running command holds a JavaScript engine "
@@ -44,6 +44,7 @@ struct ExtensionsSettingsView: View {
             storage
         }
         .formStyle(.grouped)
+        .settingsScrollTarget(.extensions)
         .releasesFocusOnOutsideClick()
         // Escape and Return are the keyboard way out of the same field.
         .onExitCommand { NSApp.keyWindow?.makeFirstResponder(nil) }
@@ -87,29 +88,20 @@ struct ExtensionsSettingsView: View {
             } label: {
                 Label("What works", systemImage: "checkmark.circle")
                 Text(
-                    String(
-                        localized:
-                            """
-                            List, detail, form and grid commands, and ones that just run. \
-                            Preferences, arguments, storage, the clipboard, toasts and HUDs.
-                            """
-                    ))
+                    "List, detail, form and grid commands, and ones that just run. Preferences, "
+                        + "arguments, storage, the clipboard, toasts, HUDs and OAuth sign-in. "
+                        + "No-view commands refresh their subtitle on their manifest interval.")
             }
             LabeledContent {
                 EmptyView()
             } label: {
                 Label("What doesn't, yet", systemImage: "xmark.circle")
                 Text(
-                    String(
-                        localized:
-                            """
-                            Raycast's OAuth sign-in, menu-bar commands, and Raycast's own AI, \
-                            browser and window-management services.
-                            """
-                    ))
+                    "Menu-bar commands, sign-ins routed through Raycast's own OAuth proxy, and "
+                        + "Raycast's AI, browser and window-management services.")
             }
         } header: {
-            Text("Compatibility")
+            SettingsSectionHeader(.extensionsCompatibility)
         } footer: {
             Text("An extension that needs something missing says so when you run it.")
                 .font(.caption)
@@ -155,10 +147,11 @@ struct ExtensionsSettingsView: View {
                 }
             }
         } header: {
-            Text(
-                core.extensions.installed.isEmpty
-                    ? String(localized: "Installed")
-                    : String(localized: "Installed (\(core.extensions.installed.count))"))
+            SettingsSectionHeader(anchor: .extensionsInstalled) {
+                Text(
+                    core.extensions.installed.isEmpty
+                        ? "Installed" : "Installed (\(core.extensions.installed.count))")
+            }
         } footer: {
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle")
@@ -184,7 +177,7 @@ struct ExtensionsSettingsView: View {
     /// Three rows rather than a menu: search, copy and folder behave differently.
     private var install: some View {
         Section {
-            SettingsRow(title: "Search extensions", subtitle: searchSubtitle) {
+            SettingsRow(title: "Search extensions", subtitle: searchSubtitle, anchor: .extensionsInstall) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
             } trailing: {
@@ -193,7 +186,10 @@ struct ExtensionsSettingsView: View {
                 Button("Search…") { browsingStore = true }
             }
             // A state of this row, not a card: the same job as the button beside it.
-            SettingsRow(title: "Import from Raycast", subtitle: importSubtitle) {
+            SettingsRow(
+                title: "Import from Raycast", subtitle: importSubtitle,
+                anchor: .extensionsInstall
+            ) {
                 Image(systemName: "arrow.down.doc")
                     .foregroundStyle(pending.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
             } trailing: {
@@ -209,7 +205,8 @@ struct ExtensionsSettingsView: View {
             }
             SettingsRow(
                 title: "Add from folder",
-                subtitle: "A folder holding package.json and the built command files."
+                subtitle: "A folder holding package.json and the built command files.",
+                anchor: .extensionsInstall
             ) {
                 Image(systemName: "folder")
                     .foregroundStyle(.secondary)
@@ -217,7 +214,7 @@ struct ExtensionsSettingsView: View {
                 Button("Choose…", action: addFolder)
             }
         } header: {
-            Text("Install")
+            SettingsSectionHeader(.extensionsInstall)
         } footer: {
             if let error {
                 // Under the buttons that caused it: it used to sit beneath the list, far above.
@@ -231,7 +228,10 @@ struct ExtensionsSettingsView: View {
     /// An install cleans up after itself, so in normal use this row has nothing to offer.
     private var storage: some View {
         Section {
-            SettingsRow(title: "Leftover files", subtitle: reclaimableSubtitle) {
+            SettingsRow(
+                title: "Leftover files", subtitle: reclaimableSubtitle,
+                anchor: .extensionsStorage
+            ) {
                 Image(systemName: "internaldrive")
                     .foregroundStyle(reclaimable.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
             } trailing: {
@@ -244,7 +244,7 @@ struct ExtensionsSettingsView: View {
                 .disabled(reclaimable.isEmpty)
             }
         } header: {
-            Text("Storage")
+            SettingsSectionHeader(.extensionsStorage)
         }
     }
 
@@ -549,6 +549,58 @@ private struct CommandRows: View {
             ExtensionPreferenceRow(
                 extensionName: installed.manifest.name, schema: schema, indent: Theme.Spacing.lg)
         }
+        // The same predicate the scheduler runs on: an unparseable interval gets no toggle.
+        if ExtensionRefreshPolicy.isSchedulable(mode: command.mode, interval: command.interval),
+            let schedule = command.intervalRaw
+        {
+            ExtensionRefreshRow(
+                extensionName: installed.manifest.name, command: command, schedule: schedule,
+                indent: Theme.Spacing.lg)
+        }
+    }
+}
+
+/// One `no-view` command's background refresh: Raycast's interval preference, stored locally.
+private struct ExtensionRefreshRow: View {
+    let extensionName: String
+    let command: ExtensionCommand
+    let schedule: String
+    var indent: CGFloat = 0
+    @Environment(AppCore.self) private var core
+
+    private static let relative: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.dateTimeStyle = .named
+        return formatter
+    }()
+
+    var body: some View {
+        let info = core.extensions.backgroundInfo(extension: extensionName, command: command.name)
+        SettingsCardRow(title: "Background refresh", detail: detail(for: info), indent: indent) {
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { info.backgroundEnabled }, set: { setEnabled($0) })
+            )
+            .labelsHidden()
+        }
+    }
+
+    private func detail(for info: ExtensionCommandMetadata) -> String {
+        var detail = "Runs every \(schedule) in the background."
+        if let lastRun = info.lastRun {
+            detail += " Last refresh \(Self.relative.localizedString(for: lastRun, relativeTo: Date()))."
+        } else {
+            detail += " Hasn't refreshed yet."
+        }
+        if let error = info.lastError {
+            detail += " Last error: \(ExtensionRefreshPolicy.headline(error))."
+        }
+        return detail
+    }
+
+    private func setEnabled(_ enabled: Bool) {
+        core.extensions.setBackgroundEnabled(enabled, extension: extensionName, command: command.name)
     }
 }
 

@@ -4,13 +4,16 @@ import Foundation
 enum SettingsBackupCoverage {
     /// Each `SettingsData` field paired with the `AppSettings` key it mirrors.
     static let mirrored: [String: AppSettingsKey] = [
+        "clipboardEnabled": .clipboardEnabled,
         "clipboardRetentionDays": .clipboardRetention,
+        "clipboardDefaultAction": .clipboardDefaultAction,
         "clipboardDisabledApps": .clipboardDisabledApps,
         "hyperKey": .hyperKey,
         "hyperKeyIncludesShift": .hyperKeyIncludesShift,
         "hyperKeyQuickPress": .hyperKeyQuickPress,
         "emojiSkinTone": .emojiSkinTone,
         "popToRootSeconds": .popToRootTimeout,
+        "escapeKeyBehavior": .escapeKeyBehavior,
         "appearance": .appearance,
         "compactMode": .compactMode,
         "showFavoritesInCompactMode": .showFavoritesInCompactMode,
@@ -28,6 +31,7 @@ enum SettingsBackupCoverage {
         "windowManagementShowInLauncher": .windowManagementShowInLauncher,
         "windowGap": .windowGap,
         "windowCycleOnRepeat": .windowCycleOnRepeat,
+        "windowLayoutsShowInLauncher": .windowLayoutsShowInLauncher,
         "quicklinksEnabled": .quicklinksEnabled,
         "quicklinksShowInLauncher": .quicklinksShowInLauncher,
         "quicklinkOpensNewWindow": .quicklinkOpensNewWindow,
@@ -35,10 +39,12 @@ enum SettingsBackupCoverage {
         "quicklinkConfirmsBeforeDelete": .quicklinkConfirmsBeforeDelete,
         "extensionsShowInLauncher": .extensionsShowInLauncher,
         "calendarShowInLauncher": .calendarShowInLauncher,
+        "calendarLauncherLimit": .calendarLauncherLimit,
         "calendarIncludesTomorrow": .calendarIncludesTomorrow,
         "joinWindowMinutes": .joinWindowMinutes,
         "autoJoinConfirms": .autoJoinConfirms,
         "menuBarEvents": .menuBarEvents,
+        "calendarMenuBarDisplay": .calendarMenuBarDisplay,
         "menuBarLinkedEventsOnly": .menuBarLinkedEventsOnly,
         "hideCurrentEvent": .hideCurrentEvent,
         "supportReminders": .supportReminders
@@ -76,6 +82,9 @@ enum SettingsBackupCoverage {
         AppSettingsKey.aiEnabled.rawValue:
             "No other AI setting travels in a backup, so an import would arm a feature it cannot "
             + "configure.",
+        AppSettingsKey.aiInstalledProviders.rawValue:
+            "Installed commands and their accounts belong to this Mac; an import must not enable "
+            + "their discovery on another one.",
         AppSettingsKey.aiConnections.rawValue:
             "AI connection metadata stays on the Mac with the Keychain credentials it describes.",
         AppSettingsKey.aiDefaultModel.rawValue:
@@ -97,6 +106,12 @@ enum SettingsBackupCoverage {
         AppSettingsKey.aiNewChatAfter.rawValue:
             "Paces the same decision as the setting it accompanies, against conversations that stay "
             + "on the Mac that had them.",
+        AppSettingsKey.mcpEnabled.rawValue:
+            "Doubles as consent to run third-party MCP servers, one of which is a local process; a "
+            + "flag that grants a capability is never carried by a backup.",
+        AppSettingsKey.mcpServers.rawValue:
+            "An MCP server is a source of executable code and a destination for chat context, and "
+            + "it is meaningless without the machine-local Keychain secrets it describes.",
         AppSettingsKey.quickActionsEnabled.rawValue:
             "Grants keystroke delivery into other apps through the Accessibility permission, and a "
             + "flag that grants a capability is never carried by a backup.",
