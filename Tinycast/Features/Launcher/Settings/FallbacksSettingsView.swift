@@ -11,9 +11,10 @@ struct FallbacksSettingsView: View {
     var body: some View {
         Form {
             Section {
+                // Looked up after joining: two literals added together are no longer a key.
                 Text(
-                    "Every search offers these below its results, under “Use … with”. "
-                        + "Each one takes what you typed as its input."
+                    ("Every search offers these below its results, under “Use … with”. "
+                        + "Each one takes what you typed as its input.").localizedUI
                 )
                 .foregroundStyle(.secondary)
             } header: {
@@ -39,8 +40,8 @@ struct FallbacksSettingsView: View {
                 }
             } footer: {
                 Text(
-                    "A quicklink appears here once its link contains an {argument}, "
-                        + "which the query fills in."
+                    ("A quicklink appears here once its link contains an {argument}, "
+                        + "which the query fills in.").localizedUI
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

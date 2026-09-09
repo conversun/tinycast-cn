@@ -1683,3 +1683,37 @@
 "What Escape does once the search field is already empty." = "搜索框已清空后，再按 Esc 的行为。";
 "What ↵ does on an entry; ⌘↵ does the other one." = "在条目上按 ↵ 的行为；⌘↵ 执行另一项。";
 "Window Layout" = "窗口布局";
+
+/* Upstream v0.10.5 → v0.10.15，补充：Settings 的窗格名、分节名与搜索目录条目，以及兜底搜索。
+   这些是 model 层的 title 字面量，编译器抽不到，全部经 .localizedUI 上屏。 */
+"A quicklink appears here once its link contains an {argument}, which the query fills in." = "当 Quicklink 的链接里含有 {argument} 时，它就会出现在这里，由搜索内容填入。";
+"Ask AI Chat" = "询问 AI 对话";
+"Backup File" = "备份文件";
+"Calendar in Menu Bar" = "菜单栏中的日历";
+"Configure Fallbacks…" = "配置兜底搜索…";
+"Create Layout from Current Windows" = "由当前窗口创建布局";
+"Default action" = "默认操作";
+"Enable Applications" = "启用应用";
+"Enable Clipboard History" = "启用剪贴板历史";
+"Enable Commands" = "启用命令";
+"Enable MCP servers" = "启用 MCP 服务器";
+"Enable System Actions" = "启用系统操作";
+"Enable System Settings" = "启用系统设置";
+"Escape Key Behavior" = "Esc 键行为";
+"Every search offers these below its results, under “Use … with”. Each one takes what you typed as its input." = "每次搜索都会在结果下方的「用“…”执行…」中列出它们，各自把你输入的内容作为输入。";
+"Export" = "导出";
+"Export Backup" = "导出备份";
+"Fallbacks" = "兜底搜索";
+"Import Raycast Scripts" = "导入 Raycast 脚本";
+"Installed AI" = "已安装的 AI";
+"MCP Servers" = "MCP 服务器";
+"New Layout" = "新建布局";
+"Providers" = "服务商";
+"Run Shell Command" = "运行 Shell 命令";
+"Search Snippets" = "搜索文本片段";
+"Show Upcoming Events" = "显示即将开始的日程";
+"Show layouts in launcher" = "在启动器中显示布局";
+"Support" = "支持";
+"Upcoming meetings in launcher" = "启动器中的即将开始的会议";
+"Use “%@” with…" = "用“%@”执行…";
+"Window Layouts" = "窗口布局";

@@ -60,7 +60,10 @@ enum Fallback: Hashable, Sendable {
 
     /// The section header. A long query is elided in the middle, so “with…” always survives.
     static func sectionTitle(query: String, limit: Int = 72) -> String {
-        guard query.count > limit else { return "Use “\(query)” with…" }
-        return "Use “\(query.prefix(limit / 2))…\(query.suffix(limit - limit / 2 - 1))” with…"
+        // One key for both branches: the ellipsis is applied to the query, never to the sentence.
+        let shown =
+            query.count > limit
+            ? "\(query.prefix(limit / 2))…\(query.suffix(limit - limit / 2 - 1))" : query
+        return String(localized: "Use “\(shown)” with…")
     }
 }
