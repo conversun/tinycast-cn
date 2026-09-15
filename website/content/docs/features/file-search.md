@@ -1,76 +1,106 @@
 ---
 title: File search
-description: Find files through the Spotlight index, on demand, with no file permission.
+description: Find files and folders through the Spotlight index, with a preview and no file permission.
 ---
 
-Search filenames across folders you choose, using the index macOS already maintains.
+Search file and folder names in the folders you choose, using the index macOS already keeps.
 
-**Settings → File Search** holds the feature switch. It ships **off**, and while off there is no
-entry point and no Spotlight work at all.
+**Settings → File Search** holds the switch. It ships **off**. While it is off there is no command
+and no Spotlight work at all.
 
-Reach it with the **Search Files** command or its own global shortcut.
+Open it with the **Search Files** command, its own global shortcut, or the **Search Files** row under
+"Use … with" at the bottom of any launcher search. That last one opens with your text already typed.
 
 ## It asks for nothing
 
-Tinycast requests **no file permission** for this. Hidden paths and application-bundle contents are
-excluded structurally — no setting can re-admit them — and that is exactly what keeps the feature
+Tinycast requests **no file permission** for this. Hidden files and the insides of app bundles are
+always left out, and no setting can bring them back. That is exactly what keeps the feature
 permission-free.
 
-If Spotlight has not indexed something, you get a thinner result list rather than a Full Disk Access
-prompt.
+If Spotlight has not indexed something, you get fewer results rather than a Full Disk Access prompt.
+
+## The screen
+
+With nothing typed, the list shows **Recently Used**: files you opened in the last 30 days or changed
+in the last 3 days, inside your search scopes. This comes from macOS's own records. Tinycast keeps no
+history of its own.
+
+Type and it becomes **Results**. Each row shows the file's icon and name. A folder also shows its
+parent folder's name, dimmed, because half the folders on a developer's Mac are called `src`.
+
+The right side previews the selected file: the file itself, then its name, location, type, size and
+dates. Videos and audio can be played there. Nothing plays until you press play.
+
+### Filtering by type
+
+<kbd>⌘</kbd><kbd>P</kbd>, or the **All Types** button, narrows the search:
+
+**All Types** · **Folders** · **Documents** · **Images** · **Audio** · **Videos** · **Archives**
+
+The filter changes what Spotlight is asked for, so narrowing never hides matches that were already
+cut off. It resets each time you open the palette.
 
 ## Actions
 
-| Action         | Shortcut                 |
-| -------------- | ------------------------ |
-| Open           | <kbd>↵</kbd>             |
-| Show in Finder | <kbd>⌘</kbd><kbd>↵</kbd> |
-| Copy Path      |                          |
+| Action                  | Shortcut                             |
+| ----------------------- | ------------------------------------ |
+| Open File / Open Folder | <kbd>return</kbd>                    |
+| Show in Finder          | <kbd>⌘</kbd><kbd>return</kbd>        |
+| Quick Look              | <kbd>⌘</kbd><kbd>Y</kbd>             |
+| Copy File               | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>C</kbd> |
+| Paste File to …         | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>V</kbd> |
+| Copy Name               | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd> |
+| Copy Path               | <kbd>⌃</kbd><kbd>⌘</kbd><kbd>C</kbd> |
+| Move to Trash           | <kbd>⌃</kbd><kbd>X</kbd>             |
 
-**Copy Path leaves the palette open** and confirms with a pill, so you can copy several paths in a
-row.
+- **Quick Look** opens a large preview inside the palette, and it plays media straight away.
+  <kbd>esc</kbd> or **Close** puts it away.
+- **Copy File** puts the file itself on the clipboard, ready to paste into Finder or Mail.
+- **Paste File to …** pastes it into the app you opened the palette over.
+- **Copy Name** and **Copy Path** keep the palette open, so you can copy several in a row.
+- **Move to Trash** does not ask first. Things in the Trash can always come back.
 
-A row shows the file's native icon, its full name, and its parent folder with `~` abbreviated.
+Copies from here land in your [clipboard history](/docs/features/clipboard) like any other copy.
 
 ## Search scopes
 
-**Settings → File Search → Search Scopes**, defaulting to your home folder.
+**Settings → File Search → Search Scopes**, set to your home folder by default.
 
-Home expands to its **visible** children plus `Library/CloudStorage` and your iCloud Drive root.
-**`~/Library` is never a scope Tinycast picks by itself** — if you add a folder inside it by hand,
-you get what you asked for.
+Your home folder means its **visible** folders, plus `Library/CloudStorage` and your iCloud Drive.
+**Tinycast never adds `~/Library` on its own.** If you add a folder inside it yourself, you get what
+you asked for.
 
-**An empty scope list searches nothing** rather than quietly falling back to home.
+**An empty scope list searches nothing**, rather than quietly falling back to home.
 
-Scopes are stored with `~` abbreviated, so a backup still points somewhere sensible on another Mac.
+Scopes are saved with `~` shortened, so a backup still points somewhere sensible on another Mac.
 
 ## Ignore patterns
 
-**Settings → File Search → Ignore Patterns**. Three shapes:
+**Settings → File Search → Ignore Patterns**. Three kinds:
 
-| Pattern          | Matched against    | Example          |
+| Pattern          | Checked against    | Example          |
 | ---------------- | ------------------ | ---------------- |
-| Plain word       | Any path component | `node_modules`   |
-| With `*` `?` `[` | Any path component | `*.tmp`          |
+| Plain word       | Any folder or name | `node_modules`   |
+| With `*` `?` `[` | Any folder or name | `*.tmp`          |
 | Containing `/`   | The whole path     | `**/[Cc]ache/**` |
 
-Matching is case-insensitive, and `*` spans `/`, so a `**/…/**` pattern behaves as written.
+Matching ignores case, and `*` also matches `/`, so a `**/…/**` pattern works as written.
 
-The setting stores **only what you add**. Six sensible rules are built in and cannot be switched off.
+The list only holds what you add. Six sensible rules are built in and always apply.
 
-## Limits
+## How search works
 
-Query terms are joined with AND — `annual report` needs both words in the filename, in any order and
-not necessarily adjacent.
+All the words you type must be in the file name, in any order. `annual report` finds
+"Report – annual 2025.pdf".
 
-At most **1,000** Spotlight candidates per query, and at most **200** rows after filtering. Typing
-waits 120 ms before searching.
+Spotlight returns at most **1,000** candidates, and at most **200** rows are shown after filtering.
+Typing waits 120 ms before searching, so a fast typist does not start a search per letter.
 
-## States
+## Messages you might see
 
-| You see                    | It means                              |
-| -------------------------- | ------------------------------------- |
-| _(nothing)_                | Empty query — no search is run        |
-| Searching files…           | First query in flight                 |
-| No files found             | Query completed with nothing matching |
-| File search is unavailable | Spotlight could not be queried        |
+| You see                          | It means                            |
+| -------------------------------- | ----------------------------------- |
+| Type to search files and folders | Nothing recent in your scopes       |
+| No files found                   | The search finished with no match   |
+| No images found                  | The same, with the Images filter on |
+| File search is unavailable       | Spotlight could not be asked        |

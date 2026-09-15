@@ -1,71 +1,96 @@
-import { Heart } from "lucide-react";
 import { site } from "../data/site";
-import { DiscordLogo, GitHubLogo, Logo } from "./ui/icon";
+import { latestVersion } from "../lib/version";
+import { Logo } from "./ui/icon";
 import { Link } from "./ui/link";
-import { MetaStrip } from "./ui/meta-strip";
 import { ThemeToggle } from "./ui/theme-toggle";
 
-export function Footer() {
-  const repoPath = site.repo.replace("https://", "");
+type FooterLink = { label: string; href: string };
+
+const linkGroups: { title: string; links: FooterLink[] }[] = [
+  {
+    title: "Product",
+    links: [
+      { label: "Features", href: "/#features" },
+      { label: "Privacy", href: "/#privacy" },
+      { label: "Install", href: "/#install" },
+    ],
+  },
+  {
+    title: "Resources",
+    links: [
+      { label: "Documentation", href: "/docs" },
+      {
+        label: "Import from Raycast",
+        href: "/docs/reference/import-from-raycast",
+      },
+      { label: "Releases", href: `${site.repo}/releases` },
+    ],
+  },
+  {
+    title: "Community",
+    links: [
+      { label: "GitHub", href: site.repo },
+      { label: "Discord", href: site.community.discord },
+      { label: "Support Tinycast", href: site.support },
+    ],
+  },
+];
+
+export async function Footer() {
+  const version = await latestVersion();
 
   return (
-    <footer className="border-t border-border/50">
-      <div className="container-page relative flex flex-col items-center gap-6 py-14 text-center">
-        <Link
-          href="/"
-          className="flex items-center gap-1 text-body font-medium text-fg"
-        >
-          <Logo size={24} />
-          {site.name}
-        </Link>
-
-        <div className="flex flex-col items-center gap-2">
-          <MetaStrip />
-          <p className="font-mono text-caption text-fg-subtle">
-            Made for people who like their Mac fast
+    <footer className="mx-auto max-w-6xl px-5 pb-10 pt-6 sm:px-10">
+      <div className="flex flex-col gap-10 md:flex-row md:justify-between">
+        <div>
+          <Link href="/" className="flex items-center gap-2">
+            <Logo size={26} />
+            <span className="text-body font-semibold tracking-tight text-fg">
+              {site.name}
+            </span>
+          </Link>
+          <p className="mt-3 max-w-xs text-small text-fg-muted">
+            {site.tagline}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-          <Link
-            href="/docs"
-            className="text-small text-fg-muted transition-colors hover:text-fg"
-          >
-            Documentation
-          </Link>
-          <a
-            href={site.repo}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 text-small text-fg-muted transition-colors hover:text-fg"
-          >
-            <GitHubLogo size={16} />
-            {repoPath}
-          </a>
-          <a
-            href={site.community.discord}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 text-small text-fg-muted transition-colors hover:text-fg"
-          >
-            <DiscordLogo size={16} />
-            Join the Discord
-          </a>
-          <a
-            href={site.support}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 text-small text-fg-muted transition-colors hover:text-fg"
-          >
-            <Heart size={16} />
-            Support Tinycast
-          </a>
-        </div>
+        <nav
+          aria-label="Footer"
+          className="grid grid-cols-2 gap-8 sm:grid-cols-3 sm:gap-16"
+        >
+          {linkGroups.map((group) => (
+            <div key={group.title}>
+              <p className="text-small font-medium text-fg">{group.title}</p>
+              <ul className="mt-3 flex flex-col gap-2">
+                {group.links.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
+                      className="text-small text-fg-muted transition-colors hover:text-fg"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </div>
 
-        {/* In flow on mobile, where an absolute one would cover the links. */}
-        <div className="md:absolute md:bottom-14 md:right-6">
-          <ThemeToggle />
-        </div>
+      <div className="mt-14 flex flex-col-reverse items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-caption text-fg-subtle">
+          © {new Date().getFullYear()} {site.name} · {version} ·{" "}
+          <a
+            href={site.licenseUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="transition-colors hover:text-fg"
+          >
+            {site.license}
+          </a>
+        </p>
+        <ThemeToggle />
       </div>
     </footer>
   );

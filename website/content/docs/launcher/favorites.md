@@ -1,55 +1,56 @@
 ---
 title: Favorites
-description: Pin the handful of apps you open constantly.
+description: Pin the things you open all the time, and launch them by number.
 ---
 
-A favorite is pinned above everything else when the launcher opens with an empty query.
+A favorite sits above everything else when the launcher opens with nothing typed.
 
 ## Adding one
 
-Select an entry and press <kbd>⌘</kbd><kbd>K</kbd> → **Add to Favorites**, or press
-<kbd>⇧</kbd><kbd>⌘</kbd><kbd>F</kbd> on the selected row. The same menu and the same chord remove it.
+Select an entry and press <kbd>⇧</kbd><kbd>⌘</kbd><kbd>F</kbd>, or choose
+<kbd>⌘</kbd><kbd>K</kbd> → **Add to Favorites**. The same key and menu remove it.
 
-Adding leaves the highlight on the first favorite; removing leaves it on the favorite above the one
-you just took out, so the section stays under your fingers either way.
+After adding, the highlight moves to your first favorite. After removing, it lands on the favorite
+above the one you took out, so the section stays under your fingers.
 
 ## Reordering
 
-Favorites sit in the order you put them in. With an empty query, select one and use
-<kbd>⌥</kbd><kbd>⌘</kbd><kbd>↑</kbd> / <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↓</kbd>, or
-<kbd>⌘</kbd><kbd>K</kbd> → **Move Favorite Up** / **Move Favorite Down**.
+Favorites stay in the order you put them. With nothing typed, select one and press
+<kbd>⌥</kbd><kbd>⌘</kbd><kbd>↑</kbd> or <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↓</kbd>, or use
+<kbd>⌘</kbd><kbd>K</kbd> → **Move Favorite Up** or **Move Favorite Down**.
 
-The first favorite offers no Move Up and the last offers no Move Down. The chords keep the entry
-selected as it moves, so holding one walks it to where you want it.
+The selection follows the favorite as it moves, so holding the keys walks it to where you want it.
 
 ## Launching by number
 
-<kbd>⌘</kbd><kbd>1</kbd> launches your first favorite, <kbd>⌘</kbd><kbd>2</kbd> the second, and so on
-to <kbd>⌘</kbd><kbd>9</kbd> — then <kbd>⌘</kbd><kbd>0</kbd> for the tenth, since there is no
-<kbd>⌘</kbd><kbd>10</kbd> key. Favorites past the tenth have no number; move one up with
-<kbd>⌥</kbd><kbd>⌘</kbd><kbd>↑</kbd> if you want it on a chord.
+<kbd>⌘</kbd><kbd>1</kbd> opens your first favorite, <kbd>⌘</kbd><kbd>2</kbd> the second, and so on up
+to <kbd>⌘</kbd><kbd>9</kbd>. <kbd>⌘</kbd><kbd>0</kbd> opens the tenth. Favorites past the tenth have
+no number; move one up if you want it on a key.
 
-**Hold <kbd>⌘</kbd>** and each numbered favorite shows its number in place of the category label on
-the right of the row, so you never have to count.
+The numbers follow key positions, so they work the same on any keyboard layout.
 
-The numbers work whenever the Favorites section is on screen — that is, at an empty query. Type a
-search and the list becomes ranked results, where a position number would mean nothing.
+**Hold <kbd>⌘</kbd> for a moment** and each numbered favorite shows its number on the right of its
+row, so you never have to count.
+
+The numbers work while the Favorites section is on screen, which means with nothing typed. Once you
+type, the list is ranked results, where a position would mean nothing.
+
+In the clipboard screen, the same number keys paste your pinned entries instead.
 
 ## In compact mode
 
-With [compact mode](/docs/palette#compact-mode) on and **Show favorites in compact mode** enabled,
-your favorites appear as icons at the right of the slim search bar.
+With [compact mode](/docs/palette#appearance) on and **Show favorites in compact mode** enabled,
+your favorites show as icons on the right of the slim search bar.
 
-The strip has room for five icons, and the same numbers launch them. If you have more than five, a
-**…** button follows them — click it, or press <kbd>↓</kbd>, to expand into the full list.
-<kbd>⌘</kbd><kbd>6</kbd> and up still launch favorites the strip has no room to draw.
+The bar has room for five icons, and the same numbers open them. With more than five, a **…** button
+follows. Click it, or press <kbd>↓</kbd>, to open the full list. <kbd>⌘</kbd><kbd>6</kbd> and up
+still open favorites the bar has no room to show.
 
 ## Favorites do not teach ranking
 
-Picking a favorite from an empty query does not feed
+Opening a favorite with nothing typed, or by its number, does not feed
 [learned ranking](/docs/launcher#learned-ranking). You did not search for it, so there is nothing to
-learn about what you meant.
+learn.
 
-Favorites are carried in [settings backups](/docs/reference/backup) and are also one of the
-categories brought over by the
-[Raycast importer](/docs/reference/import-from-raycast).
+Favorites are included in [backups](/docs/reference/backup), and they are one of the things the
+[Raycast importer](/docs/reference/import-from-raycast) brings across.

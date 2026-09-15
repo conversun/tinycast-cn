@@ -150,6 +150,7 @@ final class ExtensionRuntime: @unchecked Sendable {
             _ = context.objectForKeyedSubscript("__tinycast")?
                 .invokeMethod("stop", withArguments: [session])
         }
+        queue.async { self.nodeShims.closeFiles() }
     }
 
     private func onQueue(_ body: @escaping @Sendable (JSContext) -> Void) async {
@@ -303,6 +304,7 @@ final class ExtensionRuntime: @unchecked Sendable {
             for timer in self.timers.values { timer.cancel() }
             self.timers.removeAll()
             self.context = nil
+            self.nodeShims.closeFiles()
         }
     }
 

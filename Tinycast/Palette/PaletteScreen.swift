@@ -1,3 +1,4 @@
+import QuartzCore
 import SwiftUI
 
 /// Which arrow pair a move came from: ↑/↓ or ←/→.
@@ -6,39 +7,93 @@ enum PaletteAxis {
     case horizontal
 }
 
+/// Scale and timing supplied by content while the palette owns the window mechanics.
+@MainActor struct MenuPanelMotion {
+    let entryScale: CGFloat
+    let maximumScale: CGFloat
+    let exitScaleDelta: CGFloat
+    let expansionDuration: TimeInterval
+    let settleDuration: TimeInterval
+    let exitDuration: TimeInterval
+    let expansionTiming: CAMediaTimingFunction
+    let settleTiming: CAMediaTimingFunction
+    let exitTiming: CAMediaTimingFunction
+
+    static let palette = MenuPanelMotion(
+        entryScale: Theme.MenuMotion.entryScale,
+        maximumScale: Theme.MenuMotion.maximumScale,
+        exitScaleDelta: Theme.MenuMotion.exitScaleDelta,
+        expansionDuration: Theme.MenuMotion.expansionDuration,
+        settleDuration: Theme.MenuMotion.settleDuration,
+        exitDuration: Theme.MenuMotion.exitDuration,
+        expansionTiming: Theme.MenuMotion.expansionTiming,
+        settleTiming: Theme.MenuMotion.settleTiming,
+        exitTiming: Theme.MenuMotion.exitTiming)
+}
+
+typealias MenuPanelClipPath =
+    @MainActor (
+        _ bounds: CGRect, _ metrics: InterfaceMetrics, _ corner: MenuPanelCorner
+    ) -> CGPath
+
 /// A menu supplied by a palette screen, including its rendering and row activation.
 @MainActor struct PaletteMenuContent {
     let rowCount: Int
     let isLoading: (Int) -> Bool
+    let clipPath: MenuPanelClipPath
+    let motion: MenuPanelMotion
     /// Built on demand: `moveMenu` resolves the open menu on every arrow key.
-    let view: () -> AnyView
+    let view: (MenuPanelCorner) -> AnyView
     /// Bounds-checked by the caller against `rowCount`, so a row index is always one this menu has.
     let activate: (Int) -> Void
 
     init(
-        rowCount: Int, view: @escaping () -> AnyView, activate: @escaping (Int) -> Void,
-        isLoading: @escaping (Int) -> Bool = { _ in false }
+        rowCount: Int, view: @escaping (MenuPanelCorner) -> AnyView,
+        activate: @escaping (Int) -> Void,
+        isLoading: @escaping (Int) -> Bool = { _ in false },
+        clipPath: @escaping MenuPanelClipPath,
+        motion: MenuPanelMotion
     ) {
         self.rowCount = rowCount
         self.view = view
         self.activate = activate
         self.isLoading = isLoading
+        self.clipPath = clipPath
+        self.motion = motion
     }
 
     init(
-        popover: PopoverMenuContent, selection: Binding<Int>, width: CGFloat = Theme.Size.menuWidth,
+        popover: PopoverMenuContent, selection: Binding<Int>, width: CGFloat? = nil,
         onActivate: @escaping (Int) -> Void
     ) {
         self.init(
             rowCount: popover.items.count,
-            view: {
+            view: { corner in
                 AnyView(
                     PopoverMenu(
                         header: popover.header, items: popover.items, selection: selection,
-                        width: width, onActivate: onActivate))
+                        width: width, onActivate: onActivate,
+                        attachment: corner.popoverAttachment))
             },
             activate: { popover.items[$0].action() },
-            isLoading: { popover.items[$0].isLoading })
+            isLoading: { popover.items[$0].isLoading },
+            clipPath: { bounds, metrics, corner in
+                PopoverMenu.SurfaceShape(
+                    attachment: corner.popoverAttachment, radius: metrics.radius.menuPanel,
+                    attachedRadius: metrics.size.menuButton / 2
+                ).path(in: bounds).cgPath
+            },
+            motion: .palette)
+    }
+}
+
+private extension MenuPanelCorner {
+    var popoverAttachment: PopoverMenu.Attachment {
+        switch self {
+        case .bottomLeading: .bottomLeading
+        case .bottomTrailing: .bottomTrailing
+        case .belowHeaderTrailing: .none
+        }
     }
 }
 
@@ -141,11 +196,12 @@ struct PaletteHeaderAccessory {
         self.view = view
     }
 
-    /// Tab order: the next field, or nil once focus belongs back in the search field.
-    func fieldAfter(_ current: String?) -> String? {
+    /// Adjacent Tab field, or nil once focus belongs back in the search field.
+    func field(after current: String?, backwards: Bool) -> String? {
         guard let current, let index = fieldNames.firstIndex(of: current) else {
-            return fieldNames.first
+            return backwards ? fieldNames.last : fieldNames.first
         }
-        return fieldNames.indices.contains(index + 1) ? fieldNames[index + 1] : nil
+        let next = index + (backwards ? -1 : 1)
+        return fieldNames.indices.contains(next) ? fieldNames[next] : nil
     }
 }

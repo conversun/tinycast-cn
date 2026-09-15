@@ -19,7 +19,7 @@
    Light is the bare :root so an unstyled first paint is never a dark flash.
    Dark is applied by next-themes via .dark on <html>. */
 :root {
-  --tc-canvas: #fbfbfc;
+  --tc-canvas: #ffffff;
   --tc-surface: #ffffff;
   --tc-well: #f1f2f4;
   --tc-badge: #e9eaec;
@@ -45,15 +45,9 @@
   --tc-keycap:
     rgb(255 255 255 / 0.9) 0px 1px 0px 0px inset,
     rgb(0 0 0 / 0.14) 0px 0px 0px 1px, rgb(0 0 0 / 0.09) 0px -1px 0px 0px inset;
-  --tc-cta:
-    rgb(0 0 0 / 0.04) 0px 7px 3px 0px, rgb(0 0 0 / 0.12) 0px 4px 4px 0px;
   --tc-window:
     rgb(0 0 0 / 0.04) 0px 1px 0px 0px inset, rgb(0 0 0 / 0.12) 0px 0px 0px 1px,
     rgb(0 0 0 / 0.14) 0px 4px 40px 8px, rgb(0 0 0 / 0.1) 0px 0px 0px 0.5px;
-
-  /* The hero bloom reads as tint on a light ground, not haze. */
-  --tc-glow-violet: 0.16;
-  --tc-glow-cyan: 0.1;
 
   /* Keycaps carry the brand tint rather than the surface ramp, so a shortcut
      is findable when skimming a wall of prose. */
@@ -88,15 +82,10 @@
   --tc-keycap:
     rgb(255 255 255 / 0.08) 0px 1px 0px 0px inset,
     rgb(0 0 0 / 0.4) 0px -1px 0px 0px inset;
-  --tc-cta:
-    rgb(0 0 0 / 0.03) 0px 7px 3px 0px, rgb(0 0 0 / 0.25) 0px 4px 4px 0px;
   --tc-window:
     rgb(255 255 255 / 0.05) 0px 1px 0px 0px inset,
     rgb(255 255 255 / 0.14) 0px 0px 0px 1px, rgb(0 0 0 / 0.4) 0px 4px 40px 8px,
     rgb(0 0 0 / 0.8) 0px 0px 0px 0.5px;
-
-  --tc-glow-violet: 0.32;
-  --tc-glow-cyan: 0.16;
 
   --tc-kbd-fg: #d9c6ff;
   --tc-kbd-bg: rgb(168 117 255 / 0.2);
@@ -143,11 +132,16 @@
      doing that left the docs with no typography at all. Use the roles below in
      our own components; the defaults exist for the docs theme. */
 
-  --text-eyebrow: 0.6875rem; /* 11px — mono uppercase section labels */
-  --text-eyebrow--line-height: 1;
-  --text-eyebrow--letter-spacing: 0.14em;
+  /* Mono uppercase labels: section numbers, nav links, metadata lines. */
+  --text-micro: 0.625rem; /* 10px — mono metadata lines */
+  --text-micro--line-height: 1.5;
+  --text-micro--letter-spacing: 0.16em;
 
-  --text-caption: 0.75rem; /* 12px — mono metadata, badges */
+  --text-eyebrow: 0.6875rem; /* 11px — mono section labels */
+  --text-eyebrow--line-height: 1.5;
+  --text-eyebrow--letter-spacing: 0.18em;
+
+  --text-caption: 0.75rem; /* 12px — keycaps, badges */
   --text-caption--line-height: 1.5;
 
   /* Relative on purpose: a keycap sits in body copy, table cells and list
@@ -155,29 +149,42 @@
   --text-key: 0.9em;
   --text-key--line-height: 1.4;
 
-  --text-small: 0.8125rem; /* 13px — nav links, buttons, hints, commands */
-  --text-small--line-height: 1.5;
+  --text-small: 0.8125rem; /* 13px — nav, buttons, supporting copy */
+  --text-small--line-height: 1.6;
 
-  --text-body: 0.9375rem; /* 15px — card and paragraph copy */
-  --text-body--line-height: 1.65;
+  --text-body: 0.9375rem; /* 15px — item titles */
+  --text-body--line-height: 1.6;
 
-  --text-body-lg: 1.0625rem; /* 17px — intros, card titles */
+  --text-body-lg: 1rem; /* 16px — section intros */
   --text-body-lg--line-height: 1.6;
 
-  --text-subheading: 1.25rem; /* 20px — feature card titles */
-  --text-subheading--line-height: 1.3;
+  --text-subheading: 1.125rem; /* 18px — hero intro */
+  --text-subheading--line-height: 1.6;
 
-  --text-stat: 2.25rem; /* 36px — the ethos stat numbers */
+  /* The privacy zeros, set in mono. */
+  --text-stat: clamp(2.25rem, 1.5rem + 3.2vw, 3.75rem); /* 36→60px */
   --text-stat--line-height: 1;
+  --text-stat--font-weight: 500;
 
-  --text-heading: clamp(2rem, 1.55rem + 2.2vw, 2.5rem); /* 32→40px — h2 */
-  --text-heading--line-height: 1.15;
-  --text-heading--font-weight: 500;
+  --text-heading: clamp(1.875rem, 1.45rem + 1.8vw, 2.6rem); /* 30→42px — h2 */
+  --text-heading--line-height: 1.08;
+  --text-heading--letter-spacing: -0.03em;
+  --text-heading--font-weight: 600;
 
-  /* Hero display: large, semibold, near-neutral tracking. */
-  --text-display: clamp(2.75rem, 2.1rem + 3.4vw, 4rem); /* 44→64px — hero h1 */
-  --text-display--line-height: 1.06;
-  --text-display--letter-spacing: -0.01em;
+  /* The hero palette scales with the viewport, so it reads like the real app. */
+  --text-demo-query: clamp(1.125rem, 0.85rem + 1.1vw, 1.75rem);
+  --text-demo-query--line-height: 1.3;
+  --text-demo-row: clamp(0.9375rem, 0.82rem + 0.45vw, 1.1875rem);
+  --text-demo-row--line-height: 1.4;
+
+  --text-closing: clamp(2.25rem, 1.5rem + 3.2vw, 3.75rem); /* 36→60px */
+  --text-closing--line-height: 1.04;
+  --text-closing--letter-spacing: -0.04em;
+  --text-closing--font-weight: 600;
+
+  --text-display: clamp(2.6rem, 1.6rem + 4.2vw, 4.5rem); /* 42→72px — hero h1 */
+  --text-display--line-height: 1.04;
+  --text-display--letter-spacing: -0.045em;
   --text-display--font-weight: 600;
 
   /* Spacing & radius use Tailwind's built-in scales — the 8px grid maps
@@ -194,8 +201,12 @@
   --shadow-highlight: var(--tc-highlight);
   /* A pressed chip — the "comes across" and ethos value pills. */
   --shadow-keycap: var(--tc-keycap);
-  /* Lift under the neutral filled CTA. */
-  --shadow-cta: var(--tc-cta);
+  /* The demo palette floats on the brand gradient, so its drop is deep in both themes. */
+  --shadow-palette:
+    rgb(255 255 255 / 0.12) 0px 1px 0px 0px inset, rgb(0 0 0 / 0.16) 0 1px 2px,
+    rgb(0 0 0 / 0.18) 0 8px 16px -4px, rgb(0 0 0 / 0.36) 0 32px 64px -16px;
+  /* A keycap: hairline plus a 1.5px floor, so it reads as pressable. */
+  --shadow-cap: 0 1.5px 0 var(--tc-border);
   /* The app screenshot: key treatment plus a deep ambient drop. */
   --shadow-window: var(--tc-window);
 }
@@ -248,9 +259,9 @@
     text-wrap: balance;
   }
 
-  /* Anchor targets land below the floating nav instead of underneath it. */
+  /* Anchor targets land below the sticky header instead of underneath it. */
   section[id] {
-    scroll-margin-top: 6rem;
+    scroll-margin-top: 3.5rem;
   }
 }
 
@@ -283,82 +294,167 @@
   }
 }
 
-/* Hero atmosphere — the one place the austere system allows color to bloom.
-   Kept in CSS so the gradients derive from the brand color tokens above. */
+/* Brand surfaces — the only places colour blooms. Kept in CSS so the
+   gradients derive from the brand color tokens above. */
 @layer components {
-  .hero-glow-violet,
-  .hero-glow-cyan {
-    position: absolute;
-    border-radius: 50%;
-    translate: -50% 0;
+  /* A dot grid that fades out from the top, so the hero has texture without noise. */
+  .bg-dots {
+    background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+    background-size: 24px 24px;
+    mask-image: radial-gradient(75% 55% at 50% 0%, #000 25%, transparent 78%);
   }
 
-  .hero-glow-violet {
-    left: 50%;
-    top: -10%;
-    width: 51.25rem;
-    height: 32.5rem;
-    filter: blur(110px);
-    background: radial-gradient(
-      closest-side,
-      color-mix(
-        in srgb,
-        var(--color-violet) calc(var(--tc-glow-violet) * 100%),
-        transparent
-      ),
-      color-mix(in srgb, var(--color-violet-deep) 10%, transparent),
-      transparent
+  /* The backdrop the demo palette sits on. Literal in both themes: it stands in
+     for a desktop picture, which has no light mode. */
+  .bg-brand-gradient {
+    background-image: linear-gradient(
+      150deg,
+      var(--color-violet),
+      var(--color-cyan)
     );
   }
 
-  .hero-glow-cyan {
-    left: 18%;
-    top: 24%;
-    width: 26.25rem;
-    height: 17.5rem;
-    filter: blur(100px);
-    background: radial-gradient(
-      closest-side,
-      color-mix(
-        in srgb,
-        var(--color-cyan) calc(var(--tc-glow-cyan) * 100%),
-        transparent
-      ),
-      transparent
-    );
+  /* Transparent over the hero, glass once the page moves. Browsers without
+     scroll timelines, and reduced motion, skip the fade and keep the glass. */
+  .header-veil {
+    background-color: color-mix(in srgb, var(--color-canvas) 78%, transparent);
+    backdrop-filter: blur(20px) saturate(1.4);
   }
 
-  .hero-fade {
+  @supports (animation-timeline: scroll()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .header-veil {
+        animation: header-veil linear both;
+        animation-timeline: scroll();
+        animation-range: 0 96px;
+      }
+    }
+  }
+
+  /* The demo's text caret. */
+  .demo-caret {
+    animation: caret-blink 1.05s steps(1) infinite;
+  }
+
+  /* Result rows melt in one after another once a query finishes typing. */
+  .demo-row {
+    animation: demo-row 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* ── Glass demo ────────────────────────────────────────────────────────
+     The hero's palette as macOS draws it: frosted material that blurs and
+     saturates the page behind it, with a hairline edge and a lit top. It
+     follows the theme the way Spotlight follows the system appearance. */
+  .glass-palette {
+    --glass-fill: rgb(246 246 248 / 0.62);
+    --glass-glint: rgb(255 255 255 / 0.7);
+    --glass-sheen: rgb(255 255 255 / 0.5);
+    --glass-edge-top: rgb(255 255 255 / 0.95);
+    --glass-edge-ring: rgb(255 255 255 / 0.35);
+    --glass-outline: rgb(0 0 0 / 0.1);
+    --glass-rim: rgb(255 255 255 / 1);
+    --glass-rim-far: rgb(255 255 255 / 0.5);
+    --glass-shadow: rgb(0 0 0 / 0.2);
+    --glass-grain: 0.09;
+    --glass-chip: rgb(0 0 0 / 0.06);
+    --glass-chip-soft: rgb(0 0 0 / 0.03);
+    --glass-key-border: rgb(0 0 0 / 0.14);
+    --glass-fg: #1d1d1f;
+    --glass-fg-muted: rgb(29 29 31 / 0.62);
+    --glass-fg-subtle: rgb(29 29 31 / 0.42);
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 90% at 0% 0%, var(--glass-glint), transparent 55%),
+      linear-gradient(180deg, var(--glass-sheen), transparent 38%),
+      var(--glass-fill);
+    backdrop-filter: blur(20px) saturate(1.8);
+    box-shadow:
+      inset 0 1px 0 var(--glass-edge-top),
+      inset 0 0 0 1px var(--glass-edge-ring),
+      0 0 0 1px var(--glass-outline),
+      0 2px 6px rgb(0 0 0 / 0.04),
+      0 36px 90px -30px var(--glass-shadow);
+  }
+
+  .dark .glass-palette {
+    --glass-fill: rgb(38 38 42 / 0.5);
+    --glass-glint: rgb(255 255 255 / 0.09);
+    --glass-sheen: rgb(255 255 255 / 0.05);
+    --glass-edge-top: rgb(255 255 255 / 0.13);
+    --glass-edge-ring: rgb(255 255 255 / 0.04);
+    --glass-outline: rgb(0 0 0 / 0.6);
+    --glass-rim: rgb(255 255 255 / 0.32);
+    --glass-rim-far: rgb(255 255 255 / 0.1);
+    --glass-shadow: rgb(0 0 0 / 0.75);
+    --glass-grain: 0.14;
+    --glass-chip: rgb(255 255 255 / 0.09);
+    --glass-chip-soft: rgb(255 255 255 / 0.045);
+    --glass-key-border: rgb(255 255 255 / 0.2);
+    --glass-fg: #f5f5f7;
+    --glass-fg-muted: rgb(245 245 247 / 0.62);
+    --glass-fg-subtle: rgb(245 245 247 / 0.42);
+  }
+
+  /* The frost: a fine grain inside the glass, as the real material has. */
+  .glass-grain {
     position: absolute;
     inset: 0;
-    opacity: 0.5;
+    z-index: -1;
+    opacity: var(--glass-grain);
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* The rim: a 1px gradient border, brightest where light would catch the
+     top-left corner and again, fainter, at the bottom-right. */
+  .glass-palette::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
     background: linear-gradient(
-      to bottom,
-      transparent,
-      var(--color-canvas) 78%
+      140deg,
+      var(--glass-rim),
+      transparent 30%,
+      transparent 70%,
+      var(--glass-rim-far)
     );
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
   }
 
-  /* Mobile nav drawer — the grid-rows trick, so height: auto animates. */
-  .nav-drawer {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  /* The page's own dot grid behind the palette, fading out past its edges, so
+     the frosted glass has real texture to blur. */
+  .glass-backing {
+    position: absolute;
+    inset: -3rem;
+    z-index: -1;
+    background-image: radial-gradient(
+      color-mix(in srgb, var(--color-fg) 30%, transparent) 2px,
+      transparent 2.5px
+    );
+    background-size: 22px 22px;
+    mask-image: radial-gradient(closest-side, #000 55%, transparent);
+    pointer-events: none;
   }
 
-  .nav-drawer > div {
-    overflow: hidden;
-    opacity: 0;
-    transition: opacity 0.25s ease;
+  .glass-chip {
+    background-color: var(--glass-chip);
+    box-shadow:
+      inset 0 1px 0 var(--glass-edge-top),
+      inset 0 0 0 1px var(--glass-edge-ring);
   }
 
-  .nav-drawer[data-open="true"] {
-    grid-template-rows: 1fr;
-  }
-
-  .nav-drawer[data-open="true"] > div {
-    opacity: 1;
-    transition-delay: 0.08s;
+  /* The scene chip's timer bar, so a viewer can see when the demo moves on. */
+  .demo-progress {
+    transform-origin: left;
+    animation: demo-progress linear both;
   }
 
   /* A keyboard key. One complete rule rather than a stack of utilities: the
@@ -372,7 +468,7 @@
      own. Centring with flex throws that baseline away and needs a
      vertical-align nudge that is wrong at every other font size.
 
-     The font is the UI sans stack on purpose. ⌘ ⇧ ⌥ ⌃ ⌫ ⎋ ⇥ exist in the
+     The font is the UI sans stack on purpose. ⌘ ⇧ ⌥ ⌃ and the arrows exist in the
      system UI font on every platform and in no monospace face, so asking for
      mono here is what left some keys blank or drawn tiny. */
   .tc-key {
@@ -398,20 +494,6 @@
 
   .tc-key + .tc-key {
     margin-inline-start: 0.25em;
-  }
-
-  /* Scroll-triggered rise — driven by the <Reveal> component. */
-  .reveal {
-    opacity: 0;
-    translate: 0 1.25rem;
-    transition:
-      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-      translate 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .reveal-shown {
-    opacity: 1;
-    translate: 0 0;
   }
 }
 
@@ -454,6 +536,35 @@
   animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+@keyframes header-veil {
+  from {
+    background-color: transparent;
+  }
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes demo-row {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+    filter: blur(8px);
+  }
+}
+
+@keyframes demo-progress {
+  from {
+    scale: 0 1;
+  }
+  to {
+    scale: 1 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -465,9 +576,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-  .rise,
-  .reveal {
+  .rise {
     opacity: 1;
-    translate: 0 0;
+  }
+  .demo-caret {
+    animation: none;
   }
 }

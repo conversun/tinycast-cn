@@ -31,7 +31,12 @@ final class VisibilityStore {
 
     /// Whether the entry appears in the launcher: its category and the item itself must be on.
     func isVisible(_ entry: AppEntry) -> Bool {
-        isKindEnabled(entry.kind) && isItemVisible(entry)
+        isCategoryEnabled(entry) && isItemVisible(entry)
+    }
+
+    /// An entry a feature pane owns answers to that feature's switch, so no category gates it.
+    private func isCategoryEnabled(_ entry: AppEntry) -> Bool {
+        entry.settingsOwner != nil || isKindEnabled(entry.kind)
     }
 
     func isItemVisible(_ entry: AppEntry) -> Bool {
@@ -70,9 +75,9 @@ final class VisibilityStore {
         case .app: isKindEnabled(.application)
         case .settingsPane: isKindEnabled(.systemSettings)
         case .systemAction: isKindEnabled(.systemAction)
-        case .command: isKindEnabled(.command)
-        case .togglePalette, .customCommand, .windowCommand, .windowLayout, .quicklink,
-            .extensionCommand:
+        case .command(let id): id.owner == nil ? isKindEnabled(.command) : true
+        case .togglePalette, .quickAction, .customCommand, .windowCommand, .windowLayout,
+            .quicklink, .extensionCommand:
             true
         }
     }

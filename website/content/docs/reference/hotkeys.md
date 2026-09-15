@@ -3,114 +3,124 @@ title: Hotkeys
 description: Recording global shortcuts, double-tap modifiers, and the Hyper key.
 ---
 
-**Tinycast ships with nothing bound.** Every shortcut is one you record.
+**Tinycast ships with nothing bound.** Every global shortcut is one you record.
 
-## What can take a shortcut
+## What can have a shortcut
 
-- The palette itself (**App Launcher**)
-- The built-in commands: Search Files, Clipboard History, Search Emoji & Symbols, Open Camera,
-  Show Notes, Create Note, Search Notes
-- Every application, and every System Settings pane
-- Every quicklink, custom command and extension command
+- The palette itself (**App Launcher**, in Settings → General)
+- Every built-in command, except Open in Browser, Run Shell Command and Quit Tinycast. See
+  [Commands](/docs/launcher/commands).
+- Every app, and every System Settings pane
+- Every quicklink, custom command, custom Quick Action and extension command
 - All 31 [system actions](/docs/launcher/system-actions)
-- All 30 [window commands](/docs/features/window-management)
+- All 35 [window commands](/docs/features/window-management), and every
+  [window layout](/docs/features/window-layouts)
 
-A built-in command's shortcut appears in two panes — Settings → Commands and its own feature pane —
-but it is **one binding, not two settings**.
+Each shortcut is recorded on the item's row in its Settings pane, and shows as keycaps on its
+launcher row.
+
+A command that opens a screen is a toggle. Press its shortcut once to open the screen, and again to
+close it.
 
 ## Recording one
 
-The recorder is not a focusable control. Click it, then press the combination you want.
+The recorder is not a normal text field. Click it, then press the keys you want.
 
-A callout above the field shows the prompt, then your held modifiers live, then a conflict message
-if the chord is taken — naming the action that owns it, exactly as that action's own row does.
+A small bubble above the field shows the prompt, then the modifiers you are holding, then a warning if
+the shortcut is already taken, naming exactly what uses it.
 
-Recording needs **no permission and no event tap**. Only _using_ certain kinds of binding does.
+Recording needs **no permission**. Only _using_ some kinds of shortcut does.
 
 ## Double-tap modifiers
 
-Any action can be bound to a double-tapped lone <kbd>⌃</kbd>, <kbd>⌥</kbd>, <kbd>⇧</kbd> or
+Any shortcut can instead be a double tap of one lone <kbd>⌃</kbd>, <kbd>⌥</kbd>, <kbd>⇧</kbd> or
 <kbd>⌘</kbd>.
 
 The exact rules:
 
-- A **tap** is a press from no modifiers held, exactly one of the four, no <kbd>fn</kbd>, no other
-  key and no mouse click, released within **250 ms**.
-- A **double-tap** is a second tap of the same modifier starting within **300 ms** of the first
-  release.
-- **It fires on the second release, not the second press** — so the modifier is already up when the
-  action runs, and "double-tap and hold" is deliberately a non-event.
+- A **tap** is a press of exactly one of those four keys, with nothing else held, no other key and no
+  click, released within **250 ms**.
+- A **double tap** is a second tap of the same key starting within **300 ms** of the first release.
+- **It fires when you let go the second time, not when you press.** The key is already up when the
+  action runs, and "double-tap and hold" does nothing on purpose.
 
-<kbd>⇧</kbd> is bindable this way even though a bare <kbd>⇧</kbd> combo is rejected. Caps Lock is not
-eligible — that is what the Hyper key is for. Caps Lock being _on_ does not disqualify taps.
+<kbd>⇧</kbd> works as a double tap, even though <kbd>⇧</kbd> alone cannot be a normal shortcut. Caps
+Lock cannot be used this way; that is what the Hyper key is for. Having Caps Lock _on_ does not get in
+the way.
 
-This needs [Accessibility](/docs/permissions), and **never prompts for it**. The binding records
-regardless, the recorder shows an inline warning that opens System Settings, and the listener
-installs the moment the grant lands.
+This needs [Accessibility](/docs/permissions), and **never asks for it on its own**. The shortcut is
+saved anyway, the recorder shows a warning that opens System Settings, and the shortcut starts working
+the moment you grant access.
 
-The event tap is installed **only while something is bound to a double-tap**, so if you never use
-one, you pay nothing.
+Tinycast only watches for double taps **while at least one shortcut uses one**, so if you never do,
+it costs nothing.
 
 ## Hyper key
 
 **Settings → General → Hyper Key** turns one physical key into <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd>,
 or <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⇧</kbd><kbd>⌘</kbd> with **Include Shift** on.
 
-Candidates: **Caps Lock**, **Right Control**, **Right Shift**, **Right Option**, **Right Command**.
+You can choose **Caps Lock**, **Right Control**, **Right Shift**, **Right Option** or
+**Right Command**.
 
-Function keys are deliberately not offered — the top-row media functions fire below the level this
-works at, so binding F1 would still dim the display.
+Function keys are not offered. Their media functions fire before Tinycast can see them, so turning F1
+into Hyper would still dim your screen.
 
-Existing combo hotkeys fire from Hyper + key with no extra registration.
+Shortcuts you already use with those modifiers work with Hyper right away.
 
-### The ✦ notation
+### The ✦ symbol
 
-**Any combo whose modifiers are a superset of the Hyper chord renders as a single ✦.** So
-<kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> shows as `✦G`, and `✦⇧G` when a modifier survives.
+**Any shortcut that includes all the Hyper modifiers shows as a single ✦.** So
+<kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> shows as `✦G`, or `✦⇧G` when an extra modifier is
+left over.
 
-This is notation, not a preference — there is no toggle. With no Hyper key configured, a literal
-<kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> renders as itself.
+This is simply how it is written, not a setting. With no Hyper key set,
+<kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> shows as itself.
 
 ### Include Shift
 
-Flipping this **re-points every stored combo**, so nothing breaks. A re-point that would collide with
-another action's chord is skipped, and that row keeps its literal keycaps.
+Switching this **updates every saved shortcut**, so nothing breaks. If an update would clash with
+another shortcut, that one is skipped and keeps its original keys.
 
-The row is disabled while Hyper Key is None.
+The option is greyed out while Hyper Key is set to None.
 
 ### Quick Press
 
-**Settings → General → Quick Press** decides what a Hyper key press with no other key does:
-**Does Nothing** (default), the original key, or **Trigger Escape**.
+**Settings → General → Quick Press** decides what pressing the Hyper key on its own does:
+**Does Nothing** (default), the key's original job, or **Trigger Escape**.
 
-Escape is the popular choice for Caps Lock users.
+Escape is the favorite choice for Caps Lock users.
 
-### Caps Lock specifics
+### Caps Lock details
 
-While Caps Lock serves as Hyper it is remapped at the hardware level. That is cleared when you unbind
-it and when Tinycast quits, and it never survives a reboot.
+While Caps Lock is your Hyper key, it is remapped at the hardware level. The remap is removed when you
+pick another key, when Tinycast quits, and it never survives a restart.
 
-During the brief moment before the remap takes hold, the Caps Lock LED can still toggle. That is
-hardware behaviour, not something Tinycast can prevent.
+In the brief moment before the remap takes hold, the Caps Lock light can still switch. That is the
+hardware, not something Tinycast can stop.
 
-Hyper needs Accessibility and never prompts. A watchdog retries installation until the grant lands,
-notices revocation, revives a tap macOS has disabled, and clears a stuck key. On fast user switching
-it stops until the session is active again.
+Hyper needs Accessibility and never asks for it on its own. Tinycast keeps checking, starts working as
+soon as access is granted, notices if access is removed, and clears a key that looks stuck. When you
+switch to another user, it pauses until you are back.
 
-## Enabled, hidden and disabled
+## Hidden, switched off, and turned off
 
-**Hiding a launcher row does not disable its shortcut.** Hiding changes what search shows.
+**Hiding a row does not turn off its shortcut.** Unticking a row's checkbox, or
+<kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd> in the launcher, only changes what search shows.
 
-**Disabling a feature does disable its shortcuts.** File Search, Notes, window commands, quicklinks,
-custom commands and system actions all re-check their feature switch before running, so a registered
-shortcut for a disabled feature does nothing.
+**A section's switch does turn off its shortcuts.** **Enable Applications**, **Enable System
+Settings**, **Enable System Actions** and **Enable Commands** each stop every shortcut in their pane.
 
-A [system action's confirmation](/docs/launcher/system-actions#confirmation) applies to its hotkey
+**Turning a feature off turns off its shortcuts.** File Search, Notes, AI, Quick Actions, Navigation,
+Calendar, window commands, quicklinks, custom commands and extensions all check their switch before
+doing anything. Turn the feature back on and your shortcuts work again.
+
+A [system action's confirmation](/docs/launcher/system-actions#confirmation) comes up for its shortcut
 exactly as it does in the palette.
 
-## Lifecycle
+## Keeping them
 
-Bindings are carried in [settings backups](/docs/reference/backup), but only export → import within
-one build is guaranteed to round-trip.
+Shortcuts are included in [backups](/docs/reference/backup), except for custom Quick Actions.
 
-Bindings for items deleted while Tinycast was not running are pruned at launch.
+Shortcuts for things you deleted while Tinycast was not running are cleaned up the next time it
+starts.

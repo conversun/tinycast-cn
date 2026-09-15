@@ -1,107 +1,91 @@
 ---
 title: Settings
-description: Every setting, its default, and the pane it lives in.
+description: Every Settings pane, what it holds, and its defaults.
 ---
 
-Settings opens with <kbd>⌘</kbd><kbd>,</kbd> from the palette, or the **Settings** command. It is a
-normal resizable window, and each pane is a standard macOS form.
+Open Settings with <kbd>⌘</kbd><kbd>,</kbd> from the palette, the **Settings** command, or the menu bar
+icon. It is a normal, resizable window.
 
-Sixteen panes in four groups.
+**The search field finds any setting by name**, and also by words that are not in its title: `ocr`
+finds **Search text in images and PDFs**, and `caps lock` finds **Hyper Key**. Picking a result jumps
+straight to that row.
+
+There are 21 panes in four groups.
 
 ## General
 
-### Global Shortcuts
+### General
 
 | Setting      | Default  |
 | ------------ | -------- |
 | App Launcher | **None** |
 
-### Search
+| Setting                           | Options                                                                       | Default                           |
+| --------------------------------- | ----------------------------------------------------------------------------- | --------------------------------- |
+| Learned ranking                   | **Reset…** clears everything learned                                          | —                                 |
+| Hyper Key                         | None · Caps Lock · Right Control · Right Shift · Right Option · Right Command | **None**                          |
+| Quick Press                       | Does Nothing · the original key · Trigger Escape                              | **Does Nothing**                  |
+| Include Shift (⇧)                 | On · Off                                                                      | **On**                            |
+| Theme                             | System · Light · Dark                                                         | **System**                        |
+| Interface size                    | Default · Large · Larger                                                      | **Default**                       |
+| Background transparency           | Less to More, with Reset                                                      | Middle                            |
+| Compact mode                      | On · Off                                                                      | Off                               |
+| Show favorites in compact mode    | On · Off                                                                      | **On**                            |
+| Follow the cursor across displays | On · Off                                                                      | **On**                            |
+| Drag to reposition                | On · Off                                                                      | Off                               |
+| Launch at login                   | On · Off                                                                      | Off                               |
+| Show in menu bar                  | On · Off                                                                      | **On**                            |
+| Pop to Root Search                | Immediately · After 5, 15, 30, 60 or 90 seconds                               | **Immediately**                   |
+| Escape Key Behavior               | Navigate back or close window · Close window and pop to root                  | **Navigate back or close window** |
+| Auto-switch input source          | None, or any keyboard input source you have                                   | **None**                          |
 
-| Setting                 |                                                                                     |
-| ----------------------- | ----------------------------------------------------------------------------------- |
-| Learned ranking → Reset | Clears every learned choice. See [learned ranking](/docs/launcher#learned-ranking)  |
-| Search Scopes           | Folders indexed for applications. See [search scopes](/docs/launcher#search-scopes) |
+See [The palette](/docs/palette), [Learned ranking](/docs/launcher#learned-ranking) and
+[Hotkeys](/docs/reference/hotkeys#hyper-key).
 
-### Hyper Key
+### Permissions
 
-| Setting           | Options                                                                       | Default          |
-| ----------------- | ----------------------------------------------------------------------------- | ---------------- |
-| Hyper Key         | None · Caps Lock · Right Control · Right Shift · Right Option · Right Command | **None**         |
-| Quick Press       | Does Nothing · the original key · Trigger Escape                              | **Does Nothing** |
-| Include Shift (⇧) | —                                                                             | **On**           |
+Shows whether **Accessibility** and **Calendars** are granted, and opens the right System Settings
+pane. See [Permissions](/docs/permissions).
 
-See [Hotkeys](/docs/reference/hotkeys#hyper-key).
+## Launcher
 
-### Appearance
+| Pane            | What is in it                                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------------------------------- |
+| Applications    | [Search Scopes](/docs/launcher#search-scopes), **Enable Applications**, and a row per app                       |
+| System Settings | **Enable System Settings**, and a row per pane                                                                  |
+| System Actions  | **Enable System Actions**, and a row per action                                                                 |
+| Commands        | **Enable Commands**, a row per built-in command, and [Custom Commands](/docs/launcher/commands#custom-commands) |
+| Quicklinks      | [Quicklinks](/docs/launcher/quicklinks) switch, its commands, behavior, import and export                       |
+| Fallbacks       | Which [fallbacks](/docs/launcher/fallbacks) show under a search, and their order                                |
 
-| Setting                           | Options               | Default    |
-| --------------------------------- | --------------------- | ---------- |
-| Theme                             | System · Light · Dark | **System** |
-| Compact mode                      | —                     | Off        |
-| Show favorites in compact mode    | —                     | On         |
-| Follow the cursor across displays | —                     | **On**     |
-| Drag to reposition                | —                     | Off        |
+A row usually has a launcher checkbox, a shortcut recorder and an [alias](/docs/launcher/aliases)
+field. Long lists have a filter field.
 
-### General
+The **Enable …** switch at the top of a pane turns off every row **and** every shortcut in it. A row's
+checkbox only hides that row from search.
 
-| Setting                  | Options                                     | Default         |
-| ------------------------ | ------------------------------------------- | --------------- |
-| Launch at login          | —                                           | Off             |
-| Show in menu bar         | —                                           | **On**          |
-| Pop to Root Search       | Immediately · 5 · 15 · 30 · 60 · 90 seconds | **Immediately** |
-| Escape Key Behavior      | Navigate back or close window · Close window and pop to root | **Navigate back or close window** |
-| Auto-switch input source | None, plus every enabled keyboard source    | **None**        |
+## Features
 
-Shortcuts keep working with the menu-bar icon hidden.
+Everything here ships **off**, except Clipboard and Emoji & Symbols.
 
-## Permissions
-
-Shows the Accessibility status and opens the right System Settings pane. See
-[Permissions](/docs/permissions).
-
-## Launcher panes
-
-**Applications** · **System Settings** · **System Actions** · **Commands** · **Quicklinks**
-
-Each is a list with a **Show in launcher** master toggle and, per row, a visibility checkbox, a
-shortcut recorder and an [alias](/docs/launcher/aliases) field. Longer lists have a filter field.
-
-**Commands** additionally holds the [Custom Commands](/docs/launcher/commands#custom-commands)
-switch, and **Quicklinks** holds the [Quicklinks](/docs/launcher/quicklinks) switch.
-
-## Feature panes
-
-Seven features, all off by default.
-
-| Pane                                                  | Switch                   | Other settings                                                              |
-| ----------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------- |
-| [File Search](/docs/features/file-search)             | Enable File Search       | Search Scopes, Ignore Patterns                                              |
-| [Notes](/docs/features/notes)                         | Enable Notes             | Per-command visibility and shortcut                                         |
-| [Snippets](/docs/features/snippets)                   | Enable snippets          | Show in launcher, New Snippet, Snippets Folder                              |
-| [Window Management](/docs/features/window-management) | Enable window management | Show in launcher, Cycle sizes on repeat, Gap (0–64 pt, default 0)           |
-| [Clipboard](/docs/features/clipboard)                 | _(always on)_            | Keep history for (**3 Months**), Disabled Applications, Clear history       |
-| [Emoji & Symbols](/docs/features/emoji)               | _(always on)_            | Emoji Skin Tone (**Default**)                                               |
-| [Extensions](/docs/extensions)                        | Enable extensions        | Show in launcher, package manager, registries, custom search paths, Storage |
-
-Clipboard and Emoji have no feature switch — they are part of the palette itself.
+| Pane                                                  | Switch                            | Other settings                                                                                                                                                                                                                                |
+| ----------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [AI](/docs/ai)                                        | Enable AI                         | Providers, Default model, Reasoning effort, Web search, Opens to, Start a new conversation after, Keep conversations, System prompt, [MCP servers](/docs/ai/mcp), AI commands                                                                 |
+| [Quick Actions](/docs/ai/quick-actions)               | Enable Quick Actions              | Actions (Replace or Preview, shortcut, prompt), Add Quick Action, Model, Translate to                                                                                                                                                         |
+| [File Search](/docs/features/file-search)             | Enable File Search                | Commands, Search Scopes, Ignore Patterns                                                                                                                                                                                                      |
+| [Notes](/docs/features/notes)                         | Enable Notes                      | Notes commands                                                                                                                                                                                                                                |
+| [Snippets](/docs/features/snippets)                   | Enable snippets                   | Show in launcher, snippet commands, New Snippet, Snippets Folder                                                                                                                                                                              |
+| [Navigation](/docs/features/navigation)               | Enable navigation                 | Commands, Show Apple menu items (**Off**), Disabled Applications                                                                                                                                                                              |
+| [Window Management](/docs/features/window-management) | Enable window management          | Show in launcher, Cycling (**None**), Gap between windows (**0**), window commands, [Window Layouts](/docs/features/window-layouts)                                                                                                           |
+| [Clipboard](/docs/features/clipboard)                 | Enable Clipboard History (**On**) | Clipboard commands, Keep history for (**3 Months**), Search text in images and PDFs (**Off**), Default action (**Paste**), Disabled Applications, Clear history                                                                               |
+| [Emoji & Symbols](/docs/features/emoji)               | _(always on)_                     | Emoji commands, Emoji Skin Tone (**Default**)                                                                                                                                                                                                 |
+| [Calendar](/docs/features/calendar)                   | Join meetings from Tinycast       | Show in launcher, Upcoming meetings in launcher (**3 next**), Include Tomorrow's Events (**On**), Show the join card (**5 minutes**), Auto Join Meetings (**Off**), Camera Preview (**Off**), menu bar settings, Calendar commands, Calendars |
+| [Extensions](/docs/extensions)                        | Enable extensions                 | Show in launcher, Compatibility, installed extensions, Install, Registries, Package manager, Storage                                                                                                                                          |
 
 ## Advanced
 
-**Backup** — export and import Tinycast settings, and
-[import from Raycast](/docs/reference/import-from-raycast). See
-[Backup](/docs/reference/backup).
+**Backup.** Export a backup, import one, or
+[import from Raycast](/docs/reference/import-from-raycast). See [Backup & restore](/docs/reference/backup).
 
-**About** — version, license and links.
-
-## What is never in a backup
-
-| Excluded                                                   | Why                                   |
-| ---------------------------------------------------------- | ------------------------------------- |
-| `snippetsEnabled`                                          | It is consent to keystroke matching   |
-| `extensionsEnabled`                                        | It is consent to run third-party code |
-| Extension registries, package manager, custom search paths | Machine-specific                      |
-| Palette position                                           | Machine-specific geometry             |
-| Per-snippet confirmation flags                             | —                                     |
-
-**A backup can never grant a capability.** That is a deliberate security control, not an oversight.
+**About.** Version, license, **Check for Updates**, links to the project, and **Support**. See
+[Updates](/docs/reference/updates).

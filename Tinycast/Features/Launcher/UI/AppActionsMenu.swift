@@ -15,7 +15,8 @@ enum AppActionsMenu {
 
     static func content(
         app: AppEntry, searchQuery: String, core: AppCore, running: Bool,
-        favorites: FavoriteActions, onResetRanking: @escaping () -> Void
+        favorites: FavoriteActions, onResetRanking: @escaping () -> Void,
+        onHideFromSearch: @escaping () -> Void
     ) -> PopoverMenuContent {
         var items: [PopoverMenuItem] = [
             PopoverMenuItem(
@@ -23,13 +24,20 @@ enum AppActionsMenu {
                 shortcut: "↵"
             ) { core.launcherCoordinator.launch(app, searchQuery: searchQuery) }
         ]
-        // A query-driven row lives only for its query, so pinning it would favorite nothing.
-        if !CommandCatalog.isQueryDriven(app) {
+        if app.canRevealInFinder {
+            items.append(
+                PopoverMenuItem(title: "Show in Finder", systemImage: "folder", shortcut: "⌘↵") {
+                    core.launcherCoordinator.showInFinder(app)
+                })
+        }
+        // A query-driven row lives only for its query, so no preference could outlive it.
+        let isPersistent = !CommandCatalog.isQueryDriven(app)
+        if isPersistent {
             items.append(
                 PopoverMenuItem(
                     title: favorites.isFavorite ? "Remove from Favorites" : "Add to Favorites",
-                    systemImage: favorites.isFavorite ? "star.slash" : "star", shortcut: "⇧⌘F",
-                    action: favorites.toggle))
+                    systemImage: favorites.isFavorite ? "star.slash" : "star", startsSection: true,
+                    shortcut: "⇧⌘F", action: favorites.toggle))
         }
         if favorites.canMoveUp {
             items.append(
@@ -53,18 +61,17 @@ enum AppActionsMenu {
                     onResetRanking()
                 })
         }
-        if app.canRevealInFinder {
+        if isPersistent, app.canHideFromSearch {
             items.append(
                 PopoverMenuItem(
-                    title: "Show in Finder", systemImage: "folder", shortcut: "⌘↵"
-                ) {
-                    core.launcherCoordinator.showInFinder(app)
-                })
+                    title: "Hide from Search", systemImage: "eye.slash", shortcut: "⇧⌘H",
+                    action: onHideFromSearch))
         }
         if running, app.kind == .application {
             items.append(
                 PopoverMenuItem(
-                    title: "Restart Application", systemImage: "arrow.clockwise", shortcut: "⌘R"
+                    title: "Restart Application", systemImage: "arrow.clockwise", startsSection: true,
+                    shortcut: "⌘R"
                 ) {
                     core.launcherCoordinator.restart(app)
                 })
@@ -79,7 +86,8 @@ enum AppActionsMenu {
         if app.kind == .application {
             items.append(
                 PopoverMenuItem(
-                    title: "Uninstall Application", systemImage: "trash", isDestructive: true
+                    title: "Uninstall Application", systemImage: "trash", startsSection: true,
+                    isDestructive: true
                 ) {
                     core.uninstallCoordinator.beginUninstall(app)
                 })
@@ -90,7 +98,7 @@ enum AppActionsMenu {
                 items.append(
                     PopoverMenuItem(
                         title: enabled ? "Disable Background Refresh" : "Enable Background Refresh",
-                        systemImage: enabled ? "pause.circle" : "play.circle"
+                        systemImage: enabled ? "pause.circle" : "play.circle", startsSection: true
                     ) {
                         core.extensions.toggleBackgroundRefresh(for: app)
                     })
@@ -102,13 +110,13 @@ enum AppActionsMenu {
                 }
             }
             items.append(
-                PopoverMenuItem(title: "Configure Extension", systemImage: "slider.horizontal.3") {
+                PopoverMenuItem(
+                    title: "Configure Extension", systemImage: "slider.horizontal.3", startsSection: true
+                ) {
                     core.extensionCoordinator.showExtensionSettings(for: app)
                 })
             items.append(
-                PopoverMenuItem(
-                    title: "Uninstall Extension", systemImage: "trash", isDestructive: true
-                ) {
+                PopoverMenuItem(title: "Uninstall Extension", systemImage: "trash", isDestructive: true) {
                     core.extensionCoordinator.confirmUninstall(app)
                 })
         }

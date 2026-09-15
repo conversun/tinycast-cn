@@ -1,3 +1,4 @@
+import QuartzCore
 import SwiftUI
 
 /// Central design tokens; every dark colour is the literal the forced-dark build shipped.
@@ -129,6 +130,8 @@ enum Theme {
         static let menuRowSpacing: CGFloat = 1
         /// Stated, not measured: `viewportHeight` counts headers, so a capped menu lands on a row.
         static let menuSectionHeader: CGFloat = 16
+        /// Longer than a settings fade so a compact menu edge dissolves without a hard boundary.
+        static let menuOverflowFade: CGFloat = 30
         /// Six rows and half of the seventh, so a capped menu reads as scrollable, not clipped.
         static let menuVisibleRows: CGFloat = 6.5
         /// Rounded: a half-row of an odd pitch lands the glass edge on a half pixel.
@@ -154,13 +157,18 @@ enum Theme {
         static let clipboardMediaHeight: CGFloat = 260
         /// The preview pane is ~460pt wide, so 900px stays crisp at 2× without over-decoding.
         static let clipboardPreviewPixel: CGFloat = 900
-        /// Opening size and the resize floor; tall enough that the sidebar's rows never scroll.
-        static let settingsWindow = CGSize(width: 860, height: 700)
+        /// File search's preview stage: video's own shape, and enough height to read a page in.
+        static let previewAspectRatio: CGFloat = 16 / 9
+        /// Opening size and resize floor: the Quick Actions row's width, the sidebar's full height.
+        static let settingsWindow = CGSize(width: 900, height: 700)
         /// Settings sidebar: a fixed column, wide enough for "Window Management".
         static let settingsSidebar: CGFloat = 215
         /// The narrowest the pane column may get before a grouped row's control starts colliding.
         static let settingsDetailMinimum: CGFloat = 420
         static let settingsRowIcon: CGFloat = 20
+        static let paletteTransparencySlider: CGFloat = 190
+        /// One "Aa" segment of the Interface Size control; three sit in a grouped row's trailing slot.
+        static let interfaceSizeSegment: CGFloat = 40
         /// The sidebar's search field; matches a grouped `Form` row's control height.
         static let settingsSearchField: CGFloat = 28
         /// The layout editor. Height is stated so selecting an entry cannot resize the sheet.
@@ -183,8 +191,6 @@ enum Theme {
         static let layoutPositionCell: CGFloat = 34
         /// Settings editor modals (Custom Commands, Snippets): fixed width, intrinsic height.
         static let editorSheetWidth: CGFloat = 480
-        /// Label column of an extension's `Form`, so every field's input starts on one line.
-        static let formLabelWidth: CGFloat = 110
         /// The multi-line box inside those modals; it scrolls rather than grows the sheet.
         static let editorTextHeight: CGFloat = 120
         /// The argument prompt's field column, kept under the alert's natural width.
@@ -239,6 +245,20 @@ enum Theme {
         static let settingsFlashOut: TimeInterval = 0.6
     }
 
+    /// Motion owned by Tinycast's menus; extension-provided panels keep their own behavior.
+    @MainActor
+    enum MenuMotion {
+        static let entryScale: CGFloat = 0.94
+        static let maximumScale: CGFloat = 1.003
+        static let exitScaleDelta: CGFloat = 0.04
+        static let expansionDuration: TimeInterval = 0.14
+        static let settleDuration: TimeInterval = 0.08
+        static let exitDuration: TimeInterval = 0.18
+        static let expansionTiming = CAMediaTimingFunction(controlPoints: 0.2, 0.7, 0.2, 1)
+        static let settleTiming = CAMediaTimingFunction(controlPoints: 0.42, 0, 0.58, 1)
+        static let exitTiming = CAMediaTimingFunction(controlPoints: 0.4, 0, 1, 1)
+    }
+
     /// System text styles (not hardcoded sizes) so the UI honors Dynamic Type.
     enum Typography {
         /// One size, two frameworks: `TextTrailingDragHandle` measures what the field renders.
@@ -273,6 +293,8 @@ enum Theme {
         static let menuRow = Font.body
         static let menuShortcut = Font.callout
         static let menuIcon = Font.body
+        static let menuSymbolSize: CGFloat = 14
+        static let menuSymbolWeight = Font.Weight.medium
         static let noteTitle = Font.headline
     }
 
@@ -289,6 +311,31 @@ enum Theme {
 
         /// The ramp's inverse: the scrim darkens the dark surface and lightens the light one.
         static let panelScrim = adaptive(dark: .srgbInk(0, alpha: 0.40), light: .srgbInk(1, alpha: 0.55))
+
+        static func panelScrim(transparency: Int) -> Color {
+            guard transparency != 0 else { return panelScrim }
+            let amount = Double(max(-100, min(100, transparency))) / 100
+            func alpha(_ baseline: Double) -> Double {
+                amount > 0 ? baseline * (1 - amount) : baseline - (1 - baseline) * amount
+            }
+            return adaptive(
+                dark: .srgbInk(0, alpha: alpha(0.40)), light: .srgbInk(1, alpha: alpha(0.55)))
+        }
+
+        static func panelEdgeHighlight(transparency: Int) -> Color {
+            let amount = Double(max(-100, min(100, transparency))) / 100
+            let dark = amount > 0 ? 0.58 - amount * 0.20 : -amount * 0.04
+            let light = amount > 0 ? amount * 0.10 : -amount * 0.02
+            return adaptive(dark: .srgbInk(1, alpha: dark), light: .srgbInk(1, alpha: light))
+        }
+
+        static func panelEdgeGradient(transparency: Int) -> LinearGradient {
+            let highlight = panelEdgeHighlight(transparency: transparency)
+            return LinearGradient(
+                colors: [highlight, highlight.opacity(0.35), highlight.opacity(0.65)],
+                startPoint: .top, endPoint: .bottom)
+        }
+
         /// Selection fill, shared by every list so they look identical.
         static let selection = ramp(dark: 0.10, light: 0.09)
         /// Mouse hover: a fainter layer, visually distinct from selection.
@@ -303,6 +350,7 @@ enum Theme {
         static let textPrimary = ramp(dark: 1.0, light: 1.0)
         static let textSecondary = ramp(dark: 0.60, light: 0.60)
         static let textTertiary = ramp(dark: 0.40, light: 0.42)
+        static let menuSymbol = ramp(dark: 0.70, light: 0.70)
         static let noteText = ramp(dark: 0.90, light: 0.85)
         static let iconPlaceholder = ramp(dark: 0.06, light: 0.06)
         /// The faint wash behind the Onboarding header.

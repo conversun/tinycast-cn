@@ -11,14 +11,16 @@ enum CommandID: String, CaseIterable, Sendable {
     case clipboardHistory = "command:clipboard-history"
     case searchEmoji = "command:search-emoji"
     case searchFiles = "command:search-files"
+    case searchMenuItems = "command:search-menu-items"
+    case switchWindows = "command:switch-windows"
     case openCamera = "command:open-camera"
     case openInBrowser = "command:open-in-browser"
     case runShellCommand = "command:run-shell-command"
     case joinNextMeeting = "command:join-next-meeting"
-    case copyMeetingLink = "command:copy-meeting-link"
     case mySchedule = "command:my-schedule"
-    case openInCalendar = "command:open-in-calendar"
     case createEvent = "command:create-event"
+    case copyMeetingLink = "command:copy-meeting-link"
+    case openInCalendar = "command:open-in-calendar"
     case showNotes = "command:show-notes"
     case createNote = "command:create-note"
     case searchNotes = "command:search-notes"
@@ -26,10 +28,10 @@ enum CommandID: String, CaseIterable, Sendable {
     case captureWindowLayout = "command:capture-window-layout"
     case createQuicklink = "command:create-quicklink"
     case searchQuicklinks = "command:search-quicklinks"
-    case searchSnippets = "command:search-snippets"
-    case createSnippet = "command:create-snippet"
     case importQuicklinks = "command:import-quicklinks"
     case exportQuicklinks = "command:export-quicklinks"
+    case searchSnippets = "command:search-snippets"
+    case createSnippet = "command:create-snippet"
     case exportSettings = "command:export-settings"
     case importSettings = "command:import-settings"
     case importFromRaycast = "command:import-from-raycast"
@@ -46,22 +48,24 @@ enum CommandID: String, CaseIterable, Sendable {
     var untranslatedName: String {
         switch self {
         case .aiChat: return "AI Chat"
-        case .fixGrammar: return QuickAction.fixGrammar.title
-        case .rewrite: return QuickAction.rewrite.title
-        case .translate: return QuickAction.translate.title
-        case .summarize: return QuickAction.summarize.title
+        case .fixGrammar: return BuiltInQuickAction.fixGrammar.title
+        case .rewrite: return BuiltInQuickAction.rewrite.title
+        case .translate: return BuiltInQuickAction.translate.title
+        case .summarize: return BuiltInQuickAction.summarize.title
         case .calculatorHistory: return "Calculator History"
         case .clipboardHistory: return "Clipboard History"
         case .searchEmoji: return "Search Emoji & Symbols"
         case .searchFiles: return "Search Files"
+        case .searchMenuItems: return "Search Menu Bar Items"
+        case .switchWindows: return "Switch Windows"
         case .openCamera: return "Open Camera"
         case .openInBrowser: return "Open in Browser"
         case .runShellCommand: return "Run Shell Command"
         case .joinNextMeeting: return "Join Next Meeting"
-        case .copyMeetingLink: return "Copy Meeting Link"
         case .mySchedule: return "My Schedule"
-        case .openInCalendar: return "Open in Calendar"
         case .createEvent: return "Create Event"
+        case .copyMeetingLink: return "Copy Meeting Link"
+        case .openInCalendar: return "Open in Calendar"
         case .showNotes: return "Show Notes"
         case .createNote: return "Create Note"
         case .searchNotes: return "Search Notes"
@@ -69,10 +73,10 @@ enum CommandID: String, CaseIterable, Sendable {
         case .captureWindowLayout: return "Create Layout from Current Windows"
         case .createQuicklink: return "Create Quicklink"
         case .searchQuicklinks: return "Search Quicklinks"
-        case .searchSnippets: return "Search Snippets"
-        case .createSnippet: return "Create Snippet"
         case .importQuicklinks: return "Import Quicklinks"
         case .exportQuicklinks: return "Export Quicklinks"
+        case .searchSnippets: return "Search Snippets"
+        case .createSnippet: return "Create Snippet"
         case .exportSettings: return "Export Backup"
         case .importSettings: return "Import Backup"
         case .importFromRaycast: return "Import from Raycast"
@@ -87,22 +91,24 @@ enum CommandID: String, CaseIterable, Sendable {
     var sfSymbol: String {
         switch self {
         case .aiChat: return "sparkles"
-        case .fixGrammar: return QuickAction.fixGrammar.symbol
-        case .rewrite: return QuickAction.rewrite.symbol
-        case .translate: return QuickAction.translate.symbol
-        case .summarize: return QuickAction.summarize.symbol
+        case .fixGrammar: return BuiltInQuickAction.fixGrammar.symbol
+        case .rewrite: return BuiltInQuickAction.rewrite.symbol
+        case .translate: return BuiltInQuickAction.translate.symbol
+        case .summarize: return BuiltInQuickAction.summarize.symbol
         case .calculatorHistory: return "plus.forwardslash.minus"
         case .clipboardHistory: return "doc.on.clipboard"
         case .searchEmoji: return "face.smiling"
         case .searchFiles: return "doc.text.magnifyingglass"
+        case .searchMenuItems: return "menubar.rectangle"
+        case .switchWindows: return "macwindow.on.rectangle"
         case .openCamera: return "camera"
         case .openInBrowser: return "globe"
         case .runShellCommand: return "terminal"
         case .joinNextMeeting: return "video.fill"
-        case .copyMeetingLink: return "link"
         case .mySchedule: return "calendar"
-        case .openInCalendar: return "calendar.badge.clock"
         case .createEvent: return "calendar.badge.plus"
+        case .copyMeetingLink: return "link"
+        case .openInCalendar: return "calendar.badge.clock"
         case .showNotes: return "text.page"
         case .createNote: return "note.text.badge.plus"
         case .searchNotes: return "text.magnifyingglass"
@@ -110,10 +116,10 @@ enum CommandID: String, CaseIterable, Sendable {
         case .captureWindowLayout: return "macwindow.badge.plus"
         case .createQuicklink: return "link.badge.plus"
         case .searchQuicklinks: return Quicklink.sfSymbol
-        case .searchSnippets: return "curlybraces"
-        case .createSnippet: return "plus.rectangle.on.rectangle"
         case .importQuicklinks: return "square.and.arrow.down"
         case .exportQuicklinks: return "square.and.arrow.up"
+        case .searchSnippets: return "curlybraces"
+        case .createSnippet: return "plus.rectangle.on.rectangle"
         case .exportSettings: return "square.and.arrow.up"
         case .importSettings: return "square.and.arrow.down"
         case .importFromRaycast: return "arrow.down.doc"
@@ -125,13 +131,23 @@ enum CommandID: String, CaseIterable, Sendable {
         }
     }
 
-    /// Exhaustive over `QuickAction`, so a fifth cannot reach the launcher without a row here.
-    init(_ action: QuickAction) {
+    /// Exhaustive, so a fifth shipped action cannot reach the launcher without a row here.
+    init(_ action: BuiltInQuickAction) {
         switch action {
         case .fixGrammar: self = .fixGrammar
         case .rewrite: self = .rewrite
         case .translate: self = .translate
         case .summarize: self = .summarize
+        }
+    }
+
+    var builtInQuickAction: BuiltInQuickAction? {
+        switch self {
+        case .fixGrammar: return .fixGrammar
+        case .rewrite: return .rewrite
+        case .translate: return .translate
+        case .summarize: return .summarize
+        default: return nil
         }
     }
 

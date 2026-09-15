@@ -18,15 +18,18 @@ enum SettingsPaneScanner {
     /// Panes change only on an OS update, and an unreadable listing or date is never cached.
     struct Cache: Sendable {
         fileprivate let modified: Date
+        fileprivate let languages: [String]
         fileprivate let panes: [AppEntry]
     }
 
     /// All Settings panes, sorted by display name.
-    nonisolated static func scan(cache: Cache?) -> ([AppEntry], Cache?) {
+    nonisolated static func scan(languages: [String], cache: Cache?) -> ([AppEntry], Cache?) {
         let fm = FileManager.default
         let modified = try? extensionsDir.resourceValues(forKeys: [.contentModificationDateKey])
             .contentModificationDate
-        if let cache, cache.modified == modified { return (cache.panes, cache) }
+        if let cache, cache.modified == modified, cache.languages == languages {
+            return (cache.panes, cache)
+        }
         guard
             let items = try? fm.contentsOfDirectory(
                 at: extensionsDir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
@@ -39,17 +42,23 @@ enum SettingsPaneScanner {
                 isSettingsPane(info: info),
                 let bundleID = info["CFBundleIdentifier"] as? String,
                 !skippedBundleIDs.contains(bundleID),
-                let name = displayName(appexURL: url, info: info, bundleID: bundleID)
+                let base = AppDisplayName.inInfo(info)
             else { continue }
+            let names = BundleLocalization.names(
+                for: url, base: base,
+                developmentRegion: info["CFBundleDevelopmentRegion"] as? String,
+                languages: languages)
             result.append(
                 AppEntry(
-                    id: url.path, name: name, url: url, bundleID: bundleID,
-                    kind: .systemSettings))
+                    id: url.path, name: nameOverrides[bundleID] ?? names.first ?? base, url: url,
+                    bundleID: bundleID, kind: .systemSettings,
+                    // `EntryNaming` drops whatever repeats the name, so the whole list can go in.
+                    alternateNames: names))
         }
         let panes = result.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
-        return (panes, modified.map { Cache(modified: $0, panes: panes) })
+        return (panes, modified.map { Cache(modified: $0, languages: languages, panes: panes) })
     }
 
     private static func isSettingsPane(info: [String: Any]) -> Bool {
@@ -57,42 +66,6 @@ enum SettingsPaneScanner {
         if ex as? String == settingsExtensionPoint { return true }
         let ns = (info["NSExtension"] as? [String: Any])?["NSExtensionPointIdentifier"]
         return ns as? String == settingsExtensionPoint
-    }
-
-    /// Overrides, then loctable, then Info.plist; nil skips the pane entirely.
-    private static func displayName(
-        appexURL: URL, info: [String: Any], bundleID: String
-    ) -> String? {
-        if let override = nameOverrides[bundleID] { return override }
-        if let localized = loctableName(appexURL: appexURL) { return localized }
-        return AppDisplayName.inInfo(info)
-    }
-
-    /// Localized name from `InfoPlist.loctable`, preferred languages first, then English.
-    private static func loctableName(appexURL: URL) -> String? {
-        let url = appexURL.appendingPathComponent("Contents/Resources/InfoPlist.loctable")
-        guard let table = plist(at: url) else { return nil }
-        // Apple keys these tables by its own locale IDs ("zh_CN"), never by the tag the app runs under ("zh-Hans-US"), so a literal lookup misses every Chinese pane; `preferredLocalizations` knows that equivalence.
-        let wanted = Set(
-            Locale.preferredLanguages.compactMap {
-                Locale(identifier: $0).language.languageCode?.identifier
-            })
-        // Kept to a language the user actually asked for: unmatched, `preferredLocalizations` returns some unrelated locale, and falling through to English (then the Info.plist) beats naming a pane in Polish.
-        var codes = Bundle.preferredLocalizations(
-            from: table.keys.map { $0.replacingOccurrences(of: "_", with: "-") },
-            forPreferences: Locale.preferredLanguages
-        ).filter { wanted.contains(Locale(identifier: $0).language.languageCode?.identifier ?? "") }
-        codes.append("en")
-        for code in codes {
-            // `preferredLocalizations` hands back the dashed spelling line 87 fed it; the table keys are Apple's underscored ones.
-            let key = code.replacingOccurrences(of: "-", with: "_")
-            if let entry = (table[key] ?? table[code]) as? [String: Any],
-                let name = AppDisplayName.named(entry["CFBundleDisplayName"])
-            {
-                return name
-            }
-        }
-        return nil
     }
 
     private static func plist(at url: URL) -> [String: Any]? {

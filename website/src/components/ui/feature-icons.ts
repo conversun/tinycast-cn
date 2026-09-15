@@ -1,12 +1,15 @@
 import {
+  AppWindow,
   Archive,
   Calculator,
+  CalendarDays,
   ClipboardList,
   FileSearch,
   Globe,
   Keyboard,
   Languages,
   Link2,
+  MessagesSquare,
   NotebookPen,
   Puzzle,
   Search,
@@ -16,6 +19,7 @@ import {
   Sun,
   Tag,
   Trash2,
+  WandSparkles,
   LayoutGrid,
   Zap,
   type LucideIcon,
@@ -43,6 +47,10 @@ export const featureIcons = {
   inputSource: Languages,
   appearance: Sun,
   keyboard: Keyboard,
+  aiChat: MessagesSquare,
+  quickActions: WandSparkles,
+  calendar: CalendarDays,
+  navigation: AppWindow,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof featureIcons;

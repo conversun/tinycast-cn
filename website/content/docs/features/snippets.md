@@ -3,25 +3,57 @@ title: Snippets
 description: Reusable Markdown templates with placeholders, arguments and keyword expansion.
 ---
 
-A snippet is a piece of text you reuse, stored as a plain Markdown file you can edit by hand.
+A snippet is a piece of text you reuse, saved as a plain Markdown file you can also edit by hand.
 
-Paste one from the launcher, or type its keyword in any app and have it expand in place.
+Paste one from the launcher or the snippet browser, or type its keyword in any app and watch it
+expand in place.
 
-**Settings → Snippets** holds the feature switch. It ships **off**.
+**Settings → Snippets** holds the switch. It ships **off**.
 
 | Setting          | Default |
 | ---------------- | ------- |
 | Enable snippets  | Off     |
 | Show in launcher | On      |
 
-**The enable switch is also the consent for keystroke matching** — there is no separate toggle. It
-explains itself before turning on, then requests
+**The switch is also your consent to keyword matching.** There is no separate one. Turning it on
+explains what happens first, then asks for
 [Accessibility](/docs/permissions#snippets-and-keystroke-matching).
 
-Turning **Show in launcher** off hides the section but **keyword expansion keeps working**.
+Turning it off stops everything: the keyword listener, the file watcher and the launcher rows. Your
+files stay where they are.
 
-`snippetsEnabled` is deliberately excluded from
-[settings backups](/docs/reference/backup), so importing a file can never enable keystroke listening.
+**Show in launcher** off hides snippets and the two snippet commands from search. **Keyword expansion
+and the browser's shortcut keep working.**
+
+`snippetsEnabled` is never included in [backups](/docs/reference/backup), so importing a file can
+never switch on keystroke listening.
+
+## Commands
+
+| Command         | Does                              |
+| --------------- | --------------------------------- |
+| Search Snippets | Opens the snippet browser         |
+| Create Snippet  | Opens the editor on a new snippet |
+
+Both take a global shortcut and an alias in **Settings → Snippets**.
+
+## The snippet browser
+
+**Search Snippets** lists every enabled snippet, with a preview beside it. Type to filter by name or
+keyword.
+
+The preview shows the **template as written**, with its placeholders, plus the name, keyword, file
+name and character count. It never fills placeholders just to draw a preview, so browsing never reads
+your clipboard or asks for an argument.
+
+| Action (<kbd>⌘</kbd><kbd>K</kbd>) | Shortcut          |
+| --------------------------------- | ----------------- |
+| Paste Snippet                     | <kbd>return</kbd> |
+| Edit Snippet                      |                   |
+| Create Snippet                    |                   |
+| Show in Finder                    |                   |
+
+<kbd>esc</kbd> or <kbd>delete</kbd> in an empty search goes back.
 
 ## The file format
 
@@ -42,101 +74,117 @@ Attendees: {argument name="Attendees"}
 {cursor}
 ```
 
-`name` defaults to the filename, `keyword` is optional, `enabled` defaults to `true`, and
-`show_confirmation` defaults to `false`.
+`name` defaults to the file name. `keyword` is optional. `enabled` defaults to `true`, and
+`show_confirmation` to `false`.
 
-Strings must use **double quotes**. Keys are case-insensitive with no aliases; unknown keys,
-unquoted strings, duplicates and non-lowercase booleans are rejected by name rather than ignored.
+Text values need **double quotes**. Keys ignore case. Unknown keys, unquoted text, repeated keys and
+booleans that are not lowercase `true` or `false` are rejected with a message that names them.
 
-Everything after the closing `---` is the body, preserved byte for byte — blank lines, line endings,
+Everything after the closing `---` is the body, kept exactly as written: blank lines, line endings,
 Unicode and any later `---` lines.
 
-Each channel has its own folder, so stable and beta never share files.
+Each channel keeps its own folder, so stable and beta never share snippet files.
 
 ## Placeholders
 
-| Token                          | Gives                                         |
-| ------------------------------ | --------------------------------------------- |
-| `{clipboard}`                  | The clipboard as plain text                   |
-| `{clipboard offset=1}`         | The Nth most recent clip                      |
-| `{selection}`                  | Selected text from the app you were in        |
-| `{date}` `{time}` `{datetime}` | In your locale                                |
-| `{day}`                        | Weekday name                                  |
-| `{uuid}`                       | A fresh UUID per token                        |
-| `{date format="yyyy-MM-dd"}`   | Any date format                               |
-| `{date locale="fr-FR"}`        | Another locale — cannot combine with `format` |
-| `{time offset="+3h +30m"}`     | Signed offsets: `m` `h` `d` `M` `y`           |
-| `{argument}`                   | Prompts, named "Argument"                     |
-| `{argument name="Recipient"}`  | A named prompt                                |
-| `{argument default="Hi"}`      | Optional — expands without prompting          |
-| `{argument options="a, b, c"}` | Prompts with a picker                         |
-| `{snippet:Name}`               | Another snippet, inline                       |
-| `{cursor}`                     | Where the caret lands                         |
+| Token                          | Gives                                                              |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `{clipboard}`                  | What is on the clipboard, as plain text                            |
+| `{clipboard offset=1}`         | An earlier clip; `1` is the one before the current                 |
+| `{selection}`                  | The selected text in the app you were using                        |
+| `{date}` `{time}` `{datetime}` | Today's date, the time, or both, in your locale                    |
+| `{day}`                        | The weekday's name                                                 |
+| `{uuid}`                       | A fresh UUID for each token                                        |
+| `{date format="yyyy-MM-dd"}`   | Any date format                                                    |
+| `{date locale="fr-FR"}`        | Another locale; cannot be combined with `format`                   |
+| `{time offset="+3h +30m"}`     | Shifted by `m` minutes, `h` hours, `d` days, `M` months, `y` years |
+| `{argument}`                   | Asks you for a value, named "Argument"                             |
+| `{argument name="Recipient"}`  | Asks for a named value                                             |
+| `{argument default="Hi"}`      | Optional; uses the default without asking                          |
+| `{argument options="a, b, c"}` | Asks with a list to pick from                                      |
+| `{snippet:Name}`               | Another snippet, inline                                            |
+| `{cursor}`                     | Where the cursor lands afterwards                                  |
 
-`{selectedText}` is accepted as an alias for `{selection}`.
+These match [Raycast's dynamic placeholders](https://manual.raycast.com/dynamic-placeholders), so a
+snippet you bring over keeps working. Raycast's spellings `{selectedText}` and `{query}` are accepted
+too, as `{selection}` and `{argument}`. `{snippet name="Name"}` works as well as `{snippet:Name}`.
+
+A value only needs quotes if it contains `|`. Without quotes, a value runs up to the next `key=`, so
+`{date format=MMMM d, yyyy}` keeps its spaces.
+
+The editor's **Insert…** menu lists every token. Parameters and modifiers you type by hand.
 
 ### Modifiers
 
-Pipe them left to right: `{clipboard | trim | uppercase}`
+Chain them left to right: `{clipboard | trim | uppercase}`
 
 Available: `uppercase` · `lowercase` · `trim` · `percent-encode` · `json-stringify` · `raw`
 
-`{cursor}` and snippet references take no modifiers.
+`json-stringify` escapes text for use inside a JSON string, without adding the quotes. `raw` only
+matters in [quicklinks](/docs/launcher/quicklinks#encoding). `{cursor}` and snippet references take
+no modifiers.
 
 ### When a token is wrong
 
-**An unparseable token is left in the output exactly as written** — never silently dropped. If you
-see `{arguemnt}` in your pasted text, that is the typo telling you about itself.
+**A token Tinycast cannot read is left in the text exactly as you wrote it**, never silently dropped.
+If you see `{arguemnt}` in your pasted text, that is the typo pointing at itself.
 
 `{browser-tab}` and `{calculator}` are not supported.
 
 ### Limits
 
-Arguments are unique and prompted in first-appearance order, including ones inside referenced
-snippets. Inserted values are literal — token-shaped text in a value is not re-expanded.
+Each argument is asked for once, in the order it first appears, including ones inside referenced
+snippets. Values are inserted as-is: text that looks like a token inside a value is not expanded
+again.
 
-Snippet references are case-insensitive and nest **five** levels deep with cycle detection. A
-missing, cyclic or too-deep reference leaves the token visible.
+Snippet references ignore case and nest up to **five** levels deep, with loop detection. A missing,
+looping or too-deep reference stays visible as a token.
 
-All `{cursor}` tokens are removed; the first one wins.
+All `{cursor}` tokens are removed, and the first one decides where the cursor goes.
 
 ## Keyword expansion
 
-With a keyword set, typing it in any app expands the snippet in place.
+Give a snippet a keyword and typing it in any app expands the snippet in place.
 
-- Keywords match **case-insensitively, by longest suffix**, so a more specific keyword wins.
-- The typing buffer holds at most 256 characters and resets on app or session change, on Secure
-  Event Input, on navigation and modifier shortcuts, and after **15 seconds** of inactivity.
-- Before deleting the keyword and before inserting, every gate is re-checked. A failed gate leaves
-  what you typed untouched.
+- Keywords match **without case, by the longest ending**, so a more specific keyword wins.
+- The typing buffer holds at most 256 characters. It resets when you switch apps, on Secure Event
+  Input, on arrow keys and shortcuts with modifiers, and after **15 seconds** of no typing.
+- If you keep typing before an expansion lands, it is dropped rather than inserted mid-word.
+- Just before it deletes the keyword and inserts the text, Tinycast checks everything again. If
+  anything changed, what you typed is left alone.
 
-Status is shown plainly in Settings: **Off**, **Needs Accessibility**, or **Active**.
+Settings shows the status plainly: **Off**, **Needs Accessibility**, or **Active**.
 
-### How the text is delivered
+A keyword typed into Tinycast's own search field or Settings never expands. A keyword typed in
+[Notes](/docs/features/notes) expands right into the note.
 
-The preferred path is a single atomic Accessibility replacement.
+### How the text gets there
 
-Editors that grant Accessibility but expose no writable text fall back to synthetic keystrokes.
-Short single-line expansions — up to 100 characters — use Unicode key events. Longer or multiline
-text uses a temporary paste, but **only when your existing clipboard's first item is restorable
-plain text**, and the change count is checked before restoring so a newer copy is never overwritten.
+First choice: one clean replacement through Accessibility, which Tinycast then checks actually
+happened.
 
-An image, empty or unreadable clipboard uses the keystroke path instead. The clipboard poller ignores
-these temporary writes, so they never enter your [history](/docs/features/clipboard).
+Some apps, like Chrome, VS Code, Slack and other Electron apps, do not really accept that, so
+Tinycast types the text instead. Short, single-line expansions of up to 100 characters are typed as
+keystrokes.
+
+Longer or multi-line text uses a quick temporary paste. Tinycast saves your clipboard, pastes only
+the snippet text, then puts your clipboard back exactly. If you copied something new in the meantime,
+it leaves your new copy alone. None of this ends up in your
+[clipboard history](/docs/features/clipboard).
 
 ## In the launcher
 
-Enabled snippets appear in launcher search while **Show in launcher** is on, and **both the name and
-the keyword are searchable**, scored in the same band as an app name.
+Enabled snippets show up in launcher search while **Show in launcher** is on. **Both the name and the
+keyword are searchable**, ranked like an app name.
 
-<kbd>↵</kbd> pastes the snippet.
+<kbd>return</kbd> pastes the snippet.
 
 ## The editor
 
-Drafts live in memory and write only on **Save**. **New** creates no file until the first save.
+Changes live in memory until you press **Save**. **New** creates no file until the first save.
 
-Saving over a file that changed underneath is **rejected as a conflict**, not silently merged.
-Reopening shows what is actually on disk.
+If the file changed on disk while you were editing, saving is **refused as a conflict** instead of
+overwriting. Open the snippet again to see what is on disk now.
 
-**Show confirmation** is per snippet and off by default. When on, a brief pill names the snippet
-after a confirmed insertion. Failed, cancelled and prompt-cancelled expansions never show it.
+**Show confirmation** is per snippet and off by default. When on, a small message names the snippet
+after it is inserted. Failed or cancelled expansions never show it.

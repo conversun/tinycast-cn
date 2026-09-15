@@ -27,9 +27,10 @@ in (see Currency below).
   whose Full Calendar Access grant a calculator must never provoke mid-keystroke. `workdays` is
   therefore an ordinary time unit, and `calendarEnabled` stays the Calendar feature's own consent.
 - **`CurrencyData.generated.swift` is emitted by `node Scripts/gen-currencies.js`** and never hand-edited.
-  Three currency tables are hand-maintained, all in `CalcCurrency`: `contested`, the nouns several
+  Four currency tables are hand-maintained, all in `CalcCurrency`: `contested`, the nouns several
   currencies share (`dollars`, `pounds`); `isoNames`, the standard's own names where CLDR substitutes
-  a different one (ISO 4217 calls CNY "Yuan Renminbi"); and `crypto`, which no standards body names.
+  a different one (ISO 4217 calls CNY "Yuan Renminbi"); `signCodes`, the codes daily use spells from
+  CLDR's sign instead (`NT$` makes TWD `ntd`); and `crypto`, which no standards body names.
   Do not add slang or synonyms to any of them — no source of truth, so they rot.
 
 ## Evaluation pipeline
@@ -446,6 +447,11 @@ currency and CLDR substitutes a different word, the standard's name is carried w
 its source — CNY is "Yuan Renminbi" to ISO 4217, so `rmb` and `renminbi` resolve, while CLDR's own
 "Chinese Yuan" supplies `yuan` through the generator.
 
+`signCodes` is the same exception read off the other source. CLDR's sign for a currency is sometimes
+a letter pair the region spells as a code — it writes TWD `NT$`, and Taiwan writes `NTD` where the
+standard says `TWD`. The single-character `signs` table cannot carry a two-letter prefix, so the code
+it implies is carried here instead, with CLDR as its source. The standard code always keeps working.
+
 ### Crypto
 
 `CalcCurrency.crypto` is the third hand-written table, and the only one with no external source at
@@ -483,7 +489,7 @@ ever asks for location, and a `Model/` file never performs it.
 Where the region names the currency already written, the amount pairs with the **dollar** instead —
 the **euro** where the dollar is the one that was typed. Converting is the only reason to write a
 lone amount, so `25 eur` on a European Mac answering `25.00 EUR` said nothing at all; it now reads
-`28.95 USD`, which is what Raycast answers for the same query.
+`28.95 USD`.
 
 The target only applies where there is genuinely nothing else to say. An operator keeps the currency
 written (`$10 + €5` stays euros), an explicit target overrides everything, a trailing operator holds

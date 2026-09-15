@@ -74,12 +74,15 @@ final class CalendarCoordinator {
 
     /// The switch funnels here so enabling, which is also consent, confirms first.
     func setCalendarEnabled(_ enabled: Bool) {
-        guard enabled != settings.calendarEnabled else { return }
         if !enabled {
+            guard settings.calendarEnabled else { return }
             settings.calendarEnabled = false
             return
         }
 
+        // Asking again is the only way back: Settings cannot add an app TCC has no record of.
+        store.refreshAccess()
+        guard !settings.calendarEnabled || store.access != .granted else { return }
         NSApp.activate(ignoringOtherApps: true)
         Task {
             guard
@@ -92,9 +95,9 @@ final class CalendarCoordinator {
                     confirmRole: .standard)
             else { return }
 
-            settings.calendarEnabled = true
-            // The one prompt for this feature, raised from the gesture that asked for it.
             guard await store.requestAccess() else { return }
+            // The flag is consent, so it is written only once macOS has actually granted access.
+            settings.calendarEnabled = true
             applyEnabled()
         }
     }

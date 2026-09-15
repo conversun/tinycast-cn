@@ -1,66 +1,66 @@
 ---
 title: Installing extensions
-description: Three routes in, the registries behind them, and when you need a toolchain.
+description: Three ways in, the registries behind them, and when you need a toolchain.
 ---
 
-**Settings → Extensions → Install** offers three routes.
+**Settings → Extensions → Install** offers three ways in.
 
 ## Search Registries
 
-Searches every enabled registry and installs from any of them. This is the normal route.
+Searches every enabled registry, and installs from any of them. This is the usual way.
 
 ## Import from Raycast
 
-Copies extensions you already have out of a local Raycast install.
+Copies extensions you already have out of Raycast on this Mac.
 
-**Nothing is compiled. No Node, no package manager and no network are involved** — the bundles are
-already built.
+**Nothing is built. No Node, no package manager and no network are needed**, because the extensions
+are already built.
 
-Both channels are scanned (`~/.config/raycast` and `~/.config/raycast-x`), and an extension present
-in both is offered once. There is an **Import All**, and the pane rescans whenever you open it and
+Tinycast looks in both `~/.config/raycast` and `~/.config/raycast-x`, and an extension found in both
+is offered once. There is an **Import All** button. The pane checks again whenever you open it, and
 tells you when Raycast has something Tinycast does not.
 
-## Add Folder
+## Add from folder
 
-Point at any directory containing a manifest and built command files — a project you have just built
-locally, for instance.
+Point at any folder with a manifest and built command files, like a project you just built yourself.
 
-Only `package.json`, the built commands and `assets/` are copied. Never `node_modules`, never source
-maps.
+Only `package.json`, the built commands and `assets/` are copied. Never `node_modules`, and never
+source maps.
 
 ## Registries
 
-Two ship enabled, and you can add your own.
+Two come switched on, and you can add your own.
 
-|        | Raycast Store           | A GitHub repository         |
-| ------ | ----------------------- | --------------------------- |
-| Serves | An already-built bundle | Source                      |
-| Needs  | Nothing                 | Node, and a package manager |
+|           | Raycast Store              | A GitHub repository        |
+| --------- | -------------------------- | -------------------------- |
+| Gives you | An extension already built | Source code                |
+| You need  | Nothing                    | Node and a package manager |
 
-**The store is the reason most people need no toolchain at all.** It serves what was already built.
+**The store is why most people need no toolchain at all.** It hands over what was already built.
 
-A GitHub registry is any repo laid out with one folder per extension. Add one with `owner/repo` or a
-link to the folder. Only the extension's own folder is ever fetched, never the whole repo.
+A GitHub registry is any repository with one folder per extension, like `raycast/extensions`. Add one
+with `owner/repo` or a link to the folder. Only the extension's own folder is downloaded, never the
+whole repository.
 
-Source installs run `<package manager> install --ignore-scripts` and then build.
-**Lifecycle scripts are skipped on purpose.** An extension that does not compile fails at the build
-step rather than silently installing broken.
+Installing from source runs `<package manager> install --ignore-scripts`, then builds the extension.
+**Install scripts are skipped on purpose**, because that is code nobody asked to run. An extension
+that does not build fails at the build step, instead of installing half-broken.
 
 ## Package managers
 
 **Settings → Extensions → Package manager**
 
-**Automatic** (default) takes the first of **pnpm → Bun → Yarn → npm** that is installed. The order
-puts the fastest and most disk-frugal first, with npm last as the one that is always there.
+**Automatic** (default) uses the first of **pnpm → Bun → Yarn → npm** that you have. The fastest and
+most disk-friendly come first, and npm, which is nearly always there, comes last.
 
-Because a GUI app inherits no login-shell `PATH`, Tinycast looks in known locations itself: Homebrew,
-Volta, asdf, mise, fnm, nvm and Yarn. The pane shows what it found — "Found pnpm at
-/opt/homebrew/bin/pnpm" — or tells you nothing is installed.
+An app opened from the Dock does not see your terminal's `PATH`, so Tinycast looks in the usual places
+itself: Homebrew, Volta, asdf, mise, fnm, nvm and Yarn. The pane shows what it found, like
+"Found pnpm at /opt/homebrew/bin/pnpm", or tells you nothing is installed.
 
 ### Custom search paths
 
-For anything outside that list — Nix, in particular — the Registries sheet has **Custom search
-paths**: a colon-separated list, like `PATH`, checked **before** the built-in locations.
+For anything outside that list, like Nix, the Registries sheet has **Custom search paths**: a list of
+folders separated by colons, like `PATH`, checked **before** the usual places.
 
 ```
 ~/.local/share/mise/shims
@@ -70,12 +70,12 @@ paths**: a colon-separated list, like `PATH`, checked **before** the built-in lo
 /etc/profiles/per-user/you/home-path/bin
 ```
 
-Set once, applied to every future install.
+Set it once and every future install uses it.
 
 ## What is not backed up
 
-Three things are deliberately excluded from
-[settings backups](/docs/reference/backup), because they describe _this machine_:
+Three things are left out of [backups](/docs/reference/backup) on purpose, because they describe
+_this Mac_:
 
 - The registry list
 - The package manager choice
@@ -83,12 +83,12 @@ Three things are deliberately excluded from
 
 ## Storage
 
-Everything lives under Tinycast's Application Support folder, and **uninstalling an extension removes
-all of it**: the extension itself, its local storage and cache, its preferences, its support folder,
-its icon override, its command shortcuts, favorites and learned ranking.
+Everything lives in Tinycast's Application Support folder, and **uninstalling an extension removes
+all of it**: the extension, its storage and cache, its preferences, its support folder, its sign-ins
+in the Keychain, its icon choice, its command shortcuts, favorites, aliases and learned ranking.
 
-**Settings → Extensions → Storage** measures leftover build workspaces — the kind a crashed install
-can leave — and offers to clean them up. It sits outside the enabled group deliberately, and is empty
-in normal use.
+**Settings → Extensions → Storage** measures leftover build folders, the kind a crashed install can
+leave behind, and offers to clean them up. It works even while extensions are off, and it is empty in
+normal use.
 
 Nothing ever touches your own `~/Library/pnpm` or `~/.npm`.

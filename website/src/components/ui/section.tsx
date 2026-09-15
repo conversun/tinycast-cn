@@ -1,45 +1,58 @@
 import type { ReactNode } from "react";
-import { cn } from "../../lib/cn";
-import { Reveal } from "./reveal";
 
 type SectionProps = {
-  id?: string;
-  eyebrow?: string;
-  title?: ReactNode;
+  id: string;
+  /** Position on the page, shown as "01". Sections are read top to bottom. */
+  index: number;
+  label: string;
+  title: ReactNode;
   intro?: ReactNode;
   children: ReactNode;
-  className?: string;
 };
 
-// A contained page section with the shared vertical rhythm and an optional
-// eyebrow/title/intro header (which rises into view on scroll). Keeps every
-// band spaced and aligned identically.
+export function SectionLabel({
+  index,
+  label,
+}: {
+  index: number;
+  label: string;
+}) {
+  return (
+    <p className="flex items-baseline gap-2.5 font-mono text-eyebrow uppercase">
+      <span className="text-violet-bright">
+        {String(index).padStart(2, "0")}
+      </span>
+      <span className="text-fg-muted">{label}</span>
+    </p>
+  );
+}
+
 export function Section({
   id,
-  eyebrow,
+  index,
+  label,
   title,
   intro,
   children,
-  className,
 }: SectionProps) {
-  return (
-    <section id={id} className={cn("container-page py-16 md:py-24", className)}>
-      {(eyebrow || title || intro) && (
-        <Reveal>
-          <header className="mx-auto mb-10 max-w-2xl text-center md:mb-14">
-            {eyebrow && (
-              <p className="mb-4 font-mono text-eyebrow uppercase text-violet-bright">
-                {eyebrow}
-              </p>
-            )}
-            {title && <h2 className="text-heading">{title}</h2>}
-            {intro && (
-              <p className="mt-4 text-body-lg text-fg-muted">{intro}</p>
-            )}
-          </header>
-        </Reveal>
+  const header = (
+    <div className="max-w-2xl">
+      <SectionLabel index={index} label={label} />
+      <h2 className="mt-4 text-heading">{title}</h2>
+      {intro && (
+        <p className="mt-4 max-w-xl text-pretty text-body-lg text-fg-muted">
+          {intro}
+        </p>
       )}
-      {children}
+    </div>
+  );
+
+  return (
+    <section id={id} className="relative">
+      <div className="px-5 py-20 sm:px-10 sm:py-24">
+        {header}
+        <div className="mt-12">{children}</div>
+      </div>
     </section>
   );
 }

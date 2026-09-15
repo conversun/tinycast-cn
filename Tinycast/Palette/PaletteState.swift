@@ -20,6 +20,10 @@ final class PaletteState {
     var isComposing = false
     /// The clipboard screen's type filter, reset with the rest of the screen state on each summon.
     var clipboardFilter: ClipboardFilter = .all
+    /// The file search screen's type filter, reset on each summon like the clipboard's.
+    var fileSearchFilter: FileSearchFilter = .all
+    /// Whether file search draws its Quick Look overlay; it follows whatever row is selected.
+    var fileSearchQuickLook = false
     /// Ordering out leaves the SwiftUI tree mounted, so a media preview needs this to stop playing.
     private(set) var isVisible = false
     /// Changes every time the palette is shown so the search field can re-focus.
@@ -67,6 +71,8 @@ final class PaletteState {
 
     func noteVisible(_ visible: Bool) {
         isVisible = visible
+        // Ordering out leaves the tree mounted, and a preview must not outlive the window.
+        if !visible { fileSearchQuickLook = false }
     }
 
     var canGoBack: Bool { !backStack.isEmpty }
@@ -100,7 +106,13 @@ final class PaletteState {
         return true
     }
 
-    /// Tab rings the root surfaces, so crossing to one leaves nothing behind it.
+    /// Tab's step deeper into the ring: the screen crossed from is the step back, query and all.
+    func pushCarryingQuery(mode: PaletteMode) {
+        backStack.append(PaletteFrame(mode: self.mode, query: query, selection: selection))
+        self.mode = mode
+    }
+
+    /// Tab closing the ring on the launcher, which is its root: nothing is left behind it.
     func resetNavigation() {
         backStack.removeAll()
     }
@@ -115,6 +127,8 @@ final class PaletteState {
         commandArguments = [:]
         pendingArgumentEntryID = nil
         clipboardFilter = .all
+        fileSearchFilter = .all
+        fileSearchQuickLook = false
         forceExpanded = false
         dropHoverHighlight()
         menuOpen = false

@@ -4,5 +4,16 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
+	<!-- JavaScriptCore compiles every extension command, so the hardened runtime must allow JIT. -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<!-- Without this the hardened runtime refuses every Apple event with no prompt to recover from. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+	<!-- Undeclared, tccd refuses the prompt outright: no dialog, and the request resolves as denied. -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
 </dict>
 </plist>

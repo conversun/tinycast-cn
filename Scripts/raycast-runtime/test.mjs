@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID, randomBytes, createHmac } from "node:crypto";
-import { homedir, tmpdir } from "node:os";
+import { cpus, freemem, homedir, loadavg, tmpdir, uptime } from "node:os";
 import * as fs from "node:fs";
 import * as zlib from "node:zlib";
 
@@ -130,6 +130,30 @@ export function createHarness({ onRender, onFail, verbose = false, stubs = {} } 
 
 function syncHostCall(api, method, args) {
   switch (`${api}.${method}`) {
+    case "os.cpus":
+      return cpus();
+    case "os.freemem":
+      return freemem();
+    case "os.uptime":
+      return uptime();
+    case "os.loadavg":
+      return loadavg();
+    case "fs.open":
+      return fs.openSync(args[0], args[1], args[2]);
+    case "fs.close":
+      fs.closeSync(args[0]);
+      return null;
+    case "fs.read": {
+      const buffer = Buffer.alloc(args[1]);
+      return buffer.subarray(0, fs.readSync(args[0], buffer, 0, buffer.length, args[2])).toString("base64");
+    }
+    case "fs.write": {
+      const buffer = Buffer.from(args[1], "base64");
+      return fs.writeSync(args[0], buffer, 0, buffer.length, args[2]);
+    }
+    case "fs.chmod":
+      fs.chmodSync(args[0], args[1]);
+      return null;
     case "fs.readFile":
       return fs.readFileSync(args[0]).toString("base64");
     case "fs.writeFile":
@@ -195,6 +219,8 @@ function syncHostCall(api, method, args) {
         .digest("base64");
     case "proc.run": {
       const spec = args[0];
+      // Mirrors the Swift host: a detached child answers at launch, with no output.
+      if (spec.detached) return { stdout: "", stderr: "", status: 0 };
       try {
         const stdout = spec.shell
           ? execFileSync("/bin/sh", ["-c", spec.command], { cwd: spec.cwd })
@@ -285,7 +311,6 @@ export function bootConfig(overrides = {}) {
       homedir: homedir(),
       tmpdir: tmpdir(),
       username: "tester",
-      cpus: 8,
     },
     environment: {
       extensionName: "fixture",

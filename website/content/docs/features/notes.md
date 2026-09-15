@@ -1,93 +1,95 @@
 ---
 title: Notes
-description: Plain Markdown files in one floating editor — no database, no frontmatter, no sidecar.
+description: Plain Markdown files in one floating editor. No database, no frontmatter, no sidecar files.
 ---
 
-Notes is an unlimited local collection of Markdown files in a single floating window.
+Notes is a collection of plain Markdown files, as many as you like, edited in one floating window.
 
-**Settings → Notes** holds the feature switch. It ships **off**, and enabling it alone does not
-create the folder or write anything.
+**Settings → Notes** holds the switch. It ships **off**, and turning it on does not create the folder
+or write anything until you make a note.
 
 ## Commands
 
-Three commands, each with its own optional global shortcut:
+Three commands, each with its own optional global shortcut in **Settings → Notes**:
 
-| Command          | Does                                                         |
-| ---------------- | ------------------------------------------------------------ |
-| **Show Notes**   | Selects the last active note and shows or focuses the window |
-| **Create Note**  | Creates and selects one new Untitled note                    |
-| **Search Notes** | Shows the window with the switcher open and focused          |
-
-**Show Notes does not toggle the window closed.** Show means show.
+| Command          | Does                                                     |
+| ---------------- | -------------------------------------------------------- |
+| **Show Notes**   | Opens your last note. Press it again to hide the window. |
+| **Create Note**  | Makes a new Untitled note and opens it                   |
+| **Search Notes** | Opens the window with the note switcher ready to type in |
 
 ## In the window
 
-| Key                      | Does                                    |
-| ------------------------ | --------------------------------------- |
-| <kbd>⌘</kbd><kbd>N</kbd> | Create a note                           |
-| <kbd>⌘</kbd><kbd>P</kbd> | Open or refocus the switcher            |
-| <kbd>⌘</kbd><kbd>O</kbd> | Open the Notes folder in Finder         |
-| <kbd>⌘</kbd><kbd>W</kbd> | Hide the window                         |
-| <kbd>⎋</kbd>             | Close the switcher, then hide           |
-| <kbd>⌘</kbd><kbd>⌫</kbd> | Move the selected switcher row to Trash |
+The title bar holds three buttons: **Create**, **Browse** and **Open Folder**.
 
-<kbd>⌘</kbd><kbd>Q</kbd> is bound to nothing app-wide, so **no chord over Notes can quit Tinycast**.
+| Key                           | Does                                        |
+| ----------------------------- | ------------------------------------------- |
+| <kbd>⌘</kbd><kbd>N</kbd>      | Create a note                               |
+| <kbd>⌘</kbd><kbd>P</kbd>      | Open the switcher, or jump back into it     |
+| <kbd>⌘</kbd><kbd>O</kbd>      | Open the Notes folder in Finder             |
+| <kbd>⌘</kbd><kbd>W</kbd>      | Hide the window                             |
+| <kbd>esc</kbd>                | Close the switcher, then hide the window    |
+| <kbd>⌘</kbd><kbd>delete</kbd> | Move the selected switcher row to the Trash |
+
+<kbd>⌘</kbd><kbd>Q</kbd> does nothing here, so **no key press over Notes can quit Tinycast** by
+accident.
 
 ## Files
 
-Notes live in Tinycast's Application Support folder, one per note:
+Notes live in Tinycast's Application Support folder:
 
 ```
 ~/Library/Application Support/com.tinycast.app/Notes/
 ```
 
-**One regular `.md` file is one note, and its filename without the extension is its title.** There is
-no frontmatter, no embedded ID, no database and no sidecar file. What you see is the file.
+**One `.md` file is one note, and its file name is its title.** There is no frontmatter, no hidden
+ID, no database and no sidecar file. What you see is the file.
 
-Immediate children only — subfolders, hidden files and symlinks are ignored. Sorted by modification
-date, then title.
+Only files directly in that folder count. Subfolders, hidden files and links are ignored. Notes are
+sorted by when they changed, newest first.
 
-New notes are `Untitled.md`, then `Untitled 2.md`, and so on. Name collisions are case- and
-diacritic-insensitive, so `plán` beside `Plan` becomes `plán 2.md` — but a note never collides with
-itself, so you can rename one to change only its case or accents.
+New notes are named `Untitled.md`, then `Untitled 2.md`, and so on. **Until you rename one, it shows
+its first line as the title**, so a list of Untitled notes is still easy to scan. Heading marks like
+`#` are dropped from that title.
 
-Renaming a note changes its identity, since the filename _is_ the identity. There are no per-note
-hotkeys or favorites that could point at the old one.
+Names are compared without case or accents, so `plán` next to `Plan` becomes `plán 2.md`. A note
+never clashes with itself, so you can rename one just to change its case or accents.
 
 ## The editor
 
-One plain text view. **Markdown markers stay visible — there is no syntax highlighting, no rendered
-preview and no link behaviour.** The string on screen, in search, and in the file are identical.
+One plain text view. **Markdown marks stay visible.** There is no syntax coloring, no rendered
+preview and no clickable links. The text on screen, in search and in the file is exactly the same.
 
-AppKit owns typing, selection, cut/copy/paste, Find, marked text, emoji, combining characters and
-undo. An empty note shows a `Start writing…` placeholder, and the footer counts characters.
+Typing, selection, copy and paste, Find, emoji, input methods and undo all behave like any Mac text
+field. An empty note shows **Start writing…**, and the footer counts characters.
+
+[Snippets](/docs/features/snippets) expand right into the editor, and undo takes them back.
 
 ## The switcher
 
-An empty query lists notes by recency, reading metadata only. A query searches titles and literal
-bodies after a 120 ms pause, capped at **200** results.
+The switcher drops down from the title bar. With nothing typed, it lists notes by recency. Type and
+it searches titles and note text, after a 120 ms pause, showing up to **200** results.
 
-Rows expose VoiceOver actions to activate, rename and trash by the real note title.
+Each row offers VoiceOver actions to open, rename and move that note to the Trash.
 
 ## Saving, and the one real caveat
 
-Edits save automatically after a 300 ms pause.
+Changes save automatically 300 ms after you stop typing.
 
-**A save overwrites whatever is on disk.** There is no file watcher and no revision check, so if you
-edit the _currently active_ note in another app while Tinycast has it open, that edit is lost on the
-next autosave.
+**A save overwrites whatever is on disk.** Tinycast does not watch the folder. If you edit the note
+that is _open in Tinycast_ in another app, that edit is lost at the next autosave.
 
-<kbd>⌘</kbd><kbd>O</kbd> invites exactly this, and it is the accepted trade for having no database.
+<kbd>⌘</kbd><kbd>O</kbd> invites exactly this, and it is the trade for having no database.
 
-Every _other_ external change is picked up fine, because showing the window re-lists the folder
-first — a note added or edited outside Tinycast appears as expected.
+Every _other_ change from outside is picked up, because showing the window reads the folder again
+first. A note you add or edit elsewhere shows up as expected.
 
-Quitting waits for the save to flush, but never blocks the quit.
+Quitting waits for the last save, but never blocks the quit.
 
 ## The window
 
-You own the size; macOS remembers it. The collection may be empty — deleting the last note is
-allowed, and Create Note still works from the empty state.
+You choose the size, and macOS remembers it. You can delete every note; the window shows an empty
+state and Create Note still works.
 
-Hiding the window restores the app you came from, but only while that app is still frontmost. Closing
-a window you already walked away from leaves you where you are.
+Hiding the window takes you back to the app you came from, but only if that app is still in front.
+If you already moved on, you stay where you are.

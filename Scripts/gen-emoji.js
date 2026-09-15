@@ -45,7 +45,6 @@ const GROUP_TO_CATEGORY = {
 };
 
 const VS16 = 0xfe0f;
-const MAX_KEYWORDS = 8;
 // Chinese costs three bytes a character, so keep the list short: the CLDR name plus a few terms.
 const MAX_ZH_KEYWORDS = 5;
 const isToneScalar = (s) => s >= 0x1f3fb && s <= 0x1f3ff;
@@ -327,7 +326,7 @@ function baseKey(scalars) {
 }
 
 function cleanField(s) {
-  return s.replaceAll("|", " ").replaceAll(",", " ").trim();
+  return s.replaceAll("|", " ").replaceAll(",", " ").replace(/\s+/g, " ").trim();
 }
 
 function keywordsFor(glyph, name, annotations) {
@@ -341,7 +340,7 @@ function keywordsFor(glyph, name, annotations) {
     w = cleanField(w.toLowerCase());
     if (w && !nameWords.has(w) && !out.includes(w)) out.push(w);
   }
-  return out.slice(0, MAX_KEYWORDS);
+  return out;
 }
 
 // CLDR's `tts` is the Chinese name; the rest are its keywords, and both are scored like the English pair.
@@ -401,7 +400,7 @@ async function main() {
       cleanField(name.toLowerCase()),
       category,
       toneCapable ? "1" : "0",
-      [...zh.keywords, ...keywordsFor(glyph, name, annotations)].join(" "),
+      [...zh.keywords, ...keywordsFor(glyph, name, annotations)].join(","),
       zh.name,
     ]);
   }
@@ -413,7 +412,7 @@ async function main() {
         cleanField(name),
         category,
         "0",
-        [...zh.keywords, cleanField(keywords)].join(" ").trim(),
+        [...zh.keywords, ...keywords.split(/\s+/).filter(Boolean)].join(","),
         zh.name,
       ]);
     }

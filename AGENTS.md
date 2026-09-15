@@ -1,8 +1,8 @@
 # Tinycast
 
-A native macOS menu-bar launcher — a minimal Raycast: fuzzy app launcher, global and per-app hotkeys, a
-text/image clipboard history, an inline calculator, a floating note, snippets, quicklinks, window
-management and an emoji picker. It also **runs Raycast extensions** natively, in JavaScriptCore.
+A native macOS menu-bar launcher: fuzzy app launcher, global and per-app hotkeys, a text/image
+clipboard history, an inline calculator, a floating note, snippets, quicklinks, window management
+and an emoji picker. It also **runs Raycast extensions** natively, in JavaScriptCore.
 SwiftUI + AppKit, running as an accessory with no Dock icon (`LSUIElement`). Zero third-party
 dependencies.
 
@@ -87,11 +87,13 @@ feature's doc, under its own `## Invariants`.
   control, so it must never be able to force a change on a launcher surface.
   **Duplicating a view or a piece of layout maths to keep it here is the correct trade**, and the one
   place the no-duplication rule yields. What *is* shared: `Theme`'s base tokens (spacing, radius,
-  colour), `PopoverMenuItem` as a data shape, and `Platform/`. What is never shared: anything with
+  colour), `InterfaceMetrics` as the view over those same base tokens, `PopoverMenuItem` as a data
+  shape, and `Platform/`. What is never shared: anything with
   "how an extension looks or moves" in it. `ExtensionActionsPanel` and `ExtensionGridGeometry` exist
   precisely because the palette's own menu and the emoji grid must stay free to change without them.
-- **`AppEntry.Kind` is the only thing that says what an entry is.** One case per launcher section, per
-  `VisibilityStore` category and per Settings pane — never re-derive a category by sniffing an entry ID.
+- **`AppEntry.Kind` is the only thing that says what an entry is.** One case per launcher section and
+  per `VisibilityStore` category — never re-derive a category by sniffing an entry ID. Which *pane*
+  lists a command is a separate fact, and `SettingsTab.ownedCommands` is the only place that states it.
 - **Generated files are never hand-edited.** `EmojiData.generated.swift` comes from
   `node Scripts/gen-emoji.js`, `CurrencyData.generated.swift` from `node Scripts/gen-currencies.js`, and
   `Resources/RaycastRuntime.generated.js` from `Scripts/raycast-runtime/build.mjs` — the runtime is

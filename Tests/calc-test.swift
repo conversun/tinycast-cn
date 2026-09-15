@@ -726,6 +726,9 @@ struct CalcTests {
         // ISO 4217's own name for CNY is "Yuan Renminbi"; CLDR carries only "Chinese Yuan"
         expectError("1 rmb to usd", "No exchange rate for CNY.")
         expectError("1 renminbi to usd", "No exchange rate for CNY.")
+        // CLDR signs TWD "NT$", so `ntd` is what Taiwan types; `twd` keeps working
+        expectError("1 ntd to usd", "No exchange rate for TWD.")
+        expectError("1299 usd to ntd", "No exchange rate for TWD.")
         // Slang is no longer carried: CLDR has no "quid", and we don't hand-maintain synonyms
         expectNil("50 quid to usd")
         expectNil("100 bucks to eur")
@@ -1187,7 +1190,7 @@ struct CalcTests {
         expectDisplayAt("tomorrow + 10 work days", "7 August")
         expectDisplayAt("today + 15 workdays", "14 August")
         expectDisplayAt("today + 5 weekdays", "31 July")
-        // Raycast's own shape: the weekday rides the badge rather than the date
+        // The weekday rides the badge rather than the date
         expectBadgesAt("today + 5 business days", source: "Friday, 24 July", target: "Friday")
         expectBadgesAt("today + 1 business day", source: "Friday, 24 July", target: "Monday")
         // The duration may lead, with `from` naming the anchor or `ago` implying today

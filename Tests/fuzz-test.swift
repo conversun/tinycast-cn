@@ -135,7 +135,7 @@ struct FuzzTest {
         }
     }
 
-    static func main() {
+    static func main() async {
         displayNameRanking()
         fieldPriority()
         userAliases()
@@ -144,7 +144,7 @@ struct FuzzTest {
         alternateNameSanitizing()
         identifierFields()
         edgeCases()
-        propertyLoop()
+        await propertyLoop()
         romanizedReadings()
 
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
@@ -560,7 +560,58 @@ struct FuzzTest {
         mutating func element<T>(_ xs: [T]) -> T { xs[int(xs.count)] }
     }
 
-    static func propertyLoop() {
+    struct LoopCounts: Sendable {
+        var bandViolations = 0
+        var nondeterministic = 0
+        var unstableOrder = 0
+        var boostCrossedBand = 0
+        var matched = 0
+
+        mutating func add(_ other: LoopCounts) {
+            bandViolations += other.bandViolations
+            nondeterministic += other.nondeterministic
+            unstableOrder += other.unstableOrder
+            boostCrossedBand += other.boostCrossedBand
+            matched += other.matched
+        }
+    }
+
+    /// Checks one slice of the pre-drawn queries; slices are independent, so they run in parallel.
+    static func sweep(
+        _ queries: ArraySlice<String>, fields allFields: [SearchFields], cells: [Int]
+    ) -> LoopCounts {
+        var counts = LoopCounts()
+        for (i, query) in zip(queries.indices, queries) {
+            let folded = FuzzyMatch.Query(query)
+            for fields in allFields {
+                guard let score = SearchRelevance.quality(folded, fields: fields) else { continue }
+                counts.matched += 1
+
+                // Every score is one cell plus a shape, and usage may never lift it past P1.
+                // A query that folds away claims no cell; every real one is a cell plus a shape.
+                if !folded.isEmpty,
+                    !cells.contains(where: {
+                        score - $0 >= 0 && score - $0 <= SearchRelevance.shapeSpan
+                    })
+                {
+                    counts.bandViolations += 1
+                }
+                if score < SearchRelevance.protectionFloor,
+                    score + UsageCeiling >= SearchRelevance.protectionFloor
+                {
+                    counts.boostCrossedBand += 1
+                }
+                if SearchRelevance.quality(query: query, fields: fields) != score {
+                    counts.nondeterministic += 1
+                }
+            }
+
+            if i % 97 == 0, rank(query) != rank(query) { counts.unstableOrder += 1 }
+        }
+        return counts
+    }
+
+    static func propertyLoop() async {
         print("\n# randomized property loop")
 
         let alphabet = Array("abcdefghijklmnopqrstuvwxyz .-_0123456789浏览器사파리🙂\u{200E}\u{0301}")
@@ -574,54 +625,38 @@ struct FuzzTest {
             FuzzyMatch.Tier.allCases.compactMap { SearchRelevance.cell(role, $0) }
         }
         var rng = Random(seed: 0x5EED_1234_ABCD_0001)
-
-        var bandViolations = 0
-        var nondeterministic = 0
-        var unstableOrder = 0
-        var boostCrossedBand = 0
-        var matched = 0
+        let allFields = apps.map(\.fields)
         let iterations = 100_000
 
-        for i in 0..<iterations {
+        // Drawn up front in one sequence, so a failure reproduces however the sweep is split.
+        let queries = (0..<iterations).map { i -> String in
             // Three query shapes: a real slice, a scrambled subsequence, and junk.
-            let query: String
             switch i % 3 {
             case 0:
                 let source = Array(rng.element(allText))
                 let start = rng.int(max(1, source.count))
                 let length = 1 + rng.int(max(1, source.count - start))
-                query = String(source[start..<min(source.count, start + length)])
+                return String(source[start..<min(source.count, start + length)])
             case 1:
                 let source = Array(rng.element(allText))
-                query = String(source.compactMap { rng.int(3) == 0 ? $0 : nil })
+                return String(source.compactMap { rng.int(3) == 0 ? $0 : nil })
             default:
-                query = String((0..<(1 + rng.int(8))).map { _ in rng.element(alphabet) })
+                return String((0..<(1 + rng.int(8))).map { _ in rng.element(alphabet) })
             }
-
-            for app in apps {
-                let fields = app.fields
-                guard let score = SearchRelevance.quality(query: query, fields: fields) else { continue }
-                matched += 1
-
-                // Every score is one cell plus a shape, and usage may never lift it past P1.
-                // A query that folds away claims no cell; every real one is a cell plus a shape.
-                if !FuzzyMatch.Query(query).isEmpty,
-                    !cells.contains(where: {
-                        score - $0 >= 0 && score - $0 <= SearchRelevance.shapeSpan
-                    })
-                {
-                    bandViolations += 1
-                }
-                if score < SearchRelevance.protectionFloor,
-                    score + UsageCeiling >= SearchRelevance.protectionFloor
-                {
-                    boostCrossedBand += 1
-                }
-                if SearchRelevance.quality(query: query, fields: fields) != score { nondeterministic += 1 }
-            }
-
-            if i % 97 == 0, rank(query) != rank(query) { unstableOrder += 1 }
         }
+
+        let sliceSize = iterations / (ProcessInfo.processInfo.activeProcessorCount * 4)
+        let counts = await withTaskGroup(of: LoopCounts.self) { group in
+            for start in stride(from: 0, to: iterations, by: sliceSize) {
+                let slice = queries[start..<min(start + sliceSize, iterations)]
+                group.addTask { sweep(slice, fields: allFields, cells: cells) }
+            }
+            return await group.reduce(into: LoopCounts()) { $0.add($1) }
+        }
+        let (bandViolations, nondeterministic, unstableOrder, boostCrossedBand, matched) = (
+            counts.bandViolations, counts.nondeterministic, counts.unstableOrder,
+            counts.boostCrossedBand, counts.matched
+        )
 
         check(
             "every score is one cell plus a shape", bandViolations == 0,

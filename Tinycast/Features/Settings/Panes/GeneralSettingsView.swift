@@ -124,6 +124,8 @@ struct GeneralSettingsView: View {
                     SettingsRowTitle(.generalAppearance, "Theme")
                     Text("Match macOS, or pin Tinycast to Light or Dark.")
                 }
+                InterfaceSizeRow()
+                PaletteTransparencyRow()
                 Toggle(isOn: $settings.compactMode) {
                     SettingsRowTitle(.generalAppearance, "Compact mode")
                     Text(
@@ -170,7 +172,7 @@ struct GeneralSettingsView: View {
                 }
                 Picker(selection: $settings.escapeKeyBehavior) {
                     ForEach(EscapeKeyBehavior.allCases) { behavior in
-                        Text(behavior.title).tag(behavior)
+                        Text(behavior.title.localizedUI).tag(behavior)
                     }
                 } label: {
                     SettingsRowTitle(.generalGeneral, "Escape Key Behavior")
@@ -217,5 +219,99 @@ struct GeneralSettingsView: View {
 
     private func refreshInputSources() {
         inputSources = core.inputSourceSwitcher.options(selecting: settings.autoSwitchInputSourceID)
+    }
+}
+
+/// Three glyph steps read as a legend; a true-to-scale "Aa" would look identical at 1.1.
+private struct InterfaceSizeRow: View {
+    @Environment(AppSettings.self) private var settings
+
+    private static let glyph: [InterfaceSize: CGFloat] = [
+        .standard: 11, .large: 14, .larger: 17
+    ]
+
+    var body: some View {
+        SettingsRow(
+            title: "Interface size",
+            subtitle: "Scale the launcher and the windows that float with it. Settings stay put.",
+            subtitleLineLimit: 2,
+            anchor: .generalAppearance
+        ) {
+            HStack(spacing: Theme.Spacing.xxs) {
+                ForEach(InterfaceSize.allCases) { size in
+                    segment(size)
+                }
+            }
+        }
+    }
+
+    private func segment(_ size: InterfaceSize) -> some View {
+        let selected = settings.interfaceSize == size
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.barControl, style: .continuous)
+        return Button {
+            settings.interfaceSize = size
+        } label: {
+            Text("Aa")
+                .font(.system(size: Self.glyph[size] ?? 13, weight: .medium))
+                .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .frame(width: Theme.Size.interfaceSizeSegment, height: Theme.Size.settingsSearchField)
+                // Without this only the glyphs take the click, not the segment around them.
+                .contentShape(shape)
+                .background(shape.fill(selected ? Theme.Colors.controlSurface : Color.clear))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(size.title.localizedUI)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .help(size.title.localizedUI)
+    }
+}
+
+private struct PaletteTransparencyRow: View {
+    @Environment(AppSettings.self) private var settings
+    @State private var draft: Double?
+    @State private var isEditing = false
+
+    private var value: Binding<Double> {
+        Binding(
+            get: { draft ?? Double(settings.paletteTransparency) },
+            set: { value in
+                if isEditing {
+                    draft = value
+                } else {
+                    settings.paletteTransparency = Int(value)
+                }
+            })
+    }
+
+    var body: some View {
+        SettingsRow(
+            title: "Background transparency",
+            subtitle: "The level of transparency of the glass background.",
+            subtitleLineLimit: 2,
+            anchor: .generalAppearance
+        ) {
+            Slider(
+                value: value, in: -100...100, step: 50, neutralValue: 0,
+                label: { EmptyView() },
+                minimumValueLabel: { Text("Less") },
+                maximumValueLabel: { Text("More") },
+                tick: { SliderTick($0) },
+                onEditingChanged: { editing in
+                    isEditing = editing
+                    if !editing, let draft {
+                        settings.paletteTransparency = Int(draft)
+                        self.draft = nil
+                    }
+                }
+            )
+            .labelsHidden()
+            .accessibilityLabel("Background transparency")
+            .frame(width: Theme.Size.paletteTransparencySlider)
+            Button("Reset") {
+                draft = nil
+                settings.paletteTransparency = 0
+            }
+            .help("Restore the default background in Light and Dark.")
+        }
     }
 }

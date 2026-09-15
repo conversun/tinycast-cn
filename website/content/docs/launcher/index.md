@@ -1,115 +1,162 @@
 ---
 title: App launcher
-description: Fuzzy search across everything Tinycast knows about, and how results are ranked.
+description: One search across everything Tinycast knows about, and how it decides what comes first.
 ---
 
-The launcher is the root screen. It searches applications, System Settings panes, quicklinks,
-snippets, system actions, window commands, custom commands and built-in commands at once.
+The launcher is the root screen. One search covers your apps, System Settings panes, commands,
+quicklinks, snippets, system actions, window commands and layouts, custom commands, Quick Actions,
+extension commands and upcoming meetings.
 
-<kbd>↵</kbd> opens the selection. <kbd>⌘</kbd><kbd>K</kbd> shows everything else you can do with it.
+<kbd>return</kbd> opens what is selected. <kbd>⌘</kbd><kbd>K</kbd> shows everything else you can do with it.
 
-## What an empty query shows
+## With nothing typed
 
-Favorites first, then each category in a fixed order:
+[Favorites](/docs/launcher/favorites) come first, then each section in this order:
 
-Applications → System Settings → Quicklinks → Snippets → System Actions → Window Management →
-Custom Commands → Commands
+Meetings → Applications → System Settings → Extensions → Quicklinks → Snippets → System Actions →
+Window Layouts → Window Management → Custom Commands → Quick Actions → Commands
 
-Once you type, that structure collapses into a single **Results** list ordered by relevance.
+Each section is in alphabetical order, and stays that way. A list that reorders itself as you use it
+is hard to scan.
+
+When a meeting is about to start, a [join card](/docs/features/calendar#the-join-card) sits above
+everything.
+
+## When you type
+
+The sections fold into one **Results** list, ordered by how well each entry matches. A few things can
+appear around it:
+
+- **A calculator card** at the top when your text is a
+  [calculation](/docs/features/calculator), like `12% of 80` or `time in Tokyo`.
+- **A color card** when you paste a color like `#FF5733`.
+- **Open in Browser** at the top when you type a web address or a bare domain, like `github.com`.
+- **"Use … with"** rows at the bottom, which send your text somewhere else. See
+  [Fallbacks](/docs/launcher/fallbacks).
+
+### Listing a whole category
+
+Type a section's exact name, like `Snippets`, `Snippet` or `Window Management`, and you get that
+whole category under its own heading.
+
+It has to be the exact name. An app whose name is exactly your text still shows too, which is why
+typing `System Settings` lists both the app and its panes.
 
 ## How matching works
 
-Tinycast scores each field it knows about, in bands. A hit in a higher band always beats a hit in a
-lower one — this is why a two-letter query lands on the app you meant rather than something with
-those letters buried in it.
+Tinycast looks at several names for each entry, and trusts some more than others:
 
-| Band | Field                                           | Matches on                           |
-| ---- | ----------------------------------------------- | ------------------------------------ |
-| 6    | Your [alias](/docs/launcher/aliases)            | Exact or prefix only                 |
-| 5    | Display name, and a snippet's keyword           | Exact, prefix, word-start, substring |
-| 4    | Spotlight alternate names; alias substring hits | Literal                              |
-| 3    | Display name                                    | Subsequence                          |
-| 2    | Spotlight alternate names                       | Subsequence                          |
-| 1    | Bundle identifier                               | Literal only                         |
-| 0    | Executable name                                 | Literal only                         |
+| Name                                  | Example                                 |
+| ------------------------------------- | --------------------------------------- |
+| Your [alias](/docs/launcher/aliases)  | `ps` for Photoshop                      |
+| The display name                      | `Visual Studio Code`                    |
+| Other names the app is known by       | `iCal` for Calendar, `微信` as `weixin` |
+| The extension a command comes from    | `lucide` for Lucide's Search Icons      |
+| The bundle identifier or program name | `apple.Photos`                          |
 
-Two rules are worth knowing:
+How the letters match matters too: an exact match beats one at the start, which beats one at the
+start of a word, which beats one in the middle, which beats scattered letters.
 
-- **Identifier fields never subsequence-match.** Otherwise almost every query would hit almost every
-  bundle id.
-- **Bundle ids match with the leading component stripped**, so `apple.Photos` works. Pasting the
-  full `com.apple.Photos` still matches exactly.
+**One rule never bends: typing a name or alias exactly always wins**, however often you picked
+something else. Everything below that can move with [learned ranking](#learned-ranking).
 
-### Spotlight alternate names
+A few details keep results sensible:
 
-Apps also match the names macOS itself knows them by, which is why `iCal` finds Calendar,
-`Address Book` finds Contacts, `System Preferences` finds System Settings, and `browser`, `浏览器`
-or `사파리` all find Safari.
+- **Bundle identifiers only match as typed**, never by scattered letters. Otherwise almost any short
+  search would hit almost every app. They also match without the leading `com.`, so `apple.Photos`
+  works, while pasting the full `com.apple.Photos` still finds it.
+- **An extension's name ranks low.** An extension called `Safari` can never take that search from the
+  real Safari.
+
+### Names in your language
+
+Apps are shown the way Finder shows them, in your Mac's language. The English name still works, so
+on a Portuguese Mac both `Find My` and `Buscar` find the same app.
+
+Apps also match the other names macOS knows them by: `Address Book` finds Contacts,
+`System Preferences` finds System Settings, and `browser`, `浏览器` or `사파리` all find Safari.
+
+Names in other scripts get a Latin spelling too: `微信` answers to `weixin` and `wx`, `メモ帳` to
+`memo`, and `Яндекс` to `yandeks`.
+
+If you renamed an app in Finder, both the old and the new name find it.
 
 ## Learned ranking
 
-Tinycast learns which result you pick for each query, on device, and floats it up next time.
+Tinycast learns which result you pick for a search, on your Mac, and moves it up next time.
 
-Selecting a result records **every prefix of what you typed** — choosing WhatsApp for `wha` also
-teaches `w` and `wh`, so the app arrives faster each time.
+Pick WhatsApp after typing `wha`, and it also comes up sooner for `w` and `wh`. The more often and
+more recently you pick something, the stronger the boost.
 
-Two things deliberately do not teach it: activating something by its own global hotkey, and picking a
-favorite from an empty query. Neither is a search.
+These do not teach it, because none of them is a search: opening something with its own shortcut,
+launching a favorite with <kbd>⌘</kbd> and a number, listing a category, and Open in Browser.
 
-The boost reorders within a relevance band. It can never make a weaker match kind beat a stronger
-one, so learning cannot make search feel unpredictable.
+**Resetting.** For one entry: <kbd>⌘</kbd><kbd>K</kbd> → **Reset Ranking**, shown only when that entry
+has learned something. For everything: **Settings → General → Learned ranking → Reset**.
 
-**Resetting.** One entry: <kbd>⌘</kbd><kbd>K</kbd> → **Reset Ranking**, shown only when that entry
-has learned data. Everything: **Settings → General → Search → Reset**.
-
-Learned data stays in `launcher-ranking.json` in Tinycast's own folder and goes nowhere else.
+What it learns stays in `launcher-ranking.json` in Tinycast's own folder and goes nowhere else.
 
 ## Search scopes
 
-**Settings → General → Search Scopes** controls which folders are indexed for applications. A scope
-is a folder or a single `.app`.
+**Settings → Applications → Search Scopes** decides which folders are searched for apps. A scope can
+be a folder or a single `.app`.
 
-Defaults cover `/Applications`, `/System/Applications`, both `Utilities` folders,
-`/System/Library/CoreServices/Applications`, the Cryptex path where Safari actually lives,
-`~/Applications`, and Finder as an individual bundle.
+The defaults cover `/Applications`, `/System/Applications`, both `Utilities` folders,
+`/System/Library/CoreServices/Applications`, the hidden system folder where Safari really lives,
+`~/Applications`, and Finder on its own.
 
-Enumeration goes **one subfolder deep**, so
-`/Applications/Blackmagic Design/DaVinci Resolve.app` is found without a scope of its own. Anything
-nested deeper needs its own scope. `.app` bundles are treated as leaves, never descended into.
+Tinycast looks **one folder deep**, so `/Applications/Blackmagic Design/DaVinci Resolve.app` is found
+without its own scope. Anything deeper needs a scope of its own. It never looks inside an app bundle.
 
-Scopes are stored with `~` abbreviated, so a backup taken on one Mac still points somewhere sensible
-on another. Editing them re-indexes immediately.
+Scopes are saved with `~` shortened, so a backup still makes sense on another Mac. Changing them
+searches again straight away.
 
 ## Actions on an app
 
-Open <kbd>⌘</kbd><kbd>K</kbd> with an application selected:
+Open <kbd>⌘</kbd><kbd>K</kbd> with an app selected:
 
-| Action                                            | Shortcut                             |
-| ------------------------------------------------- | ------------------------------------ |
-| Open Application                                  | <kbd>↵</kbd>                         |
-| Show in Finder                                    | <kbd>⌘</kbd><kbd>↵</kbd>             |
-| Add to / Remove from Favorites                    |                                      |
-| Quit Application                                  | <kbd>⌃</kbd><kbd>⇧</kbd><kbd>Q</kbd> |
-| Reset Ranking                                     |                                      |
-| [Uninstall Application](/docs/launcher/uninstall) |                                      |
+| Action                                            | Shortcut                                            |
+| ------------------------------------------------- | --------------------------------------------------- |
+| Open Application                                  | <kbd>return</kbd>                                   |
+| Show in Finder                                    | <kbd>⌘</kbd><kbd>return</kbd>                       |
+| Add to / Remove from Favorites                    | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>F</kbd>                |
+| Move Favorite Up / Down                           | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↑</kbd> / <kbd>↓</kbd> |
+| Reset Ranking                                     |                                                     |
+| Hide from Search                                  | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd>                |
+| Restart Application                               | <kbd>⌘</kbd><kbd>R</kbd>                            |
+| Quit Application                                  | <kbd>⌃</kbd><kbd>⇧</kbd><kbd>Q</kbd>                |
+| [Uninstall Application](/docs/launcher/uninstall) |                                                     |
 
-**Quit Application** appears only while that app is running, and quits it gracefully — an app with
-unsaved work still shows you its save sheet. The menu samples "is running" once when it opens, so
-the row cannot appear or disappear underneath your cursor.
+**Restart Application** and **Quit Application** only appear while the app is running. Both quit
+politely, so an app with unsaved work still asks you to save. Restart waits up to five seconds for
+the app to quit, then opens it again. If the app refuses to quit, nothing is reopened.
 
 To quit everything at once, use the **Quit All Applications**
-[system action](/docs/launcher/system-actions), which skips Finder and Tinycast itself.
+[system action](/docs/launcher/system-actions). It leaves Finder and Tinycast running.
 
-## Per-app hotkeys
+## Hiding a result
 
-Any application can take its own global shortcut, recorded in **Settings → Applications**. Pressing
-it toggles that app: focus it if it is not frontmost, hide it if it is.
+<kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd> (**Hide from Search**) takes the selected entry out of search
+results. The palette stays open on the same search.
 
-See [Hotkeys](/docs/reference/hotkeys) for the recorder and the double-tap option.
+It works for apps, System Settings panes, commands, Quick Actions, system actions, window commands
+and window layouts. To bring one back, tick its checkbox again in that Settings pane.
 
-## Hiding things
+Hiding only changes what search shows. The app stays installed, and its favorite, alias, learned
+ranking and shortcut all keep working.
 
-**Settings → Applications** has a master **Show in launcher** toggle plus a checkbox per app, so you
-can hide the ones you never launch by name without hiding the section.
+## Per-app shortcuts
 
-A hidden row still keeps its shortcut. Hiding changes what search shows, not what works.
+Any app can have its own global shortcut, set in **Settings → Applications**. Press it to bring the
+app to the front; press it again while the app is in front to hide it.
+
+See [Hotkeys](/docs/reference/hotkeys) for recording shortcuts and the double-tap option.
+
+## Switching a whole section off
+
+**Settings → Applications** has **Enable Applications**, plus a checkbox per app.
+
+- **Enable Applications** off takes every app out of search **and** turns off every per-app shortcut.
+- A single app's checkbox only hides that one row. Its shortcut keeps working.
+
+System Settings, System Actions and Commands each have the same kind of switch in their own pane.

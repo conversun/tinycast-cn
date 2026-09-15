@@ -1,109 +1,116 @@
 ---
 title: Window management
-description: 34 commands — halves, quarters, fourths, thirds, nudges, display moves and instant Space switching.
+description: 35 commands for halves, quarters, thirds, sizing, nudges, displays and instant Space switching.
 ---
 
-Move and resize the window you were last in, without installing anything else.
+Move and resize the window you were last using, without installing anything else.
 
-**It needs no new permission.** It reuses the same
-[Accessibility](/docs/permissions) grant that clipboard pasting already uses.
+**It needs no new permission.** It uses the same [Accessibility](/docs/permissions) grant that
+clipboard pasting already uses.
 
-**Settings → Window Management** holds the feature switch. It ships **off**; while off there are no
-launcher entries and a still-registered shortcut moves nothing.
+**Settings → Window Management** holds the switch. It ships **off**. While it is off there are no
+window commands in the launcher, and a shortcut you recorded moves nothing.
+
+The same pane also holds [window layouts](/docs/features/window-layouts): saved arrangements of many
+windows across your displays.
 
 ## The commands
 
-**Halves** — Left · Right · Top · Bottom
+**Halves** · Left Half · Right Half · Top Half · Bottom Half
 
-**Quarters** — Top Left · Top Right · Bottom Left · Bottom Right
+**Quarters** · Top Left Quarter · Top Right Quarter · Bottom Left Quarter · Bottom Right Quarter
 
-**Fourths** — First Three Fourths · Last Three Fourths
+**Fourths** · First Three Fourths · Last Three Fourths
 
-**Thirds** — First Third · Center Third · Last Third · First Two Thirds · Last Two Thirds
+**Thirds** · First Third · Center Third · Last Third · First Two Thirds · Last Two Thirds
 
-**Sizing** — Maximize · Almost Maximize · Reasonable Size · Maximize Height · Maximize Width ·
-Center · Center Half · Make Larger · Make Smaller · Restore
+**Sizing** · Maximize · Almost Maximize · Reasonable Size · Maximize Height · Maximize Width ·
+Center · Center Half · Center Two Thirds · Make Larger · Make Smaller · Restore Window
 
-**Moving** — Left · Right · Up · Down · Next Display · Previous Display
+**Moving** · Move Left · Move Right · Move Up · Move Down · Move to Next Display · Move to Previous Display
 
-**Fullscreen** — Toggle Fullscreen
+**Fullscreen** · Toggle Fullscreen
 
-**Spaces** — Switch to Previous Space · Switch to Next Space
+**Spaces** · Switch to Previous Space · Switch to Next Space
 
 ## Settings
 
-| Setting                  | Range          | Default |
-| ------------------------ | -------------- | ------- |
-| Enable window management | —              | **Off** |
-| Show in launcher         | —              | On      |
-| Cycle sizes on repeat    | —              | **Off** |
-| Gap between windows      | 0–64 pt, in 2s | **0**   |
+| Setting                  | Options                                  | Default  |
+| ------------------------ | ---------------------------------------- | -------- |
+| Enable window management | On · Off                                 | **Off**  |
+| Show in launcher         | On · Off                                 | On       |
+| Cycling                  | None · Cycle ½, ⅓ and ⅔ · Cycle displays | **None** |
+| Gap between windows      | 0 to 64 points, in steps of 2            | **0**    |
 
-Per-command shortcut and visibility live in this same pane — window commands deliberately get no
-launcher pane of their own.
+Each command's shortcut, alias and launcher checkbox live in this same pane. To switch one command
+off, clear its shortcut and untick its checkbox. There is no separate per-command switch.
 
-**Clearing a recorded shortcut is how you disable one.** There is no separate per-command switch.
+## How the sizes are worked out
 
-## Geometry
+**Gaps.** An edge against the screen gets the full gap; an edge between two windows gets half. So two
+windows side by side leave exactly one gap between them, and every screen edge is inset by one gap.
+Edges are rounded, so thirds never overlap or leave a one-point seam.
 
-**Gaps.** An edge on the screen boundary takes the full gap; an interior edge takes half. So two
-adjacent tiles leave exactly `gap` between them and every screen edge is inset by `gap`. Rects round
-on their edges, so thirds never overlap or leave a one-point seam.
+**Make Larger and Make Smaller** step by 5% of the _screen_, not the window, so the two undo each
+other exactly. The largest size is the screen. The smallest is 200 × 150 points or 15% of the
+screen, whichever is bigger. Past either limit, they do nothing.
 
-**Make Larger / Make Smaller** step by 5% of the _screen_, not the window, forced so each edge moves
-a whole point — which makes the two **exactly invertible**. The ceiling is the screen; the floor is
-200×150 or 15% of the screen, whichever is larger. Both saturate into clean no-ops.
+**Reasonable Size** is 60% of the screen, centered, and never more than 1025 × 900 points. On a big
+5K display you get a sensible window, not a huge one. Pressing it again changes nothing.
 
-**Reasonable Size** is 60% of the screen, centred, capped at 1025×900 points — so a 5K display gets a
-sensible window rather than an enormous one. It ignores the current size, making it idempotent.
+**Center Half** is half the screen's width at full height, centered. **Center Two Thirds** is the
+same, at two thirds of the width.
 
-**Center Half** is half the screen's _area_: half width, full height, centred.
-
-Oversized or off-screen windows are always clamped back onto the display, pinning the leading edge.
-The usable area already excludes the menu bar, the Dock and the notch.
+A window that is too big or off-screen is always pulled back onto the display. The usable area
+already leaves out the menu bar, the Dock and the notch.
 
 ## Cycling and Restore
 
-**Cycling** covers the four halves only, stepping ½ → ⅓ → ⅔, and is off by default. Top and Bottom
-Half cycle through vertical thirds.
+**Cycling** only applies to the four halves, and it is off by default. With it off, pressing Left Half
+again just puts the window in the same place. The two modes change that:
 
-It restarts at ½ when you move the window yourself (more than 2 pt), on a different command, on a
-different display, after a timeout, or when cycling is off.
+- **Cycle ½, ⅓ and ⅔** changes the width in place with each press. Top Half and Bottom Half step
+  through heights instead.
+- **Cycle displays** moves the half along every half-slot across your displays, so one shortcut
+  sweeps the whole desk. With two displays, Left Half goes Display 1 left → Display 2 right →
+  Display 2 left → Display 1 right, then round again. With one display it does nothing.
 
-**Restore is single-level, not a stack.** Left Half → Maximize → Top Right → Restore lands on the
-**original** frame, not the previous one.
+The cycle starts over when you move the window yourself (by more than 2 points), use a different
+command, move to a different display, or wait a while.
 
-Restore also works on windows Tinycast has never moved, because the frame is captured before the
-first change. Memory is per window, capped at 64, dropped when the app quits, and never written to
-disk.
+**Restore Window goes back one step, not through a history.** Left Half → Maximize → Top Right
+Quarter → Restore Window puts the window back where it **started**, not where it was last.
+
+Restore Window also works on windows Tinycast has never moved, because it notes the frame before the first
+change. It remembers up to 64 windows, forgets an app's windows when it quits, and never saves this
+to disk.
 
 ## Fullscreen
 
-**Toggle Fullscreen** uses the accessibility fullscreen attribute, falling back to pressing the
-window's fullscreen button, then to a quiet no-op.
+**Toggle Fullscreen** asks the window to go fullscreen, then tries pressing its green button, and
+otherwise does nothing.
 
-There is deliberately no synthetic <kbd>⌃</kbd><kbd>⌘</kbd><kbd>F</kbd> attempt — apps can rebind it,
-and firing an unrelated menu command would be worse than doing nothing.
+It never fakes <kbd>⌃</kbd><kbd>⌘</kbd><kbd>F</kbd>. Apps can use that key for something else, and
+firing the wrong command would be worse than doing nothing.
 
-It clears the cycle chain but keeps the restore point.
+It resets the cycle, but keeps the Restore point.
 
 ## Spaces
 
-**Switch to Previous Space** and **Switch to Next Space** move between macOS Spaces without the
-sliding transition — roughly 56 ms, against about a second for the system's own
+**Switch to Previous Space** and **Switch to Next Space** move between macOS Spaces **without the
+sliding animation**: about 56 ms, instead of about a second for the system's own
 <kbd>⌃</kbd><kbd>←</kbd> and <kbd>⌃</kbd><kbd>→</kbd>.
 
-They work by synthesising the trackpad swipe macOS already switches Spaces with, at a velocity high
-enough that the transition finishes rather than animates. Desktop Spaces and fullscreen Spaces are
-both included, since it is the same gesture either way.
+They work by sending the same trackpad swipe macOS already uses to switch Spaces, fast enough that
+the switch finishes instead of animating. Desktop Spaces and fullscreen Spaces are both included.
 
-Held down, presses that arrive while a switch is still in flight are dropped rather than queued, so a
-long press never overshoots. At the first or last Space, macOS does whatever it normally does.
+If you hold the shortcut down, presses that arrive mid-switch are dropped, so a long press never
+jumps too far. At the first or last Space, macOS does whatever it normally does.
 
-## Failing quietly
+## When a window will not move
 
-Windows that are minimized, sheets or popovers, already natively fullscreen, or that report no
-position or size are rejected before anything is attempted.
+Minimized windows, sheets and popovers, windows already in native fullscreen, and windows that do not
+report a position or size are skipped before anything happens.
 
-A non-resizable window — System Information, for instance — is left alone rather than half-moved. If
-an app refuses to shrink, the window is re-placed against its anchor **once**, never in a loop.
+A window that cannot be resized, like System Information, is left alone rather than half-moved. If an
+app refuses to shrink, Tinycast lines the window up against its side **once**, never in a loop.

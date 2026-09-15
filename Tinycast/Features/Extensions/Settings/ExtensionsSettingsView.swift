@@ -488,6 +488,8 @@ private struct SettingsCardRow<Control: View>: View {
     var indent: CGFloat = 0
     /// A short fact about the row, beside its name rather than in the control column.
     var badge: String?
+    /// `nil` lets a pair of 120pt fields size themselves; other rows keep the shared 200pt slot.
+    var controlWidth: CGFloat? = Self.controlWidth
     @ViewBuilder var control: Control
 
     var body: some View {
@@ -516,16 +518,18 @@ private struct SettingsCardRow<Control: View>: View {
             .gridColumnAlignment(.leading)
             // One width for every control: else a toggle, a pop-up and a field end apart.
             control
-                .frame(width: SettingsCardRow.controlWidth, alignment: .trailing)
+                .frame(width: controlWidth, alignment: .trailing)
                 .gridColumnAlignment(.trailing)
         }
     }
 }
 
-/// One command: its shortcut, then any preferences it declares of its own.
+/// One command: alias, shortcut and launcher checkbox on the title row, then its own preferences.
 private struct CommandRows: View {
     let installed: InstalledExtension
     let command: ExtensionCommand
+    @Environment(AppSettings.self) private var settings
+    @Environment(VisibilityStore.self) private var visibility
 
     /// A fact about the command, so it sits by the name as a badge rather than a warning colour.
     private var badge: String? {
@@ -533,15 +537,26 @@ private struct CommandRows: View {
     }
 
     var body: some View {
-        SettingsCardRow(title: command.title, detail: command.description, badge: badge) {
-            if command.mode.isSupported {
-                // Per command, not per extension: a shortcut has to land on one thing to run.
-                ShortcutRecorder(
-                    action: .extensionCommand(
-                        entryID: ExtensionCommandRef(
-                            extensionName: installed.manifest.name, commandName: command.name
-                        ).entryID),
-                    isQuiet: true)
+        let entry = installed.launcherEntry(for: command)
+        let isVisible = visibility.isItemVisible(entry)
+        SettingsCardRow(
+            title: command.title, detail: command.description, badge: badge, controlWidth: nil
+        ) {
+            HStack(spacing: Theme.Spacing.lg) {
+                // Hidden or unpublished commands never reach rank, so typing here would match nothing.
+                AliasField(entry: entry)
+                    .settingsEnabled(settings.extensionsShowInLauncher && isVisible)
+                if command.mode.isSupported {
+                    // Per command, not per extension: a shortcut has to land on one thing to run.
+                    ShortcutRecorder(action: .extensionCommand(entryID: entry.id))
+                }
+                Toggle(
+                    "", isOn: Binding(get: { isVisible }, set: { visibility.setItemVisible($0, for: entry) })
+                )
+                .labelsHidden()
+                .toggleStyle(.checkbox)
+                .help("Show in launcher")
+                .accessibilityLabel("Show \(command.title) in launcher")
             }
         }
         // Indented under its command: at the same inset the association is reading order.
@@ -607,39 +622,31 @@ private struct ExtensionRefreshRow: View {
 /// Hides one extension's commands: an import can add hundreds, and the global switch is too blunt.
 private struct ExtensionLauncherRow: View {
     let installed: InstalledExtension
-    @Environment(AppCore.self) private var core
-
-    private var entryIDs: [String] {
-        installed.manifest.commands.map {
-            ExtensionCommandRef(extensionName: installed.manifest.name, commandName: $0.name)
-                .entryID
-        }
-    }
-
-    private var isVisible: Bool {
-        entryIDs.contains { !core.visibility.hiddenItemKeys.contains($0) }
-    }
+    @Environment(VisibilityStore.self) private var visibility
 
     var body: some View {
+        let entries = installed.manifest.commands.map(installed.launcherEntry)
+        let visibleCount = entries.count(where: visibility.isItemVisible)
         SettingsCardRow(
             title: String(localized: "Show in launcher"),
-            detail: isVisible
-                ? String(localized: "Its commands appear in launcher search.")
-                : String(localized: "Hidden from launcher search; shortcuts still work.")
+            detail: detail(visible: visibleCount, of: entries.count)
         ) {
             // A closure, not `set: setVisible`: an actor-isolated method as a setter crashes IRGen.
-            Toggle("", isOn: Binding(get: { isVisible }, set: { setVisible($0) }))
-                .labelsHidden()
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { visibleCount > 0 },
+                    set: { visible in entries.forEach { visibility.setItemVisible(visible, for: $0) } })
+            )
+            .labelsHidden()
         }
     }
 
-    private func setVisible(_ visible: Bool) {
-        for entryID in entryIDs {
-            core.visibility.setItemVisible(
-                visible,
-                for: AppEntry(
-                    id: entryID, name: "", url: installed.directory, bundleID: nil,
-                    kind: .extensionCommand))
+    private func detail(visible: Int, of total: Int) -> String {
+        switch visible {
+        case 0: String(localized: "Hidden from launcher search; shortcuts still work.")
+        case total: String(localized: "Its commands appear in launcher search.")
+        default: String(localized: "\(visible) of \(total) commands appear in launcher search.")
         }
     }
 }
@@ -933,6 +940,15 @@ private struct ExtensionImportSheet: View {
                     chosen.remove(candidate.installed.manifest.name)
                 }
             })
+    }
+}
+
+extension InstalledExtension {
+    /// The entry `VisibilityStore` and `AliasStore` key on: only its id is read, never its row.
+    fileprivate func launcherEntry(for command: ExtensionCommand) -> AppEntry {
+        AppEntry(
+            id: ExtensionCommandRef(extensionName: manifest.name, commandName: command.name).entryID,
+            name: command.title, url: directory, bundleID: nil, kind: .extensionCommand)
     }
 }
 

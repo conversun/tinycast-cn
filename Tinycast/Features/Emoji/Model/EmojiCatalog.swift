@@ -75,9 +75,7 @@ struct EmojiEntry: Identifiable, Hashable, Sendable {
     let name: String
     let category: EmojiCategory
     let supportsSkinTone: Bool
-    let keywords: String  // space-joined search terms; empty for most symbols
-    /// The CLDR name in this fork's language, scored like `name` so 火 finds 🔥 and not the blob
-    /// that merely lists it. Empty where CLDR has no annotation for the glyph.
+    let keywords: String  // comma-joined search terms; empty for most symbols
     let localizedName: String
 
     var id: String { glyph }

@@ -1,9 +1,21 @@
 import CryptoKit
+import Darwin
 import Foundation
 
 /// Answered inline on the JS queue, so a blocking answer can never deadlock the UI.
 final class ExtensionNodeShims: @unchecked Sendable {
     private let fileManager = FileManager.default
+    private var fileHandles: [Int32: FileHandle] = [:]
+
+    /// A lock flag like `O_EXLOCK` would block the JS queue with no way back.
+    private static let openableFlags =
+        O_RDONLY | O_WRONLY | O_RDWR | O_APPEND | O_CREAT | O_TRUNC | O_EXCL | O_NOFOLLOW
+    private static let openFileLimit = 256
+
+    func closeFiles() {
+        for handle in fileHandles.values { try? handle.close() }
+        fileHandles.removeAll()
+    }
 
     /// Returns the JSON envelope `{ok, value}` / `{ok:false, error, code}` the JS side unwraps.
     func perform(api: String, method: String, argsJSON: String) -> String {
@@ -39,10 +51,78 @@ final class ExtensionNodeShims: @unchecked Sendable {
     private func dispatch(api: String, method: String, arguments: [Any]) throws -> Any? {
         switch api {
         case "fs": return try filesystem(method: method, arguments: arguments)
+        case "os": return try operatingSystem(method: method)
         case "proc": return try process(method: method, arguments: arguments)
         case "crypto": return try crypto(method: method, arguments: arguments)
         case "zlib": return try compression(method: method, arguments: arguments)
         default: throw ShimError.failed("Unknown host module '\(api)'.", "ENOSYS")
+        }
+    }
+
+    // MARK: - os
+
+    private func operatingSystem(method: String) throws -> Any {
+        if method == "uptime" { return ProcessInfo.processInfo.systemUptime }
+        if method == "loadavg" {
+            var averages = [Double](repeating: 0, count: 3)
+            let count = averages.withUnsafeMutableBufferPointer {
+                getloadavg($0.baseAddress, Int32($0.count))
+            }
+            guard count == Int32(averages.count) else {
+                throw ShimError.failed("Could not read system load averages.")
+            }
+            return averages
+        }
+        if method == "freemem" {
+            var statistics = vm_statistics64_data_t()
+            var count = mach_msg_type_number_t(
+                MemoryLayout<vm_statistics64_data_t>.stride / MemoryLayout<integer_t>.stride)
+            let result = withUnsafeMutablePointer(to: &statistics) { pointer in
+                pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                    host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+                }
+            }
+            guard result == KERN_SUCCESS else {
+                throw ShimError.failed("Could not read free memory (Mach error \(result)).")
+            }
+            return Double(statistics.free_count) * Double(getpagesize())
+        }
+        guard method == "cpus" else {
+            throw ShimError.failed("os.\(method) is not supported.", "ENOSYS")
+        }
+
+        var processorCount: natural_t = 0
+        var processorInfo: processor_info_array_t?
+        var processorInfoCount: mach_msg_type_number_t = 0
+        let result = host_processor_info(
+            mach_host_self(), PROCESSOR_CPU_LOAD_INFO, &processorCount,
+            &processorInfo, &processorInfoCount)
+        guard result == KERN_SUCCESS, let processorInfo else {
+            throw ShimError.failed("Could not read CPU load (Mach error \(result)).")
+        }
+        defer {
+            _ = vm_deallocate(
+                mach_task_self_, vm_address_t(UInt(bitPattern: processorInfo)),
+                vm_size_t(processorInfoCount) * vm_size_t(MemoryLayout<integer_t>.stride))
+        }
+
+        let millisecondsPerTick = 1_000 / Double(CLK_TCK)
+        return (0..<Int(processorCount)).map { processor -> [String: Any] in
+            let offset = processor * Int(CPU_STATE_MAX)
+            func milliseconds(_ state: Int32) -> Double {
+                Double(processorInfo[offset + Int(state)]) * millisecondsPerTick
+            }
+            return [
+                "model": "Apple Silicon",
+                "speed": 0,
+                "times": [
+                    "user": milliseconds(CPU_STATE_USER),
+                    "nice": milliseconds(CPU_STATE_NICE),
+                    "sys": milliseconds(CPU_STATE_SYSTEM),
+                    "idle": milliseconds(CPU_STATE_IDLE),
+                    "irq": 0
+                ]
+            ]
         }
     }
 
@@ -57,6 +137,22 @@ final class ExtensionNodeShims: @unchecked Sendable {
         }
 
         switch method {
+        case "open":
+            let target = try path(0)
+            guard fileHandles.count < Self.openFileLimit else {
+                throw ShimError.failed("EMFILE: too many open files, open '\(target)'", "EMFILE")
+            }
+            let flags = (arguments[safe: 1] as? NSNumber)?.int32Value ?? O_RDONLY
+            let mode = (arguments[safe: 2] as? NSNumber)?.uint16Value ?? 0o666
+            let descriptor = Darwin.open(
+                target, (flags & Self.openableFlags) | O_CLOEXEC, mode_t(mode))
+            guard descriptor >= 0 else { throw fileError("open", target) }
+            fileHandles[descriptor] = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+            return descriptor
+
+        case "close", "read", "write":
+            return try fileOperation(method: method, arguments: arguments)
+
         case "readFile":
             let target = try path(0)
             guard let data = fileManager.contents(atPath: target) else {
@@ -178,6 +274,73 @@ final class ExtensionNodeShims: @unchecked Sendable {
             throw ShimError.failed("fs.\(method) is not supported.", "ENOSYS")
         }
     }
+
+    private func fileOperation(method: String, arguments: [Any]) throws -> Any? {
+        guard let descriptor = (arguments.first as? NSNumber)?.int32Value,
+            let handle = fileHandles[descriptor]
+        else { throw ShimError.failed("EBADF: bad file descriptor, \(method)", "EBADF") }
+        switch method {
+        case "close":
+            fileHandles[descriptor] = nil
+            do { try handle.close() } catch { throw fileError("close") }
+            return nil
+        case "read":
+            let count = max(0, (arguments[safe: 1] as? NSNumber)?.intValue ?? 0)
+            let position = (arguments[safe: 2] as? NSNumber)?.int64Value
+            var data = Data(count: count)
+            let read = data.withUnsafeMutableBytes { bytes in
+                uninterrupted {
+                    if let position {
+                        return Darwin.pread(descriptor, bytes.baseAddress, count, off_t(position))
+                    }
+                    return Darwin.read(descriptor, bytes.baseAddress, count)
+                }
+            }
+            guard read >= 0 else { throw fileError("read") }
+            return data.prefix(read).base64EncodedString()
+        default:
+            let data = Data(base64Encoded: arguments[safe: 1] as? String ?? "") ?? Data()
+            let position = (arguments[safe: 2] as? NSNumber)?.int64Value
+            var written = 0
+            // fs-minipass drops the remainder it is handed, so a short write truncates in silence.
+            try data.withUnsafeBytes { bytes in
+                while written < data.count {
+                    let start = bytes.baseAddress!.advanced(by: written)
+                    let remaining = data.count - written
+                    let step = uninterrupted {
+                        if let position {
+                            return Darwin.pwrite(
+                                descriptor, start, remaining, off_t(position) + off_t(written))
+                        }
+                        return Darwin.write(descriptor, start, remaining)
+                    }
+                    guard step > 0 else { throw fileError("write") }
+                    written += step
+                }
+            }
+            return written
+        }
+    }
+
+    private func uninterrupted(_ body: () -> Int) -> Int {
+        while true {
+            let result = body()
+            if result >= 0 || errno != EINTR { return result }
+        }
+    }
+
+    private func fileError(_ syscall: String, _ path: String? = nil) -> ShimError {
+        let code = errno
+        let name = Self.errorNames[code] ?? "EIO"
+        let target = path.map { " '\($0)'" } ?? ""
+        return ShimError.failed(
+            "\(name): \(String(cString: strerror(code))), \(syscall)\(target)", name)
+    }
+
+    private static let errorNames: [Int32: String] = [
+        EACCES: "EACCES", EBADF: "EBADF", EEXIST: "EEXIST", EISDIR: "EISDIR", EMFILE: "EMFILE",
+        ENOENT: "ENOENT", ENOSPC: "ENOSPC", ENOTDIR: "ENOTDIR", EPERM: "EPERM"
+    ]
 
     private func stat(path: String, followLinks: Bool) throws -> [String: Any] {
         let attributes =

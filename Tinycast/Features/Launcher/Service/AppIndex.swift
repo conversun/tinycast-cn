@@ -5,6 +5,7 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case application
         case systemSettings
         case command
+        case quickAction
         case customCommand
         case snippet
         case systemAction
@@ -19,57 +20,75 @@ struct AppEntry: Identifiable, Hashable, Sendable {
             case .application:
                 return KindDescriptor(
                     label: "Application", sectionTitle: "Applications",
-                    openVerb: "Open Application", canRevealInFinder: true, isSymbolIcon: false)
+                    openVerb: "Open Application", canHideFromSearch: true,
+                    canRevealInFinder: true, isSymbolIcon: false)
             case .systemSettings:
                 return KindDescriptor(
                     label: "System Setting", sectionTitle: "System Settings",
-                    openVerb: "Open System Setting", canRevealInFinder: true, isSymbolIcon: false)
+                    openVerb: "Open System Setting", canHideFromSearch: true,
+                    canRevealInFinder: true, isSymbolIcon: false)
             case .command:
                 return KindDescriptor(
                     label: "Command", sectionTitle: "Commands",
-                    openVerb: "Run Command", canRevealInFinder: false, isSymbolIcon: true)
+                    openVerb: "Run Command", canHideFromSearch: true,
+                    canRevealInFinder: false, isSymbolIcon: true)
+            case .quickAction:
+                return KindDescriptor(
+                    label: "Quick Action", sectionTitle: "Quick Actions",
+                    openVerb: "Run Quick Action", canHideFromSearch: true,
+                    canRevealInFinder: false, isSymbolIcon: true)
             case .customCommand:
                 return KindDescriptor(
                     label: "Custom Command", sectionTitle: "Custom Commands",
-                    openVerb: "Run Custom Command", canRevealInFinder: false, isSymbolIcon: true)
+                    openVerb: "Run Custom Command", canHideFromSearch: false,
+                    canRevealInFinder: false, isSymbolIcon: true)
             case .snippet:
                 return KindDescriptor(
                     label: "Snippet", sectionTitle: "Snippets",
-                    openVerb: "Paste Snippet", canRevealInFinder: true, isSymbolIcon: true)
+                    openVerb: "Paste Snippet", canHideFromSearch: false,
+                    canRevealInFinder: true, isSymbolIcon: true)
             case .systemAction:
                 return KindDescriptor(
                     label: "System Action", sectionTitle: "System Actions",
-                    openVerb: "Run System Action", canRevealInFinder: false, isSymbolIcon: true)
+                    openVerb: "Run System Action", canHideFromSearch: true,
+                    canRevealInFinder: false, isSymbolIcon: true)
             case .windowCommand:
                 return KindDescriptor(
                     label: "Window Command", sectionTitle: "Window Management",
-                    openVerb: "Move Window", canRevealInFinder: false, isSymbolIcon: true)
+                    openVerb: "Move Window", canHideFromSearch: true,
+                    canRevealInFinder: false, isSymbolIcon: true)
             case .windowLayout:
                 return KindDescriptor(
                     label: "Window Layout", sectionTitle: "Window Layouts",
-                    openVerb: "Arrange Windows", canRevealInFinder: false, isSymbolIcon: true)
+                    openVerb: "Arrange Windows", canHideFromSearch: true,
+                    canRevealInFinder: false, isSymbolIcon: true)
             case .quicklink:
                 return KindDescriptor(
                     label: "Quicklink", sectionTitle: "Quicklinks",
-                    openVerb: "Open Quicklink", canRevealInFinder: false, isSymbolIcon: true)
+                    openVerb: "Open Quicklink", canHideFromSearch: false,
+                    canRevealInFinder: false, isSymbolIcon: true)
             case .extensionCommand:
                 // The label is per-entry, the owning extension's title; this is the fallback.
                 return KindDescriptor(
                     label: "Extension", sectionTitle: "Extensions",
-                    openVerb: "Run Command", canRevealInFinder: false, isSymbolIcon: true)
+                    openVerb: "Run Command", canHideFromSearch: true,
+                    canRevealInFinder: false, isSymbolIcon: true)
             case .meeting:
                 return KindDescriptor(
                     label: "Meeting", sectionTitle: "Meetings",
-                    openVerb: "Join Meeting", canRevealInFinder: false, isSymbolIcon: true)
+                    openVerb: "Join Meeting", canHideFromSearch: false,
+                    canRevealInFinder: false, isSymbolIcon: true)
             }
         }
     }
 
-    /// Everything that is fixed per kind. A new `Kind` case fails to build until it names all five.
+    /// Everything that is fixed per kind. A new `Kind` case fails to build until it names all six.
     struct KindDescriptor: Sendable {
         let label: String
         let sectionTitle: String
         let openVerb: String
+        /// Only where Settings lists a per-item checkbox to put it back: a hide is never one-way.
+        let canHideFromSearch: Bool
         let canRevealInFinder: Bool
         let isSymbolIcon: Bool
     }
@@ -79,6 +98,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
     let url: URL
     let bundleID: String?
     let kind: Kind
+    /// Set when a feature pane, not this entry's category pane, lists its controls and gates it.
+    var settingsOwner: SettingsTab?
     /// Secondary label beside the name, for an entry whose name alone can't say what it acts on.
     var subtitle: String?
     /// Background-refresh dot for a scheduled extension command; nil everywhere else.
@@ -135,6 +156,9 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         switch kind {
         case .command:
             return CommandCatalog.command(for: self)?.hotKeyAction
+        case .quickAction:
+            if let command = CommandCatalog.command(for: self) { return command.hotKeyAction }
+            return CustomQuickAction.id(fromEntryID: id).map { .quickAction(id: $0) }
         case .application:
             return bundleID.map { .app(bundleID: $0) }
         case .systemSettings:
@@ -157,6 +181,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
     /// Synthetic entries have no file to reveal; a destination is its record's own action.
     var canRevealInFinder: Bool { kind.descriptor.canRevealInFinder }
 
+    var canHideFromSearch: Bool { kind.descriptor.canHideFromSearch }
+
     /// What this row draws, and the only thing any icon path needs to ask.
     var iconSource: EntryIcon { iconOverride ?? defaultIcon }
 
@@ -172,6 +198,8 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         case .snippet: return "text.quote"
         case .customCommand: return CustomCommand.sfSymbol
         case .command: return CommandCatalog.command(for: self)?.sfSymbol ?? "questionmark"
+        case .quickAction:
+            return CommandCatalog.command(for: self)?.sfSymbol ?? CustomQuickAction.sfSymbol
         case .systemAction: return SystemActionCatalog.action(forEntryID: id)?.sfSymbol ?? "questionmark"
         case .windowCommand:
             return WindowCommandCatalog.command(forEntryID: id)?.sfSymbol ?? "questionmark"
@@ -198,6 +226,14 @@ extension AppEntry {
             id: layout.entryID, name: layout.name,
             url: URL(string: "tinycast://window-layout/" + layout.id.uuidString)!,
             bundleID: nil, kind: .windowLayout, symbolName: layout.iconSymbol)
+    }
+
+    /// The one row a custom Quick Action draws, wherever it is offered from.
+    init(_ action: CustomQuickAction) {
+        self.init(
+            id: action.entryID, name: action.name,
+            url: URL(string: "tinycast://quick-action/" + action.id.uuidString)!,
+            bundleID: nil, kind: .quickAction, symbolName: action.iconSymbol)
     }
 
     /// The one row a quicklink draws, wherever it is offered from.
@@ -279,6 +315,7 @@ final class AppIndex {
     private var windowCommandEntries: [AppEntry] = []
     private var windowLayoutEntries: [AppEntry] = []
     private var quicklinkEntries: [AppEntry] = []
+    private var customQuickActionEntries: [AppEntry] = []
     private var extensionEntries: [AppEntry] = []
     private var meetingEntries: [AppEntry] = []
     /// The catalog's commands a disabled feature hides; the Commands slice is recomputed from it.
@@ -299,6 +336,14 @@ final class AppIndex {
 
     /// The always-relevant built-ins, plus whatever a disabled feature has not hidden.
     private var commandEntries: [AppEntry] {
+        visibleCatalogEntries.filter { $0.kind == .command }
+    }
+
+    private var quickActionEntries: [AppEntry] {
+        visibleCatalogEntries.filter { $0.kind == .quickAction } + customQuickActionEntries
+    }
+
+    private var visibleCatalogEntries: [AppEntry] {
         CommandCatalog.all.filter {
             guard let command = CommandCatalog.command(for: $0) else { return true }
             return !hiddenCommands.contains(command)
@@ -329,6 +374,14 @@ final class AppIndex {
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         guard entries != customCommandEntries else { return }
         customCommandEntries = entries
+        publishEntries()
+    }
+
+    /// Replaces the custom Quick Action slice, which shares its section with the shipped four.
+    func setCustomQuickActions(_ actions: [CustomQuickAction]) {
+        let entries = actions.sorted(by: CustomQuickAction.precedes).map(AppEntry.init)
+        guard entries != customQuickActionEntries else { return }
+        customQuickActionEntries = entries
         publishEntries()
     }
 
@@ -427,7 +480,8 @@ final class AppIndex {
             let languages = BundleLocalization.indexedLanguages(Locale.preferredLanguages)
             let reusing = BundleNameCache(reusing: nameCache, languages: languages)
             let (found, cache, panes) = await Task.detached(priority: .utility) {
-                AppIndex.scan(scopes: scopes, cache: reusing, paneCache: reusingPanes)
+                AppIndex.scan(
+                    scopes: scopes, languages: languages, cache: reusing, paneCache: reusingPanes)
             }.value
             nameCache = cache
             paneCache = panes
@@ -438,7 +492,8 @@ final class AppIndex {
     }
 
     nonisolated private static func scan(
-        scopes: [String], cache: BundleNameCache, paneCache: SettingsPaneScanner.Cache?
+        scopes: [String], languages: [String], cache: BundleNameCache,
+        paneCache: SettingsPaneScanner.Cache?
     ) -> ([AppEntry], BundleNameCache, SettingsPaneScanner.Cache?) {
         Signposts.interval("AppIndex.scan") {
             var cache = cache
@@ -454,8 +509,9 @@ final class AppIndex {
                     continue
                 }
 
-                let names = cache.names(for: url)
                 // Finder's rule: LaunchServices ignores a display name the file name contradicts.
+                let names = cache.names(
+                    for: url, base: fileName, developmentRegion: bundle?.developmentLocalization)
                 let name = names.localized.first ?? fileName
                 let executable =
                     bundle?.object(forInfoDictionaryKey: "CFBundleExecutable") as? String
@@ -475,7 +531,7 @@ final class AppIndex {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
             // Settings panes are `.appex` bundles, which carry no Spotlight alternate names.
-            let (panes, panesCache) = SettingsPaneScanner.scan(cache: paneCache)
+            let (panes, panesCache) = SettingsPaneScanner.scan(languages: languages, cache: paneCache)
             // Named here, not at publish: romanizing a CJK index is ~50 ms of main-actor time.
             return (AppIndex.named(apps + panes), cache, panesCache)
         }
@@ -497,7 +553,7 @@ final class AppIndex {
             + Self.named(
                 extensionEntries + quicklinkEntries + snippetEntries + Self.systemActionEntries
                     + windowLayoutEntries + windowCommandEntries + customCommandEntries
-                    + commandEntries)
+                    + quickActionEntries + commandEntries)
         guard updated != apps else { return }
         apps = updated
         entriesRevision &+= 1

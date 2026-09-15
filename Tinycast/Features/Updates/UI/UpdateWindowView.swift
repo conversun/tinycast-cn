@@ -148,10 +148,8 @@ struct UpdateWindowView: View {
             content()
                 .textSelection(.enabled)
                 .padding(Theme.Spacing.xl)
-                .hideNativeScrollers()
         }
         .frame(height: Self.cardHeight)
-        .thinScrollbar()
         .background(Theme.Colors.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
     }

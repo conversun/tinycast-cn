@@ -8,6 +8,8 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     case calculatorHistory
     case emoji
     case fileSearch
+    case menuSearch
+    case switchWindows
     case schedule
     case uninstall
     case quicklinks
@@ -30,6 +32,8 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .calculatorHistory: return "plus.forwardslash.minus"
         case .emoji: return "face.smiling"
         case .fileSearch: return "doc.text.magnifyingglass"
+        case .menuSearch: return "menubar.rectangle"
+        case .switchWindows: return "macwindow.on.rectangle"
         case .schedule: return "calendar"
         case .uninstall: return "trash"
         case .quicklinks: return Quicklink.sfSymbol
@@ -44,10 +48,11 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .clipboard: return String(localized: "Type to filter entries…")
         case .ai: return String(localized: "Ask anything…")
         case .aiHistory: return String(localized: "Search chats…")
-        case .calculatorHistory:
-            return String(localized: "Do math, convert units, or search your past calculations…")
+        case .calculatorHistory: return String(localized: "Do math, convert units, or search your past calculations…")
         case .emoji: return String(localized: "Search emoji and symbols…")
         case .fileSearch: return String(localized: "Search files and folders…")
+        case .menuSearch: return String(localized: "Search menu bar items…")
+        case .switchWindows: return String(localized: "Search open windows…")
         case .schedule: return String(localized: "Search your schedule…")
         case .uninstall: return String(localized: "Filter files and folders by name…")
         case .quicklinks: return String(localized: "Search quicklinks…")

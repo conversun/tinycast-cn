@@ -3,30 +3,30 @@
 // `RaycastImportOptions` exactly — don't add anything the importer can't carry.
 
 export const migration = {
-  eyebrow: "Already set up elsewhere?",
   title: "Bring your setup with you.",
   intro:
-    "Tinycast reads a Raycast export directly. Point it at your .rayconfig file, type the passphrase, and pick what comes across — no redoing shortcuts by hand.",
+    "Tinycast reads a Raycast export directly. Point it at your .rayconfig file, type the passphrase, and your shortcuts come with you.",
   steps: [
     {
       title: "Export what you have",
-      body: "Raycast → Settings → Advanced → Export, and note the passphrase.",
+      body: "In Raycast, export your settings and data. Note the passphrase you set.",
     },
     {
       title: "Open Settings → Backup",
-      body: "Choose the file. Tinycast reads both export formats and says which one it found.",
+      body: "Choose the file and type the passphrase. A wrong one is reported as exactly that.",
     },
     {
       title: "Pick what to bring",
-      body: "Keep it all or just the parts you want — then you're set up.",
+      body: "Keep everything, or only the parts you want. That's the whole setup.",
     },
   ],
-  // Must match RaycastImportOptions in Features/Backup/Model/RaycastFormat.swift.
+  // Must match RaycastImportOptions in Features/Backup/Model/RaycastImport.swift.
   transfers: [
     "Shortcuts",
     "Favorites",
     "Clipboard history",
     "Snippets",
+    "Quicklinks",
     "Aliases",
     "Emoji skin tone",
     "Compact mode",

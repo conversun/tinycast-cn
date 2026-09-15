@@ -1,4 +1,22 @@
+import QuartzCore
 import SwiftUI
+
+/// Restated here so launcher motion can change without moving an extension surface.
+@MainActor private enum ExtensionMenuMotion {
+    private static let entryScale: CGFloat = 0.94
+    private static let exitScaleDelta: CGFloat = 0.04
+
+    static let panel = MenuPanelMotion(
+        entryScale: entryScale,
+        maximumScale: 1.003,
+        exitScaleDelta: exitScaleDelta,
+        expansionDuration: 0.14,
+        settleDuration: 0.08,
+        exitDuration: 0.18,
+        expansionTiming: CAMediaTimingFunction(controlPoints: 0.2, 0.7, 0.2, 1),
+        settleTiming: CAMediaTimingFunction(controlPoints: 0.42, 0, 0.58, 1),
+        exitTiming: CAMediaTimingFunction(controlPoints: 0.4, 0, 1, 1))
+}
 
 /// `ExtensionScreen` decides the row order; this maps `selection` 1:1 onto visible rows.
 struct ExtensionCommandScreen: PaletteScreen {
@@ -49,7 +67,7 @@ struct ExtensionCommandScreen: PaletteScreen {
         }
     }
 
-    /// The panel's first `Action`, exactly as in Raycast.
+    /// The primary action is the panel's first `Action`.
     private func primaryAction(at selection: Int) -> ExtensionAction? {
         ExtensionScreen.actions(in: screen.actionPanel(forItemAt: selection)).first
     }
@@ -83,7 +101,7 @@ struct ExtensionCommandScreen: PaletteScreen {
         let extensions = extensions
         return PaletteMenuContent(
             rowCount: actions.count,
-            view: {
+            view: { _ in
                 AnyView(
                     ExtensionActionsPanel(
                         header: ExtensionActionsMenu.header(screen: screen, selection: selection),
@@ -93,7 +111,17 @@ struct ExtensionCommandScreen: PaletteScreen {
             activate: { index in
                 guard let handler = actions[index].handler else { return }
                 extensions.dispatch(handler: handler)
-            })
+            },
+            clipPath: { bounds, metrics, _ in
+                UnevenRoundedRectangle(
+                    topLeadingRadius: metrics.radius.menuPanel,
+                    bottomLeadingRadius: metrics.radius.menuPanel,
+                    bottomTrailingRadius: metrics.size.menuButton / 2,
+                    topTrailingRadius: metrics.radius.menuPanel,
+                    style: .continuous
+                ).path(in: bounds).cgPath
+            },
+            motion: ExtensionMenuMotion.panel)
     }
 
     func activate(at selection: Int) {
@@ -102,6 +130,52 @@ struct ExtensionCommandScreen: PaletteScreen {
     }
 
     func secondary(at selection: Int) -> Bool { false }
+
+    /// The `searchBarAccessory` dropdown; an empty one states and opens nothing, so it is none.
+    var searchAccessory: ExtensionSearchAccessory? {
+        guard let accessory = ExtensionSearchAccessory(node: screen.searchBarAccessory),
+            !accessory.items.isEmpty
+        else { return nil }
+        return accessory
+    }
+
+    /// The header control for it, as an opaque box the palette only seats and toggles.
+    func searchAccessoryButton(
+        _ accessory: ExtensionSearchAccessory, isOpen: Bool, action: @escaping () -> Void
+    ) -> AnyView {
+        AnyView(
+            ExtensionSearchAccessoryButton(
+                accessory: accessory, value: extensions.accessorySelection(accessory),
+                assetsPath: assetsPath, isOpen: isOpen, action: action))
+    }
+
+    /// Its choices as a palette menu, so the arrows, ↵, Escape and the click-away come free.
+    func searchAccessoryMenu(
+        menuSelection: Binding<Int>, onActivate: @escaping (Int) -> Void
+    ) -> PaletteMenuContent? {
+        guard let accessory = searchAccessory else { return nil }
+        let chosen = extensions.accessorySelection(accessory).map { Set([$0]) } ?? []
+        let assetsPath = assetsPath
+        let extensions = extensions
+        return PaletteMenuContent(
+            rowCount: accessory.items.count,
+            view: { _ in
+                AnyView(
+                    ExtensionPickerList(
+                        items: accessory.items, selection: menuSelection.wrappedValue,
+                        chosen: chosen, assetsPath: assetsPath,
+                        width: ExtensionSearchAccessoryButton.listWidth, onSelect: onActivate,
+                        onHighlight: { menuSelection.wrappedValue = $0 }))
+            },
+            activate: { index in
+                extensions.chooseAccessorySelection(accessory, value: accessory.items[index].value)
+            },
+            clipPath: { bounds, metrics, _ in
+                RoundedRectangle(cornerRadius: metrics.radius.menuPanel, style: .continuous)
+                    .path(in: bounds).cgPath
+            },
+            motion: ExtensionMenuMotion.panel)
+    }
 
     func body(selection: Int, scroll: ScrollIntent) -> AnyView {
         AnyView(

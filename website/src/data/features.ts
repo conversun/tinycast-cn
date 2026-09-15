@@ -1,132 +1,150 @@
 import type { IconName } from "../components/ui/feature-icons";
 
+export type FeaturePreview =
+  | "launcher"
+  | "extensions"
+  | "clipboard"
+  | "calculator"
+  | "aiChat"
+  | "quickActions"
+  | "windows"
+  | "snippets";
+
 export type Feature = {
   icon: IconName;
   title: string;
   body: string;
   /** Deep link into the docs page that covers this feature. */
   href: string;
-  // `wide` features span two columns in the bento grid.
-  wide?: boolean;
+  preview: FeaturePreview;
+  /** Spans two columns of the bento on wide screens. */
+  isWide: boolean;
 };
+
+export type MinorFeature = Pick<Feature, "icon" | "title" | "href">;
 
 // Everything Tinycast does, in plain language. Kept true to what the app
 // actually ships — each maps to a real feature in the source, and each links
-// to the docs page that covers it.
-export const features: Feature[] = [
+// to the docs page that covers it. Order sets the bento: every row adds up to
+// four columns, with wide cards counting as two.
+export const coreFeatures: Feature[] = [
   {
     icon: "launch",
     title: "App launcher",
-    body: "Fuzzy-search every app on your Mac and open it with a keystroke. Pin the ones you reach for, see what's already running, and quit an app without leaving the keyboard.",
+    body: "Fuzzy-search every app and open it with a keystroke. Pin favorites, see what's running, restart or quit without the mouse.",
     href: "/docs/launcher",
-    wide: true,
-  },
-  {
-    icon: "extensions",
-    title: "Extensions",
-    body: "Runs Raycast extensions natively, rendered as SwiftUI. Install from the store without a toolchain, or bring over the ones you already have.",
-    href: "/docs/extensions",
-  },
-  {
-    icon: "clipboard",
-    title: "Clipboard history",
-    body: "Text and images, full-text searchable, filtered by type, pasted straight back where you came from — kept as long as you like, up to forever.",
-    href: "/docs/features/clipboard",
+    preview: "launcher",
+    isWide: true,
   },
   {
     icon: "calculator",
     title: "Inline calculator",
-    body: "Math, unit, live currency and crypto conversions right in the palette — plus plain-English dates like “days till 9 Apr”.",
+    body: "Math, units, live currency, time zones and dates like “days till 9 Apr”.",
     href: "/docs/features/calculator",
+    preview: "calculator",
+    isWide: false,
   },
   {
-    icon: "snippets",
-    title: "Snippets",
-    body: "Reusable Markdown templates with placeholders, arguments and nested references. Type a keyword in any app and it expands.",
-    href: "/docs/features/snippets",
+    icon: "clipboard",
+    title: "Clipboard history",
+    body: "Text, images, files and colors, searchable and pasted straight back.",
+    href: "/docs/features/clipboard",
+    preview: "clipboard",
+    isWide: false,
   },
   {
-    icon: "notes",
-    title: "Floating notes",
-    body: "Plain Markdown files in one floating editor. No database, no frontmatter — the file on disk is exactly what you typed.",
-    href: "/docs/features/notes",
+    icon: "aiChat",
+    title: "AI Chat",
+    body: "Apple Intelligence, Codex, Claude, OpenCode or any API you bring.",
+    href: "/docs/ai",
+    preview: "aiChat",
+    isWide: false,
   },
   {
-    icon: "fileSearch",
-    title: "File search",
-    body: "Find files and folders through the Spotlight index, only when you ask. Needs no file permission at all.",
-    href: "/docs/features/file-search",
+    icon: "quickActions",
+    title: "Quick Actions",
+    body: "Select text in any app and fix, rewrite, translate or summarize it.",
+    href: "/docs/ai/quick-actions",
+    preview: "quickActions",
+    isWide: false,
   },
   {
     icon: "windows",
     title: "Window management",
-    body: "Halves, quarters, thirds, nudges, display moves and instant Space switching — 32 commands, with no new permission and nothing new to install.",
+    body: "Halves, thirds, nudges, display moves and saved layouts, all from the keyboard. 34 commands.",
     href: "/docs/features/window-management",
+    preview: "windows",
+    isWide: true,
+  },
+  {
+    icon: "extensions",
+    title: "Raycast extensions",
+    body: "Run in JavaScriptCore and drawn in SwiftUI. Install from the store with no toolchain.",
+    href: "/docs/extensions",
+    preview: "extensions",
+    isWide: true,
+  },
+  {
+    icon: "snippets",
+    title: "Snippets",
+    body: "Markdown templates with placeholders. Type a keyword in any app and it expands.",
+    href: "/docs/features/snippets",
+    preview: "snippets",
+    isWide: true,
+  },
+];
+
+// The long tail: named, linked, and kept out of the way of the eight above.
+export const moreFeatures: MinorFeature[] = [
+  { icon: "notes", title: "Floating notes", href: "/docs/features/notes" },
+  {
+    icon: "fileSearch",
+    title: "File search",
+    href: "/docs/features/file-search",
+  },
+  {
+    icon: "calendar",
+    title: "Calendar & meetings",
+    href: "/docs/features/calendar",
+  },
+  {
+    icon: "navigation",
+    title: "Window & menu search",
+    href: "/docs/features/navigation",
   },
   {
     icon: "quicklinks",
     title: "Quicklinks",
-    body: "Turn a URL, search, file or deeplink into a real command, with arguments it prompts you for and a chosen app to open it in.",
     href: "/docs/launcher/quicklinks",
   },
   {
     icon: "keyboard",
     title: "Custom commands",
-    body: "Name a shell command and run it from search or its own global hotkey. Every run confirms first.",
     href: "/docs/launcher/commands",
   },
   {
     icon: "bolt",
-    title: "System actions",
-    body: "Lock, sleep, restart, volume, Bluetooth, Stage Manager, empty the Trash — 31 actions, each bindable to a key.",
+    title: "31 system actions",
     href: "/docs/launcher/system-actions",
   },
-  {
-    icon: "emoji",
-    title: "Emoji & symbols",
-    body: "Search the full emoji and symbol set, tune the skin tone, and your most-used ones float to the top.",
-    href: "/docs/features/emoji",
-  },
-  {
-    icon: "globe",
-    title: "Global & per-app hotkeys",
-    body: "Record a shortcut to summon the palette, bind a key to any app to focus or hide it, or double-tap a lone modifier.",
-    href: "/docs/reference/hotkeys",
-  },
-  {
-    icon: "hyper",
-    title: "Hyper key",
-    body: "Turn Caps Lock or a right-side modifier into ⌃⌥⇧⌘ — a whole extra layer of shortcuts, shown as a single ✦.",
-    href: "/docs/reference/hotkeys",
-  },
-  {
-    icon: "alias",
-    title: "Aliases",
-    body: "Rename anything in the launcher. An alias matches as strongly as the real name, so “ps” can open Photoshop.",
-    href: "/docs/launcher/aliases",
-  },
+  { icon: "emoji", title: "Emoji & symbols", href: "/docs/features/emoji" },
+  { icon: "globe", title: "Per-app hotkeys", href: "/docs/reference/hotkeys" },
+  { icon: "hyper", title: "Hyper key", href: "/docs/reference/hotkeys" },
+  { icon: "alias", title: "Aliases", href: "/docs/launcher/aliases" },
   {
     icon: "uninstall",
     title: "App uninstaller",
-    body: "Remove an app and the caches, preferences and containers it leaves behind. Everything goes to the Trash, never deleted.",
     href: "/docs/launcher/uninstall",
   },
   {
     icon: "inputSource",
     title: "Input source switching",
-    body: "Switch the keyboard to a chosen source while the palette is open, and put it back when you leave.",
-    href: "/docs/palette",
+    href: "/docs/palette#input-source",
   },
   {
     icon: "appearance",
-    title: "Light & Dark",
-    body: "Follow macOS, or pin Tinycast to Light or Dark. Same design either way — only the ink inverts.",
-    href: "/docs/reference/settings",
+    title: "Light, Dark and glass",
+    href: "/docs/palette#appearance",
   },
-  {
-    icon: "backup",
-    title: "Backup & restore",
-    body: "Export every shortcut, favorite and clip to one file, then restore it on another Mac. A backup can never grant a permission.",
-    href: "/docs/reference/backup",
-  },
+  { icon: "backup", title: "Backup & restore", href: "/docs/reference/backup" },
 ];

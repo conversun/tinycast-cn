@@ -1,74 +1,81 @@
 ---
 title: System actions
-description: 31 built-in actions for the Mac itself — lock, sleep, volume, Bluetooth, Trash and more.
+description: 31 built-in actions for the Mac itself, like lock, sleep, volume, Bluetooth and the Trash.
 ---
 
-System actions are things you do to the machine rather than to a file. Each one is searchable and
-each one can take a global shortcut.
+System actions are things you do to your Mac rather than to a file. Each one is searchable, and each
+one can have a global shortcut.
 
-They live in their own **System Actions** section, and are configured in
+They have their own **System Actions** section in the launcher, and their own pane in
 **Settings → System Actions**.
 
 ## The full list
 
-**Session** — Lock Screen · Sleep · Sleep Displays · Restart · Shut Down · Log Out ·
+**Session** · Lock Screen · Sleep · Sleep Displays · Restart · Shut Down · Log Out ·
 Show Screen Saver
 
-**Media** — Play / Pause · Next Track · Previous Track
+**Media** · Play / Pause · Next Track · Previous Track
 
-**Volume** — Toggle Mute · Turn Volume Up · Turn Volume Down · Set Volume… ·
-Set Volume to 0% / 25% / 50% / 75% / 100%
+**Volume** · Toggle Mute · Turn Volume Up · Turn Volume Down · Set Volume… ·
+Set Volume to 0% · 25% · 50% · 75% · 100%
 
-**Desktop** — Show Desktop · Toggle System Appearance · Toggle Stage Manager ·
+**Desktop** · Show Desktop · Toggle System Appearance · Toggle Stage Manager ·
 Hide All Apps Except Frontmost · Unhide All Hidden Apps · Quit All Applications ·
 Dismiss Notifications
 
-**Files** — Open Trash · Empty Trash · Eject All Disks · Toggle Hidden Files
+**Files** · Open Trash · Empty Trash · Eject All Disks · Toggle Hidden Files
 
-**Hardware** — Toggle Bluetooth
+**Hardware** · Toggle Bluetooth
 
 ## Confirmation
 
-Five actions ask first, because getting them by accident is expensive:
+Five actions ask first, because running them by accident is costly:
 
 Restart · Shut Down · Log Out · Empty Trash · Quit All Applications
 
-<kbd>↵</kbd> runs, <kbd>⎋</kbd> cancels. Each confirmation carries that action's own icon, so you can
-tell at a glance what you are about to do.
+<kbd>return</kbd> runs and <kbd>esc</kbd> cancels. Each dialog shows that action's own icon, so you can see
+at a glance what you are about to do. **Quit All Applications** tells you how many apps it will quit.
 
-**The gate applies to the global shortcut too.** There is no way to bypass it, and holding a
+**The same question comes up when you use a shortcut.** There is no way around it, and holding a
 shortcut down cannot stack up dialogs.
 
 ## What you see afterwards
 
-Actions with no visible effect report the state they landed in — `Trash Emptied`,
-`Hidden Files Shown`, `Dark Appearance`, `Bluetooth Off`, `3 Disks Ejected`.
+Actions with no visible effect tell you where they landed: `Trash Emptied`, `Hidden Files Shown`,
+`Dark Appearance`, `Bluetooth Off`, `3 Disks Ejected`.
 
-A green check means something changed. A neutral dot means there was nothing to do:
-`Trash Is Already Empty` is an outcome, not a failure, and the same goes for Eject All Disks,
-Dismiss Notifications and Unhide All Apps.
+A green check means something changed. A plain dot means there was nothing to do.
+`Trash Is Already Empty` is an answer, not a failure, and so is the same kind of message from Eject
+All Disks, Dismiss Notifications and Unhide All Hidden Apps.
 
-## Volume
+## A few details
 
-Volume Up and Down walk a **5% grid** — from 37%, up lands on 40% and down on 35%.
+**Volume.** Up and Down move along a **5% grid**: from 37%, up goes to 40% and down to 35%. Tinycast
+shows its own volume display, because macOS only shows one for the real media keys. It shows the
+level as a number, says `Muted` instead of `0%`, and fades after 1.6 seconds.
 
-Tinycast draws its own volume HUD, because macOS only shows one for real media keys. It prints the
-level as text, shows `Muted` rather than `0%`, and dismisses after 1.6 seconds. Arrow keys walk the
-same 5% grid; clicking the track jumps straight to a level.
+**Eject All Disks** ejects external and removable drives, including a dock's hard drive, and never
+touches internal or network volumes.
 
-## Toggle System Appearance
+**Hide All Apps Except Frontmost** and **Quit All Applications**, run from a shortcut with the
+palette closed, work on the app that is actually in front. Quit All leaves Finder and Tinycast
+running, and quits politely, so apps with unsaved work still ask you to save.
 
-This changes **macOS itself**, not just Tinycast. Tinycast follows along only while its own
-[theme](/docs/palette#appearance) is set to System.
+**Toggle System Appearance** changes **macOS itself**, not just Tinycast. Tinycast follows along only
+while its own [theme](/docs/palette#appearance) is set to System.
 
 ## Permissions
 
-Automation, Accessibility and Bluetooth are requested at first use of the specific action that needs
-them, never up front. If you deny one, you get an alert with a link to the right System Settings
-pane rather than a silent no-op.
+Some actions need Automation, Accessibility or Bluetooth access. Each is asked for the first time you
+run the action that needs it, never up front. If you say no, you get a message with a link to the
+right System Settings pane instead of nothing happening.
 
 ## Settings
 
-**Settings → System Actions** is a list with a **Show in launcher** master toggle, and per action a
-visibility checkbox, a shortcut recorder and an alias field. There is a filter field at the top,
-which you will want with 31 rows.
+**Settings → System Actions** has **Enable System Actions** at the top, and a row per action with a
+launcher checkbox, a shortcut recorder and an alias field. A filter field at the top helps with 31
+rows.
+
+**Enable System Actions** off takes every action out of search and turns off their shortcuts. A single
+row's checkbox only hides it from search, and <kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd> in the launcher
+does the same.

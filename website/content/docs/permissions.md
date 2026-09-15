@@ -1,70 +1,92 @@
 ---
 title: Permissions
-description: Accessibility is the only permission Tinycast requests, and only when you use a feature that needs it.
+description: What Tinycast asks for, why, and the moment it asks.
 ---
 
-Tinycast asks for **one** permission: Accessibility. Nothing else is ever requested.
+Tinycast asks for a permission **only when you use a feature that needs it**, never at launch. The
+launcher, the calculator, the emoji picker and search all work with no permission at all.
 
-The launcher, the calculator, the emoji picker and search all work with no permission at all.
+**Settings → Permissions** shows where Accessibility and Calendars stand, and opens the right System
+Settings pane for you.
 
 ## Accessibility
 
-macOS calls this "control your computer". In Tinycast it is what allows the app to read from and
-write to the window you were in before the palette opened.
+macOS calls this "control your computer". In Tinycast it lets the app read from, and write to, the
+window you were using before the palette opened.
 
-**Grant it in System Settings → Privacy & Security → Accessibility**, or from
-**Settings → Permissions**, which shows the current status and opens the right pane for you.
+Grant it in **System Settings → Privacy & Security → Accessibility**, or from
+**Settings → Permissions**.
 
 ### What needs it
 
-| Feature                                               | Why                                                      |
-| ----------------------------------------------------- | -------------------------------------------------------- |
-| [Clipboard](/docs/features/clipboard) paste-back      | Puts the clip into the app you came from                 |
-| [Emoji](/docs/features/emoji) paste                   | Same                                                     |
-| [Snippets](/docs/features/snippets)                   | Watches for the expansion keyword, then inserts the text |
-| [Window management](/docs/features/window-management) | Reads and sets other apps' window frames                 |
-| [Hyper key](/docs/reference/hotkeys#hyper-key)        | Rewrites the physical key into a modifier chord          |
-| Double-tap modifier hotkeys                           | Detects the tap pattern                                  |
-| `getSelectedText` in [extensions](/docs/extensions)   | Reads the selection from the front app                   |
-
-You are prompted the first time you use one of these, not at launch.
+| Feature                                                                       | Why                                                  |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [Clipboard](/docs/features/clipboard) and [emoji](/docs/features/emoji) paste | Puts the item into the app you came from             |
+| [Snippets](/docs/features/snippets)                                           | Notices the keyword you type, then inserts the text  |
+| [Quick Actions](/docs/ai/quick-actions)                                       | Reads your selected text and replaces it             |
+| [Window management](/docs/features/window-management) and layouts             | Reads and sets other apps' window frames             |
+| [Navigation](/docs/features/navigation)                                       | Lists open windows and presses menu bar items        |
+| [Hyper key](/docs/reference/hotkeys#hyper-key)                                | Turns one physical key into a modifier chord         |
+| Double-tap modifier shortcuts                                                 | Notices the tap pattern                              |
+| <kbd>⌘</kbd><kbd>esc</kbd> back to the root search                            | macOS keeps this chord for itself unless we catch it |
+| `getSelectedText` in [extensions](/docs/extensions)                           | Reads the selection from the front app               |
 
 ### Snippets and keystroke matching
 
-Snippet keyword expansion is the one feature that watches typing, so it is worth being precise about.
+Snippet keyword expansion is the one feature that watches what you type, so here are the exact
+rules.
 
-- Snippets ship **disabled**, and enabling them shows an explanation first. Turning the feature on
-  _is_ the consent — there is no separate switch.
-- Matching happens **entirely on device**. Keystrokes are never stored and never sent anywhere.
-- The typing buffer holds at most 256 characters and resets on app switch, on any modifier shortcut,
-  when Secure Event Input is active, and after 15 seconds of inactivity.
-- Tinycast uses a **listen-only** event tap on the Accessibility grant. It deliberately does not use
-  Input Monitoring.
-- **A settings backup can never enable it.** The `snippetsEnabled` flag is excluded from exports on
-  purpose, so importing a file someone sent you cannot switch on keystroke listening.
+- Snippets ship **off**. Turning them on shows an explanation first, and that switch _is_ your
+  consent. There is no separate one.
+- Matching happens **only on your Mac**. Keystrokes are never stored and never sent anywhere.
+- The typing buffer holds at most 256 characters. It resets when you switch apps, press a shortcut
+  with a modifier, when Secure Event Input is on, and after 15 seconds of no typing.
+- Tinycast uses a **listen-only** event tap under the Accessibility grant. It does not use Input
+  Monitoring.
+- **A settings backup can never turn it on.** Importing a file someone sent you cannot switch on
+  keystroke listening.
 
-## Full Disk Access
+## Calendars
 
-Tinycast **detects** Full Disk Access but **never requests** it.
+The [Calendar](/docs/features/calendar) feature reads your events to find meeting links.
 
-The [uninstaller](/docs/launcher/uninstall) probes silently to work out which files it will be able
-to move. Without the grant, protected locations — `~/Library/Containers`,
-`~/Library/Group Containers`, `~/Library/Cookies` — are shown as locked rows rather than being
-removed. The probe can only under-report, so the worst case is a row you have to clear by hand.
+Turning it on shows Tinycast's own explanation first, then the macOS prompt. The feature only counts
+as on once macOS says yes. If you said no earlier, **Settings → Permissions** sends you to the right
+System Settings pane to change it.
+
+Events are read on your Mac and nothing leaves it.
+
+## Camera
+
+**Open Camera** and the optional camera preview before a meeting ask for the camera the first time
+you use them. Nothing touches the camera until then, and the camera turns off as soon as the preview
+closes.
 
 ## Automation and Bluetooth
 
-Two [system actions](/docs/launcher/system-actions) trigger their own system prompts the first time
-you run them:
+A few actions trigger their own macOS prompt the first time you run them:
 
-- **Show Info in Finder** drives Finder through Apple Events, raising the standard Automation prompt.
+- **Show Info in Finder** in the [uninstaller](/docs/launcher/uninstall), and some
+  [system actions](/docs/launcher/system-actions), drive other apps through Apple Events. That raises
+  the standard Automation prompt.
 - **Toggle Bluetooth** raises the Bluetooth prompt.
 
-Both are requested at first use of that specific action, never up front.
+If you say no, Tinycast tells you and links to the right System Settings pane instead of silently
+doing nothing.
 
-## What File Search does not need
+## Full Disk Access
 
-[File Search](/docs/features/file-search) asks for **no file permission whatsoever**. It reads the
-system Spotlight index and structurally excludes hidden paths and application-bundle contents, which
-is exactly what lets it stay permission-free. If Spotlight has not indexed something, you get a
-thinner result list rather than a permission prompt.
+Tinycast **checks** for Full Disk Access but **never asks** for it.
+
+The [uninstaller](/docs/launcher/uninstall) checks quietly to work out which files it can move.
+Without the grant, protected places like `~/Library/Containers`, `~/Library/Group Containers` and
+`~/Library/Cookies` show as locked rows instead. The worst case is a row you clear by hand.
+
+## What Tinycast never needs
+
+- **File access for File Search.** [File Search](/docs/features/file-search) reads the Spotlight
+  index macOS already keeps. If Spotlight has not indexed something, you get fewer results, not a
+  prompt.
+- **Screen Recording.** The window switcher reads window titles through Accessibility.
+- **Location.** The calculator picks your currency from your Mac's region setting.
+- **Input Monitoring.** Snippets listen under Accessibility, as described above.

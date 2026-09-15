@@ -1,4 +1,11 @@
 {
   "title": "Reference",
-  "pages": ["shortcuts", "hotkeys", "settings", "backup", "import-from-raycast"]
+  "pages": [
+    "shortcuts",
+    "hotkeys",
+    "settings",
+    "backup",
+    "import-from-raycast",
+    "updates"
+  ]
 }

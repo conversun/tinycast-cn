@@ -4,6 +4,7 @@
     "index",
     "favorites",
     "aliases",
+    "fallbacks",
     "system-settings",
     "system-actions",
     "commands",

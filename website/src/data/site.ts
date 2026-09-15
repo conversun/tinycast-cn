@@ -20,59 +20,59 @@ export const site = {
 
 // The hero, in as few words as possible — headline plus one punchy line.
 export const hero = {
-  eyebrow: "Native macOS launcher",
-  headline: "Everything on your Mac. One keystroke away.",
+  // One entry per line: the break falls between the two sentences at every width.
+  headlineLines: ["Everything on your Mac.", "One keystroke away."],
   sub: "A tiny, native launcher. No Electron. No account. No telemetry. No bullshit.",
+  // The mono line under the buttons. Each fact is stated in the docs.
+  facts: ["Under 100 MB of memory", "Zero dependencies", "Free & open source"],
 } as const;
 
 export const nav = [
-  { label: "Gallery", href: "/#gallery" },
   { label: "Features", href: "/#features" },
+  { label: "Privacy", href: "/#privacy" },
   { label: "Docs", href: "/docs" },
-  { label: "Install", href: "/#install" },
 ] as const;
 
 // Homebrew install channels. Each is a separate app that runs side by side,
-// with its own settings, permissions and login item.
+// with its own settings, permissions and login item. Descriptions follow
+// docs/install.md.
+export const brewTrustCommand = "brew trust --tap abue-ammar/tinycast";
+
 export const channels = [
   {
     id: "stable",
     label: "Stable",
-    command:
-      "brew trust --tap abue-ammar/tinycast && brew install --cask abue-ammar/tinycast/tinycast",
-    note: "Recommended",
+    cask: "tinycast",
+    description:
+      "Recommended. The smaller build, for Apple silicon on macOS 26.",
   },
   {
     id: "universal",
     label: "Intel",
-    command:
-      "brew trust --tap abue-ammar/tinycast && brew install --cask abue-ammar/tinycast/tinycast-universal",
-    note: "Intel Macs",
+    cask: "tinycast-universal",
+    description:
+      "The universal build, for Intel Macs on macOS 26. Runs on Apple silicon too.",
   },
   {
     id: "beta",
     label: "Beta",
-    command:
-      "brew trust --tap abue-ammar/tinycast && brew install --cask abue-ammar/tinycast/tinycast@beta",
-    note: "Side-by-side",
+    cask: "tinycast@beta",
+    description:
+      "Installs Tinycast Beta, with its own settings, right beside stable.",
   },
   {
     id: "sequoia",
     label: "Sequoia",
-    command:
-      "brew trust --tap abue-ammar/tinycast && brew install --cask abue-ammar/tinycast/tinycast-sequoia",
-    note: "macOS 15",
+    cask: "tinycast-sequoia",
+    description: "For macOS 15 Sequoia. New features reach macOS 26 first.",
   },
 ] as const;
+
+export function brewInstallCommand(cask: string): string {
+  return `brew install --cask abue-ammar/tinycast/${cask}`;
+}
 
 // Only for a direct DMG download. Homebrew clears quarantine on every install
 // and update, so the Homebrew path needs no manual step at all.
 export const quarantineCommand =
   'xattr -dr com.apple.quarantine "/Applications/Tinycast.app"';
-
-// Headline numbers for the "why it's tiny" band. Kept honest, from the README.
-export const stats = [
-  { value: "<100", unit: "MB", label: "Memory" },
-  { value: "0", unit: "", label: "Dependencies" },
-  { value: "0", unit: "", label: "Telemetry" },
-] as const;

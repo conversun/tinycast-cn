@@ -2,6 +2,8 @@ import AppKit
 import SwiftUI
 
 struct ClipboardList: View {
+
+    @Environment(\.metrics) private var metrics
     let results: [ClipboardItem]
     let selectedID: ClipboardItem.ID?
     /// Changes only when the list should scroll, so mouse selection never yanks it.
@@ -9,6 +11,9 @@ struct ClipboardList: View {
     let onSelect: (ClipboardItem) -> Void
     let onActivate: () -> Void
     let onActions: (ClipboardItem) -> Void
+    /// Nil when the entry has nothing left to hand over, which is reported rather than dragged.
+    let onDragPayload: (ClipboardItem) -> ClipDragPayload?
+    let onDropped: () -> Void
     @Environment(ClipboardStore.self) private var store
 
     private enum Row: Identifiable {
@@ -61,21 +66,23 @@ struct ClipboardList: View {
                             )
                             .selectionFrame(item.id == selectedID)
                             .contentShape(Rectangle())
-                            // Simultaneous gestures, and the light catcher: `.contextMenu` stalls.
-                            .onTapGesture { onSelect(item) }
-                            .simultaneousGesture(
-                                TapGesture(count: 2).onEnded {
+                            // The light catcher: `.contextMenu` stalls.
+                            .onRightClick { onActions(item) }
+                            .clipDraggable(
+                                payload: { onDragPayload(item) },
+                                onSelect: { onSelect(item) },
+                                onActivate: {
                                     onSelect(item)
                                     onActivate()
-                                }
+                                },
+                                onDropped: onDropped
                             )
-                            .onRightClick { onActions(item) }
                         }
                     }
                 }
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.top, Theme.Spacing.xs)
-                .padding(.bottom, Theme.Spacing.md)
+                .padding(.horizontal, metrics.spacing.md)
+                .padding(.top, metrics.spacing.xs)
+                .padding(.bottom, metrics.spacing.md)
                 .hideNativeScrollers()
                 .scrollOriginAnchor()
             }
@@ -118,6 +125,8 @@ enum DateBucket: Int {
 }
 
 private struct ClipboardRow: View {
+
+    @Environment(\.metrics) private var metrics
     let item: ClipboardItem
     let selected: Bool
     let imageURL: URL?
@@ -134,24 +143,24 @@ private struct ClipboardRow: View {
     }
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.lg) {
+        HStack(spacing: metrics.spacing.lg) {
             thumbnail(item.colorValue)
             Text(previewText)
-                .font(Theme.Typography.menuRow)
+                .font(metrics.typography.menuRow)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
             if let slot, palette.commandHeld {
-                HStack(spacing: Theme.Spacing.xxs) {
+                HStack(spacing: metrics.spacing.xxs) {
                     KeyCapChip(text: "⌘", style: .outline)
                     KeyCapChip(text: String(slot), style: .outline)
                 }
             }
         }
-        .padding(.horizontal, Theme.Spacing.md)
-        .padding(.vertical, Theme.Spacing.sm)
+        .padding(.horizontal, metrics.spacing.md)
+        .padding(.vertical, metrics.spacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+            RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous)
                 .fill(fill)
         )
         .armedHover($hovered)
@@ -175,7 +184,7 @@ private struct ClipboardRow: View {
             // A colour states itself, so it takes the tile a glyph would otherwise fill.
             if let color {
                 ColorSwatch(color: color)
-                    .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
+                    .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
             } else {
                 glyphTile("doc.text")
             }
@@ -184,9 +193,9 @@ private struct ClipboardRow: View {
                 image
                     .resizable()
                     .scaledToFill()
-                    .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
+                    .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
                     .clipShape(
-                        RoundedRectangle(cornerRadius: Theme.Radius.thumbnail, style: .continuous))
+                        RoundedRectangle(cornerRadius: metrics.radius.thumbnail, style: .continuous))
             } placeholder: {
                 glyphTile("photo")
             }
@@ -195,9 +204,9 @@ private struct ClipboardRow: View {
                 image
                     .resizable()
                     .scaledToFill()
-                    .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
+                    .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
                     .clipShape(
-                        RoundedRectangle(cornerRadius: Theme.Radius.thumbnail, style: .continuous))
+                        RoundedRectangle(cornerRadius: metrics.radius.thumbnail, style: .continuous))
             } placeholder: {
                 glyphTile(fileKind.systemImage)
             }
@@ -212,9 +221,9 @@ private struct ClipboardRow: View {
 
     /// A symbol on a rounded tile, sized so text and image rows share one shape.
     private func glyphTile(_ systemName: String) -> some View {
-        RoundedRectangle(cornerRadius: Theme.Radius.thumbnail, style: .continuous)
+        RoundedRectangle(cornerRadius: metrics.radius.thumbnail, style: .continuous)
             .fill(Theme.Colors.controlSurface)
-            .frame(width: Theme.Size.rowIcon, height: Theme.Size.rowIcon)
+            .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
             .overlay(
                 Image(systemName: systemName)
                     .font(.system(size: 12))
@@ -278,6 +287,8 @@ private struct AsyncThumbnail<Content: View, Placeholder: View>: View {
 }
 
 struct ClipboardPreview: View {
+
+    @Environment(\.metrics) private var metrics
     let item: ClipboardItem?
     @Environment(ClipboardStore.self) private var store
 
@@ -309,16 +320,16 @@ struct ClipboardPreview: View {
                 }
             }
         case .image:
-            AsyncThumbnail(url: store.imageURL(for: item), maxPixel: Theme.Size.clipboardPreviewPixel) {
+            AsyncThumbnail(url: store.imageURL(for: item), maxPixel: metrics.size.clipboardPreviewPixel) {
                 image in
                 image
                     .resizable()
                     .scaledToFit()
                     .clipShape(
-                        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                        RoundedRectangle(cornerRadius: metrics.radius.card, style: .continuous)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                        RoundedRectangle(cornerRadius: metrics.radius.card, style: .continuous)
                             .strokeBorder(Theme.Colors.cardStroke, lineWidth: 1)
                     )
             } placeholder: {
@@ -333,6 +344,7 @@ struct ClipboardPreview: View {
 
 /// The "Information" block; disk-touching details are gathered off the main actor.
 private struct ClipboardInfoSection: View {
+    @Environment(\.metrics) private var metrics
     let item: ClipboardItem
     let imageURL: URL?
 
@@ -363,17 +375,17 @@ private struct ClipboardInfoSection: View {
     }()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: metrics.spacing.sm) {
             Text("Information")
-                .font(Theme.Typography.sectionHeader)
+                .font(metrics.typography.sectionHeader)
                 .foregroundStyle(.secondary)
             VStack(spacing: 0) {
                 let rows = self.rows
                 ForEach(rows) { row in
                     if row.id != rows.first?.id { Divider() }
-                    HStack(spacing: Theme.Spacing.sm) {
+                    HStack(spacing: metrics.spacing.sm) {
                         Text(row.label.localizedUI).foregroundStyle(.secondary)
-                        Spacer(minLength: Theme.Spacing.lg)
+                        Spacer(minLength: metrics.spacing.lg)
                         if let icon = row.icon {
                             Image(nsImage: icon)
                                 .resizable()
@@ -382,11 +394,11 @@ private struct ClipboardInfoSection: View {
                         Text(row.value.localizedUI).lineLimit(1).truncationMode(.middle)
                     }
                     .font(.callout)
-                    .padding(.vertical, Theme.Spacing.sm)
+                    .padding(.vertical, metrics.spacing.sm)
                 }
             }
         }
-        .padding(.top, Theme.Spacing.xl)
+        .padding(.top, metrics.spacing.xl)
         .task(id: item.id) { await loadDetails() }
     }
 

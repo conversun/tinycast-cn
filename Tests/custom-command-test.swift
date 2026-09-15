@@ -5,6 +5,8 @@ import Foundation
 struct CustomCommandTests {
     @MainActor
     static func main() async {
+        // The app has no controlling terminal; an inherited one gets `zsh -i` stopped by SIGTTOU.
+        setsid()
         let suiteName = "com.tinycast.custom-command-tests"
         let defaults = isolatedDefaults(suiteName)
 

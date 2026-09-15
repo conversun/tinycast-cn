@@ -49,6 +49,16 @@ enum Paster {
         }
     }
 
+    /// A file, pasted into `previousApp`; the receiver takes the file or its path, as it reads.
+    @MainActor
+    static func pasteFile(_ url: URL, previousApp: NSRunningApplication?) {
+        PasteboardFiles.write(url, to: .general)
+        previousApp?.activate()
+        DispatchQueue.main.asyncAfter(deadline: .now() + activationDelay) {
+            postCommandV()
+        }
+    }
+
     /// String counterpart of `copy(_:store:)`.
     @MainActor
     static func copyString(_ text: String) {
@@ -100,7 +110,9 @@ enum Paster {
             pb.declareTypes([.string, ClipboardManager.internalType], owner: nil)
             pb.setString(text, forType: .string)
         case .image:
-            guard let url = store.imageURL(for: item), let data = try? Data(contentsOf: url) else {
+            guard let url = store.imageURL(for: item),
+                let data = try? Data(contentsOf: url, options: .mappedIfSafe)
+            else {
                 return false
             }
             pb.clearContents()

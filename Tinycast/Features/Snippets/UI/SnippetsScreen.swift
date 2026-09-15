@@ -5,6 +5,8 @@ struct SnippetsScreen: PaletteScreen {
     let store: SnippetsStore
     let core: AppCore
     let vm: PaletteState
+
+    private var metrics: InterfaceMetrics { core.settings.interfaceSize.metrics }
     let openActions: () -> Void
 
     /// A disabled snippet is off everywhere, so the browser lists exactly what the launcher does.
@@ -60,7 +62,7 @@ struct SnippetsScreen: PaletteScreen {
                         openActions()
                     }
                 )
-                .frame(width: Theme.Size.clipboardListWidth)
+                .frame(width: metrics.size.clipboardListWidth)
                 Rectangle().fill(Theme.Colors.separator).frame(width: Theme.Size.hairline)
                 SnippetPreview(record: selected)
             }
@@ -84,7 +86,7 @@ enum SnippetActionsMenu {
                 PopoverMenuItem(title: "Paste Snippet", systemImage: "text.quote", shortcut: "↵") {
                     core.snippetCoordinator.expandSnippetFromPalette(id: record.id)
                 },
-                PopoverMenuItem(title: "Edit Snippet", systemImage: "pencil") {
+                PopoverMenuItem(title: "Edit Snippet", systemImage: "pencil", startsSection: true) {
                     core.paletteCoordinator.hidePalette(restoreFocus: false)
                     core.snippetCoordinator.editSnippet(record)
                 },
@@ -92,7 +94,7 @@ enum SnippetActionsMenu {
                     core.paletteCoordinator.hidePalette(restoreFocus: false)
                     core.snippetCoordinator.editSnippet(nil)
                 },
-                PopoverMenuItem(title: "Show in Finder", systemImage: "folder") {
+                PopoverMenuItem(title: "Show in Finder", systemImage: "folder", startsSection: true) {
                     core.snippetCoordinator.showSnippetInFinder(record)
                 }
             ])

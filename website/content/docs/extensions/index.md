@@ -1,66 +1,74 @@
 ---
 title: Extensions
-description: Tinycast runs Raycast extensions natively, rendered as SwiftUI.
+description: Tinycast runs Raycast extensions natively, drawn with SwiftUI.
 ---
 
-Tinycast runs Raycast extensions — the same `package.json` and the same prebuilt command bundles —
-rendered natively into the palette.
+Tinycast runs Raycast extensions: the same `package.json` and the same built command files, drawn
+natively in the palette.
 
-There is no Electron, no browser and no Node.js at runtime. JavaScriptCore ships with macOS, so this
-costs **no extra binary size**.
+There is no Electron, no browser and no Node.js running inside Tinycast. Extensions run in
+JavaScriptCore, which already ships with macOS, so this adds **nothing to the app's size**.
 
-**Settings → Extensions** holds the feature switch. It ships **off**, and turning it on asks for
-confirmation, because enabling it is consent to run third-party code.
+**Settings → Extensions** holds the switch. It ships **off**, and turning it on asks first, because
+it means agreeing to run code someone else wrote.
 
 | Setting           | Default |
 | ----------------- | ------- |
 | Enable extensions | **Off** |
 | Show in launcher  | On      |
 
-`extensionsEnabled` is deliberately excluded from
-[settings backups](/docs/reference/backup), so importing a file cannot switch it on.
+The switch is never included in [backups](/docs/reference/backup), so importing a file cannot turn it
+on.
 
-While off, no directory is scanned, no launcher row is published and no JavaScript context exists.
+While it is off, no folder is scanned, nothing shows in the launcher and no JavaScript engine exists.
 
-## The one standing cost
+## The one ongoing cost
 
-**Exactly one command runs at a time, and a running command holds a JavaScript engine in memory
-until you leave it.** That is the only continuous cost Tinycast has.
+**One command runs at a time, and a running command keeps a JavaScript engine in memory until you
+leave it.** That is the only ongoing cost Tinycast has.
 
-Starting a command stops the previous one and discards its context, so no state survives between
-runs. A fresh boot takes about 7 ms once warm.
+Starting a command stops the one before and throws its engine away, so nothing carries over between
+runs. A fresh start takes about 7 ms once warm.
+
+The one exception is [background refresh](/docs/extensions/customising#background-refresh), which
+briefly runs a command on a schedule, and only if you turn it on.
 
 ## Where to go next
 
-- [Installing extensions](/docs/extensions/installing) — the three routes, registries and package
+- [Installing extensions](/docs/extensions/installing): the three ways in, registries and package
   managers
-- [What works](/docs/extensions/compatibility) — the supported API surface and the known gaps
-- [Configuring one](/docs/extensions/customising) — preferences, icons and storage
+- [What works](/docs/extensions/compatibility): what is supported, and the known gaps
+- [Configuring one](/docs/extensions/customising): preferences, icons, aliases and background
+  refresh
 
-## Shortcuts and arguments
+## In the launcher
 
-A global shortcut binds to a **command**, not to an extension. See
+An extension's commands show in the **Extensions** section. The extension's own name also finds its
+commands, so `lucide` finds Lucide's **Search Icons**.
+
+A global shortcut belongs to a **command**, not to a whole extension. See
 [Hotkeys](/docs/reference/hotkeys).
 
-A command declaring arguments shows inline fields right after your typed text.
-<kbd>⇥</kbd> walks from the search field through each argument and back; <kbd>↵</kbd> from any of
-them runs the command. A blank required argument blocks the launch and focuses the field that is
-missing.
+A command that takes arguments shows small fields right after what you typed. <kbd>tab</kbd> moves from
+the search field through each field and back, and <kbd>return</kbd> from any of them runs the command. An
+empty required field stops the launch and puts the cursor there.
 
-Every declared argument is sent, as an empty string when unfilled.
+Every argument is sent, as an empty string if you left it blank. Raycast does the same, and
+extensions count on it.
 
-## Navigation
+## Moving around
 
-<kbd>⎋</kbd> and a bare <kbd>⌫</kbd> pop the extension's **own** navigation stack first, and only
-leave the command once it is at its root.
+<kbd>esc</kbd> clears the search field first. On an empty field, <kbd>esc</kbd> and <kbd>delete</kbd> go
+back through the extension's **own** screens, and only leave the command once you are at its first
+screen.
 
-Pushed screens stay mounted, so popping back restores what was there.
+Screens you go back to keep their state, so you land where you left off.
 
-An extension's action panel becomes the palette's <kbd>⌘</kbd><kbd>K</kbd> menu. The first action is
-the primary <kbd>↵</kbd> action, and an action's own declared shortcut is honoured.
+An extension's actions become the palette's <kbd>⌘</kbd><kbd>K</kbd> menu. The first action is the
+one <kbd>return</kbd> runs, and each action's own shortcut works.
 
 ## Appearance
 
-A running command keeps the [appearance](/docs/palette#appearance) it started with; a theme change
-reaches it on the next launch. Icons and colors declared per-appearance re-render when the surface
-flips.
+A running command keeps the [appearance](/docs/palette#appearance) it started with. A theme change
+reaches it the next time it opens. Icons and colors made for light and dark switch as the palette
+does.

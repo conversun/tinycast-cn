@@ -27,7 +27,9 @@ what you touched.
 ```
 
 The suite runs in parallel, `hw.ncpu` harnesses at a time, which is what takes it from about 140
-seconds to about 15. `TINYCAST_TEST_JOBS=1` forces it back to one at a time. Parallelism is safe
+seconds to about 15. `TINYCAST_TEST_JOBS=1` forces it back to one at a time. Each result is numbered
+against the total and shows its run and compile time, a quiet stretch names the harnesses still running, and a harness that runs longer
+than `TINYCAST_TEST_TIMEOUT` seconds (default 300) is killed and reported as timed out. Parallelism is safe
 because each harness already roots its scratch state somewhere of its own — a UUID-suffixed
 `temporaryDirectory`, a `UserDefaults(suiteName:)`, or `NSPasteboard.withUniqueName()` — and a new
 harness must keep doing that rather than reach for a fixed path.
@@ -62,7 +64,11 @@ second case, and it is why `ClipboardManager.fileURLs(on:volatileRoots:)` and `P
 each take the thing they act on as a parameter: a seam that exists so the harness never has to reach
 for the shared board. Its scratch tree lives under `temporaryDirectory`, which is itself a volatile
 root, so the cases about *reading* files inject an empty root list and the one case about durability
-is the one that runs against the shipped roots.
+is the one that runs against the shipped roots. Both file URL and legacy filename boards also cover
+the capture cap, exact ordering, rejected prefixes, duplicates and symlinks using private fixtures.
+The reader cases add the limit boundaries, the predicate call counts and modern/legacy precedence.
+Note that macOS synthesizes `public.file-url` items for any `NSFilenamesPboardType` write, so a
+legacy fixture still exercises the modern representation and the fallback branch stays unreached.
 
 Never join a compile to its run with `&&` in a `set -e` script. `set -e` is specified to ignore a
 failing command in a non-final AND-OR list member, so `swiftc … && /tmp/x` swallows a compile error and
@@ -79,16 +85,21 @@ If a change touches anything in the right column, the harness on the left is man
 | `corpus-test` | the launcher's ranking, over a dense synthetic index — **a new complaint is a new case in `Tests/launcher-corpus/corpus.json`** |
 | `file-search-test` | `FileSearch/Model/`, plus the shared `FuzzyMatch` scorer |
 | `file-search-session-test` | serialized query execution, debounce coalescing and cancellation |
+| `menu-search-test` | `MenuSearch/Model/` decisions, `MenuSearch/Service/` session filtering, the shared `FuzzyMatch` scorer |
 | `ranking-test` | `Launcher/Model/LauncherRankingStore.swift` |
 | `scopes-test` | `Launcher/Model/SearchScopes.swift` |
 | `app-name-test` | `Platform/AppDisplayName.swift` — every path that names a scanned bundle |
 | `calc-test` | all of `Calculator/Model/` |
 | `calendar-test` | all of `Calendar/Model/` — link detection, the join window, the day buckets |
+| `clipboard-search-test` | Ordinary and OCR result ordering, opt-in lifecycle, cancellation, pins and type filters |
+| `clipboard-text-test` | Apple Vision/PDF extraction, scheduling, retry backoff and recovery |
 | `clipboard-test` | `Clipboard/Model/ClipboardStore.swift`, `ClipboardFilter.swift`, `ClipboardFileKind.swift`, the colour trio |
 | `pasteboard-test` | `Clipboard/Service/ClipboardManager.swift` capture and `Paster.write` — what a Finder copy reads as, and what a file entry writes back |
 | `emoji-test` | `Emoji/Model/EmojiCatalog.swift`, `EmojiGridGeometry.swift`, the generated data |
+| `emoji-search-test` | `Emoji/Service/EmojiIndex.swift`, `FrequentEmojiStore.swift`, `Scripts/gen-emoji.js`'s keyword format |
 | `palette-navigation-test` | `Palette/PaletteState.swift`'s screen motions — `prepare`, `replace`, `push`, `pop` |
 | `palette-selection-test` | `Features/PaletteRowIndex.swift` |
+| `interface-size-test` | `DesignSystem/InterfaceMetrics.swift`, `Features/Settings/InterfaceSize.swift`, `Extensions/Model/ExtensionFormMetrics.swift` |
 | `palette-placement-test` | `DesignSystem/Theme.swift`, `Palette/PalettePlacement.swift` |
 | `hotkey-test` | `HotKeys/Model/DoubleTapModifier.swift`, `DoubleTapDetector.swift`, `HyperKey.swift`, `HotKeyAction.swift`, `Service/KeyShortcut.swift`, and the command→action mapping in `Launcher/Model/CommandID.swift` |
 | `fallback-test` | `Launcher/Model/Fallback.swift`, plus the `CommandID` and `Quicklink` ids it is built from |
@@ -110,6 +121,7 @@ If a change touches anything in the right column, the harness on the left is man
 | `ext-metadata-test` | `Extensions/Service/ExtensionCommandMetadataStore.swift` — round-trip, failure runs, uninstall |
 | `ext-test` | the extension runtime end to end — boots a real bundle in JavaScriptCore and renders it |
 | `ext-icon-test` | `Extensions/Service/ExtensionIconCache.swift` — artwork sizing and its fallback |
+| `icon-cache-test` | `Platform/Images/IconCache.swift` — row sizing at 1×/2×, warm reuse, stamp and style invalidation, bitmap release, and that a row icon draws identically to the 96px one |
 | `entry-icon-test` | `EntryIcon` — that each case draws, caches and prints apart from the others, and that a moved `FileIconStamp` retires the bitmap decoded before it |
 | `text-diff-test` | `QuickActions/Model/TextDiffEngine.swift` — exact chunks, Unicode, ties, token-cap boundaries and fast paths |
 | `settings-backup-test` | `Settings/AppSettingsKey.swift`, `Backup/Model/SettingsBackupCoverage.swift` |
@@ -191,6 +203,10 @@ search result that navigates and then sits there.
 `UninstallScanner.measure`, `FileSearchService.search`, and `Notes.search`. Open the Time Profiler or
 `os_signpost` instrument in Instruments and filter to that subsystem; nothing needs recompiling.
 
+None of the benchmarks below join the suite, so each is registered in `run-tests.sh` as `run index`
+instead: `--index` hands it editor flags without queueing it, and without that entry nothing in the
+file resolves. Keep the entry's source list matching the command beside it.
+
 Run the real Spotlight-backed file-search benchmark separately from the deterministic harnesses:
 
 ```sh
@@ -219,6 +235,32 @@ swiftc -O -swift-version 6 Tinycast/Features/Calculator/Model/*.swift \
 `Tests/text-diff-performance.swift` is the same shape for `TextDiffEngine`: build it with `-O`
 against the engine, pass a token count, a workload (`dense`, `sparse`, `equal`, `empty`) and an
 iteration count for timings, or `--probe` to diff every chunk between two builds.
+
+`Tests/clipboard-file-performance.swift` measures file capture with private pasteboards and temporary
+fixtures. It reports wall and process CPU time as JSON for modern and legacy formats, including
+32/1,000/10,000 durable files, rejected-input controls and an uncapped-reader control that guards
+the attachment path against the bounded reader it now delegates to. Compare three fresh processes
+per build with identical `-O` settings:
+
+```sh
+swiftc -O -swift-version 6 Tinycast/Platform/PasteboardFiles.swift \
+    Tinycast/Features/Clipboard/Model/{ClipboardStore,ClipboardFilter,ColorValue,ColorFormat,ColorSpaces}.swift \
+    Tinycast/Features/Clipboard/Service/ClipboardManager.swift \
+    Tests/clipboard-file-performance.swift -o /tmp/clipboard-file-performance
+/tmp/clipboard-file-performance
+```
+
+`Tests/emoji-search-performance.swift` times uncached queries, typing prefixes and memo hits against
+the loaded catalog, with process RSS and footprint as JSON; `--names` also lists every catalog name
+missing from its own top five results:
+
+```sh
+swiftc -O -swift-version 6 Tinycast/Features/Emoji/Model/{EmojiCatalog,EmojiData.generated}.swift \
+    Tinycast/Features/Emoji/Service/{EmojiIndex,FrequentEmojiStore}.swift \
+    Tinycast/Features/Launcher/Model/SearchRelevance.swift Tinycast/Platform/{AppPaths,Memo}.swift \
+    Tests/emoji-search-performance.swift -o /tmp/emoji-search-performance
+/tmp/emoji-search-performance --names
+```
 
 `Signposts.interval` owns an explicit `defer` around the wrapped work on purpose. The obvious spelling
 leaks the interval when the work throws, because the `.end` emit is skipped on the throw path and the
@@ -319,6 +361,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - A conflicting binding is rejected and names its current owner
 - A double-tap binding fires; Hyper Key remaps and its status dot is green
 - Every binding survives quit and relaunch
+- `Enable Commands` off leaves every pane-owned command listed, searchable and firing — Notes,
+  Clipboard, Emoji, File Search, Snippets, Quicklinks, Calendar, AI and the two layout commands
 
 ### Uninstall
 
@@ -355,7 +399,7 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Adding `*.log` takes effect on the next query with no relaunch; removing it restores those results
 - Built-in ignore rows carry no remove button; user rows do, and a duplicate or blank is refused
 - Recording a shortcut opens the palette straight into File Search, hidden from the launcher or not
-- The pane's checkbox and the Search Files row in Settings ▸ Commands move together
+- Search Files is absent from Settings ▸ Commands, and `Enable Commands` off leaves its shortcut live
 - Export, clear both lists and the shortcut, re-import: all three return, defaults undo not duplicated
 
 ### Notes
@@ -363,7 +407,7 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - With Notes **off**: all three commands are absent, their shortcuts no-op, and the Notes directory is
   not created
 - Enabling in Settings projects Show Notes, Create Note, and Search Notes immediately; the pane's
-  visibility checkboxes and recorders match Settings > Commands
+  visibility checkboxes and recorders are the only ones — Settings > Commands lists none of the three
 - Show Notes opens the last active note and focuses an already visible window without hiding it
 - Create Note makes one unique Untitled file, including as the first action in an empty channel
 - Command-P and the Browse button focus search, arrows move selection, Return opens, and Command-N
@@ -422,6 +466,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 - With Calendar **off**: no launcher entries, no card, no permission prompt at launch
 - Enabling shows the consent dialog **before** the macOS prompt; declining prompts for nothing
+- After Calendar permission is reset, Settings ▸ Calendar offers `Allow Calendar Access…` and asks
+  again; after denial it offers System Settings instead
 - With a meeting four minutes out, an empty palette shows the card on top, provider glyph and all
 - The countdown steps on the minute boundary rather than on a keystroke
 - ↵ joins: a Zoom link opens the Zoom app, and the browser where no app claims the scheme
@@ -453,8 +499,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Create Event writes to the default calendar and shows up on the card, the schedule and the launcher
   without a relaunch; a blank title leaves the dialog up on ↵ and on a click
 - Arrow keys move the caret in the New Event title field, and still step the Set Volume slider
-- Every row of Settings ▸ Calendar has Add Alias, Record Hotkey and a checkbox, and an alias set
-  there is the alias the Commands pane shows
+- Every command row of Settings ▸ Calendar has Add Alias, Record Hotkey and a checkbox, and none of
+  the five appears in Settings ▸ Commands
 - Export with auto join and camera preview on, import onto a clean profile: both come back **off**,
   while the menu-bar settings carry over
 
@@ -465,6 +511,12 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Holding a bound hotkey does **not** stack dialogs
 - Window commands move the window you were last in; cycle-on-repeat steps ½ → ⅓ → ⅔
 - "Top Half" lands flush with the top of the visible frame, on a secondary display too
+
+### Extensions
+
+- Every command under Settings ▸ Extensions has Add Alias, and Record Hotkey when the mode is
+  supported; an alias set there finds the command from its start and shows the chip
+- Hiding the extension from the launcher, or turning off Show in launcher, dims its alias fields
 
 ### Settings and backup
 

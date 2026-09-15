@@ -3,29 +3,33 @@ title: System Settings
 description: Every macOS Settings pane, searchable from the launcher.
 ---
 
-Tinycast indexes the panes of System Settings as ordinary launcher entries, so `bluetooth` or
-`display` opens the pane directly instead of opening System Settings and hunting for it.
+Tinycast lists the panes of System Settings as ordinary launcher entries. Type `bluetooth` or
+`display` and the pane opens directly, instead of opening System Settings and hunting for it.
 
-They appear in their own **System Settings** section on an empty query, right after Applications.
+They get their own **System Settings** section, right after Applications. Pane names follow your
+Mac's language, and the English names still match.
 
 ## Actions
 
-| Action                         | Shortcut                 |
-| ------------------------------ | ------------------------ |
-| Open System Setting            | <kbd>↵</kbd>             |
-| Show in Finder                 | <kbd>⌘</kbd><kbd>↵</kbd> |
-| Add to / Remove from Favorites |                          |
-| Reset Ranking                  |                          |
+| Action                         | Shortcut                             |
+| ------------------------------ | ------------------------------------ |
+| Open System Setting            | <kbd>return</kbd>                    |
+| Show in Finder                 | <kbd>⌘</kbd><kbd>return</kbd>        |
+| Add to / Remove from Favorites | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>F</kbd> |
+| Reset Ranking                  |                                      |
+| Hide from Search               | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd> |
 
 ## Settings
 
 **Settings → System Settings** lists every pane with:
 
-- a **Show in launcher** master toggle, plus a checkbox per pane
+- **Enable System Settings** at the top, which takes every pane out of search and turns off their
+  shortcuts
+- a checkbox per pane, which only hides that pane from search
 - a global **shortcut** recorder per pane
 - an **alias** field per pane
 
-Binding a shortcut to a pane you open often — Displays before a presentation, say — is the main
-reason to spend time here.
+Giving a shortcut to a pane you open often, like Displays before a presentation, is the main reason
+to spend time here.
 
-Hiding a pane does not disable its shortcut. See [Hotkeys](/docs/reference/hotkeys).
+See [Hotkeys](/docs/reference/hotkeys) for recording shortcuts.

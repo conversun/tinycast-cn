@@ -2,6 +2,8 @@ import SwiftUI
 
 /// React owns the values; every edit dispatches back and the re-render draws it.
 struct ExtensionFormView: View {
+    private var form: ExtensionFormMetrics { ExtensionFormMetrics(scale: metrics.scale) }
+    @Environment(\.metrics) private var metrics
     let screen: ExtensionScreen
     let assetsPath: String?
     /// The focused field, as the flat index the palette navigates with.
@@ -14,21 +16,26 @@ struct ExtensionFormView: View {
     @Environment(PaletteState.self) private var palette
     @FocusState private var focused: Int?
 
+    private var labelWidth: CGFloat {
+        form.labelWidth(for: metrics.size.panelWidth, gap: metrics.spacing.md)
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: ExtensionFormMetrics.rowSpacing) {
+                VStack(alignment: .leading, spacing: form.rowSpacing) {
                     ForEach(screen.fields) { field in
                         row(field)
                     }
                 }
                 // Centred as a block; the label column and controls keep their own widths.
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, ExtensionFormMetrics.formVerticalPadding)
+                .padding(.vertical, form.formVerticalPadding)
                 // Behind the fields, so a press on bare form closes an open list as a menu's does.
                 .background {
                     Color.clear.contentShape(Rectangle())
                         .onTapGesture { palette.dismissControlList() }
+                        .onRightClick { palette.dismissControlList() }
                 }
                 .hideNativeScrollers()
                 .scrollOriginAnchor()
@@ -80,17 +87,17 @@ struct ExtensionFormView: View {
             Rectangle()
                 .fill(Theme.Colors.separator)
                 .frame(maxWidth: .infinity, minHeight: 1, maxHeight: 1)
-                .padding(.vertical, ExtensionFormMetrics.separatorSpacing)
+                .padding(.vertical, form.separatorSpacing)
 
         case "Form.Description":
             labelled(field, showTitle: field.string("title") != nil) {
                 Text(field.string("text") ?? "")
-                    .font(Theme.Typography.rowTrailing)
+                    .font(metrics.typography.rowTrailing)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                     // Bare text still takes a control's height, so its label sits level.
-                    .padding(.vertical, ExtensionFormMetrics.verticalInset)
-                    .frame(minHeight: ExtensionFormMetrics.controlHeight, alignment: .leading)
+                    .padding(.vertical, form.verticalInset)
+                    .frame(minHeight: form.controlHeight, alignment: .leading)
             }
 
         case "Form.TextField", "Form.PasswordField":
@@ -117,7 +124,7 @@ struct ExtensionFormView: View {
         case "Form.Dropdown":
             labelled(field) {
                 ExtensionPickerField(
-                    items: ExtensionFormView.items(in: field),
+                    items: ExtensionPickerItem.items(in: field),
                     chosen: [field.string("value") ?? ""].filter { !$0.isEmpty },
                     placeholder: field.string("placeholder") ?? "Select…",
                     title: field.string("title") ?? "Dropdown",
@@ -132,7 +139,7 @@ struct ExtensionFormView: View {
         case "Form.TagPicker":
             labelled(field) {
                 ExtensionPickerField(
-                    items: ExtensionFormView.items(in: field),
+                    items: ExtensionPickerItem.items(in: field),
                     chosen: field.array("value").compactMap(\.stringValue),
                     placeholder: field.string("placeholder") ?? "Select…",
                     title: field.string("title") ?? "Tags",
@@ -164,30 +171,10 @@ struct ExtensionFormView: View {
         default:
             labelled(field) {
                 Text(String(localized: "\(field.type) isn't supported yet"))
-                    .font(Theme.Typography.rowTrailing)
+                    .font(metrics.typography.rowTrailing)
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    /// Items may be direct children or grouped in sections.
-    static func items(in field: RenderNode) -> [ExtensionPickerItem] {
-        var items: [ExtensionPickerItem] = []
-        func walk(_ node: RenderNode, section: String?) {
-            for child in node.children {
-                if child.type.hasSuffix(".Item") {
-                    let value = child.string("value") ?? ""
-                    items.append(
-                        ExtensionPickerItem(
-                            value: value, title: child.string("title") ?? value,
-                            iconValue: child.props["icon"], section: section))
-                } else if child.type.hasSuffix(".Section") {
-                    walk(child, section: child.string("title"))
-                }
-            }
-        }
-        walk(field, section: nil)
-        return items
     }
 
     /// Labels sit left of controls without moving the control away from the palette centre.
@@ -195,49 +182,52 @@ struct ExtensionFormView: View {
     private func labelled<Content: View>(
         _ field: RenderNode, showTitle: Bool = true, @ViewBuilder content: () -> Content
     ) -> some View {
-        HStack(alignment: .top, spacing: Theme.Spacing.md) {
-            HStack(spacing: Theme.Spacing.xxs) {
+        HStack(alignment: .top, spacing: metrics.spacing.md) {
+            HStack(spacing: metrics.spacing.xxs) {
                 Spacer(minLength: 0)
                 Text(showTitle ? (field.string("title") ?? "") : "")
-                    .font(Theme.Typography.rowTrailing)
+                    .font(metrics.typography.rowTrailing)
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .multilineTextAlignment(.trailing)
                 // The info marker Raycast draws beside a label that carries one.
                 if let info = field.string("info"), !info.isEmpty {
                     Image(systemName: "info.circle")
-                        .font(Theme.Typography.disclosure)
+                        .font(metrics.typography.disclosure)
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .help(info)
                         // The control carries this text as its hint, so the glyph is decoration.
                         .accessibilityHidden(true)
                 }
             }
-            .frame(width: Theme.Size.formLabelWidth, alignment: .trailing)
+            .frame(width: labelWidth, alignment: .trailing)
             // Centred on a control's height but free to grow, so a long label wraps.
-            .frame(minHeight: ExtensionFormMetrics.controlHeight)
+            .frame(minHeight: form.controlHeight)
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            VStack(alignment: .leading, spacing: metrics.spacing.xs) {
                 content()
                 if let error = field.string("error"), !error.isEmpty {
                     Text(error)
-                        .font(Theme.Typography.rowTrailing)
+                        .font(metrics.typography.rowTrailing)
                         .foregroundStyle(.red)
                         // Spoken by the control it belongs to, so this text is its echo.
                         .accessibilityHidden(true)
                 }
             }
         }
+        // Leading, so content narrower than a control can't pull its label towards the centre.
         .frame(
-            width: Theme.Size.formLabelWidth + Theme.Spacing.md
-                + ExtensionFormMetrics.controlWidth
+            width: labelWidth + metrics.spacing.md
+                + form.controlWidth,
+            alignment: .leading
         )
         .frame(maxWidth: .infinity)
-        .offset(x: -(Theme.Size.formLabelWidth + Theme.Spacing.md) / 2)
+        .offset(x: -(labelWidth + metrics.spacing.md) / 2)
     }
 }
 
 /// Local state absorbs typing so the caret never jumps; a programmatic reset wins.
 private struct ExtensionTextField: View {
+    @Environment(\.metrics) private var metrics
     let node: RenderNode
     let secure: Bool
     let index: Int?
@@ -258,7 +248,7 @@ private struct ExtensionTextField: View {
             }
         }
         .textFieldStyle(.plain)
-        .font(Theme.Typography.rowTitle)
+        .font(metrics.typography.rowTitle)
         .focused($focus, equals: index)
         .extensionFieldChrome(focused: focus == index, hovered: hovered)
         .onHover { hovered = $0 }
@@ -293,6 +283,10 @@ private struct ExtensionTextField: View {
 }
 
 private struct ExtensionTextArea: View {
+
+    private var form: ExtensionFormMetrics { ExtensionFormMetrics(scale: metrics.scale) }
+
+    @Environment(\.metrics) private var metrics
     let node: RenderNode
     let index: Int?
     @FocusState.Binding var focus: Int?
@@ -305,10 +299,10 @@ private struct ExtensionTextArea: View {
 
     var body: some View {
         TextEditor(text: $text)
-            .font(Theme.Typography.rowTitle)
+            .font(metrics.typography.rowTitle)
             .scrollContentBackground(.hidden)
             // The text system insets its own line fragments, which the chrome's inset then repeats.
-            .padding(.horizontal, -ExtensionFormMetrics.textViewGutter)
+            .padding(.horizontal, -form.textViewGutter)
             .focused($focus, equals: index)
             .extensionFieldChrome(focused: focus == index, hovered: hovered, multiline: true)
             .onHover { hovered = $0 }
@@ -318,10 +312,10 @@ private struct ExtensionTextArea: View {
             .overlay(alignment: .topLeading) {
                 if text.isEmpty {
                     Text(node.string("placeholder") ?? "")
-                        .font(Theme.Typography.rowTitle)
+                        .font(metrics.typography.rowTitle)
                         .foregroundStyle(Theme.Colors.textTertiary)
-                        .padding(.horizontal, ExtensionFormMetrics.textInset)
-                        .padding(.vertical, ExtensionFormMetrics.verticalInset)
+                        .padding(.horizontal, form.textInset)
+                        .padding(.vertical, form.verticalInset)
                         .allowsHitTesting(false)
                 }
             }
@@ -344,6 +338,8 @@ private struct ExtensionTextArea: View {
 
 /// Its own control, not `Toggle`: a `Toggle` takes focus only under Full Keyboard Access.
 private struct ExtensionCheckbox: View {
+    private var form: ExtensionFormMetrics { ExtensionFormMetrics(scale: metrics.scale) }
+    @Environment(\.metrics) private var metrics
     let node: RenderNode
     let index: Int?
     @FocusState.Binding var focus: Int?
@@ -354,16 +350,16 @@ private struct ExtensionCheckbox: View {
     private var isOn: Bool { node.bool("value") ?? false }
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        HStack(spacing: metrics.spacing.sm) {
             box
             Text(node.string("label") ?? "")
-                .font(Theme.Typography.rowTitle)
+                .font(metrics.typography.rowTitle)
                 .foregroundStyle(Theme.Colors.textPrimary)
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
-        .frame(width: ExtensionFormMetrics.controlWidth, alignment: .leading)
-        .frame(height: ExtensionFormMetrics.controlHeight)
+        .frame(width: form.controlWidth, alignment: .leading)
+        .frame(height: form.controlHeight)
         .contentShape(Rectangle())
         .focusable()
         .focused($focus, equals: index)
@@ -396,8 +392,8 @@ private struct ExtensionCheckbox: View {
                 }
             }
             .frame(
-                width: ExtensionFormMetrics.checkboxSize,
-                height: ExtensionFormMetrics.checkboxSize)
+                width: form.checkboxSize,
+                height: form.checkboxSize)
     }
 
     private var borderColor: Color {
@@ -414,6 +410,8 @@ private struct ExtensionCheckbox: View {
 }
 
 private struct ExtensionFilePicker: View {
+
+    @Environment(\.metrics) private var metrics
     let node: RenderNode
     let index: Int?
     @FocusState.Binding var focus: Int?
@@ -429,12 +427,12 @@ private struct ExtensionFilePicker: View {
     }
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        HStack(spacing: metrics.spacing.sm) {
             Image(systemName: "doc")
-                .font(Theme.Typography.rowTrailing)
+                .font(metrics.typography.rowTrailing)
                 .foregroundStyle(Theme.Colors.textSecondary)
             Text(label)
-                .font(Theme.Typography.rowTitle)
+                .font(metrics.typography.rowTitle)
                 .foregroundStyle(paths.isEmpty ? Theme.Colors.textTertiary : Theme.Colors.textPrimary)
                 .lineLimit(1)
             Spacer(minLength: 0)
