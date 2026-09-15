@@ -3,10 +3,10 @@
 本文档是 fork 自有的：上游没有这份文件，所以它永远不参与合并冲突。改动同步流程、
 汉化约定或发布参数时更新它。参考实现：`241794a`（rebase 恢复合并）+ `bdd1fe8`（汉化跟进）。
 
-## 正常路径：手动派发
+## 正常路径：定时检查，也可手动派发
 
-[`sync-upstream-release.yml`](../.github/workflows/sync-upstream-release.yml) 只接受手动派发
-（定时任务已移除：受阻时它每 6 小时红一次，噪音盖过了信号）：解析上游最新**稳定** release
+[`sync-upstream-release.yml`](../.github/workflows/sync-upstream-release.yml) 每 6 小时检查一次
+（UTC 00:23、06:23、12:23、18:23，也支持手动派发）：解析上游最新**稳定** release
 （`/releases/latest`，上游的 beta 与 `-sequoia` 预发布都不参与）→ `git merge <tag>` →
 `run-tests.sh` → push main → 调 [`release-cn.yml`](../.github/workflows/release-cn.yml)
 发 `<上游版本>-cn.1`。对应 release 已存在时十几秒内退出，幂等，无需干预。
@@ -16,17 +16,18 @@ gh workflow run sync-upstream-release.yml --repo conversun/tinycast-cn
 # 指定上游 tag：额外加 -f upstream_tag=vX.Y.Z
 ```
 
-代价：没有任何东西会主动提醒你上游发了新版，得自己盯 upstream 的 releases。
+GitHub 的定时任务可能延迟；需要立即同步时使用上面的手动派发命令。
 
 ## 受阻路径：开 issue，不留红叉
 
 汉化 fork 与上游冲突是设计使然，所以 `git merge` 冲突或 `run-tests.sh` 失败都**不算故障**：
 工作流回滚合并、不推 main，改为开一条带 `sync-blocked` 标签的 issue（标题 `Sync vX.Y.Z needs a hand`，
-正文附冲突文件清单或测试尾部日志），run 本身保持绿色。同一 tag 只开一条，重复派发不会刷屏。
+正文附冲突文件清单或测试尾部日志），run 本身保持绿色。同一 tag 已有未关闭 issue 时不重复创建。
+标签创建失败时仍创建不带标签的 issue，并在日志中警告，避免标签阻断通知。
 这一步靠仓库开着 Issues：关掉的话 `gh issue list` 非零退出，整次派发会跟着变红，
 冲突清单只能去 run 日志的 `Merge upstream release into main` 一步里看。
 
-按下文配方在本地解完、`main` 带上合并提交后，关掉 issue 并再派发一次 —— merge 已是 no-op，
+按下文配方在本地解完、`main` 带上合并提交后，关掉 issue，等待定时任务或再派发一次 —— merge 已是 no-op，
 测试通过，就会照常发 `-cn.1`。
 
 ## 上游 rebase 过历史时（merge 炸假冲突）
