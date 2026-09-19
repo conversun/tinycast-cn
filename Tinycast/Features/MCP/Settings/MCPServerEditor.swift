@@ -86,7 +86,7 @@ struct MCPServerEditor: View {
                     }
                     field("Connection") {
                         Picker("Connection", selection: $kind) {
-                            ForEach(Kind.allCases) { Text($0.title).tag($0) }
+                            ForEach(Kind.allCases) { Text($0.title.localizedUI).tag($0) }
                         }
                         .labelsHidden()
                         .pickerStyle(.segmented)
@@ -119,14 +119,14 @@ struct MCPServerEditor: View {
                         }
                     }
                 } header: {
-                    Text(target.isNew ? "Add MCP Server" : "Edit MCP Server")
+                    Text((target.isNew ? "Add MCP Server" : "Edit MCP Server").localizedUI)
                 } footer: {
                     Text(
-                        kind == .http
+                        (kind == .http
                             ? "Remote endpoints must use HTTPS. The header value is stored in your "
                                 + "login Keychain, never in preferences."
                             : "The command runs on this Mac with your own account. One "
-                                + "NAME=value per line; values are stored in your login Keychain."
+                                + "NAME=value per line; values are stored in your login Keychain.").localizedUI
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -136,7 +136,7 @@ struct MCPServerEditor: View {
                     Toggle("Offer this server's tools", isOn: $isEnabled)
                     field("Trust") {
                         Picker("Trust", selection: $trust) {
-                            ForEach(MCPTrust.allCases) { Text($0.title).tag($0) }
+                            ForEach(MCPTrust.allCases) { Text($0.title.localizedUI).tag($0) }
                         }
                         .labelsHidden()
                     }
@@ -150,8 +150,8 @@ struct MCPServerEditor: View {
                     }
                 } footer: {
                     Text(
-                        "Ask Each Chat puts the first tool call of every conversation through a "
-                            + "confirmation. Never Allow withholds the server without removing it."
+                        ("Ask Each Chat puts the first tool call of every conversation through a "
+                            + "confirmation. Never Allow withholds the server without removing it.").localizedUI
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -177,7 +177,9 @@ struct MCPServerEditor: View {
         case .running:
             ProgressView().controlSize(.small)
         case .found(let count):
-            Label(count == 1 ? "1 tool" : "\(count) tools", systemImage: "checkmark.circle")
+            Label(
+                count == 1 ? String(localized: "1 tool") : String(localized: "\(count) tools"),
+                systemImage: "checkmark.circle")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .failed(let message):
@@ -188,7 +190,7 @@ struct MCPServerEditor: View {
     }
 
     private func field(_ label: String, @ViewBuilder content: () -> some View) -> some View {
-        LabeledContent(label) { content() }
+        LabeledContent(label.localizedUI) { content() }
     }
 
     private var draft: (server: MCPServer, secrets: MCPSecretStore.Secrets) {

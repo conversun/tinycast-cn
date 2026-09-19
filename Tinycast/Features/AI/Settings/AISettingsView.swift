@@ -87,7 +87,7 @@ struct AISettingsView: View {
         } header: {
             SettingsSectionHeader(.aiDefault)
         } footer: {
-            Text(defaultModelFooter)
+            Text(defaultModelFooter.localizedUI)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -116,7 +116,9 @@ struct AISettingsView: View {
         }
         if !settings.connections.isEmpty {
             let count = settings.connections.count
-            providers.append(count == 1 ? "1 API connection" : "\(count) API connections")
+            providers.append(count == 1
+                ? String(localized: "1 API connection")
+                : String(localized: "\(count) API connections"))
         }
         return providers.isEmpty ? "No external providers ready" : providers.joined(separator: ", ")
     }
@@ -166,8 +168,8 @@ struct AISettingsView: View {
             SettingsSectionHeader(.aiConversations)
         } footer: {
             Text(
-                "Conversations stay on this Mac. Nothing here is carried in a settings backup — which "
-                    + "chats a Mac keeps is that Mac's business."
+                ("Conversations stay on this Mac. Nothing here is carried in a settings backup — which "
+                    + "chats a Mac keeps is that Mac's business.").localizedUI
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -187,8 +189,8 @@ struct AISettingsView: View {
             SettingsSectionHeader(.aiSystemPrompt)
         } footer: {
             Text(
-                "Your text is sent ahead of every message in every chat, after what Tinycast "
-                    + "already tells the model about itself. Both are billed again on each turn."
+                ("Your text is sent ahead of every message in every chat, after what Tinycast "
+                    + "already tells the model about itself. Both are billed again on each turn.").localizedUI
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -263,8 +265,8 @@ struct AISettingsView: View {
             SettingsSectionHeader(.aiInstalledAI)
         } footer: {
             Text(
-                "Tinycast uses the Codex, Claude and OpenCode commands already installed and signed "
-                    + "in on this Mac. Tinycast never stores or asks for their API keys."
+                ("Tinycast uses the Codex, Claude and OpenCode commands already installed and signed "
+                    + "in on this Mac. Tinycast never stores or asks for their API keys.").localizedUI
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -530,9 +532,9 @@ struct AISettingsView: View {
         _ window: ChatGPTSubscription.UsageWindow, fallback: String
     ) -> String {
         guard let minutes = window.durationMinutes else { return fallback }
-        if minutes >= 1_440 { return "\(minutes / 1_440)-day window" }
-        if minutes >= 60 { return "\(minutes / 60)-hour window" }
-        return "\(minutes)-minute window"
+        if minutes >= 1_440 { return String(localized: "\(minutes / 1_440)-day window") }
+        if minutes >= 60 { return String(localized: "\(minutes / 60)-hour window") }
+        return String(localized: "\(minutes)-minute window")
     }
 
     private func edit(_ connection: AIConnection) {

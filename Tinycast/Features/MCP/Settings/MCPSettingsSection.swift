@@ -41,9 +41,9 @@ struct MCPSettingsSection: View {
             SettingsSectionHeader(.aiMCPServers)
         } footer: {
             Text(
-                "Tools from every enabled server are offered to the model; type @slug to address "
+                ("Tools from every enabled server are offered to the model; type @slug to address "
                     + "one directly. The first call of a chat asks before it runs. Credentials "
-                    + "stay in your login Keychain."
+                    + "stay in your login Keychain.").localizedUI
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -112,7 +112,7 @@ private struct MCPServerRow: View {
 
     /// The slug leads, because it is the half a reader has to type into the composer.
     private var subtitle: String {
-        let state = server.isEnabled ? status.label : "Disabled"
+        let state = server.isEnabled ? status.label : "Disabled".localizedUI
         return "@\(server.slug) · \(state) · \(server.transport.summary)"
     }
 }

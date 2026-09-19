@@ -147,7 +147,7 @@ struct WindowLayoutInspector: View {
     // MARK: - Helpers
 
     private func sectionLabel(_ title: String) -> some View {
-        Text(title)
+        Text(title.localizedUI)
             .font(.callout.weight(.medium))
     }
 

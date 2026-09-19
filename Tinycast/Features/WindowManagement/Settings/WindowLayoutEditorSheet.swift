@@ -56,7 +56,7 @@ struct WindowLayoutEditorSheet: View {
 
     private var previewColumn: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-            Text(title)
+            Text(title.localizedUI)
                 .font(.title2.weight(.bold))
             WindowLayoutPreview(draft: draft, screens: screens, gap: previewGap)
         }

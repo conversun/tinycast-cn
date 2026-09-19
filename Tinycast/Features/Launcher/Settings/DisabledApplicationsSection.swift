@@ -36,7 +36,7 @@ struct DisabledApplicationsSection: View {
         } header: {
             SettingsSectionHeader(anchor)
         } footer: {
-            Text(footer)
+            Text(footer.localizedUI)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
