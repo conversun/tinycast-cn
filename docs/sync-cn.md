@@ -142,3 +142,14 @@ gh workflow run release-cn.yml --repo conversun/tinycast-cn \
 - 成功后自动 bump [homebrew-tinycast-cn](https://github.com/conversun/homebrew-tinycast-cn)
   的 cask（version + sha256），无需手动操作；`prerelease=true` 的派发只发 GitHub release，
   不动 cask —— `brew upgrade --cask tinycast-cn` 是稳定通道。
+
+## v0.11.3 同步核验
+
+上游再次重写了历史：旧 `v0.10.23` 与新历史中的 `740cbd86` 仅有 `docs/ui.md` 一处差异。
+本次以旧发布树为基线做三方合并，保留完整的 `v0.11.3` 树增量；最终合并提交的两个父节点
+分别是原 CN main 和真正的 `v0.11.3`，后续同步仍可使用正常祖先关系。
+
+设置编辑器从 Sheet 拆成 Panel 时，必须同步迁移动态标题、说明、占位符和错误的查表入口。
+备份分类与 Esc 行为还需核对模型字符串：既要有词条，也要在显示处调用 `.localizedUI`。
+本次为用户反馈的备份、Esc 与扩展兼容性文案加入了 `localization-test` 回归检查；继续用
+Xcode 抽取核对字面量，并单独核对目录、模型及拼接文案，不能只依赖该测试。

@@ -10,9 +10,18 @@ import { createContext, runInContext } from "node:vm";
 import { readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync } from "node:child_process";
-import { createHash, randomUUID, randomBytes, createHmac } from "node:crypto";
+import { execFileSync, spawn } from "node:child_process";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  pbkdf2Sync,
+  randomBytes,
+  randomUUID,
+} from "node:crypto";
 import { cpus, freemem, homedir, loadavg, tmpdir, uptime } from "node:os";
+import { lookup } from "node:dns/promises";
 import * as fs from "node:fs";
 import * as zlib from "node:zlib";
 
@@ -217,10 +226,48 @@ function syncHostCall(api, method, args) {
       return createHmac(args[0], Buffer.from(args[2], "base64"))
         .update(Buffer.from(args[1], "base64"))
         .digest("base64");
+    case "crypto.pbkdf2":
+      return pbkdf2Sync(Buffer.from(args[1], "base64"), Buffer.from(args[2], "base64"), args[3], args[4], args[0])
+        .toString("base64");
+    case "crypto.cipher": {
+      const [mode, decrypt, key, iv, data, padding] = args;
+      const algorithm = `aes-${Buffer.from(key, "base64").length * 8}-${mode}`;
+      const create = decrypt ? createDecipheriv : createCipheriv;
+      const cipher = create(algorithm, Buffer.from(key, "base64"), mode === "ecb" ? null : Buffer.from(iv, "base64"));
+      cipher.setAutoPadding(padding);
+      return Buffer.concat([cipher.update(Buffer.from(data, "base64")), cipher.final()]).toString("base64");
+    }
+    case "proc.start": {
+      const spec = args[0];
+      const child = spec.shell
+        ? spawn("/bin/sh", ["-c", spec.command], { cwd: spec.cwd, stdio: spec.detached ? "ignore" : "pipe" })
+        : spawn(spec.command, spec.args, { cwd: spec.cwd, stdio: spec.detached ? "ignore" : "pipe" });
+      child.on("error", () => {});
+      if (child.pid === undefined) throw Object.assign(new Error(`ENOENT: spawn '${spec.command}'`), { code: "ENOENT" });
+      if (spec.detached) return child.pid;
+      if (spec.input) child.stdin.end(Buffer.from(spec.input, "base64"));
+      const stdout = [];
+      const stderr = [];
+      child.stdout.on("data", (chunk) => stdout.push(chunk));
+      child.stderr.on("data", (chunk) => stderr.push(chunk));
+      const exit = new Promise((done) =>
+        child.on("close", (status, signal) =>
+          done({
+            stdout: Buffer.concat(stdout).toString("base64"),
+            stderr: Buffer.concat(stderr).toString("base64"),
+            status: status ?? 1,
+            signal,
+          }),
+        ),
+      );
+      runningChildren.set(child.pid, exit);
+      return child.pid;
+    }
+    case "proc.kill":
+      process.kill(args[0], args[1]);
+      return null;
     case "proc.run": {
       const spec = args[0];
-      // Mirrors the Swift host: a detached child answers at launch, with no output.
-      if (spec.detached) return { stdout: "", stderr: "", status: 0 };
       try {
         const stdout = spec.shell
           ? execFileSync("/bin/sh", ["-c", spec.command], { cwd: spec.cwd })
@@ -252,6 +299,9 @@ function syncHostCall(api, method, args) {
 }
 
 const oauthTokens = new Map();
+const runningChildren = new Map();
+const openSockets = new Map();
+let nextSocketId = 1;
 
 async function stubHostCall(api, method, args) {
   switch (`${api}.${method}`) {
@@ -283,8 +333,37 @@ async function stubHostCall(api, method, args) {
         bodyBase64: body.toString("base64"),
       };
     }
-    case "proc.run":
-      return syncHostCall(api, method, args);
+    case "proc.wait": {
+      const exit = runningChildren.get(args[0]);
+      runningChildren.delete(args[0]);
+      return exit;
+    }
+    // Node's own WebSocket stands in for `URLSessionWebSocketTask`: same one-message-at-a-time read.
+    case "websocket.open":
+      return openSocket(args[0]);
+    case "dns.resolve":
+      return lookup(args[0], { all: true, family: 4 }).then(
+        (found) => found.map((entry) => entry.address),
+        () => [],
+      );
+    case "websocket.receive": {
+      const entry = openSockets.get(args[0]);
+      if (!entry) throw new Error("harness: no socket");
+      return entry.queue.length ? entry.queue.shift() : new Promise((resolve) => entry.waiters.push(resolve));
+    }
+    case "websocket.send": {
+      const entry = openSockets.get(args[0].id);
+      entry?.socket.send(args[0].text ?? Buffer.from(args[0].base64, "base64"));
+      return null;
+    }
+    case "websocket.close": {
+      const entry = openSockets.get(args[0].id);
+      openSockets.delete(args[0].id);
+      entry?.socket.close(args[0].code, args[0].reason);
+      return null;
+    }
+    case "websocket.ping":
+      return null;
     // Positional arguments throughout, matching `src/api/oauth.js`.
     case "oauth.authorize":
       return { authorizationCode: "auth-code-12345", state: args[1] ?? "" };
@@ -300,6 +379,30 @@ async function stubHostCall(api, method, args) {
       if (["window", "feedback", "cache", "storage", "clipboard", "system"].includes(api)) return null;
       throw new Error(`harness: no async stub for ${api}.${method}`);
   }
+}
+
+async function openSocket(spec) {
+  const socket = new WebSocket(spec.url, spec.protocols ?? []);
+  socket.binaryType = "arraybuffer";
+  const entry = { socket, queue: [], waiters: [] };
+  const deliver = (event) => (entry.waiters.length ? entry.waiters.shift()(event) : entry.queue.push(event));
+  socket.addEventListener("message", (event) =>
+    deliver(
+      typeof event.data === "string"
+        ? { type: "text", text: event.data }
+        : { type: "binary", base64: Buffer.from(event.data).toString("base64") },
+    ),
+  );
+  socket.addEventListener("close", (event) =>
+    deliver({ type: "close", code: event.code, reason: event.reason, abnormal: !event.wasClean }),
+  );
+  await new Promise((resolve, reject) => {
+    socket.addEventListener("open", resolve, { once: true });
+    socket.addEventListener("error", () => reject(new Error(`connection to ${spec.url} failed`)), { once: true });
+  });
+  const id = nextSocketId++;
+  openSockets.set(id, entry);
+  return { id, protocol: socket.protocol ?? "" };
 }
 
 export function bootConfig(overrides = {}) {
@@ -414,7 +517,7 @@ async function runExtension(dir, commandName) {
   );
   harness.start("s1", readFileSync(file, "utf8"), file, dir, target.mode === "view" ? "view" : "no-view", {});
 
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await new Promise((resolve) => setTimeout(resolve, Number(process.env.EXT_TEST_SETTLE_MS ?? 1500)));
   if (harness.state.failures.length) {
     console.log("\n✗ failures:");
     for (const failure of harness.state.failures) console.log(failure);

@@ -83,6 +83,7 @@ struct AIProviderTests {
         modelCatalogSearchesWithoutRenderingEverything()
         endpointPolicyRejectsUnsafeRemoteURLs()
         storedKeysDoNotFollowARetargetedConnection()
+        savingAConnectionDecidesItsKey()
         sseFramesSurviveSplits()
         openAIAndAnthropicStreamsDecode()
         capturedStreamsDecodeHoweverTheyArrive()
@@ -515,6 +516,48 @@ struct AIProviderTests {
             "editing a label or the model list is not a retarget and keeps the saved key")
     }
 
+    static func savingAConnectionDecidesItsKey() {
+        var remote = AIConnection()
+        remote.provider = .openAI
+        remote.baseURL = "https://api.openai.com/v1"
+        var local = remote
+        local.baseURL = "http://localhost:11434/v1"
+        var moved = remote
+        moved.baseURL = "https://gateway.example.com/v1"
+        typealias Policy = AIConnectionKeyPolicy
+
+        expect(
+            Policy.resolve(enteredKey: "  sk-new \n", connection: remote, saved: nil, hasStoredKey: false)
+                == .store("sk-new"),
+            "a typed key is stored trimmed")
+        expect(
+            Policy.resolve(enteredKey: "sk-new", connection: moved, saved: remote, hasStoredKey: true)
+                == .store("sk-new"),
+            "a retarget that brings its own key replaces the old one")
+        expect(
+            Policy.resolve(enteredKey: " ", connection: moved, saved: remote, hasStoredKey: true)
+                == .reject("Enter an API key for this endpoint — the saved key stays with the old one."),
+            "a remote retarget without a key is refused, so the old key never reaches the new host")
+        expect(
+            Policy.resolve(enteredKey: "", connection: local, saved: remote, hasStoredKey: true)
+                == .removeStored,
+            "a retarget to loopback drops the key issued for the remote endpoint")
+        expect(
+            Policy.resolve(enteredKey: "", connection: remote, saved: nil, hasStoredKey: false)
+                == .reject("Enter an API key for this remote provider."),
+            "a new remote connection needs a key")
+        expect(
+            Policy.resolve(enteredKey: "", connection: local, saved: nil, hasStoredKey: false) == .keep,
+            "a loopback endpoint saves without a key")
+        expect(
+            Policy.resolve(enteredKey: "", connection: remote, saved: remote, hasStoredKey: true) == .keep,
+            "an unchanged endpoint keeps its saved key")
+        expect(
+            Policy.resolve(enteredKey: "", connection: moved, saved: remote, hasStoredKey: false)
+                == .reject("Enter an API key for this remote provider."),
+            "with no saved key there is nothing to retarget, only a missing key")
+    }
+
     static func sseFramesSurviveSplits() {
         var parser = SSEParser()
         expect(parser.feed(Data("data: hel".utf8)).isEmpty, "a partial SSE frame waits")
@@ -934,6 +977,42 @@ struct AIProviderTests {
             claudeFrame.events == [.usage(AIUsage(inputTokens: 8, outputTokens: 3))]
                 && claudeFrame.completed,
             "Claude result usage ends the stream")
+
+        let cursorDelta = Data(
+            #"{"type":"assistant","timestamp_ms":1,"message":{"content":[{"type":"text","text":"Hi"}]}}"#
+                .utf8)
+        expect(
+            InstalledAIStreamDecoder.decode(cursorDelta, kind: .cursor).events == [.text("Hi")],
+            "Cursor live deltas decode as text")
+        let cursorFlush = Data(
+            #"{"type":"assistant","message":{"content":[{"type":"text","text":"Hi"}]}}"#.utf8)
+        expect(
+            InstalledAIStreamDecoder.decode(cursorFlush, kind: .cursor).events.isEmpty,
+            "Cursor buffered flushes without timestamp_ms are ignored")
+        let cursorDone = Data(#"{"type":"result","subtype":"success","result":"Hi"}"#.utf8)
+        expect(
+            InstalledAIStreamDecoder.decode(cursorDone, kind: .cursor).completed,
+            "Cursor result ends the stream")
+        let cursorSession = Data(
+            #"{"type":"system","subtype":"init","session_id":"ses_cursor"}"#.utf8)
+        expect(
+            InstalledAIStreamDecoder.decode(cursorSession, kind: .cursor).sessionID == "ses_cursor",
+            "Cursor system init carries the session id for cleanup")
+        let grokText = Data(
+            #"{"type":"stream_event","session_id":"ses_g","event":{"delta":{"type":"text_delta","text":"Yo"}}}"#
+                .utf8)
+        let grokTextFrame = InstalledAIStreamDecoder.decode(grokText, kind: .grok)
+        expect(
+            grokTextFrame.events == [.text("Yo")] && grokTextFrame.sessionID == "ses_g",
+            "Grok partial text reuses the Claude stream shape and keeps the session id")
+        let grokFinish = Data(
+            #"{"type":"result","is_error":false,"session_id":"ses_g","usage":{"input_tokens":5,"output_tokens":1}}"#
+                .utf8)
+        let grokFrame = InstalledAIStreamDecoder.decode(grokFinish, kind: .grok)
+        expect(
+            grokFrame.events == [.usage(AIUsage(inputTokens: 5, outputTokens: 1))]
+                && grokFrame.completed && grokFrame.sessionID == "ses_g",
+            "Grok result usage ends the stream and names the session to delete")
     }
 }
 

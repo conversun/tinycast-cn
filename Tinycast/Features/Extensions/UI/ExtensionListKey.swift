@@ -29,7 +29,7 @@ enum ExtensionListKey: Equatable {
         switch key {
         case .upArrow: return listOpen ? .moveUp : .ignored
         case .downArrow: return listOpen ? .moveDown : .openList
-        case .return: return listOpen ? .commit : .openList
+        case .return, KeyEquivalent("\u{3}"): return listOpen ? .commit : .openList
         case .escape: return listOpen ? .dismiss : .ignored
         case .leftArrow: return listOpen ? .ignored : .stepValue(-1)
         case .rightArrow: return listOpen ? .ignored : .stepValue(1)

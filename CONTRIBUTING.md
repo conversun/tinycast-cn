@@ -28,12 +28,14 @@ Check existing [issues](https://github.com/abue-ammar/tinycast/issues) and
 ## Before submitting
 
 - **A linked issue marked `approved`.** Put `Closes #<number>` in the PR description. A PR that
-  doesn't close an `approved` issue is closed automatically the moment it opens — fix the link and
-  reopen it. Docs-only changes (`*.md`, `docs/`, `website/`) skip the check.
+  doesn't close an `approved` issue is closed automatically the moment it opens. It reopens on its
+  own when the linked issue is approved; if the link was missing, fix it and reopen the PR.
+  Anyone may open the PR, not only the issue's author. Docs-only changes (`*.md`, `docs/`,
+  `website/`) skip the check.
 - The whole bar in [`docs/testing.md`](docs/testing.md#definition-of-done) passes — harnesses, lint,
-  purity, a clean build. Engine changes come with new cases. CI runs the harnesses and lint — it
-  annotates lint violations on your diff — but does **not** build the app, so **build locally**: a PR
-  that doesn't compile still looks green.
+  purity, a clean build. Engine changes come with new cases. There is no CI, so **run
+  `./Scripts/run-tests.sh`, `./Scripts/lint.sh` and a build locally**. CodeRabbit reviews every PR
+  and flags lint violations on the diff, but it does not run the harnesses or build the app.
 - Leak-tested and memory-measured. Numbers in the PR.
 - You actually used the app, on your path and the ones next to it.
 - Rebased on `main`, squashed into logical commits.

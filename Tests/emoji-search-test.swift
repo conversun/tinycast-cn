@@ -23,6 +23,30 @@ struct EmojiSearchTests {
         let index = EmojiIndex()
         await index.load()
 
+        // Pins are authored order, not usage order: reloads retain it and imports sanitize it.
+        let pinnedURL = directory.appendingPathComponent("pinned.json")
+        try JSONEncoder().encode(["A", "", "A", "B"]).write(to: pinnedURL)
+        let pinned = PinnedEmojiStore(fileURL: pinnedURL)
+        expect(pinned.glyphs == ["A", "B"], "pin load drops blanks and duplicates")
+        pinned.toggle("C")
+        expect(pinned.glyphs == ["A", "B", "C"], "a new pin is appended")
+        pinned.swap("C", with: "B")
+        expect(pinned.glyphs == ["A", "C", "B"], "a swap exchanges exactly the two named pins")
+        pinned.swap("A", with: "missing")
+        expect(pinned.glyphs == ["A", "C", "B"], "a swap with an unpinned glyph changes nothing")
+        pinned.toggle("C")
+        expect(pinned.glyphs == ["A", "B"], "toggling an existing pin removes it")
+        pinned.replace(["B", "B", "D", ""])
+        expect(pinned.glyphs == ["B", "D"], "backup replacement preserves sanitized order")
+        expect(
+            PinnedEmojiStore(fileURL: pinnedURL).glyphs == ["B", "D"],
+            "pin order survives a store reload")
+        var reportedPersistenceFailure = false
+        let unwritable = PinnedEmojiStore(fileURL: directory)
+        unwritable.onPersistenceFailure = { reportedPersistenceFailure = true }
+        unwritable.toggle("A")
+        expect(reportedPersistenceFailure, "pin persistence failures are reported")
+
         for (query, glyph, maxRank) in [
             ("pray", "🙏", 5),
             ("火", "🔥", 1),

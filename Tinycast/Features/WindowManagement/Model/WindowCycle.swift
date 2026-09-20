@@ -21,10 +21,9 @@ enum WindowCycle: String, CaseIterable, Identifiable, Sendable {
 
     var detail: String {
         switch self {
-        case .off: "Triggering a half again re-applies the same frame."
-        case .sizes: "Triggering a half again steps it through a third and two thirds."
-        case .displays:
-            "Triggering a half again walks it to the next half across your displays, wrapping around."
+        case .off: "Repeating a half keeps the same frame."
+        case .sizes: "Repeating a half steps through ⅓ and ⅔."
+        case .displays: "Repeating a half moves it across your displays."
         }
     }
 }

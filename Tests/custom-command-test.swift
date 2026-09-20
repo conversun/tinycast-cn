@@ -410,38 +410,35 @@ struct CustomCommandTests {
             injected.log.contains("; touch /tmp/tinycast-should-not-exist")
                 && !FileManager.default.fileExists(atPath: "/tmp/tinycast-should-not-exist"))
 
-        // MARK: Argument session
+        // MARK: Inline argument values
 
-        let session = CustomCommandArgumentSession()
-        session.begin(
-            command: CustomCommand(
-                name: "Search", command: "open \"$1$2\"",
-                arguments: [
-                    CustomCommandArgument(name: "Engine"),
-                    CustomCommandArgument(name: "Query", isOptional: true)
-                ]))
-        check("the form opens on the first argument", session.current?.name == "Engine")
-        check("the prompt names the pending argument", session.prompt == "Engine…")
-        check("more than one argument left means ↵ advances", !session.isLastArgument)
-        check("submitting an incomplete form yields nothing", session.submit("google") == nil)
-        check("the form advances to the next argument", session.current?.name == "Query")
-        check("one argument left means ↵ runs", session.isLastArgument)
+        let search = CustomCommand(
+            name: "Search", command: "open \"$1$2\"",
+            arguments: [
+                CustomCommandArgument(name: "Query"),
+                CustomCommandArgument(name: "Query", isOptional: true)
+            ])
         check(
-            "an answered argument shows its value",
-            session.progress.map(\.value) == ["google", nil])
+            "fields are keyed by position, so a shared name cannot collide",
+            (0..<2).map(CustomCommandArgument.fieldID) == ["$1", "$2"])
+        check(
+            "a required value still empty holds the run",
+            search.positionalValues(from: ["$2": "swift"]) == nil)
+        check(
+            "an optional value left empty still occupies its slot",
+            search.positionalValues(from: ["$1": "google"]) == ["google", ""])
+        check(
+            "values arrive in $n order",
+            search.positionalValues(from: ["$2": "swift", "$1": "google"]) == ["google", "swift"])
+        check(
+            "a command without arguments is always complete",
+            CustomCommand(name: "Plain", command: "true").positionalValues(from: [:]) == [])
 
-        check("backspace hands the previous answer back", session.retreat() == "google")
-        check("retreating reopens that argument", session.current?.name == "Engine")
-        check("retreating past the first is refused", session.retreat() == nil)
-
-        _ = session.submit("google")
-        let completed = session.submit("swift")
-        check("the last answer completes the form", completed?.values == ["google", "swift"])
-        check("a full form has nothing left pending", session.current == nil)
-        check("submitting past the last argument is refused", session.submit("extra") == nil)
-
-        session.cancel()
-        check("cancelling ends the session", !session.isActive && session.prompt == nil)
+        let capped = CustomCommandArgument.sanitized(
+            ["a", " ", "b", "c", "d"].map { CustomCommandArgument(name: $0) })
+        check(
+            "arguments are capped at three, counted after blanks drop",
+            capped.map(\.name) == ["a", "b", "c"])
 
         // MARK: Shell environment
 

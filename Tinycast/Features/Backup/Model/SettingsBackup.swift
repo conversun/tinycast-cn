@@ -8,10 +8,12 @@ struct SettingsBackup: Codable {
     var customCommands: [CustomCommand]?
     var quicklinks: [Quicklink]?
     var windowLayouts: [WindowLayout]?
+    var customWindowSizes: [CustomWindowSize]?
     var favoriteApps: [String]?
     var hiddenLauncherItems: [String]?
     var hiddenLauncherKinds: [String]?
     var launcherAliases: [String: String]?
+    var pinnedEmoji: [String]?
 
     /// Enums store by raw value, so an unknown one is ignored rather than failing.
     struct SettingsData: Codable {
@@ -26,10 +28,12 @@ struct SettingsBackup: Codable {
         var hyperKeyIncludesShift: Bool?
         var hyperKeyQuickPress: String?
         var emojiSkinTone: String?
+        var emojiGridColumns: Int?
         var showInMenuBar: Bool?
         var popToRootSeconds: Int?
         var escapeKeyBehavior: String?
         var appearance: String?
+        var calcNumberStyle: String?
         var interfaceSize: String?
         var paletteTransparency: Int?
         var compactMode: Bool?
@@ -42,6 +46,8 @@ struct SettingsBackup: Codable {
         var fileSearchScopes: [String]?
         var fileSearchIgnorePatterns: [String]?
         var notesEnabled: Bool?
+        var notesRendersMarkdown: Bool?
+        var notesShowsFormattingBar: Bool?
         // `snippetsEnabled` is absent: an import must not enable keystroke listening.
         var customCommandsEnabled: Bool?
         var customCommandsShowInLauncher: Bool?
@@ -62,6 +68,8 @@ struct SettingsBackup: Codable {
         var quicklinkOpensNewWindow: Bool?
         var quicklinkSelectionFallback: String?
         var quicklinkConfirmsBeforeDelete: Bool?
+        // Carried like quicklinks: running a shortcut the user built grants no permission class.
+        var appleShortcutsEnabled: Bool?
         // `calendarEnabled` is absent: an import must not grant calendar access.
         var calendarShowInLauncher: Bool?
         var calendarLauncherLimit: Int?
@@ -90,6 +98,7 @@ struct SettingsBackup: Codable {
         var windowCommands: [String: HotKeyBinding]?
         var quicklinks: [String: HotKeyBinding]?
         var windowLayouts: [String: HotKeyBinding]?
+        var customWindowSizes: [String: HotKeyBinding]?
     }
 
     /// A tally of what an import touched, for user-facing confirmation.
@@ -99,9 +108,11 @@ struct SettingsBackup: Codable {
         var favorites = 0
         var hiddenItems = 0
         var aliases = 0
+        var pinnedEmoji = 0
         var customCommands = 0
         var quicklinks = 0
         var windowLayouts = 0
+        var customWindowSizes = 0
     }
 }
 
@@ -122,11 +133,13 @@ extension SettingsBackup {
             hyperKeyIncludesShift: s.hyperKeyIncludesShift,
             hyperKeyQuickPress: s.hyperKeyQuickPress.rawValue,
             emojiSkinTone: s.emojiSkinTone.rawValue,
+            emojiGridColumns: s.emojiGridColumns.rawValue,
             showInMenuBar: UserDefaults.standard.object(forKey: SettingsKey.showInMenuBar) as? Bool
                 ?? true,
             popToRootSeconds: s.popToRootTimeout.rawValue,
             escapeKeyBehavior: s.escapeKeyBehavior.rawValue,
             appearance: s.appearance.rawValue,
+            calcNumberStyle: s.calcNumberStyle.rawValue,
             interfaceSize: s.interfaceSize.rawValue,
             paletteTransparency: s.paletteTransparency,
             compactMode: s.compactMode,
@@ -138,6 +151,8 @@ extension SettingsBackup {
             fileSearchScopes: s.fileSearchScopes,
             fileSearchIgnorePatterns: s.fileSearchIgnorePatterns,
             notesEnabled: s.notesEnabled,
+            notesRendersMarkdown: s.notesRendersMarkdown,
+            notesShowsFormattingBar: s.notesShowsFormattingBar,
             customCommandsEnabled: s.customCommandsEnabled,
             customCommandsShowInLauncher: s.customCommandsShowInLauncher,
             snippetsShowInLauncher: s.snippetsShowInLauncher,
@@ -155,6 +170,7 @@ extension SettingsBackup {
             quicklinkOpensNewWindow: s.quicklinkOpensNewWindow,
             quicklinkSelectionFallback: s.quicklinkSelectionFallback.rawValue,
             quicklinkConfirmsBeforeDelete: s.quicklinkConfirmsBeforeDelete,
+            appleShortcutsEnabled: s.appleShortcutsEnabled,
             calendarShowInLauncher: s.calendarShowInLauncher,
             calendarLauncherLimit: s.calendarLauncherLimit.rawValue,
             calendarIncludesTomorrow: s.calendarIncludesTomorrow,
@@ -201,15 +217,21 @@ extension SettingsBackup {
             uniqueKeysWithValues: hk.boundWindowLayoutIDs.compactMap { id in
                 hk.binding(for: .windowLayout(id: id)).map { (id.uuidString.lowercased(), $0) }
             })
+        hotkeys.customWindowSizes = Dictionary(
+            uniqueKeysWithValues: hk.boundCustomWindowSizeIDs.compactMap { id in
+                hk.binding(for: .customWindowSize(id: id)).map { (id.uuidString.lowercased(), $0) }
+            })
         backup.hotkeys = hotkeys
 
         backup.customCommands = core.customCommands.commands
         backup.quicklinks = core.quicklinks.quicklinks
         backup.windowLayouts = core.windowLayouts.layouts
+        backup.customWindowSizes = core.customWindowSizes.sizes
         backup.favoriteApps = core.favorites.keys
         backup.hiddenLauncherItems = Array(core.visibility.hiddenItemKeys)
         backup.hiddenLauncherKinds = Array(core.visibility.disabledKinds)
         backup.launcherAliases = core.aliases.aliases
+        backup.pinnedEmoji = core.pinnedEmoji.glyphs
         return backup
     }
 
@@ -229,6 +251,10 @@ extension SettingsBackup {
             summary.windowLayouts =
                 core.windowLayoutCoordinator.replaceWindowLayouts(windowLayouts)
         }
+        if let customWindowSizes {
+            summary.customWindowSizes =
+                core.customWindowSizeCoordinator.replaceCustomWindowSizes(customWindowSizes)
+        }
         if let hotkeys { summary.hotkeys = applyHotkeys(hotkeys, to: core) }
         if let favoriteApps {
             core.favorites.replace(keys: favoriteApps)
@@ -244,6 +270,10 @@ extension SettingsBackup {
             core.aliases.replace(launcherAliases)
             // Counted after the store, which drops blanks the file may carry.
             summary.aliases = core.aliases.aliases.count
+        }
+        if let pinnedEmoji {
+            core.pinnedEmoji.replace(pinnedEmoji)
+            summary.pinnedEmoji = core.pinnedEmoji.glyphs.count
         }
         return summary
     }
@@ -288,6 +318,10 @@ extension SettingsBackup {
             settings.emojiSkinTone = tone
             count += 1
         }
+        if let raw = s.emojiGridColumns, let columns = EmojiGridColumns(rawValue: raw) {
+            settings.emojiGridColumns = columns
+            count += 1
+        }
         if let show = s.showInMenuBar {
             UserDefaults.standard.set(show, forKey: SettingsKey.showInMenuBar)
             count += 1
@@ -306,6 +340,10 @@ extension SettingsBackup {
         }
         if let raw = s.appearance, let appearance = AppAppearance(rawValue: raw) {
             settings.appearance = appearance
+            count += 1
+        }
+        if let raw = s.calcNumberStyle, let style = CalcNumberStyle(rawValue: raw) {
+            settings.calcNumberStyle = style
             count += 1
         }
         if let value = s.paletteTransparency, (-100...100).contains(value) {
@@ -347,6 +385,14 @@ extension SettingsBackup {
         }
         if let flag = s.notesEnabled {
             settings.notesEnabled = flag
+            count += 1
+        }
+        if let flag = s.notesRendersMarkdown {
+            settings.notesRendersMarkdown = flag
+            count += 1
+        }
+        if let flag = s.notesShowsFormattingBar {
+            settings.notesShowsFormattingBar = flag
             count += 1
         }
         if let flag = s.customCommandsEnabled {
@@ -403,6 +449,10 @@ extension SettingsBackup {
         }
         if let flag = s.quicklinksShowInLauncher {
             settings.quicklinksShowInLauncher = flag
+            count += 1
+        }
+        if let flag = s.appleShortcutsEnabled {
+            settings.appleShortcutsEnabled = flag
             count += 1
         }
         if let flag = s.quicklinkOpensNewWindow {
@@ -498,6 +548,11 @@ extension SettingsBackup {
             guard let id = UUID(uuidString: rawID), core.windowLayouts.layout(id: id) != nil
             else { continue }
             apply(b, .windowLayout(id: id))
+        }
+        for (rawID, b) in hotkeys.customWindowSizes ?? [:] {
+            guard let id = UUID(uuidString: rawID), core.customWindowSizes.size(id: id) != nil
+            else { continue }
+            apply(b, .customWindowSize(id: id))
         }
         for (rawID, b) in hotkeys.quicklinks ?? [:] {
             guard let id = UUID(uuidString: rawID), core.quicklinks.quicklink(id: id) != nil else {

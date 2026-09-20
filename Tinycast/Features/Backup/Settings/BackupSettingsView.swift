@@ -31,7 +31,7 @@ struct BackupSettingsView: View {
 
     private var raycastFileSubtitle: String {
         guard let name = raycastFile?.lastPathComponent else {
-            return String(localized: "Choose a .rayconfig file exported from Raycast.")
+            return String(localized: "A .rayconfig file from Raycast 2.0 or later.")
         }
         return "\(name) — \((isRaycastExport ? "Raycast export" : "not a Raycast export").localizedUI)"
     }
@@ -47,7 +47,7 @@ struct BackupSettingsView: View {
                     }
                 } label: {
                     SettingsRowTitle(.backupExport, "Export Backup")
-                    Text("Choose what to include, then save it as a single .tinycast file.")
+                    Text("The ticked items, as one .tinycast file.")
                 }
                 BackupCategorySelection(selection: $exportSelection)
                 if let backupStatus { statusRow(backupStatus) }
@@ -74,7 +74,6 @@ struct BackupSettingsView: View {
                         }
                     } label: {
                         Text("Import")
-                        Text("Only the categories you tick are restored.")
                     }
                 }
             } header: {
@@ -100,8 +99,9 @@ struct BackupSettingsView: View {
                     .onSubmit(runRaycastImport)
                 } label: {
                     Text("Passphrase")
-                    Text("The password you set when exporting from Raycast.")
                 }
+                RaycastImportSelection(selection: $selection)
+                conflictNotice
                 LabeledContent {
                     if importing {
                         ProgressView().controlSize(.small)
@@ -111,10 +111,7 @@ struct BackupSettingsView: View {
                     }
                 } label: {
                     Text("Import")
-                    Text("Choose what to bring over, then import.")
                 }
-                RaycastImportSelection(selection: $selection)
-                conflictNotice
                 if let status { statusRow(status) }
             } header: {
                 SettingsSectionHeader(.backupImportFromRaycast)
@@ -139,7 +136,7 @@ struct BackupSettingsView: View {
             }
         } else {
             Label(
-                "Tip: unset the matching Raycast shortcuts to avoid conflicts.",
+                "Unset matching Raycast shortcuts to avoid conflicts.",
                 systemImage: "info.circle"
             )
             .foregroundStyle(.secondary)
@@ -160,9 +157,9 @@ struct BackupSettingsView: View {
 
     private var backupFileSubtitle: String {
         guard let name = backupFile?.lastPathComponent else {
-            return "Choose a .tinycast file exported from Tinycast."
+            return String(localized: "A .tinycast file exported from Tinycast.")
         }
-        return openedManifest == nil ? "\(name) — couldn't be read" : name
+        return openedManifest == nil ? String(localized: "\(name) — couldn't be read") : name
     }
 
     private func available(in manifest: BackupManifest) -> [BackupCategory: Int] {

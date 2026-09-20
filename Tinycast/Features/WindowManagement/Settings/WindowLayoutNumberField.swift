@@ -50,7 +50,7 @@ struct WindowLayoutNumberField: View {
                 .frame(width: Theme.Size.layoutFieldUnit, alignment: .leading)
         }
         .layoutFieldChrome(isFocused: isFocused)
-        .accessibilityLabel(name)
+        .accessibilityLabel(name.localizedUI)
         .accessibilityValue("\(value) \(suffix)")
     }
 

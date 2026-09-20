@@ -62,7 +62,7 @@ struct CalcTests {
         expectDisplay("2.5e8 / 2", "125,000,000")
         expectDisplay("1E6 + 1", "1,000,001")  // uppercase E
         expectDisplay("1e6", "1,000,000")  // a lone shorthand literal cards like "10k"
-        expectNil("10em")  // partial "e" isn't an exponent, so the ident scanner still gets it
+        expectDisplay("10em", "160 px")  // partial "e" isn't an exponent, so `em` stays a unit
         expectDisplay("1e3k + 1", "1,000,001")  // exponent then compact suffix, both applied
 
         // Exact up to 2^53, past the old 1e15 cutoff — truncating these lost real digits on copy
@@ -492,7 +492,7 @@ struct CalcTests {
         expectDisplay("1lbf to n", "4.448221615 N")
         expectDisplay("3000px / 300ppi to inches", "10 in")
         expectDisplay("5in * 300PPI", "1,500 px")
-        expectCopy("5in * 300ppi", "1500 px")
+        expectCopy("5in * 300ppi", "1500px")
         expectDisplay("300ppi * 5in", "1,500 px")
         expectDisplay("3000 pixels / 10in to ppi", "300 ppi")
         expectBadges("3000px / 10in", source: "Expression", target: "Pixels per Inch")
@@ -510,6 +510,28 @@ struct CalcTests {
         expectError("10px + 1in", "Cannot add Pixels and Length.")
         expectNil("3000px / 0ppi")
         expectNil("pixels")
+        expectDisplay("16px to rem", "1 rem")
+        expectDisplay("1.5rem to px", "24 px")
+        expectCopy("1.5rem to px", "24px")
+        expectCopy("24px", "1.5rem")
+        expectCopy("2000rem", "32000px")
+        expectCopy("1rem + 8px", "24px")
+        expectCopy("300ppi to px/cm", "118.1102362 px/cm")
+        expectDisplay("rem to px", "16 px")
+        expectDisplay("rem px", "16 px")
+        expectDisplay("24px", "1.5 rem")
+        expectBadges("24px", source: "Pixels", target: "REM")
+        expectDisplay("2rem", "32 px")
+        expectDisplay("2em", "32 px")
+        expectDisplay("0.875 rems", "14 px")
+        expectDisplay("1em to rem", "1 rem")
+        expectDisplay("1rem + 8px", "24 px")
+        expectDisplay("8px + 1rem", "1.5 rem")
+        expectDisplay("2rem * 3", "6 rem")
+        expectDisplay("32px / 1rem", "2")
+        expectDisplay("48rem / 96ppi to in", "8 in")
+        expectError("1rem to cm", "Cannot convert Pixels to Length.")
+        expectNil("rem")
         expectDisplay("20m2 / 4m", "5 m")
         expectDisplay("sqrt(25m2)", "5 m")
         expectDisplay("cbrt(-8m3)", "-2 m")
@@ -967,6 +989,108 @@ struct CalcTests {
         expectDisplayAt("9:30am in nyc", "5:30 AM")
         expectDisplayAt("5pm in tokyo", "2:00 AM (tomorrow)")
         expectBadgesAt("5pm london in sf", source: "London", target: "Los Angeles")
+
+        let zoneNow = clock.calendar.date(
+            from: DateComponents(year: 2026, month: 9, day: 15, hour: 12))!
+        for home in ["UTC", "Asia/Shanghai", "America/Los_Angeles"] {
+            var calendar = clock.calendar
+            calendar.timeZone = TimeZone(identifier: home)!
+            for query in [
+                "5:30pm SF to London", "5:30 pm SF to London", "5:30 pm in SF to London",
+                "5:30 PM in San Francisco to London", "5:30\u{a0}pm SF to London",
+                "5:30 pm SF in London", "5:30 pm SF at London", "5:30 pm at SF to London",
+                "17:30 SF to London"
+            ] {
+                expectDisplayAt(query, "1:30 AM (tomorrow)", now: zoneNow, calendar: calendar)
+                expectBadgesAt(
+                    query, source: "Los Angeles", target: "London", now: zoneNow, calendar: calendar)
+            }
+            for query in ["5pm SF to London", "5pm in SF to London", "5 pm in SF to London"] {
+                expectDisplayAt(query, "1:00 AM (tomorrow)", now: zoneNow, calendar: calendar)
+            }
+            for query in [
+                "5pm PSTT to London", "5:30 pm PSTT to London", "5pm in PSTT to London",
+                "5pm SF junk to London", "5pm in to London", "5pm at to London",
+                "5pm pm SF to London", "5pm am SF to London",
+                "time in sf in 4 hours", "now in tokyo in 2h",
+                "time at sf in 4 hours", "now at tokyo in 2h"
+            ] {
+                expectNilAt(query, now: zoneNow, calendar: calendar)
+            }
+        }
+        expectDisplayAt("5:30 pm to London", "6:30 PM")
+        expectDisplayAt("5 pm in Tokyo", "2:00 AM (tomorrow)")
+        expectDisplayAt("5:30 am SF to London", "1:30 PM")
+        expectDisplayAt("12 am SF to London", "8:00 AM")
+        expectDisplayAt("12 pm SF to London", "8:00 PM")
+        expectDisplayAt("5:30 pm in SF to London + 30 min", "2:00 AM (tomorrow)")
+        expectCopy("5:30 pm SF to London", "1:30 AM")
+        expectNilAt("13 pm SF to London")
+        expectNilAt("5:60 pm SF to London")
+
+        let localConversionNow = clock.calendar.date(
+            from: DateComponents(year: 2026, month: 9, day: 15, hour: 12))!
+        for (home, target, time, dayNote) in [
+            ("Asia/Shanghai", "Shanghai", "8:30 AM", " (tomorrow)"),
+            ("UTC", "UTC", "12:30 AM", " (tomorrow)"),
+            ("America/Los_Angeles", "Los Angeles", "5:30 PM", "")
+        ] {
+            var calendar = clock.calendar
+            calendar.timeZone = TimeZone(identifier: home)!
+            let expected = CalcResult(
+                expression: "5:30 PM", sourceBadge: "Los Angeles", targetBadge: target,
+                payload: .value(display: time + dayNote, copyText: time))
+            for query in [
+                "5:30pm SF", "5:30 pm SF", "17:30 San Francisco", "5:30 PM SFO",
+                "  5:30\tpm\u{00A0}sf  "
+            ] {
+                let result = CalcEngine.evaluate(query, now: localConversionNow, calendar: calendar)
+                check("\(query) [home \(home)]", expected: "true", got: "\(result == expected)")
+            }
+        }
+        for components in [
+            DateComponents(year: 2026, month: 9, day: 15, hour: 12),
+            DateComponents(year: 2026, month: 1, day: 1, hour: 0),
+            DateComponents(year: 2026, month: 11, day: 1, hour: 12)
+        ] {
+            let now = clock.calendar.date(from: components)!
+            for (home, destination) in [
+                ("UTC", "UTC"), ("Asia/Shanghai", "Shanghai"),
+                ("Pacific/Kiritimati", "Kiritimati"), ("Pacific/Pago_Pago", "Pago Pago")
+            ] {
+                var calendar = clock.calendar
+                calendar.timeZone = TimeZone(identifier: home)!
+                for (query, explicit) in [
+                    ("5 pm SF", "5pm SF"), ("12 am Canada", "12am Canada"),
+                    ("12 pm CDG", "12pm CDG"), ("09:15 Kathmandu", "09:15 Kathmandu"),
+                    ("23:30 Pago Pago", "23:30 Pago Pago"), ("00:30 Kiritimati", "00:30 Kiritimati"),
+                    ("1:30 am SF", "1:30am SF"), ("17:30 São Paulo", "17:30 São Paulo")
+                ] {
+                    let expected = CalcEngine.evaluate(
+                        "\(explicit) to \(destination)", now: now, calendar: calendar)
+                    let result = CalcEngine.evaluate(query, now: now, calendar: calendar)
+                    check(
+                        "\(query) [home \(home), now \(now)]", expected: "true",
+                        got: "\(expected != nil && result == expected)")
+                }
+            }
+        }
+        expectDisplayAt("5:30 pm SF + 30 min", "1:00 AM (tomorrow)", now: localConversionNow)
+        expectDisplayAt("5:30pm SF - 2h", "10:30 PM", now: localConversionNow)
+        expectDisplayAt("5:30pm in SF", "10:30 AM", now: localConversionNow)
+        expectDisplayAt("5:30pm SF to London", "1:30 AM (tomorrow)", now: localConversionNow)
+        expectNilAt(
+            "2:30 am SF",
+            now: clock.calendar.date(from: DateComponents(year: 2026, month: 3, day: 8, hour: 12))!)
+        for query in [
+            "5:30 pm PSTT", "5:30pm PSTT", "5:30pm SF junk", "5:30 pm SF London",
+            "5pm", "5 pm", "17:30", "17:30 pm", "5 SF", "pm SF", "now SF",
+            "13pm SF", "5:60pm SF", "5pm pm SF", "5:30 am pm SF", "25:30 SF",
+            "5:30pm SF to", "5:30pm SF to PSTT", "5:30pm SF + 2 kg",
+            "time in sf in 4 hours", "now in tokyo in 2h", "Screen Time", "Safari SF"
+        ] {
+            expectNilAt(query)
+        }
         // Aliases cover what the identifiers don't spell, and DST is Foundation's own answer
         expectDisplayAt("time in nyc", "8:18 PM (yesterday)")
         expectDisplayAt("time in cet", "2:18 AM")
@@ -997,6 +1121,35 @@ struct CalcTests {
         expectDisplay("1 cup to ml", "236.5882365 mL")
         expectNil("5pm london in sf + 2 kg")
 
+        for components in [
+            DateComponents(year: 2026, month: 9, day: 15, hour: 12),
+            DateComponents(year: 2026, month: 9, day: 30, hour: 12),
+            DateComponents(year: 2026, month: 12, day: 31, hour: 12),
+            DateComponents(year: 2026, month: 3, day: 8, hour: 12),
+            DateComponents(year: 2026, month: 11, day: 1, hour: 12)
+        ] {
+            let now = clock.calendar.date(from: components)!
+            for home in ["UTC", "Asia/Shanghai", "America/Los_Angeles"] {
+                var calendar = clock.calendar
+                calendar.timeZone = TimeZone(identifier: home)!
+                for (query, expected) in [
+                    ("23:30 Pago Pago to Kiritimati", "12:30 AM (in 2 days)"),
+                    ("00:30 Kiritimati to Pago Pago", "11:30 PM (2 days ago)"),
+                    ("22:59 Pago Pago to Kiritimati", "11:59 PM (tomorrow)"),
+                    ("01:00 Kiritimati to Pago Pago", "12:00 AM (yesterday)"),
+                    ("12:00 Pago Pago to Pago Pago", "12:00 PM")
+                ] {
+                    expectDisplayAt(query, expected, now: now, calendar: calendar)
+                }
+            }
+        }
+        expectBadgesAt("23:30 Pago Pago to Kiritimati", source: "Pago Pago", target: "Kiritimati")
+        expectBadgesAt("00:30 Kiritimati to Pago Pago", source: "Kiritimati", target: "Pago Pago")
+        expectCopy("23:30 Pago Pago to Kiritimati", "12:30 AM")
+        expectCopy("00:30 Kiritimati to Pago Pago", "11:30 PM")
+        expectDisplayAt("23:30 Pago Pago to Kiritimati + 30 min", "1:00 AM (tomorrow)")
+        expectDisplayAt("00:30 Kiritimati to Pago Pago + 30 min", "12:00 AM (yesterday)")
+
         // `<weekday> in <n> weeks` answers that weekday inside the week it lands in
         expectDisplayAt("monday in 3 weeks", "10 August")
         expectDisplayAt("monday in 1 week", "27 July")
@@ -1018,6 +1171,8 @@ struct CalcTests {
         expectDisplayAt("time in 4 hours", "4:18 AM")
         expectDisplayAt("time in 90 min", "1:48 AM")
         expectDisplayAt("time in 4 hours in san francisco", "9:18 PM (yesterday)")
+        expectDisplayAt("time in 4 hours in sf", "9:18 PM (yesterday)")
+        expectBadgesAt("time in 4 hours in sf", source: "UTC", target: "Los Angeles")
 
         // A bare offset on a clock answer is hours, the unit the answer already implies
         expectDisplayAt("time in tokyo + 2", "11:18 AM")
@@ -1122,6 +1277,128 @@ struct CalcTests {
         expectBadgesAt("time in malmö", source: "UTC", target: "Stockholm")
         expectBadgesAt("5pm graz in basel", source: "Vienna", target: "Zurich")
 
+        // Countries answer with their main clock, badged with the city that clock belongs to
+        expectDisplayAt("time in uk", "1:18 AM")
+        expectDisplayAt("Time in UK", "1:18 AM")
+        expectBadgesAt("time in united kingdom", source: "UTC", target: "London")
+        expectBadgesAt("time in japan", source: "UTC", target: "Tokyo")
+        expectBadgesAt("what time is it in germany", source: "UTC", target: "Berlin")
+        expectBadgesAt("time in côte d’ivoire", source: "UTC", target: "Abidjan")
+        expectBadgesAt("time in trinidad and tobago", source: "UTC", target: "Port of Spain")
+        expectDisplayAt("5pm uk in japan", "1:00 AM (tomorrow)")
+        expectDisplayAt("time in uk + 2", "3:18 AM")
+        // A country spanning several clocks answers with its capital's, never a remote edge
+        expectBadgesAt("time in usa", source: "UTC", target: "New York")
+        expectBadgesAt("time in us", source: "UTC", target: "New York")
+        expectBadgesAt("time in australia", source: "UTC", target: "Sydney")
+        expectBadgesAt("time in canada", source: "UTC", target: "Toronto")
+        expectBadgesAt("time in russia", source: "UTC", target: "Moscow")
+        expectBadgesAt("time in uae", source: "UTC", target: "Dubai")
+        // A unit spelled like a country code stays a unit
+        expectDisplay("10 ms to us", "10,000 µs")
+        expectNilAt("time in antarctica")
+        check(
+            "country zones resolve", expected: "true",
+            got: "\(CountryZoneData.zones.values.allSatisfy { TimeZone(identifier: $0) != nil })")
+
+        expectDisplayAt("SF time", "5:18 PM (yesterday)")
+        expectDisplayAt("time SF", "5:18 PM (yesterday)")
+        expectDisplayAt("current time to Tokyo", "9:18 AM")
+        expectDisplayAt("what time is it to Tokyo", "9:18 AM")
+        let usaExpected = CalcResult(
+            expression: "12:00 PM", sourceBadge: "UTC", targetBadge: "New York",
+            payload: .value(display: "8:00 AM", copyText: "8:00 AM"))
+        let usaNow = CalcEngine.evaluate("now in usa", now: zoneNow, calendar: clock.calendar)
+        check("now in usa", expected: "true", got: "\(usaNow == usaExpected)")
+        for query in ["Canada timezone", "Canada time zone", "timezone Canada", "timezone in Canada"] {
+            let expected = CalcResult(
+                expression: "12:00 PM", sourceBadge: "UTC", targetBadge: "Toronto",
+                payload: .value(display: "8:00 AM", copyText: "8:00 AM"))
+            let actual = CalcEngine.evaluate(query, now: zoneNow, calendar: clock.calendar)
+            check(query, expected: "true", got: "\(actual == expected)")
+        }
+        for query in ["Canada time to China", "Canada timezone to China", "Canada time zone to China"] {
+            let expected = CalcResult(
+                expression: "8:00 AM", sourceBadge: "Toronto", targetBadge: "Shanghai",
+                payload: .value(display: "8:00 PM", copyText: "8:00 PM"))
+            let actual = CalcEngine.evaluate(query, now: zoneNow, calendar: clock.calendar)
+            check(query, expected: "true", got: "\(actual == expected)")
+        }
+        expectDisplayAt("Tokyo time", "9:18 AM")
+        expectDisplayAt("  sF\tTiMe  ", "5:18 PM (yesterday)")
+        expectDisplayAt("San\u{a0}Francisco\u{2009}time", "5:18 PM (yesterday)")
+        expectDisplayAt("Tokyo\ntime", "9:18 AM")
+        expectDisplayAt("  TiMe\tSF  ", "5:18 PM (yesterday)")
+        expectDisplayAt("SF\u{a0}TiMe\u{2009}ZoNe", "5:18 PM (yesterday)")
+        expectDisplayAt("TimeZone\nIn\tTokyo", "9:18 AM")
+        expectDisplayAt("Canada\tTiMe\u{a0}ZoNe\tTo\nChina", "8:00 PM", now: zoneNow)
+        for components in [
+            DateComponents(year: 2026, month: 1, day: 15, hour: 12),
+            DateComponents(year: 2026, month: 9, day: 15, hour: 12),
+            DateComponents(year: 2026, month: 9, day: 15, hour: 23, minute: 30)
+        ] {
+            let now = clock.calendar.date(from: components)!
+            for home in ["UTC", "Asia/Shanghai", "America/Los_Angeles"] {
+                var calendar = clock.calendar
+                calendar.timeZone = TimeZone(identifier: home)!
+                for place in [
+                    "SF", "Tokyo", "London", "Shanghai", "San Francisco", "New York", "Canada",
+                    "USA", "United States", "United Kingdom", "India", "South Korea", "PST", "UTC", "GMT",
+                    "SFO", "CDG", "LDN", "SÃO PAULO", "Zürich", "Côte d’Ivoire", "Trinidad and Tobago",
+                    "Georgia", "Basel", "The Hague", "Swift Current"
+                ] {
+                    let expected = CalcEngine.evaluate("time in \(place)", now: now, calendar: calendar)
+                    for query in [
+                        "\(place) TiMe", "time \(place)", "\(place) timezone", "\(place) time zone",
+                        "timezone \(place)", "timezone in \(place)", "now in \(place)"
+                    ] {
+                        let actual = CalcEngine.evaluate(query, now: now, calendar: calendar)
+                        check(
+                            "\(query) [\(home), \(now)]", expected: "true",
+                            got: "\(expected != nil && actual == expected)")
+                    }
+                }
+                for (source, target) in [
+                    ("Canada", "China"), ("SFO", "CDG"), ("Tokyo", "SF"), ("SF", "Tokyo"),
+                    ("New York", "São Paulo"), ("Kolkata", "Kathmandu"), ("Kiritimati", "Pago Pago")
+                ] {
+                    let expected = CalcEngine.evaluate(
+                        "time \(source) to \(target)", now: now, calendar: calendar)
+                    for phrase in ["time", "timezone", "time zone"] {
+                        let query = "\(source) \(phrase) to \(target)"
+                        let actual = CalcEngine.evaluate(query, now: now, calendar: calendar)
+                        check(
+                            "\(query) [\(home), \(now)]", expected: "true",
+                            got: "\(expected != nil && actual == expected)")
+                    }
+                }
+            }
+        }
+        for query in [
+            "Screen Time", "QuickTime Player", "Time Machine", "FaceTime", "PSTT time", "xyzzy time",
+            "SF junk time", "4 hours time", "90 min time", "5pm time", "5pm SF time",
+            "SF current time", "SF time now", "SF time + 2h", "time in SF time", "time time"
+        ] {
+            expectNilAt(query)
+        }
+        for place in ["PSTT", "xyzzy", "SF junk", "4 hours", "5pm SF", "time"] {
+            for query in [
+                "time \(place)", "\(place) timezone", "\(place) time zone",
+                "timezone \(place)", "timezone in \(place)", "\(place) time to China",
+                "\(place) timezone to China", "Canada time zone to \(place)"
+            ] {
+                expectNilAt(query)
+            }
+        }
+        for query in [
+            "timezone", "time zone", "timezone in", "timezone in in SF", "timezone to China",
+            "timezone settings", "SF timezone app", "Canada time to",
+            "Canada time to China to Tokyo", "time in SF in 4 hours", "now in usa in 2h",
+            "Canada timezone to 2h", "timezone in 4 hours", "Canada time to China + 2h"
+        ] {
+            expectNilAt(query)
+        }
+
         // A bare number takes the unit its moment implies
         expectDisplayAt("3:45pm + 5", "24 July at 8:45 PM")
         expectDisplayAt("3:45pm - 2", "24 July at 1:45 PM")
@@ -1224,8 +1501,222 @@ struct CalcTests {
         expectDisplay("1kg + 1kg to g", "2,000 g")
         expectDisplay("2hr + 30min to min", "150 min")
 
+        localeTests()
+
         print("\n\(passes) passed, \(failures) failed")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    // MARK: - Locale-aware input and output
+
+    static let italian = CalcNumberFormat(decimalSeparator: ",", groupingSeparator: ".")!
+    static let french = CalcNumberFormat(decimalSeparator: ",", groupingSeparator: "\u{202F}")!
+    static let swiss = CalcNumberFormat(decimalSeparator: ".", groupingSeparator: "\u{2019}")!
+    static let ungrouped = CalcNumberFormat(decimalSeparator: ",", groupingSeparator: nil)!
+
+    static func localeTests() {
+        // Resolving a format from the Mac's separators
+        check(
+            "format [en separators]", expected: "true",
+            got: "\(CalcNumberFormat(decimalSeparator: ".", groupingSeparator: ",") == .english)")
+        check(
+            "format [arabic decimal]", expected: "nil",
+            got: "\(CalcNumberFormat(decimalSeparator: "\u{066B}", groupingSeparator: "\u{066C}") as Any)")
+        check(
+            "format [grouping equal to decimal]", expected: "nil",
+            got:
+                "\(CalcNumberFormat(decimalSeparator: ",", groupingSeparator: ",")?.groupingSeparator as Any)"
+        )
+        check(
+            "format [ascii space grouping]", expected: "nil",
+            got:
+                "\(CalcNumberFormat(decimalSeparator: ",", groupingSeparator: " ")?.groupingSeparator as Any)"
+        )
+        check("format [it argument separator]", expected: ";", got: String(italian.argumentSeparator))
+        check("format [ch argument separator]", expected: ",", got: String(swiss.argumentSeparator))
+
+        // The issue's own examples
+        expectLocalized("2,3 + 1,5", "3,8", italian)
+        expectLocalized("1.234,56 + 0,44", "1.235", italian)
+        expectLocalized("10/4", "2,5", italian)
+        expectLocalizedCopy("1.234,56 + 0,44", "1235", italian)
+        expectLocalizedCopy("10/4", "2,5", italian)
+
+        // Decimal comma, dot grouping
+        expectLocalized("2^20", "1.048.576", italian)
+        expectLocalized("1.000.000 / 3", "333.333,3333", italian)
+        expectLocalized("1/3", "0,3333333333", italian)
+        expectLocalized(",5 + 1", "1,5", italian)
+        expectLocalized("1,5e3", "1.500", italian)
+        expectLocalized("2,5k", "2.500", italian)
+        expectLocalized("12.345.678 + 1", "12.345.679", italian)
+        expectLocalized("-1.234,5 * 2", "-2.469", italian)
+        expectLocalized("2 + 2 =", "4", italian)
+        expectLocalizedCopy("2^20", "1048576", italian)
+        expectLocalizedCopy("1/3", "0,3333333333", italian)
+
+        // Function arguments take `;`; a comma between digits is always the decimal
+        expectLocalized("max(2,5; 3)", "3", italian)
+        expectLocalized("max(2,5;3,5)", "3,5", italian)
+        expectLocalized("hypot(3;4)", "5", italian)
+        expectLocalized("round(3,14159; 2)", "3,14", italian)
+        expectLocalized("gcd(12;18;8)", "2", italian)
+        expectLocalized("log(8;2)", "3", italian)
+        expectLocalized("max(1.000; 999)", "1.000", italian)
+        expectLocalized("max(2,3)", "2,3", italian)
+        expectLocalized("hypot(3m;400cm)", "5 m", italian)
+        expectLocalizedExpression("hypot(3m;400cm)", "hypot(3 m; 400 cm)", italian)
+        expectLocalizedExpression("max(2,5;3)", "max(2,5; 3)", italian)
+        // A spaced comma can't sit between two digits, so it still separates
+        expectLocalized("max(2, 3)", "3", italian)
+        expectLocalized("average of 10; 20; 30", "20", italian)
+        expectLocalized("average of 10, 20, 30", "20", italian)
+        expectLocalized("sum of 1,5; 2,5", "4", italian)
+
+        // A number with no single reading earns no card rather than a guess
+        expectLocalizedNil("1,2,3", italian)
+        expectLocalizedNil("1.5 + 1", italian)
+        expectLocalizedNil("1.23,4 + 1", italian)
+        expectLocalizedNil("1,234.5 + 1", italian)
+        expectLocalizedNil("12.34 * 2", italian)
+        expectLocalizedNil("1.2345 + 1", italian)
+
+        // Partial input keeps the card while the next digits are still coming
+        expectLocalized("1 + 2,", "3", italian)
+        expectLocalized("2,5 +", "2,5", italian)
+        expectLocalizedExpression("2,5 +", "2,5 +", italian)
+        expectLocalizedExpression("1.234,5 *", "1234,5 ×", italian)
+
+        // Units, currency and percent render through the same formatter
+        expectLocalized("1,5km to m", "1.500 m", italian)
+        expectLocalized("10kg + 500g", "10.500 g", italian)
+        expectLocalized("2,5 hours to min", "150 min", italian)
+        expectLocalized("5feet + 1m", "2,524 m", italian)
+        expectLocalizedCopy("1,5km to m", "1500 m", italian)
+        expectLocalized("€1.234,50 to usd", "1.341,85 USD", italian)
+        expectLocalizedCopy("€1.234,50 to usd", "1341,85 USD", italian)
+        expectLocalized("$10 + 5", "15,00 USD", italian)
+        expectLocalized("20% off 1.500", "1.200", italian)
+        expectLocalized("0x1000", "4.096", italian)
+        expectLocalized("255 to hex", "0xFF", italian)
+        expectLocalizedCopy("0x1000", "4096", italian)
+        expectLocalizedExpression("1,5km to m", "1,5 km", italian)
+
+        // Dates, clocks and zones never reach the number rewrite
+        for query in [
+            "17.2.26 + 100 weekdays", "25.8.27", "25. aug", "25. aug + 3",
+            "time in Tokyo", "1970-01-01T00:00:00.125Z to unix ms", "1.2.3 + 1", "7:30 - 13:30"
+        ] {
+            expectSameAsEnglish(query, italian)
+        }
+        expectLocalized("1970-01-01T00:00:00Z + 1h to unix", "3.600", italian)
+        expectLocalized("hrs till 9am", "8,7 hours", italian)
+
+        // Space grouping: the Mac's narrow no-break space, never a typed space
+        expectLocalized("1\u{202F}234,5 + 0,5", "1\u{202F}235", french)
+        expectLocalized("2^20", "1\u{202F}048\u{202F}576", french)
+        expectLocalized("max(1,5; 2)", "2", french)
+        expectLocalized("1.5 + 1", "2,5", french)
+
+        // Decimal dot with apostrophe grouping keeps the comma for arguments
+        expectLocalized("1\u{2019}234.5 + 0.5", "1\u{2019}235", swiss)
+        expectLocalized("max(1,2)", "2", swiss)
+        expectLocalized("1,000 + 234", "1\u{2019}234", swiss)
+        expectLocalized("10/4", "2.5", swiss)
+        expectSameAsEnglish("19.2.27", swiss)
+        expectSameAsEnglish("1.2.3 + 1", swiss)
+
+        // A format without grouping neither reads nor writes one
+        expectLocalized("1234,5 * 2", "2469", ungrouped)
+        expectLocalized("2^20", "1048576", ungrouped)
+        expectLocalized("1.234 + 1", "2,234", ungrouped)
+
+        // English stays byte-for-byte what it was
+        expectLocalized("1,000 + 234", "1,234", .english)
+        expectLocalized("max(2,3)", "3", .english)
+        expectLocalizedNil("max(2;3)", .english)
+
+        // Canonical history text, localized for display
+        check("history [grouped]", expected: "1.234,5 kg", got: italian.localized("1,234.5 kg"))
+        check("history [dotted date]", expected: "19.2.27", got: italian.localized("19.2.27"))
+        check("history [clock]", expected: "00:18:00.123", got: italian.localized("00:18:00.123"))
+        check(
+            "history [date prose]", expected: "Friday, 24 July 2026",
+            got: italian.localized("Friday, 24 July 2026"))
+        check(
+            "history [arguments]", expected: "max(1,5; 2)",
+            got: italian.localizedExpression("max(1.5, 2)"))
+        // Inside a call a canonical comma is an argument, even where it looks like grouping
+        check(
+            "history [unspaced arguments]", expected: "max(2;3)", got: italian.localizedExpression("max(2,3)")
+        )
+        check(
+            "history [grouping-shaped argument]", expected: "max(1;234) + 1.234",
+            got: italian.localizedExpression("max(1,234) + 1,234"))
+        check(
+            "history [decimal argument]", expected: "round(3,14159;2)",
+            got: italian.localizedExpression("round(3.14159,2)"))
+        check(
+            "history [nested call]", expected: "2max(1; min(2;3))",
+            got: italian.localizedExpression("2max(1, min(2,3))"))
+        check("history [ch arguments]", expected: "max(1,234)", got: swiss.localizedExpression("max(1,234)"))
+        expectLocalizedExpression("max(1,234)", "max(1,234)", swiss)
+        expectLocalized("max(1;234)", "234", italian)
+        check("history [exponent]", expected: "1,524157875e+16", got: italian.localized("1.524157875e+16"))
+        check("history [english]", expected: "1,234.5", got: CalcNumberFormat.english.localized("1,234.5"))
+        check("history [search]", expected: "3.8", got: italian.canonical("3,8") ?? "nil")
+    }
+
+    static func evaluateLocalized(_ query: String, _ format: CalcNumberFormat) -> CalcResult? {
+        CalcEngine.evaluate(
+            query, now: clock.now, calendar: clock.calendar, rates: fx, format: format
+        ).map(format.localized)
+    }
+
+    static func formatLabel(_ query: String, _ format: CalcNumberFormat) -> String {
+        "\(query) [decimal \(format.decimalSeparator)]"
+    }
+
+    static func expectLocalized(_ query: String, _ expected: String, _ format: CalcNumberFormat) {
+        guard case .value(let display, _)? = evaluateLocalized(query, format)?.payload else {
+            fail(formatLabel(query, format), expected: expected, got: "nil / error")
+            return
+        }
+        check(formatLabel(query, format), expected: expected, got: display)
+    }
+
+    static func expectLocalizedCopy(_ query: String, _ expected: String, _ format: CalcNumberFormat) {
+        guard case .value(_, let copy)? = evaluateLocalized(query, format)?.payload else {
+            fail(formatLabel(query, format), expected: expected, got: "nil / error")
+            return
+        }
+        check(formatLabel(query, format) + " [copy]", expected: expected, got: copy)
+    }
+
+    static func expectLocalizedExpression(
+        _ query: String, _ expected: String, _ format: CalcNumberFormat
+    ) {
+        guard let result = evaluateLocalized(query, format) else {
+            fail(formatLabel(query, format), expected: expected, got: "nil")
+            return
+        }
+        check(formatLabel(query, format) + " [expression]", expected: expected, got: result.expression)
+    }
+
+    static func expectLocalizedNil(_ query: String, _ format: CalcNumberFormat) {
+        if let result = evaluateLocalized(query, format) {
+            fail(formatLabel(query, format), expected: "nil", got: "\(result.payload)")
+        } else {
+            passes += 1
+        }
+    }
+
+    /// Text with no decimal in it must come out exactly as English renders it.
+    static func expectSameAsEnglish(_ query: String, _ format: CalcNumberFormat) {
+        let english = CalcEngine.evaluate(query, now: clock.now, calendar: clock.calendar, rates: fx)
+        check(
+            formatLabel(query, format) + " [same as English]", expected: "\(english as Any)",
+            got: "\(evaluateLocalized(query, format) as Any)")
     }
 
     // MARK: - Fixed clock for deterministic date/time tests (Fri 2026-07-24 00:18:00 UTC)
@@ -1264,10 +1755,12 @@ struct CalcTests {
 
     // MARK: - Helpers
 
-    static func expectDisplayAt(_ query: String, _ expected: String, calendar: Calendar? = nil) {
+    static func expectDisplayAt(
+        _ query: String, _ expected: String, now: Date = clock.now, calendar: Calendar? = nil
+    ) {
         guard
             case .value(let display, _)? = CalcEngine.evaluate(
-                query, now: clock.now, calendar: calendar ?? clock.calendar)?.payload
+                query, now: now, calendar: calendar ?? clock.calendar)?.payload
         else {
             fail(query, expected: expected, got: "nil / error")
             return
@@ -1275,8 +1768,11 @@ struct CalcTests {
         check(query, expected: expected, got: display)
     }
 
-    static func expectBadgesAt(_ query: String, source: String, target: String) {
-        guard let result = CalcEngine.evaluate(query, now: clock.now, calendar: clock.calendar)
+    static func expectBadgesAt(
+        _ query: String, source: String, target: String, now: Date = clock.now,
+        calendar: Calendar? = nil
+    ) {
+        guard let result = CalcEngine.evaluate(query, now: now, calendar: calendar ?? clock.calendar)
         else {
             fail(query, expected: "\(source) → \(target)", got: "nil")
             return

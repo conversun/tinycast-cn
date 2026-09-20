@@ -12,6 +12,9 @@ enum ExtensionListKeyTests {
             "↵ opens the list",
             resolve(.return, listOpen: false) == .openList, nil)
         check(
+            "keypad ⌤ opens the list",
+            resolve(KeyEquivalent("\u{3}"), listOpen: false) == .openList, nil)
+        check(
             "space opens the list",
             resolve(.space, characters: " ", listOpen: false) == .openList, nil)
         check(
@@ -37,6 +40,7 @@ enum ExtensionListKeyTests {
         check("↑ moves up", resolve(.upArrow) == .moveUp, nil)
         check("↓ moves down", resolve(.downArrow) == .moveDown, nil)
         check("↵ commits", resolve(.return) == .commit, nil)
+        check("keypad ⌤ commits", resolve(KeyEquivalent("\u{3}")) == .commit, nil)
         check("⎋ dismisses", resolve(.escape) == .dismiss, nil)
         check(
             "a letter is typed into the query",

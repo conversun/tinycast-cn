@@ -32,7 +32,7 @@ struct NoteSwitcherView: View {
             notes.moveSwitcherSelection(by: -1)
             return .handled
         }
-        .onKeyPress(.return) {
+        .onKeyPress(keys: [.return, KeyEquivalent("\u{3}")]) { _ in
             guard !notes.isRenamingSwitcherNote else { return .ignored }
             notes.selectSwitcherNote()
             return .handled

@@ -106,8 +106,8 @@ struct LauncherList: View {
         }
         // Publication order, so rows match the flat index.
         let kinds: [AppEntry.Kind] = [
-            .meeting, .application, .systemSettings, .extensionCommand, .quicklink, .snippet,
-            .systemAction, .windowLayout, .windowCommand, .customCommand, .quickAction,
+            .meeting, .application, .systemSettings, .extensionCommand, .quicklink, .appleShortcut,
+            .snippet, .systemAction, .windowLayout, .windowCommand, .customCommand, .quickAction,
             .command
         ]
         for kind in kinds {
@@ -246,6 +246,11 @@ private struct AppRow: View {
                             .offset(y: 3)
                     }
                 }
+            if app.kind == .meeting {
+                MeetingEntryContent(entryID: app.id) { meeting, _ in
+                    CalendarBar(color: meeting.calendarColor)
+                }
+            }
             Text(app.name)
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)
@@ -284,6 +289,8 @@ private struct AppRow: View {
                     KeyCapChip(text: "⌘", style: .outline)
                     KeyCapChip(text: String(slot), style: .outline)
                 }
+            } else if app.kind == .meeting {
+                MeetingEntryContent(entryID: app.id) { MeetingTiming(meeting: $0, now: $1) }
             } else {
                 Text(app.kindLabel.localizedUI)
                     .font(metrics.typography.rowTrailing)

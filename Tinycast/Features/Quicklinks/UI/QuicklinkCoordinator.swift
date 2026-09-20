@@ -61,8 +61,11 @@ final class QuicklinkCoordinator {
     func applyQuicklinksPresence() {
         let visible = settings.quicklinksEnabled && settings.quicklinksShowInLauncher
         appIndex.setQuicklinks(visible ? store.quicklinks : [])
-        appIndex.setCommandsVisible(
-            [.createQuicklink, .searchQuicklinks, .importQuicklinks, .exportQuicklinks], visible)
+        let commands: Set<CommandID> = [
+            .createQuicklink, .searchQuicklinks, .importQuicklinks, .exportQuicklinks
+        ]
+        appIndex.setCommandsVisible(commands, settings.quicklinksEnabled)
+        appIndex.setCommandsListed(commands, settings.quicklinksShowInLauncher)
     }
 
     // MARK: - Opening
@@ -119,6 +122,11 @@ final class QuicklinkCoordinator {
     /// `{selection}` promoted to a field when unreadable and the setting says ask.
     static let selectionArgument = SnippetTemplateEngine.MissingArgument(
         name: "Selected Text", options: [])
+
+    /// Left empty, "Selected Text" still resolves at open, so it never holds ↵ or earns a red edge.
+    static func requiresValue(_ argument: SnippetTemplateEngine.MissingArgument) -> Bool {
+        argument.name != selectionArgument.name
+    }
 
     /// The header fields a row shows: the link's own arguments, plus the one the setting asks for.
     func promptedArguments(for quicklink: Quicklink) -> [SnippetTemplateEngine.MissingArgument] {

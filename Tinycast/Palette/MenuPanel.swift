@@ -4,9 +4,10 @@ import SwiftUI
 /// The ⌘K menu's own window, so glass renders against the desktop and nothing clips it.
 final class MenuPanel: NSPanel {
     weak var paletteState: PaletteState?
+    var onKeyDown: ((NSEvent) -> Bool)?
+    var onResignKey: ((_ stayedInPalette: Bool) -> Void)?
 
-    /// Key stays with the palette: its `onKeyPress` handlers drive this menu's selection.
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool { true }
 
     init() {
         super.init(
@@ -26,11 +27,29 @@ final class MenuPanel: NSPanel {
     override func sendEvent(_ event: NSEvent) {
         switch event.type {
         case .mouseMoved: paletteState?.notePointerMoved(to: NSEvent.mouseLocation)
-        case .scrollWheel: paletteState?.disarmHoverHighlight(pointerAt: NSEvent.mouseLocation)
+        case .keyDown, .scrollWheel:
+            paletteState?.disarmHoverHighlight(pointerAt: NSEvent.mouseLocation)
+        case .flagsChanged:
+            paletteState?.noteCommandHeld(event.modifierFlags.contains(.command))
         default: break
+        }
+        if event.type == .keyDown, onKeyDown?(event) == true {
+            return
         }
         super.sendEvent(event)
     }
+
+    override func resignKey() {
+        super.resignKey()
+        paletteState?.noteCommandHeld(false)
+        guard onKeyDown != nil else { return }
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self, onKeyDown != nil else { return }
+            onResignKey?(parent?.isKeyWindow == true)
+        }
+    }
+
 }
 
 /// Presents one menu at a time in a `MenuPanel` hung off a corner of the palette.
@@ -57,7 +76,8 @@ final class MenuPanelController {
 
     func show(
         _ content: AnyView, corner: MenuPanelCorner, parent: NSWindow, core: AppCore,
-        clipPath: @escaping MenuPanelClipPath, motion: MenuPanelMotion
+        clipPath: @escaping MenuPanelClipPath, motion: MenuPanelMotion,
+        onKeyDown: @escaping (NSEvent) -> Bool, onDismiss: @escaping () -> Void
     ) {
         let transition = beginTransition(closing: false)
         self.motion = motion
@@ -65,6 +85,8 @@ final class MenuPanelController {
         modelScale = reducesMotion ? 1 : motion.entryScale
         let panel = ensurePanel(state: core.palette)
         let wasVisible = panel.isVisible
+        configureCallbacks(
+            for: panel, core: core, onKeyDown: onKeyDown, onDismiss: onDismiss)
         panel.cancelFade()
         panel.alphaValue = 0
         let root = AnyView(content.paletteEnvironment(core))
@@ -78,6 +100,7 @@ final class MenuPanelController {
             resetMotion: true)
         if !wasVisible, panel.parent == nil { parent.addChildWindow(panel, ordered: .above) }
         startReveal(in: panel, transition: transition, motion: motion)
+        panel.makeKey()
         refreshShadow(panel)
     }
 
@@ -111,7 +134,23 @@ final class MenuPanelController {
         let container = NSView(frame: .zero)
         container.addSubview(view)
         panel.contentView = container
+        // AppKit owns the hosting layer's first layout; let it settle before applying our anchor.
+        panel.displayIfNeeded()
         hosting = view
+    }
+
+    private func configureCallbacks(
+        for panel: MenuPanel, core: AppCore, onKeyDown: @escaping (NSEvent) -> Bool,
+        onDismiss: @escaping () -> Void
+    ) {
+        panel.onKeyDown = onKeyDown
+        panel.onResignKey = { [weak core] stayedInPalette in
+            if stayedInPalette {
+                onDismiss()
+            } else {
+                core?.paletteCoordinator.hidePalette(restoreFocus: false)
+            }
+        }
     }
 
     private func refreshShadow(_ panel: MenuPanel) {
@@ -158,6 +197,9 @@ final class MenuPanelController {
             cancelTransitions()
             return
         }
+        panel.onKeyDown = nil
+        panel.onResignKey = nil
+        if panel.isKeyWindow { parent?.makeKey() }
         // A hidden child must detach or AppKit restores it with its parent on the next summon.
         guard panel.isVisible else {
             cancelTransitions()

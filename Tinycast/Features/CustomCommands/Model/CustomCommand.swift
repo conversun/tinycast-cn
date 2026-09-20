@@ -11,14 +11,21 @@ struct CustomCommandArgument: Codable, Hashable, Sendable {
         self.isOptional = isOptional
     }
 
+    /// Raycast's own cap, and what keeps the inline fields beside the search field on screen.
+    static let limit = 3
+
+    /// The inline field holding `$n`, keyed by position since two arguments may share a name.
+    static func fieldID(at index: Int) -> String { "$\(index + 1)" }
+
     /// A blank name is dropped rather than rejected, so an import can't lose the whole command.
     static func sanitized(_ arguments: [CustomCommandArgument]) -> [CustomCommandArgument] {
-        arguments.compactMap { argument in
+        let cleaned = arguments.compactMap { argument -> CustomCommandArgument? in
             var cleaned = argument
             cleaned.name = argument.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !cleaned.name.isEmpty, !cleaned.name.contains("\0") else { return nil }
             return cleaned
         }
+        return Array(cleaned.prefix(limit))
     }
 }
 
@@ -36,7 +43,7 @@ struct CustomCommand: Codable, Hashable, Identifiable, Sendable {
     var loadsShellEnvironment: Bool
     var requiresConfirmation: Bool
     var showsConfirmation: Bool
-    /// Prompted for in order before the run; empty for the commands that take no input.
+    /// Filled in the launcher row's inline fields; empty for the commands that take no input.
     var arguments: [CustomCommandArgument]
     /// Captures what the command prints and opens the output window once it exits.
     var showsOutput: Bool
@@ -68,6 +75,15 @@ struct CustomCommand: Codable, Hashable, Identifiable, Sendable {
     var symbol: String { iconSymbol ?? Self.sfSymbol }
 
     var entryID: String { Self.entryIDPrefix + id.uuidString.lowercased() }
+
+    /// The values in `$n` order, keyed by `fieldID(at:)`; nil while a required one is empty.
+    func positionalValues(from values: [String: String]) -> [String]? {
+        let positional = arguments.indices.map {
+            values[CustomCommandArgument.fieldID(at: $0)] ?? ""
+        }
+        let complete = zip(arguments, positional).allSatisfy { $0.isOptional || !$1.isEmpty }
+        return complete ? positional : nil
+    }
 
     static func id(fromEntryID entryID: String) -> UUID? {
         guard entryID.hasPrefix(entryIDPrefix) else { return nil }

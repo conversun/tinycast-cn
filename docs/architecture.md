@@ -19,9 +19,11 @@ Independently of the folder tree, every mature subsystem has converged on the sa
 │ Calculator/* · EmojiCatalog · EmojiGridGeometry · SystemAction ·            │
 │ VolumeLevel ·                                                              │
 │ WindowCommand · WindowPlacementEngine · WindowActionMemory · WindowLayout/* ·      │
+│ CustomWindowSize{,Store} ·                                                 │
 │ PaletteRowIndex ·                                                          │
 │ Uninstall{Target,SearchRoot,Rules,Protection,Plan} ·                       │
-│ Quicklink{,Destination,Store,Archive} · Notes/Model/* · Snippets/Model/* · │
+│ Quicklink{,Destination,Store,Archive} · AppleShortcut · Notes/Model/* ·    │
+│ Snippets/Model/* ·                                                         │
 │ ShellCommandRunner · DoubleTap{Modifier,Detector} · ClipboardStore ·       │
 │ RaycastDecoder · Scrypt · AppSettingsKey · SettingsBackupCoverage          │
 │ MeetingLink · MeetingEvent · UpcomingWindow · MeetingDay · MenuBarSummary  │
@@ -39,7 +41,8 @@ Independently of the folder tree, every mature subsystem has converged on the sa
 │ SnippetKeywordListener · NotesRepository · CurrencyRateStore · Paster ·    │
 │ HotKeyCenter · HyperKeyTap · DoubleTapMonitor · RunningAppsMonitor ·       │
 │ CalendarStore · MeetingLauncher · MeetingClock · CameraSession ·           │
-│ SupportReminderStore · AXMenuAccess · WindowZOrder · WindowSwitchSweep     │
+│ SupportReminderStore · AXMenuAccess · WindowZOrder · WindowSwitchSweep ·   │
+│ AppleShortcutRunner                                                        │
 └──────────────────────────────────┬─────────────────────────────────────────┘
                                    │ published through
 ┌─ OBSERVABLE STATE ───────────────▼─────────────────────────────────────────┐
@@ -86,7 +89,7 @@ app: the stores (`AppIndex`, `ClipboardStore`, `SnippetsStore`, `QuicklinkStore`
 (`ClipboardManager`, the opt-in `ClipboardTextIndexer`,
 `HotKeyManager`, `HyperKeyTap`, `RunningAppsMonitor`, `SnippetKeywordListener`), the shared state
 (`AppSettings`, `PaletteState`, `FileSearchSession`, `MenuSearchSession`, `UninstallSession`,
-`CustomCommandArgumentSession`, `MeetingClock`), `NotesStore`, the twenty feature coordinators, and the
+`MeetingClock`), `NotesStore`, the twenty feature coordinators, and the
 window controllers.
 
 `AppDelegate.applicationDidFinishLaunching` calls `AppCore.shared.start()` and nothing else. That is the
@@ -127,9 +130,9 @@ driven imperatively from AppKit.
   unreliable for accessory apps, so this is deliberate. Their lifecycles are independent of the
   palette's in both directions.
 - **Notes** — a persistent, titled, non-activating `NotesPanel` managed by `NotesWindowController`.
-  The user owns its size and AppKit autosaves the frame; its literal-source TextKit 2 editor switches
-  among local Markdown files and stays visible on focus loss. The displayed string is the canonical
-  file source; Notes has no parser, rendered preview, or source/display mapping.
+  The user owns its size and AppKit autosaves the frame; its TextKit 2 editor renders Markdown over the
+  literal source, switches among local Markdown files and stays visible on focus loss. The displayed
+  string is the canonical file source; there is no source/display mapping.
   See [features/notes.md](features/notes.md).
 - **The main menu** — shaped by `TinycastApp`'s `.commands`, which rebinds ⌘Q to Close Settings. It is
   only ever on screen while a titled window is open, so it is Settings' menu bar. It must stay
@@ -236,7 +239,7 @@ Every `SettingsTab` maps to one `…SettingsView`, and each is a stock `Form` wi
 `.formStyle(.grouped)` — see [ui.md](ui.md#settings). A pane lives with its feature; only a pane no
 feature owns (General, Permissions) lives in `Settings/Panes/`. The four launcher-category panes —
 Applications, System Settings, System Actions, Commands — are thin wrappers over the shared
-`LauncherItemsSection`.
+`LauncherItemsSection`; Apple Shortcuts pairs its feature switch with the same `LauncherItemsList`.
 
 `SettingsTab` and `SettingsSection` both identify by the case itself, never by an index. A selectable
 `List` flattens section and row IDs into one namespace, so overlapping `Int` IDs make SwiftUI drop

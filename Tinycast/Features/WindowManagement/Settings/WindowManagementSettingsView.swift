@@ -3,35 +3,46 @@ import SwiftUI
 struct WindowManagementSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(AppCore.self) private var core
+    @State private var editor: WindowLayoutEditRequest?
     @State private var pendingDeletion: WindowLayout?
+    @State private var customSizeEdit: CustomWindowSizeEditRequest?
 
     var body: some View {
         @Bindable var settings = settings
-        @Bindable var core = core
         return Form {
             FeatureSwitchSection(
                 anchor: .windowManagementWindowManagement,
                 enableTitle: "Enable window management",
-                enableSubtitle:
-                    "Moves the window you were last in, using the Accessibility permission Tinycast already uses to paste.",
-                launcherSubtitle: "Find the window commands in launcher search.",
+                enableSubtitle: "Moves the last window you used. Needs Accessibility.",
                 isEnabled: $settings.windowManagementEnabled,
                 showsInLauncher: $settings.windowManagementShowInLauncher)
 
             Group {
                 options
-                WindowLayoutsSection(onDelete: { pendingDeletion = $0 })
+                WindowLayoutsSection(
+                    onEdit: { editor = WindowLayoutEditRequest(layout: $0) },
+                    onDelete: { pendingDeletion = $0 })
                 FeatureCommandsSection(
                     owner: .windowManagement, anchor: .windowManagementLayoutCommands)
+                CustomWindowSizesSection(onEdit: {
+                    customSizeEdit = CustomWindowSizeEditRequest(size: $0)
+                })
                 commands
             }
             .settingsEnabled(settings.windowManagementEnabled)
         }
         .formStyle(.grouped)
         .settingsScrollTarget(.windowManagement)
-        // Presented from the pane, so the two launcher commands can open it too.
-        .sheet(item: $core.pendingWindowLayoutEdit) { request in
-            WindowLayoutEditorSheet(request: request)
+        .settingsEditorPanel(item: $editor) { request in
+            WindowLayoutEditorPanel(request: request)
+        }
+        .onChange(of: core.pendingWindowLayoutEdit?.id, initial: true) { _, _ in
+            guard let request = core.pendingWindowLayoutEdit else { return }
+            editor = request
+            core.pendingWindowLayoutEdit = nil
+        }
+        .settingsEditorPanel(item: $customSizeEdit) { request in
+            CustomWindowSizeEditorPanel(request: request)
         }
         .alert(item: $pendingDeletion) { layout in
             Alert(
@@ -66,7 +77,7 @@ struct WindowManagementSettingsView: View {
                 }
             } label: {
                 SettingsRowTitle(.windowManagementOptions, "Gap between windows")
-                Text("Points left between tiled windows and around the screen edge.")
+                Text("Between tiled windows and screen edges.")
             }
         } header: {
             SettingsSectionHeader(.windowManagementOptions)
@@ -101,7 +112,7 @@ private struct WindowCommandSettingsRow: View {
             Toggle("", isOn: visibilityBinding)
                 .labelsHidden()
                 .toggleStyle(.checkbox)
-                .help("Show in launcher")
+                .launcherVisibilityHelp()
                 .accessibilityLabel("Show \(command.name) in launcher")
         }
     }

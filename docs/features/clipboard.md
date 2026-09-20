@@ -192,6 +192,8 @@ the only palette screen with a control up there. It toggles a `PopoverMenu` anch
 under the button, so the ⌘K Actions menu, the app menu and this one are the same view on the same
 glass. **⌘P** toggles it; ↑/↓, ↵ and Esc come free from `RootPaletteView`'s one menu path, and the
 menu opens highlighting the *active* filter rather than the first row, the way a pop-up button does.
+A native, row-height search field above the rows filters their titles with the shared fuzzy matcher;
+an empty result centres **No Results** in one row. Escape clears a non-empty query before closing.
 The filter is not gated on the list having rows: an over-narrow filter empties it, and the button is
 the way back out.
 
@@ -226,9 +228,10 @@ surfaces read one parser: the clipboard history, and the launcher, where pasting
 with a card the way the calculator does.
 
 `ColorValue` (`Model/`, Foundation-only) is that parser. It takes the CSS spellings people copy —
-the four hex lengths, plus `rgb()`/`hsl()` and their alpha forms in both the comma and CSS4
-space-and-slash syntax — and stores **sRGB components**, so every notation derives from one source
-rather than a second parser that can drift from it.
+the four hex lengths, plus `rgb()`/`hsl()`/`oklch()` and their alpha forms in both the comma and
+CSS4 space-and-slash syntax — and stores **sRGB components**, so every notation derives from one
+source rather than a second parser that can drift from it. An extension's tints and grid swatches
+read the same parser, which is how a colour picker's `oklch()` swatch draws as its colour.
 
 **A colour is rejected rather than approximated**, because a wrong swatch filed under Colors Only
 is worse than none. An HSL channel must carry its `%`, or `hsl(120, 100, 50)` clamps to white.
@@ -246,11 +249,12 @@ and then removed: they
 restate the same four answers, and a row you scroll past to reach the one you wanted costs more
 than it gives. `oklch()` stays as the one perceptual space people write, and `hsl()` keeps one
 decimal because whole degrees cost up to 5/255 on the way back. `clipboard-test` sweeps every
-offered notation and re-parses it.
+offered notation and re-parses it, bar `oklch()`: it states fewer digits than the channel the
+sweep compares to.
 
-`ColorSpaces.swift` holds Oklab and its polar form — matrices and cube roots, no tables. Oklab is
-private to it: `oklch()` is the one thing it exists for. A neutral is stated with no hue at all,
-since `atan2` over two rounding errors still names a direction.
+`ColorSpaces.swift` holds Oklab and its polar form, both ways — matrices and cube roots, no tables.
+Oklab is private to it: `oklch()` is the one thing it exists for. A neutral is stated with no hue at
+all, since `atan2` over two rounding errors still names a direction.
 
 The notations are a menu of their own under the launcher card, and **nowhere else** — a history
 entry's ⌘K stays the actions it always was, since converting a colour is not something you reach

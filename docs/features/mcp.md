@@ -75,9 +75,9 @@ so `didExit` drains the pipe before composing its message — what a server prin
 the only reason a reader will ever see. And pending calls are failed *before* the owner is told,
 because the owner's own `close()` would otherwise overwrite the real reason with "not running".
 
-The command is found by `Platform/ExecutableLocator`, which walks PATH, the usual install prefixes
-and every nvm Node version before asking a login shell — a GUI app inherits Finder's PATH, which has
-none of `npx`, `uvx` or `node` on it.
+The command is found by `Platform/ExecutableLocator`, which asks a login shell first and only then
+walks PATH, the usual install prefixes and every nvm Node version — a GUI app inherits Finder's PATH,
+which has none of `npx`, `uvx` or `node` on it.
 
 ## Tool names
 
@@ -110,7 +110,7 @@ that must arrive as **one** user turn however many of them there are.
 
 `MCPSettingsSection` is a section inside Settings → AI, the way `AICommandSection` is. Each row leads
 with the handle, because that is the half a reader has to type, then the live status and the
-transport. `MCPServerEditor` is the sheet: name, HTTP or command, the credential, enabled, trust, and
+transport. `MCPServerEditor` is the editor panel: name, HTTP or command, the credential, enabled, trust, and
 a Test Connection button that runs a real handshake so a typo is caught there rather than in the
 middle of a conversation.
 

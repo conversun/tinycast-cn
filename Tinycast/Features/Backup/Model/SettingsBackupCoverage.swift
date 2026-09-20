@@ -12,9 +12,11 @@ enum SettingsBackupCoverage {
         "hyperKeyIncludesShift": .hyperKeyIncludesShift,
         "hyperKeyQuickPress": .hyperKeyQuickPress,
         "emojiSkinTone": .emojiSkinTone,
+        "emojiGridColumns": .emojiGridColumns,
         "popToRootSeconds": .popToRootTimeout,
         "escapeKeyBehavior": .escapeKeyBehavior,
         "appearance": .appearance,
+        "calcNumberStyle": .calcNumberStyle,
         "interfaceSize": .interfaceSize,
         "paletteTransparency": .paletteTransparency,
         "compactMode": .compactMode,
@@ -26,6 +28,8 @@ enum SettingsBackupCoverage {
         "fileSearchScopes": .fileSearchScopes,
         "fileSearchIgnorePatterns": .fileSearchIgnorePatterns,
         "notesEnabled": .notesEnabled,
+        "notesRendersMarkdown": .notesRendersMarkdown,
+        "notesShowsFormattingBar": .notesShowsFormattingBar,
         "customCommandsEnabled": .customCommandsEnabled,
         "customCommandsShowInLauncher": .customCommandsShowInLauncher,
         "snippetsShowInLauncher": .snippetsShowInLauncher,
@@ -42,6 +46,7 @@ enum SettingsBackupCoverage {
         "quicklinkOpensNewWindow": .quicklinkOpensNewWindow,
         "quicklinkSelectionFallback": .quicklinkSelectionFallback,
         "quicklinkConfirmsBeforeDelete": .quicklinkConfirmsBeforeDelete,
+        "appleShortcutsEnabled": .appleShortcutsEnabled,
         "extensionsShowInLauncher": .extensionsShowInLauncher,
         "calendarShowInLauncher": .calendarShowInLauncher,
         "calendarLauncherLimit": .calendarLauncherLimit,
@@ -77,9 +82,11 @@ enum SettingsBackupCoverage {
         AppSettingsKey.extensionsEnabled.rawValue:
             "Doubles as consent to run third-party JavaScript; an import must not switch it on.",
         AppSettingsKey.palettePosition.rawValue:
-            "Machine-local geometry: a point restored onto another display layout lands nowhere.",
+            "Machine-local geometry: every entry names a display this Mac has, and no other one.",
         AppSettingsKey.autoSwitchInputSource.rawValue:
             "Names a keyboard input source installed on this Mac; another Mac may not have it.",
+        AppSettingsKey.meetingBrowser.rawValue:
+            "Names a browser installed on this Mac; another Mac may not have it.",
         AppSettingsKey.calendarEnabled.rawValue:
             "Doubles as consent to read your calendar; an import must not grant calendar access.",
         AppSettingsKey.autoJoinMeetings.rawValue:
@@ -125,6 +132,9 @@ enum SettingsBackupCoverage {
         AppSettingsKey.quickActionModel.rawValue:
             "Names an external AI destination for text taken from whatever app is frontmost; an "
             + "import must not choose one.",
+        AppSettingsKey.quickActionModelOverrides.rawValue:
+            "Sends one action's text to its own AI destination, some keyed by actions that exist only "
+            + "on the Mac that made them.",
         AppSettingsKey.quickActionPreviews.rawValue:
             "Says which actions may rewrite a document without showing the result first, which is a "
             + "decision each Mac makes about its own text.",

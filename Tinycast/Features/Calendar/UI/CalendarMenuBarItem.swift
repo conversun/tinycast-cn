@@ -14,7 +14,12 @@ struct CalendarMenuBarLabel: View {
         case (.meetingIcon, let meeting?):
             icon(meeting.link?.provider.sfSymbol ?? "calendar", describing: meeting.title)
         case (.meetingTitle, let meeting?):
-            title(summary(for: meeting))
+            HStack(spacing: Theme.Spacing.xs) {
+                if let color = meeting.calendarColor {
+                    Image(nsImage: color.menuBarDot).accessibilityHidden(true)
+                }
+                title(summary(for: meeting))
+            }
         case (.meetingTitle, nil)
         where !AppCore.shared.calendarCoordinator.hasUpcomingMenuBarEvent:
             title("No upcoming events")
@@ -43,12 +48,19 @@ struct CalendarMenuBarMenu: View {
     var body: some View {
         if let meeting = AppCore.shared.calendarCoordinator.menuBarEvent {
             if meeting.link != nil {
-                Button("Join \(meeting.title)") {
+                Button {
                     AppCore.shared.calendarCoordinator.join(meeting)
+                } label: {
+                    MeetingMenuLabel(title: String(localized: "Join \(meeting.title)"), color: meeting.calendarColor)
                 }
             }
-            Button("Open in Calendar...") {
+            Button {
                 AppCore.shared.calendarCoordinator.openInCalendar(meeting)
+            } label: {
+                // Only the first item names the meeting, so only it carries the calendar bar.
+                MeetingMenuLabel(
+                    title: "Open in Calendar...".localizedUI,
+                    color: meeting.link == nil ? meeting.calendarColor : nil)
             }
             Divider()
         }
@@ -56,5 +68,45 @@ struct CalendarMenuBarMenu: View {
         Button("Calendar Settings...") {
             AppCore.shared.settingsCoordinator.showSettings(tab: .calendar)
         }
+    }
+}
+
+private struct MeetingMenuLabel: View {
+    let title: String
+    let color: MeetingEvent.CalendarColor?
+
+    var body: some View {
+        if let color {
+            Label {
+                Text(title)
+            } icon: {
+                Image(nsImage: color.menuBarBar)
+            }
+        } else {
+            Text(title)
+        }
+    }
+}
+
+extension MeetingEvent.CalendarColor {
+    fileprivate var menuBarDot: NSImage {
+        swatch(NSSize(width: Theme.Size.colorDot, height: Theme.Size.colorDot))
+    }
+
+    fileprivate var menuBarBar: NSImage {
+        swatch(
+            NSSize(width: Theme.Size.calendarBarWidth, height: Theme.Size.menuBarCalendarBarHeight))
+    }
+
+    /// Not a template, so the status bar and its menu keep the colour instead of inking it.
+    private func swatch(_ size: NSSize) -> NSImage {
+        let image = NSImage(size: size, flipped: false) { rect in
+            nsColor.setFill()
+            let radius = min(rect.width, rect.height) / 2
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.isTemplate = false
+        return image
     }
 }

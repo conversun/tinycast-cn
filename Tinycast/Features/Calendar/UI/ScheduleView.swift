@@ -95,14 +95,12 @@ private struct MeetingRow: View {
             )
             .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
             .foregroundStyle(meeting.isInProgress(now: now) ? Theme.Colors.brand : .secondary)
+            CalendarBar(color: meeting.calendarColor)
             Text(meeting.title)
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)
             Spacer(minLength: metrics.spacing.md)
-            Text(trailing)
-                .font(metrics.typography.rowTrailing)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            MeetingTiming(meeting: meeting, now: now)
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
@@ -112,12 +110,15 @@ private struct MeetingRow: View {
         )
         .armedHover($hovered)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(meeting.title), \(trailing)")
+        .accessibilityLabel(accessibilityText)
         .accessibilityAddTraits(.isButton)
     }
 
-    /// A meeting under way says so; everything else reads as the clock time it starts.
-    private var trailing: String {
-        meeting.isInProgress(now: now) ? String(localized: "Now") : MeetingTimeFormat.clock(meeting.start)
+    private var accessibilityText: String {
+        let parts = [
+            meeting.title, MeetingTimeFormat.range(of: meeting),
+            UpcomingWindow.rowCountdown(for: meeting, now: now), meeting.calendarName
+        ]
+        return parts.compactMap(\.self).joined(separator: ", ")
     }
 }

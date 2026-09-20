@@ -44,11 +44,21 @@ enum AIProviderFactory {
                 throw AIProviderError.unavailable("Claude is disabled in AI Settings.")
             }
             return try installedAI.provider(kind: .claude, model: model, effort: effort)
+        case .grok(let model, let effort):
+            guard settings.enabledInstalledProviders.contains(.grok) else {
+                throw AIProviderError.unavailable("Grok is disabled in AI Settings.")
+            }
+            return try installedAI.provider(kind: .grok, model: model, effort: effort)
         case .openCode(let model, let effort):
             guard settings.enabledInstalledProviders.contains(.openCode) else {
                 throw AIProviderError.unavailable("OpenCode is disabled in AI Settings.")
             }
             return try installedAI.provider(kind: .openCode, model: model, effort: effort)
+        case .cursor(let model, let effort):
+            guard settings.enabledInstalledProviders.contains(.cursor) else {
+                throw AIProviderError.unavailable("Cursor is disabled in AI Settings.")
+            }
+            return try installedAI.provider(kind: .cursor, model: model, effort: effort)
         case .api(let connectionID, let model, let effort):
             guard let connection = settings.connection(id: connectionID) else {
                 throw AIProviderError.unavailable(String(localized: "Choose an API connection in Settings."))

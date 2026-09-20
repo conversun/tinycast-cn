@@ -84,12 +84,17 @@ is a dial-in helper rather than a meeting.
 `zoommtg://zoom.us/join?confno=…` (carrying `pwd` when present) and a `teams.microsoft.com` link to
 `msteams:` plus its path and query. Nothing else is rewritten — the rest of the table has no
 unambiguous scheme, and guessing one would open the wrong thing. If no app claims the scheme, the
-plain `https` link opens instead.
+plain `https` link opens instead — in `meetingBrowserBundleID` when one is chosen under
+`Open Meeting Links In`, otherwise in the default browser. A chosen browser since uninstalled falls
+back to the default rather than failing the join, and the picker reads it as `Default Browser`.
 
 **A Google Meet link opens as the account whose calendar carried it.** Someone signed into several
 Google accounts otherwise lands on the account chooser, so `MeetingLink.webURL` appends
 `?authuser=<address>` — the address the current user carries in the invite, taken from their attendee
-entry or, for a meeting booked with no guests, from the organizer. A link that already names an
+entry or, for a meeting booked with no guests, from the organizer. EventKit's `mailto:` participant
+URLs are opaque — `path` sees nothing on them — so `MeetingLink.accountAddress(of:isCurrentUser:)`
+reads the address out of the absolute string and percent-decodes it there, before `accountURL`
+encodes it again. A link that already names an
 `authuser` was written deliberately and is left alone, and no other provider takes an account in its
 URL. **`MeetingLink.url` stays the link as written**: it is what the failure report quotes and what
 `Copy Meeting Link` puts on the pasteboard, so a link shared onwards carries no address of ours.
@@ -219,7 +224,7 @@ join(meeting)
 ```
 
 **The preview is itself a confirmation**, so it stands in for one when both are on rather than asking
-twice. `CameraPanel` sits at `.floating`, below a dialog's `.modalPanel`, so a failure report
+twice. `CameraPanel` sits at `.floating`, below a dialog's `.dialog`, so a failure report
 still lands on top of it. The session, the panel and the stage are the `Camera` feature's — see
 [camera.md](camera.md); only the join-specific controller and footer live here.
 
@@ -227,15 +232,16 @@ still lands on top of it. The session, the panel and the stage are the `Camera` 
 
 The Calendar pane carries the master switch (routed through the coordinator so the consent gate cannot
 be bypassed), the `Include Tomorrow's Events` switch, the `Join Next Meeting` recorder, the
-join-window picker, and the per-calendar checkbox list — `LauncherItemsSection`'s shape, including the one `Form` row holding a `LazyVStack`, because a
-`Form` realizes every row it is handed.
+join-window picker, and the per-calendar checkbox list — one `Form` row holding a `LazyVStack`,
+because a `Form` realizes every row it is handed; a few light rows don't need `LauncherItemsTable`.
 
 The hidden-calendar set stores **exclusions**, so a calendar added after the setting was written
 defaults to on. Holidays and Birthdays are what people switch off.
 
 `autoJoinMeetings` and `cameraPreview` join `calendarEnabled` in
 `SettingsBackupCoverage.deliberatelyExcluded`: one arms the app to open links unattended and the
-other turns on the camera, and an import must grant neither. The menu-bar settings carry over
+other turns on the camera, and an import must grant neither. `meetingBrowser` is excluded too: it names an
+app installed on this Mac, which another Mac may not have. The menu-bar settings carry over
 normally, and so does `calendarIncludesTomorrow`: it narrows what is read rather than widening what
 can be reached.
 

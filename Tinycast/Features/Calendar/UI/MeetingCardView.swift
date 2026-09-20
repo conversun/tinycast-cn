@@ -19,10 +19,13 @@ struct MeetingCard: View {
                     .font(metrics.typography.calcResult.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text(subtitle)
-                    .font(metrics.typography.rowTrailing)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                HStack(spacing: metrics.spacing.sm) {
+                    if let tint = meeting.calendarColor { ColorDot(color: tint.color) }
+                    Text(subtitle)
+                        .font(metrics.typography.rowTrailing)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: metrics.spacing.md)
             Text(UpcomingWindow.countdown(to: meeting.start, now: now))
@@ -40,13 +43,14 @@ struct MeetingCard: View {
         .leadCard(selected: selected)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(meeting.title), \(UpcomingWindow.countdown(to: meeting.start, now: now))"
+            "\(meeting.title), \(subtitle), "
+                + UpcomingWindow.countdown(to: meeting.start, now: now)
         )
         .accessibilityAddTraits(.isButton)
     }
 
     private var subtitle: String {
-        let time = MeetingTimeFormat.clock(meeting.start)
+        let time = MeetingTimeFormat.range(of: meeting)
         guard let provider = meeting.link?.provider else { return time }
         return "\(time) · \(provider.title)"
     }
@@ -58,6 +62,16 @@ enum MeetingTimeFormat {
     private static let formatter: Date.FormatStyle = .dateTime.hour().minute()
 
     static func clock(_ date: Date) -> String { date.formatted(formatter) }
+
+    /// Two clocks rather than the interval style, which drops a shared AM/PM and dates midnight.
+    static func range(of meeting: MeetingEvent) -> String {
+        "\(clock(meeting.start)) – \(clock(meeting.end))"
+    }
+}
+
+extension MeetingEvent.CalendarColor {
+    var color: Color { Color(.sRGB, red: red, green: green, blue: blue) }
+    var nsColor: NSColor { NSColor(srgbRed: red, green: green, blue: blue, alpha: 1) }
 }
 
 /// Actions for a meeting, shared by the card and every schedule row.

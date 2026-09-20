@@ -5,7 +5,13 @@ enum CalcTimeZone {
     static func evaluate(_ raw: String, now: Date, calendar: Calendar) -> CalcResult? {
         guard raw.count <= 128, raw.contains(where: \.isWhitespace) else { return nil }
         let inputWords = raw.split(whereSeparator: \.isWhitespace)
-        guard inputWords.count >= 2, inputWords.contains(where: { connectors.contains($0.lowercased()) })
+        if let query = currentTimeQuery(inputWords.map { $0.lowercased() }) {
+            return evaluate(query, now: now, calendar: calendar)
+        }
+        guard inputWords.count >= 2,
+            inputWords.contains(where: { connectors.contains($0.lowercased()) })
+                || parseClock(inputWords[0].lowercased()) != nil
+                || parseClock(inputWords.prefix(2).joined().lowercased()) != nil
         else {
             return nil
         }
@@ -22,26 +28,39 @@ enum CalcTimeZone {
         let words = zoneQuery.split(whereSeparator: \.isWhitespace).map(String.init)
         guard words.count >= 2 else { return nil }
 
-        // Every grammar needs a connector, so an app search never touches the zone table.
-        guard let connector = words.lastIndex(where: { $0 == "in" || $0 == "to" || $0 == "at" })
-        else { return nil }
-        let targetWords = Array(words[(connector + 1)...])
-        guard !targetWords.isEmpty else { return nil }
-
-        // `time in 4 hours` names a duration where a zone would go, so the home zone answers.
         let target: TimeZone
+        let leading: [String]
         var ahead: (count: Int, component: Calendar.Component)?
-        if let zone = zone(named: targetWords) {
-            target = zone
-        } else if let duration = parseDuration(targetWords.joined(separator: " ")) {
-            target = calendar.timeZone
-            ahead = duration
+        if let connector = words.lastIndex(where: { $0 == "in" || $0 == "to" || $0 == "at" }) {
+            let targetWords = Array(words[(connector + 1)...])
+            guard !targetWords.isEmpty else { return nil }
+            // `time in 4 hours` names a duration where a zone would go, so the home zone answers.
+            if let zone = zone(named: targetWords) {
+                target = zone
+            } else if let duration = parseDuration(targetWords.joined(separator: " ")) {
+                target = calendar.timeZone
+                ahead = duration
+            } else {
+                return nil
+            }
+            leading = Array(words[0..<connector])
         } else {
-            return nil
+            var sourceWords = words
+            if sourceWords[1] == "am" || sourceWords[1] == "pm" {
+                let meridiem = sourceWords.remove(at: 1)
+                sourceWords[0] += meridiem
+            }
+            guard parseClock(sourceWords[0]) != nil,
+                zone(named: Array(sourceWords.dropFirst())) != nil
+            else { return nil }
+            leading = sourceWords
+            target = calendar.timeZone
         }
 
-        let leading = Array(words[0..<connector])
-        guard var source = sourceMoment(leading, now: now, calendar: calendar) else { return nil }
+        guard
+            var source = sourceMoment(
+                leading, allowZoneConnector: ahead == nil, now: now, calendar: calendar)
+        else { return nil }
         if let ahead {
             guard let shifted = calendar.date(byAdding: ahead.component, value: ahead.count, to: source.date)
             else { return nil }
@@ -54,19 +73,37 @@ enum CalcTimeZone {
             source = SourceMoment(date: shifted, zone: source.zone)
         }
 
-        var display = calendar
-        display.timeZone = target
-        let sameDay =
-            calendar.dateComponents(in: source.zone, from: source.date).day
-            == display.dateComponents(in: target, from: source.date).day
+        guard let dayNote = dayOffsetNote(source, target: target, calendar: calendar) else { return nil }
         let time = clockString(source.date, zone: target, calendar: calendar)
-        let dayNote = sameDay ? "" : " (\(dayOffsetWord(source, target: target, calendar: calendar)))"
 
         return CalcResult(
             expression: clockString(source.date, zone: source.zone, calendar: calendar),
             sourceBadge: label(for: source.zone),
             targetBadge: label(for: target),
             payload: .value(display: time + dayNote, copyText: time))
+    }
+
+    private static func currentTimeQuery(_ words: [String]) -> String? {
+        if words.first == "time" || words.first == "timezone" {
+            var place = Array(words.dropFirst())
+            if words.first == "timezone", place.first == "in" { place.removeFirst() }
+            if zone(named: place) != nil { return "time in \(place.joined(separator: " "))" }
+        }
+
+        let destination = words.firstIndex(of: "to") ?? words.endIndex
+        var place = Array(words[..<destination])
+        if place.suffix(2) == ["time", "zone"] {
+            place.removeLast(2)
+        } else if place.last == "time" || place.last == "timezone" {
+            place.removeLast()
+        } else {
+            return nil
+        }
+        guard zone(named: place) != nil else { return nil }
+        guard destination < words.endIndex else { return "time in \(place.joined(separator: " "))" }
+        let target = Array(words[(destination + 1)...])
+        guard zone(named: target) != nil else { return nil }
+        return "time \(place.joined(separator: " ")) to \(target.joined(separator: " "))"
     }
 
     /// Splits a trailing `+ 2h` / `- 30 min` off the zone phrase it shifts.
@@ -108,7 +145,7 @@ enum CalcTimeZone {
     private static func endsInZoneOrDuration(_ tail: String) -> Bool {
         // Folded, because the identifiers carry no accents while `zürich` and `são paulo` do.
         let folded = tail.folding(options: [.diacriticInsensitive], locale: nil)
-        if cities[folded] != nil || aliases[folded] != nil { return true }
+        if zoneIdentifier(named: folded) != nil { return true }
         // `time in 4 hours` ends in the unit alone, so a bare unit word counts as a duration tail.
         if durationUnits.contains(folded) || parseDuration(folded, impliesHours: true) != nil {
             return true
@@ -122,14 +159,13 @@ enum CalcTimeZone {
         "s", "sec", "secs", "second", "seconds"
     ]
 
-    /// The final word of every multi-word name in either table, so `in new york` still reaches it.
+    /// The final word of every multi-word name in any table, so `in new york` still reaches it.
     private static let citySuffixes: Set<String> = {
         var tails: Set<String> = []
-        for name in cities.keys where name.contains(" ") {
-            if let last = name.split(separator: " ").last { tails.insert(String(last)) }
-        }
-        for name in aliases.keys where name.contains(" ") {
-            if let last = name.split(separator: " ").last { tails.insert(String(last)) }
+        for names in [cities.keys, aliases.keys, CountryZoneData.zones.keys] {
+            for name in names where name.contains(" ") {
+                if let last = name.split(separator: " ").last { tails.insert(String(last)) }
+            }
         }
         return tails
     }()
@@ -164,7 +200,7 @@ enum CalcTimeZone {
     }
 
     private static func sourceMoment(
-        _ words: [String], now: Date, calendar: Calendar
+        _ words: [String], allowZoneConnector: Bool, now: Date, calendar: Calendar
     ) -> SourceMoment? {
         var words = words.filter { !["what", "whats", "the", "is", "it", "current"].contains($0) }
 
@@ -178,15 +214,22 @@ enum CalcTimeZone {
             words = Array(words[0..<connector])
         }
 
-        guard let head = words.first else { return nil }
+        guard var head = words.first else { return nil }
+        var rest = Array(words.dropFirst())
+        if rest.first == "am" || rest.first == "pm" {
+            guard !head.hasSuffix("am"), !head.hasSuffix("pm") else { return nil }
+            head += rest.removeFirst()
+        }
         guard head == "time" || head == "now" || head == "clock" || parseClock(head) != nil else {
             return nil
         }
 
-        let rest = Array(words.dropFirst())
-        let zone = rest.isEmpty ? calendar.timeZone : (self.zone(named: rest) ?? calendar.timeZone)
+        if allowZoneConnector, rest.first == "in" || rest.first == "at" {
+            rest.removeFirst()
+            guard !rest.isEmpty else { return nil }
+        }
+        guard let zone = rest.isEmpty ? calendar.timeZone : self.zone(named: rest) else { return nil }
         if head == "time" || head == "now" || head == "clock" {
-            guard rest.isEmpty || self.zone(named: rest) != nil else { return nil }
             guard let ahead else { return SourceMoment(date: now, zone: zone) }
             guard let shifted = calendar.date(byAdding: ahead.component, value: ahead.count, to: now)
             else { return nil }
@@ -244,9 +287,12 @@ enum CalcTimeZone {
         // `são paulo` and `zürich` are how the cities are spelled; the identifiers are not.
         let phrase = words.joined(separator: " ")
             .folding(options: [.diacriticInsensitive], locale: nil)
-        if let identifier = aliases[phrase] { return TimeZone(identifier: identifier) }
-        guard let identifier = cities[phrase] else { return nil }
-        return TimeZone(identifier: identifier)
+        return zoneIdentifier(named: phrase).flatMap(TimeZone.init(identifier:))
+    }
+
+    /// A curated alias outranks a city, and a city outranks a country sharing its spelling.
+    private static func zoneIdentifier(named phrase: String) -> String? {
+        aliases[phrase] ?? cities[phrase] ?? CountryZoneData.zones[phrase]
     }
 
     /// Foundation already carries the IANA database, so nothing here is generated.
@@ -264,7 +310,8 @@ enum CalcTimeZone {
         "UTC": ["utc", "zulu"],
         "GMT": ["gmt"],
         "America/New_York": [
-            "est", "edt", "et", "nyc", "new york city", "boston", "washington", "dc", "miami", "atlanta",
+            "est", "edt", "et", "usa", "nyc", "new york city", "boston", "washington", "dc", "miami",
+            "atlanta",
             "philadelphia", "jfk", "atl", "bos", "mia", "ewr", "iad", "charlotte", "nashville", "orlando",
             "tampa", "pittsburgh", "cleveland", "cincinnati", "columbus", "baltimore", "raleigh",
             "indianapolis", "louisville"
@@ -351,7 +398,7 @@ enum CalcTimeZone {
         "Europe/Warsaw": ["waw", "krakow", "gdansk", "wroclaw", "poznan", "lodz"],
         "Europe/Budapest": ["bud"],
         "Europe/Brussels": ["bru", "antwerp", "ghent", "bruges"],
-        "Asia/Dubai": ["dxb", "auh", "sharjah"],
+        "Asia/Dubai": ["uae", "dxb", "auh", "sharjah"],
         "Asia/Qatar": ["doh", "doha"],
         "Asia/Hong_Kong": ["hkg"],
         "Asia/Bangkok": ["bkk", "phuket", "chiang mai"],
@@ -405,15 +452,27 @@ enum CalcTimeZone {
         CalcDateFormatters.string(from: date, calendar: calendar, zone: zone, pattern: "h:mm a")
     }
 
-    private static func dayOffsetWord(
+    private static func dayOffsetNote(
         _ source: SourceMoment, target: TimeZone, calendar: Calendar
-    ) -> String {
+    ) -> String? {
         var here = calendar
         here.timeZone = source.zone
         var there = calendar
         there.timeZone = target
-        let from = here.startOfDay(for: source.date)
-        let to = there.startOfDay(for: source.date)
-        return to < from ? "yesterday" : "tomorrow"
+        // Compare civil dates in one zone so offsets and DST cannot shorten the day count.
+        var dates = calendar
+        dates.timeZone = .gmt
+        guard
+            let from = dates.date(from: here.dateComponents([.era, .year, .month, .day], from: source.date)),
+            let to = dates.date(from: there.dateComponents([.era, .year, .month, .day], from: source.date)),
+            let days = dates.dateComponents([.day], from: from, to: to).day
+        else { return nil }
+        switch days {
+        case 0: return ""
+        case 1: return " (tomorrow)"
+        case -1: return " (yesterday)"
+        case ..<0: return " (\(-days) days ago)"
+        default: return " (in \(days) days)"
+        }
     }
 }

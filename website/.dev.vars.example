@@ -1,0 +1,5 @@
+# Copy to .dev.vars (gitignored) and fill in from sandbox.polar.sh. Used only by `npm run preview`.
+POLAR_SERVER=sandbox
+POLAR_ACCESS_TOKEN=
+POLAR_PRODUCT_MONTHLY=
+POLAR_PRODUCT_ONE_TIME=

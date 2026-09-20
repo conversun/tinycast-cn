@@ -1,8 +1,12 @@
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
-import { Heart } from "lucide-react";
 import type { ReactNode } from "react";
 import { DocsProvider } from "../../components/docs-provider";
-import { DiscordLogo, GitHubLogo, Logo } from "../../components/ui/icon";
+import {
+  DiscordLogo,
+  GitHubLogo,
+  Logo,
+  SupportIcon,
+} from "../../components/ui/icon";
 import { site } from "../../data/site";
 import { source } from "../../lib/source";
 
@@ -24,12 +28,11 @@ export default function Layout({ children }: { children: ReactNode }) {
             type: "button",
             text: (
               <span className="flex items-center gap-1.5">
-                <Heart size={15} />
+                <SupportIcon size={15} />
                 Support
               </span>
             ),
             url: site.support,
-            external: true,
           },
           {
             type: "icon",

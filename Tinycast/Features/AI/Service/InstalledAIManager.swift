@@ -24,9 +24,11 @@ final class InstalledAIManager {
     }
 
     @discardableResult
-    func refresh(enabledKinds: Set<InstalledAIKind> = [.claude, .openCode]) -> Task<Void, Never> {
+    func refresh(
+        enabledKinds: Set<InstalledAIKind> = Set(InstalledAIKind.managedCLIKinds)
+    ) -> Task<Void, Never> {
         var tasks: [Task<Void, Never>] = []
-        for kind in [InstalledAIKind.claude, .openCode] {
+        for kind in InstalledAIKind.managedCLIKinds {
             if enabledKinds.contains(kind) {
                 tasks.append(refresh(kind: kind))
             } else {
@@ -54,7 +56,7 @@ final class InstalledAIManager {
 
     func ensure(enabledKinds: Set<InstalledAIKind>) -> Task<Void, Never> {
         var tasks: [Task<Void, Never>] = []
-        for kind in [InstalledAIKind.claude, .openCode] {
+        for kind in InstalledAIKind.managedCLIKinds {
             guard enabledKinds.contains(kind) else {
                 stop(kind: kind)
                 continue
@@ -125,7 +127,7 @@ final class InstalledAIManager {
             let auth = await InstalledAIProbe.run(
                 executable: executable, arguments: ["auth", "status", "--json"],
                 workspace: workspace)
-            let loggedIn = InstalledAIProbe.loggedIn(toClaude: auth.output)
+            let loggedIn = InstalledAIProbe.loggedIn(inStatusJSON: auth.output)
             return (
                 kind,
                 InstalledAIStatus(
@@ -142,6 +144,40 @@ final class InstalledAIManager {
                 kind,
                 InstalledAIStatus(
                     phase: models.status == 0 && !catalog.isEmpty ? .ready : .signInRequired,
+                    version: version, executable: executable, models: catalog)
+            )
+        case .grok:
+            let models = await InstalledAIProbe.run(
+                executable: executable, arguments: ["models"], workspace: workspace)
+            let catalog = InstalledAIModel.grokCatalog(models.output)
+            return (
+                kind,
+                InstalledAIStatus(
+                    phase: models.status == 0 && !catalog.isEmpty ? .ready : .signInRequired,
+                    version: version, executable: executable, models: catalog)
+            )
+        case .cursor:
+            let auth = await InstalledAIProbe.run(
+                executable: executable, arguments: ["status", "--format", "json"],
+                workspace: workspace)
+            let loggedIn = InstalledAIProbe.loggedIn(inStatusJSON: auth.output)
+            guard auth.status == 0, loggedIn else {
+                return (
+                    kind,
+                    InstalledAIStatus(
+                        phase: .signInRequired, version: version, executable: executable)
+                )
+            }
+            let models = await InstalledAIProbe.run(
+                executable: executable, arguments: ["--list-models"], workspace: workspace)
+            let catalog = InstalledAIModel.cursorCatalog(models.output)
+            return (
+                kind,
+                InstalledAIStatus(
+                    phase: models.status == 0 && !catalog.isEmpty
+                        ? .ready
+                        : .failed(
+                            "Cursor returned no models."),
                     version: version, executable: executable, models: catalog)
             )
         case .codex:
@@ -229,10 +265,12 @@ enum InstalledAIProbe {
     }
 
     nonisolated static func version(in output: String) -> String? {
-        output.firstMatch(of: #/\d+\.\d+(?:\.\d+)?/#).map { String($0.output) }
+        output.firstMatch(of: #/\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/#).map {
+            String($0.output)
+        }
     }
 
-    nonisolated static func loggedIn(toClaude output: String) -> Bool {
+    nonisolated static func loggedIn(inStatusJSON output: String) -> Bool {
         guard let data = output.data(using: .utf8),
             let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return false }

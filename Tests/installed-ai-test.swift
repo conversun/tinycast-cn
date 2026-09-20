@@ -22,8 +22,16 @@ struct InstalledAITests {
         }
         defer { fixture.tearDown() }
         openCodeCatalogCarriesModelVariants()
+        cursorCatalogParsesListModels()
+        grokCatalogParsesListedModels()
+        statusJSONRecognizesLogin()
+        versionKeepsPrereleaseAndBuild()
         await openCodeRunsWithoutToolsAndDeletesItsSession(fixture)
         await claudeRunsWithoutToolsOrHistory(fixture)
+        await grokRunsWithoutToolsAndDeletesItsSession(fixture)
+        await cursorRunsAskModeWithoutForce(fixture)
+        await cursorDiscoveryRequiresLoginAndListsModels(fixture)
+        await oversizedCompleteFrameFailsTheTurn(fixture)
         claudeMCPConfigNamesNoServers(fixture)
 
         print("\(passes) passed, \(failures) failed")
@@ -53,6 +61,52 @@ struct InstalledAITests {
         expect(models.last?.efforts.isEmpty == true, "models without variants show no effort picker")
     }
 
+    private static func cursorCatalogParsesListModels() {
+        let output = """
+            Available models
+
+            auto - Auto (current, default)
+            composer-2.5 - Composer 2.5
+            gpt-5.2 - GPT-5.2
+            """
+        let models = InstalledAIModel.cursorCatalog(output)
+        expect(
+            models.map(\.id) == ["auto", "composer-2.5", "gpt-5.2"],
+            "Cursor discovery keeps each --list-models id")
+        expect(
+            models.map(\.name) == ["Auto (current, default)", "Composer 2.5", "GPT-5.2"],
+            "Cursor discovery keeps each --list-models display name")
+        expect(models.allSatisfy(\.efforts.isEmpty), "Cursor model ids carry effort; no separate picker")
+    }
+
+    private static func statusJSONRecognizesLogin() {
+        expect(
+            InstalledAIProbe.loggedIn(inStatusJSON: #"{"loggedIn":true}"#),
+            "Claude auth status JSON reports login")
+        expect(
+            InstalledAIProbe.loggedIn(inStatusJSON: #"{"isAuthenticated":true}"#),
+            "Cursor status JSON reports login")
+        expect(
+            !InstalledAIProbe.loggedIn(inStatusJSON: #"{"status":"logged_out"}"#),
+            "unsigned-in status JSON is not treated as logged in")
+    }
+
+    private static func versionKeepsPrereleaseAndBuild() {
+        let cases: [(String, String?)] = [
+            ("opencode2 v0.0.0-beta-19271\n", "0.0.0-beta-19271"),
+            ("2.0.14 (Claude Code)\n", "2.0.14"),
+            ("codex-cli 0.46.0\n", "0.46.0"),
+            ("tool 1.2.3-rc.1+build.5\n", "1.2.3-rc.1+build.5"),
+            ("no version here", nil)
+        ]
+        for (output, expected) in cases {
+            let version = InstalledAIProbe.version(in: output)
+            expect(
+                version == expected,
+                "version(in: \(output.debugDescription)) is \(String(describing: version))")
+        }
+    }
+
     private static func openCodeRunsWithoutToolsAndDeletesItsSession(_ fixture: Fixture) async {
         let events = await fixture.events(
             kind: .openCode, model: "provider/model", effort: "high")
@@ -75,6 +129,23 @@ struct InstalledAITests {
         fixture.expectPrompt("opencode-prompt.log")
     }
 
+    private static func grokCatalogParsesListedModels() {
+        let output = """
+            You are logged in with grok.com.
+
+            Default model: grok-4.6
+
+            Available models:
+              * grok-4.6 (default)
+              - grok-4.5
+            """
+        let models = InstalledAIModel.grokCatalog(output)
+        expect(models.map(\.id) == ["grok-4.6", "grok-4.5"], "Grok discovery keeps listed model ids")
+        expect(
+            models.first?.efforts.map(\.id) == ["low", "medium", "high", "xhigh"],
+            "Grok models expose the CLI's advertised reasoning efforts")
+    }
+
     private static func claudeRunsWithoutToolsOrHistory(_ fixture: Fixture) async {
         let events = await fixture.events(kind: .claude, model: "sonnet", effort: "xhigh")
         expect(events.contains(.text("Claude reply")), "Claude text reaches the provider stream")
@@ -92,6 +163,85 @@ struct InstalledAITests {
             arguments.contains("--effort") && arguments.contains("xhigh"),
             "Claude receives the chosen reasoning effort")
         fixture.expectPrompt("claude-prompt.log")
+    }
+
+    private static func cursorRunsAskModeWithoutForce(_ fixture: Fixture) async {
+        let events = await fixture.events(kind: .cursor, model: "composer-2.5", effort: nil)
+        expect(events.contains(.text("Cursor ")), "Cursor delta text reaches the provider stream")
+        expect(!events.contains(.text("Cursor reply")), "Cursor skips buffered assistant flushes")
+        expect(events.last == .finished, "Cursor finishes the provider stream")
+        let arguments = fixture.read("agent-args.log")
+        for flag in [
+            "-p", "--mode", "ask", "--trust", "--workspace", "--model", "composer-2.5",
+            "--output-format", "stream-json", "--stream-partial-output"
+        ] {
+            expect(arguments.contains(flag), "Cursor runs with \(flag)")
+        }
+        expect(!arguments.contains("--force"), "Cursor never runs with --force")
+        expect(!arguments.contains("--yolo"), "Cursor never runs with --yolo")
+        expect(
+            !arguments.contains("--approve-mcps"),
+            "Cursor never auto-approves the user's MCP servers")
+        expect(
+            !fixture.read("agent-args.log").contains("\"mcp\""),
+            "Cursor discovery and turns never edit the user's MCP configuration")
+        fixture.expectPrompt("agent-prompt.log")
+        let chat = fixture.cursorChats.appending(path: "ws/ses_cursor", directoryHint: .isDirectory)
+        expect(
+            await fixture.awaitMissing(chat),
+            "Cursor deletes the local chat created for the reply")
+    }
+
+    private static func oversizedCompleteFrameFailsTheTurn(_ fixture: Fixture) async {
+        setenv("TC_INSTALLED_MAX_LINE_BYTES", "64", 1)
+        defer { unsetenv("TC_INSTALLED_MAX_LINE_BYTES") }
+        let error = await fixture.streamError(
+            kind: .claude, model: "oversized-frame", effort: nil)
+        expect(
+            error?.contains("oversized response") == true,
+            "a complete NDJSON frame over the byte limit fails the turn")
+    }
+
+    private static func cursorDiscoveryRequiresLoginAndListsModels(_ fixture: Fixture) async {
+        let manager = InstalledAIManager(supportDirectory: fixture.root)
+        await manager.refresh(kind: .cursor).value
+        let status = manager.status(for: .cursor)
+        expect(status.isReady, "Cursor discovery is ready after status and --list-models")
+        expect(
+            status.models.map(\.id) == ["auto", "composer-2.5"],
+            "Cursor discovery keeps the --list-models catalog")
+    }
+
+    private static func grokRunsWithoutToolsAndDeletesItsSession(_ fixture: Fixture) async {
+        let events = await fixture.events(kind: .grok, model: "grok-4.6", effort: "high")
+        expect(events.contains(.text("Grok reply")), "Grok text reaches the provider stream")
+        expect(events.last == .finished, "Grok finishes the provider stream")
+        let argv = fixture.arguments("grok-args.log")
+        for flag in [
+            "--prompt-file", "--output-format", "streaming-messages-json",
+            "--include-partial-messages", "--max-turns", "--no-subagents",
+            "--disable-web-search", "--no-plan", "--permission-mode", "dontAsk",
+            "--tools", "--deny", "--disallowed-tools", "--sandbox", "workspace", "--verbatim"
+        ] {
+            expect(argv.contains(flag), "Grok runs with \(flag)")
+        }
+        if let index = argv.firstIndex(of: "--prompt-file"), index + 1 < argv.count {
+            let name = URL(fileURLWithPath: argv[index + 1]).lastPathComponent
+            expect(
+                name.hasPrefix("tinycast-prompt-") && name.hasSuffix(".txt")
+                    && name != "tinycast-prompt.txt",
+                "Grok prompt file is unique per turn")
+        }
+        expect(
+            argv.contains("--effort") && argv.contains("high"),
+            "Grok receives the chosen reasoning effort")
+        expect(
+            fixture.read("grok-grok-environment.log").contains("1"),
+            "Grok disables its auto-updater for the turn")
+        let deleted = await fixture.awaitFile("grok-deleted.log", containing: "ses_stub")
+        if !deleted { print("Grok invocations: \(fixture.read("grok-args.log"))") }
+        expect(deleted, "Grok deletes the session created for the reply")
+        fixture.expectPrompt("grok-prompt.log")
     }
 
     /// The CLI rejects a bare `{}` before the turn starts, and a stub argv would never notice.
@@ -114,17 +264,20 @@ struct InstalledAITests {
 private final class Fixture {
     let root: URL
     let workspace: URL
+    let cursorChats: URL
     let executables: [InstalledAIKind: URL]
 
     init?() {
         root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "installed-ai-\(UUID().uuidString)", directoryHint: .isDirectory)
         workspace = root.appending(path: "workspace", directoryHint: .isDirectory)
+        cursorChats = root.appending(path: "cursor-chats", directoryHint: .isDirectory)
         let bin = root.appending(path: "bin", directoryHint: .isDirectory)
         do {
             try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: cursorChats, withIntermediateDirectories: true)
             var values: [InstalledAIKind: URL] = [:]
-            for kind in [InstalledAIKind.claude, .openCode] {
+            for kind in InstalledAIKind.managedCLIKinds {
                 let executable = bin.appending(path: kind.command)
                 try FileManager.default.copyItem(
                     at: URL(fileURLWithPath: "Tests/ai-fixtures/installed-cli-stub.js"),
@@ -137,6 +290,7 @@ private final class Fixture {
             let inheritedPath = ProcessInfo.processInfo.environment["PATH"] ?? ""
             setenv("PATH", bin.path + ":" + inheritedPath, 1)
             setenv("TC_INSTALLED_STUB_ROOT", root.path, 1)
+            setenv("TC_CURSOR_CHATS_ROOT", cursorChats.path, 1)
         } catch {
             print("fixture setup failed: \(error)")
             return nil
@@ -148,13 +302,6 @@ private final class Fixture {
         let provider = InstalledCLIProvider(
             kind: kind, executable: kind == .openCode ? nil : executable,
             model: model, effort: effort, workspace: workspace)
-        let request = AIRequest(
-            instructions: "Follow the custom instruction.",
-            messages: [
-                AIMessage(role: .user, text: "First question"),
-                AIMessage(role: .assistant, text: "First answer"),
-                AIMessage(role: .user, text: "Final question")
-            ])
         do {
             var events: [AIStreamEvent] = []
             for try await event in provider.stream(request) { events.append(event) }
@@ -163,6 +310,29 @@ private final class Fixture {
             print("\(kind.title) stream failed: \(error)")
             return []
         }
+    }
+
+    func streamError(kind: InstalledAIKind, model: String, effort: String?) async -> String? {
+        guard let executable = executables[kind] else { return nil }
+        let provider = InstalledCLIProvider(
+            kind: kind, executable: kind == .openCode ? nil : executable,
+            model: model, effort: effort, workspace: workspace)
+        do {
+            for try await _ in provider.stream(request) {}
+            return nil
+        } catch {
+            return String(describing: error)
+        }
+    }
+
+    private var request: AIRequest {
+        AIRequest(
+            instructions: "Follow the custom instruction.",
+            messages: [
+                AIMessage(role: .user, text: "First question"),
+                AIMessage(role: .assistant, text: "First answer"),
+                AIMessage(role: .user, text: "Final question")
+            ])
     }
 
     func expectPrompt(_ name: String) {
@@ -182,17 +352,26 @@ private final class Fixture {
         return argv
     }
 
-    func read(_ name: String) -> String {
-        (try? String(contentsOf: root.appending(path: name), encoding: .utf8)) ?? ""
+    func awaitFile(_ name: String, containing value: String) async -> Bool {
+        await awaitCondition { self.read(name).contains(value) }
     }
 
-    func awaitFile(_ name: String, containing value: String) async -> Bool {
+    func awaitMissing(_ url: URL) async -> Bool {
+        await awaitCondition { !FileManager.default.fileExists(atPath: url.path) }
+    }
+
+    /// Cleanup outlives the stream on purpose, so the assertion waits instead of racing it.
+    private func awaitCondition(_ isSatisfied: () -> Bool) async -> Bool {
         let deadline = ContinuousClock.now + .seconds(5)
         while ContinuousClock.now < deadline {
-            if read(name).contains(value) { return true }
+            if isSatisfied() { return true }
             try? await Task.sleep(for: .milliseconds(10))
         }
-        return read(name).contains(value)
+        return isSatisfied()
+    }
+
+    func read(_ name: String) -> String {
+        (try? String(contentsOf: root.appending(path: name), encoding: .utf8)) ?? ""
     }
 
     func tearDown() {

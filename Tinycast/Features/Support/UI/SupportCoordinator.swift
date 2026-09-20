@@ -4,9 +4,8 @@ import SwiftUI
 /// The support window's lifecycle. Every route lands here, so the anchor moves once per showing.
 @MainActor
 final class SupportCoordinator {
-    /// The one place the checkout URL is written down; every surface links to this.
-    static let checkout = URL(
-        string: "https://buy.polar.sh/polar_cl_NDVFC20DKQpLcNawsh97QzbARBXD3WNn8v35R0mbJmT")!
+    /// The one place the support page URL is written down; every surface links to this.
+    static let supportPage = URL(string: "https://tinycast.dev/support")!
 
     private let store: SupportReminderStore
     /// Environment injection and activity reads only — never for state this type owns.
@@ -35,7 +34,7 @@ final class SupportCoordinator {
     }
 
     func openCheckout() {
-        NSWorkspace.shared.open(Self.checkout)
+        NSWorkspace.shared.open(Self.supportPage)
         window.close()
     }
 

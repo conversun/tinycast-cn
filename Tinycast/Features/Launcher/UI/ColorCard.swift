@@ -15,7 +15,7 @@ struct ColorCard: View {
     var body: some View {
         HStack(spacing: 0) {
             LeadCardColumn(
-                text: AttributedString(primary.string(for: color)), badge: primary.title)
+                text: AttributedString(primary.string(for: color)), badge: primary.title.localizedUI)
             Image(systemName: "arrow.right")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.tertiary)

@@ -20,6 +20,7 @@ struct PopoverMenuItem {
     let title: String
     let icon: PopoverMenuIcon
     let isLoading: Bool
+    let isEnabled: Bool
     var sectionTitle: String?
     var startsSection: Bool
     var shortcut: String?
@@ -29,14 +30,18 @@ struct PopoverMenuItem {
     var isDestructive: Bool = false
     let action: () -> Void
 
+    /// What the keyboard and pointer may land on; a loading or disabled row only states itself.
+    var isSelectable: Bool { isEnabled && !isLoading }
+
     init(
-        title: String, icon: PopoverMenuIcon, isLoading: Bool = false, sectionTitle: String? = nil,
-        startsSection: Bool = false, shortcut: String? = nil, detail: String? = nil,
-        isDestructive: Bool = false, action: @escaping () -> Void
+        title: String, icon: PopoverMenuIcon, isLoading: Bool = false, isEnabled: Bool = true,
+        sectionTitle: String? = nil, startsSection: Bool = false, shortcut: String? = nil,
+        detail: String? = nil, isDestructive: Bool = false, action: @escaping () -> Void
     ) {
         self.title = title
         self.icon = icon
         self.isLoading = isLoading
+        self.isEnabled = isEnabled
         self.sectionTitle = sectionTitle
         self.startsSection = startsSection
         self.shortcut = shortcut
@@ -46,12 +51,12 @@ struct PopoverMenuItem {
     }
 
     init(
-        title: String, systemImage: String, isLoading: Bool = false, sectionTitle: String? = nil,
-        startsSection: Bool = false, shortcut: String? = nil, isDestructive: Bool = false,
-        action: @escaping () -> Void
+        title: String, systemImage: String, isLoading: Bool = false, isEnabled: Bool = true,
+        sectionTitle: String? = nil, startsSection: Bool = false, shortcut: String? = nil,
+        isDestructive: Bool = false, action: @escaping () -> Void
     ) {
         self.init(
-            title: title, icon: .symbol(systemImage), isLoading: isLoading,
+            title: title, icon: .symbol(systemImage), isLoading: isLoading, isEnabled: isEnabled,
             sectionTitle: sectionTitle, startsSection: startsSection, shortcut: shortcut,
             isDestructive: isDestructive, action: action)
     }
@@ -69,6 +74,16 @@ struct PopoverMenu: View {
         case none
         case bottomLeading
         case bottomTrailing
+    }
+
+    struct Search {
+        enum Placement {
+            case top
+            case bottom
+        }
+
+        let placeholder: String
+        let placement: Placement
     }
 
     struct SurfaceShape: Shape {
@@ -94,21 +109,92 @@ struct PopoverMenu: View {
     var width: CGFloat?
     let onActivate: (Int) -> Void
     var attachment = Attachment.none
+    let search: Search
 
     /// The palette arms this only once the pointer has moved of its own accord.
     @Environment(PaletteState.self) private var palette
     @Environment(\.metrics) private var metrics
+    @FocusState private var searchFocused: Bool
     /// Set by the pointer so the reveal can tell its own move from a keyboard one.
     @State private var pointerSelection: Int?
 
+    private var listInset: CGFloat { metrics.spacing.md }
     var body: some View {
         let shape = SurfaceShape(
             attachment: attachment, radius: metrics.radius.menuPanel,
             attachedRadius: metrics.size.menuButton / 2)
-        rows
-            .padding(metrics.spacing.sm)
-            .frame(width: width ?? metrics.size.menuWidth)
+        surfaceContent
+            .frame(width: width ?? metrics.size.actionMenuWidth)
             .glassEffect(.regular, in: shape)
+    }
+
+    private var surfaceContent: some View {
+        VStack(spacing: 0) {
+            if search.placement == .top {
+                searchField
+                searchSeparator
+            }
+            menuContent
+            if search.placement == .bottom {
+                searchSeparator
+                searchField
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var menuContent: some View {
+        if items.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                if let header {
+                    headerLabel(header)
+                    Color.clear.frame(height: metrics.size.menuRowSpacing)
+                }
+                Text("No Results")
+                    .font(metrics.typography.menuRow)
+                    .foregroundStyle(Theme.Colors.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: metrics.size.menuRowHeight)
+            }
+            .padding(listInset)
+        } else {
+            rows
+        }
+    }
+
+    private var searchField: some View {
+        @Bindable var palette = palette
+        let placeholder = search.placeholder
+        return TextField("", text: $palette.menuQuery)
+            .textFieldStyle(.plain)
+            .font(metrics.typography.menuRow)
+            .foregroundStyle(Theme.Colors.textPrimary)
+            .tint(Theme.Colors.textPrimary)
+            .focused($searchFocused)
+            .lineLimit(1)
+            .background(alignment: .leading) {
+                if palette.menuQuery.isEmpty {
+                    Text(placeholder.localizedUI)
+                        .font(metrics.typography.menuRow)
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, metrics.spacing.xl + metrics.spacing.sm)
+            .frame(height: metrics.size.menuRowHeight)
+            .offset(y: search.placement == .bottom ? -metrics.spacing.xxs / 2 : 0)
+            .padding(.vertical, metrics.spacing.xxs / 2)
+            .accessibilityLabel(placeholder.localizedUI)
+            .onAppear { searchFocused = true }
+    }
+
+    private var searchSeparator: some View {
+        Rectangle()
+            .fill(Theme.Colors.separator)
+            .frame(height: Theme.Size.hairline)
+            .accessibilityHidden(true)
     }
 
     private func headerLabel(_ text: String) -> some View {
@@ -140,7 +226,10 @@ struct PopoverMenu: View {
                                 if let sectionTitle = items[index].sectionTitle {
                                     sectionLabel(sectionTitle, isFirst: index == 0)
                                 }
-                                PopoverMenuRow(item: items[index], selected: index == selection) {
+                                PopoverMenuRow(
+                                    item: items[index],
+                                    selected: index == selection && items[index].isSelectable
+                                ) {
                                     onActivate(index)
                                 }
                             }
@@ -149,12 +238,15 @@ struct PopoverMenu: View {
                         .id(index)
                     }
                 }
+                .padding(listInset)
             }
-            .frame(height: viewportHeight)
+            .frame(height: viewportHeight + listInset * 2)
             // `never`, not `hidden`: hidden still lets AppKit claim the scroller's gutter.
             .scrollIndicators(.never)
             .scrollBounceBehavior(contentHeight > viewportCapacity ? .always : .basedOnSize)
-            .overflowFade(band: metrics.scaled(Theme.Size.menuOverflowFade), includingTop: true)
+            // The hosting view outlives a presentation, so a fresh one must not inherit the offset.
+            .id(palette.menuPresentationToken)
+            .onAppear { proxy.scrollTo(selection, anchor: .center) }
             .onChange(of: selection) {
                 let byPointer = pointerSelection == selection
                 pointerSelection = nil
@@ -210,7 +302,7 @@ struct PopoverMenu: View {
 
     /// Tighter below than above, so a header belongs to the rows under it, not between two groups.
     private func sectionLabel(_ title: String, isFirst: Bool) -> some View {
-        Text(title)
+        Text(title.localizedUI)
             .font(metrics.typography.sectionHeader)
             .foregroundStyle(.secondary)
             .lineLimit(1)
@@ -227,7 +319,9 @@ struct PopoverMenu: View {
 
     /// Armed only once the pointer has moved of its own accord, so a scroll past it lights nothing.
     private func hover(_ index: Int) {
-        guard palette.hoverHighlightArmed, index != selection else { return }
+        guard palette.hoverHighlightArmed, items[index].isSelectable, index != selection else {
+            return
+        }
         pointerSelection = index
         selection = index
     }
@@ -252,7 +346,7 @@ private struct PopoverMenuRow: View {
                     case .blank:
                         EmptyView()
                     case .symbol(let name):
-                        Image(systemName: name)
+                        Image(systemName: SystemSymbolName.resolve(name))
                             .font(
                                 .system(
                                     size: metrics.scaled(Theme.Typography.menuSymbolSize),
@@ -307,9 +401,10 @@ private struct PopoverMenuRow: View {
                 RoundedRectangle(cornerRadius: metrics.radius.menuRow, style: .continuous)
                     .fill(selected ? Theme.Colors.menuHover : Color.clear)
             )
+            .opacity(item.isEnabled ? 1 : 0.45)
         }
         .buttonStyle(.plain)
-        .disabled(item.isLoading)
+        .disabled(!item.isSelectable)
     }
 }
 

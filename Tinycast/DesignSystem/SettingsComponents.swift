@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The few pieces more than one Settings pane needs; everything else is a stock `Form` section.
+// The few pieces more than one Settings pane or editor needs; everything else stays feature-owned.
 
 /// Not `LabeledContent`: its selectable text field eats the taps a `ShortcutRecorder` needs.
 struct SettingsRow<Icon: View, Trailing: View>: View {
@@ -58,14 +58,109 @@ extension View {
     func settingsEnabled(_ isEnabled: Bool) -> some View {
         disabled(!isEnabled).opacity(isEnabled ? 1 : 0.45)
     }
+
+    func settingsEditorTextField() -> some View {
+        modifier(SettingsEditorTextField())
+    }
+
+    func settingsEditorTextArea(height: CGFloat) -> some View {
+        modifier(SettingsEditorTextArea(height: height))
+    }
+
+    func settingsEditorPanelSurface() -> some View {
+        modifier(SettingsEditorPanelSurface())
+    }
+
+    /// The one place that says hiding a row from the launcher never unbinds its shortcut.
+    func launcherVisibilityHelp() -> some View {
+        help("Show in launcher. Its shortcut works either way.")
+    }
+}
+
+struct SettingsEditorHeader: View {
+    let title: String
+    var subtitle: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text(title.localizedUI)
+                .font(Theme.Typography.panelTitle)
+            if let subtitle {
+                Text(subtitle.localizedUI)
+                    .font(Theme.Typography.rowTitle)
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+struct SettingsEditorField<Content: View>: View {
+    let title: String
+    var labelFont: Font?
+    @ViewBuilder var content: Content
+
+    init(
+        _ title: String, labelFont: Font? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.labelFont = labelFont
+        self.content = content()
+    }
+
+    var body: some View {
+        LabeledContent {
+            content
+                .labelsHidden()
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        } label: {
+            Text(title.localizedUI).font(labelFont)
+        }
+    }
+}
+
+private struct SettingsEditorTextField: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .textFieldStyle(.plain)
+            .padding(.horizontal, Theme.Spacing.lg)
+            .frame(height: Theme.Size.dialogButtonHeight)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                    .fill(Theme.Colors.controlSurface))
+    }
+}
+
+private struct SettingsEditorTextArea: ViewModifier {
+    let height: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .scrollContentBackground(.hidden)
+            .padding(Theme.Spacing.sm)
+            .frame(height: height)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
+                    .fill(Theme.Colors.controlSurface))
+    }
+}
+
+private struct SettingsEditorPanelSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous)
+        content
+            .background(Theme.Colors.panelScrim, in: shape)
+            .glassEffect(.regular, in: shape)
+    }
 }
 
 /// A feature pane's opening section: the master switch, then its launcher-visibility companion.
 struct FeatureSwitchSection: View {
     let anchor: SettingsAnchor
     let enableTitle: String
-    let enableSubtitle: String
-    let launcherSubtitle: String
+    var enableSubtitle: String?
     @Binding var isEnabled: Bool
     @Binding var showsInLauncher: Bool
 
@@ -73,14 +168,11 @@ struct FeatureSwitchSection: View {
         Section {
             Toggle(isOn: $isEnabled) {
                 SettingsRowTitle(anchor, enableTitle)
-                Text(enableSubtitle.localizedUI)
+                if let enableSubtitle { Text(enableSubtitle.localizedUI) }
             }
-            Toggle(isOn: $showsInLauncher) {
-                Text("Show in launcher")
-                Text(launcherSubtitle.localizedUI)
-            }
-            // The switch above stays live so the feature can always be turned back on.
-            .settingsEnabled(isEnabled)
+            Toggle("Show in launcher", isOn: $showsInLauncher)
+                // The switch above stays live so the feature can always be turned back on.
+                .settingsEnabled(isEnabled)
         } header: {
             SettingsSectionHeader(anchor)
         }
@@ -160,6 +252,14 @@ struct AliasField: View {
         // A backup import replaces the table out from under an unfocused row.
         .onChange(of: aliases.revision) { _, _ in
             if !focused { draft = aliases.alias(for: key) ?? "" }
+        }
+        // A reused table row hands the field another entry; unsaved text belongs to the old one.
+        .onChange(of: key) { old, new in
+            if focused {
+                aliases.setAlias(draft, for: old)
+                focused = false
+            }
+            draft = aliases.alias(for: new) ?? ""
         }
         .padding(.horizontal, Theme.Spacing.sm)
         .frame(width: Theme.Size.shortcutRecorder, height: 24)

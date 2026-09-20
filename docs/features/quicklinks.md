@@ -112,7 +112,8 @@ where the field stays a filter with its prompt intact and the row below already 
 **"Selected Text" is asked for up front, not after a failed read.** A chip cannot capture a selection,
 so the field appears whenever the link reads `{selection}` and the setting is `.ask`. Left empty it
 changes nothing — a selection the frontmost app *does* expose is still used — and only a typed value
-replaces it. That is the one behavioural difference from the two-screen form it replaced, and it is
+replaces it. So it is never owed: `QuicklinkCoordinator.requiresValue` keeps it out of the first
+incomplete field, and ↵ opens a selected-text link at once instead of focusing the empty chip first. That is the one behavioural difference from the two-screen form it replaced, and it is
 what lets the strip be drawn without capturing anything.
 
 `openQuicklink(id:forcingDefaultApp:values:)` is the single funnel, and it captures the expansion

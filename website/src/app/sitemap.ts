@@ -11,8 +11,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return [
     { url: `${site.url}/`, lastModified: now, priority: 1 },
+    { url: `${site.url}/support/`, lastModified: now, priority: 0.8 },
     ...source.getPages().map((page) => ({
-      url: `${site.url}${page.url}`,
+      url: `${site.url}${page.url}/`,
       lastModified: now,
       priority: 0.7,
     })),

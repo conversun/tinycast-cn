@@ -9,6 +9,13 @@ struct LocalizationTests {
             fatalError("Chinese localization bundle is missing")
         }
         let keys = [
+            "Navigate back or close window",
+            "A .tinycast file exported from Tinycast.",
+            "Settings & Shortcuts",
+            "Snippets",
+            "Launcher Learning",
+            "List, detail, form, grid and no-view commands, plus preferences, storage and OAuth.",
+            "Menu-bar commands, Raycast's OAuth proxy, and its AI, browser and window services.",
             "Create Window Layout",
             "No external providers ready",
             "Turn on Apple Intelligence, or add a provider above.",

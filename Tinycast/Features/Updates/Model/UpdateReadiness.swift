@@ -6,7 +6,6 @@ struct UpdateActivity: Sendable {
     var isRunningExtension = false
     var isUninstalling = false
     var isRecordingHotKey = false
-    var isPromptingForArguments = false
     var isShowingDialog = false
     var isPaletteVisible = false
 }
@@ -18,7 +17,6 @@ enum UpdateReadiness {
         case runningExtension
         case uninstalling
         case recordingHotKey
-        case promptingForArguments
         case dialogOpen
         case paletteOpen
 
@@ -28,7 +26,6 @@ enum UpdateReadiness {
             case .runningExtension: return String(localized: "Waiting for a running extension command to finish.")
             case .uninstalling: return String(localized: "Waiting for the uninstaller to finish.")
             case .recordingHotKey: return String(localized: "Finish recording the shortcut first.")
-            case .promptingForArguments: return String(localized: "Finish the open command prompt first.")
             case .dialogOpen: return String(localized: "Close the open dialog first.")
             case .paletteOpen: return String(localized: "Close Tinycast's window first.")
             }
@@ -41,7 +38,6 @@ enum UpdateReadiness {
         if activity.isRunningExtension { return .runningExtension }
         if activity.isUninstalling { return .uninstalling }
         if activity.isRecordingHotKey { return .recordingHotKey }
-        if activity.isPromptingForArguments { return .promptingForArguments }
         if activity.isShowingDialog { return .dialogOpen }
         if activity.isPaletteVisible { return .paletteOpen }
         return nil

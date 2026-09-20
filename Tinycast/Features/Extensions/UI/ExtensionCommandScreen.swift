@@ -10,8 +10,8 @@ import SwiftUI
         entryScale: entryScale,
         maximumScale: 1.003,
         exitScaleDelta: exitScaleDelta,
-        expansionDuration: 0.14,
-        settleDuration: 0.08,
+        expansionDuration: 0.10,
+        settleDuration: 0.05,
         exitDuration: 0.18,
         expansionTiming: CAMediaTimingFunction(controlPoints: 0.2, 0.7, 0.2, 1),
         settleTiming: CAMediaTimingFunction(controlPoints: 0.42, 0, 0.58, 1),
@@ -39,8 +39,8 @@ struct ExtensionCommandScreen: PaletteScreen {
     /// A form owns the whole keyboard: its fields are the text, so the search field steps aside.
     var hidesSearchField: Bool { isForm }
 
-    /// A form's primary action stands even with no field to land on.
-    var actsWithoutRows: Bool { isForm }
+    /// A form or rowless Detail's primary action stands even with no row to land on.
+    var actsWithoutRows: Bool { isForm || screen.kind == .detail }
 
     /// A text area edits with ↑/↓ itself, so only ⇥ leaves it.
     func ownsVerticalKeys(at selection: Int) -> Bool {
@@ -72,8 +72,10 @@ struct ExtensionCommandScreen: PaletteScreen {
         ExtensionScreen.actions(in: screen.actionPanel(forItemAt: selection)).first
     }
 
+    /// A submenu reached first is a grouping device, so its title stands in for the leaf's.
     var primaryActionTitle: String {
-        primaryAction(at: vm.selection)?.title ?? "Run"
+        let primary = primaryAction(at: vm.selection)
+        return primary?.enclosingSubmenuTitle ?? primary?.title ?? "Run"
     }
 
     func hasPrimaryAction(at selection: Int) -> Bool { primaryAction(at: selection) != nil }
@@ -92,24 +94,40 @@ struct ExtensionCommandScreen: PaletteScreen {
 
     /// A command's rows carry tinted icons and its panel scrolls; a menu row cannot.
     func menuContent(
-        at selection: Int, menuSelection: Binding<Int>, onActivate: @escaping (Int) -> Void
+        at selection: Int, searchQuery: ActionMenuSearchQuery, menuSelection: Binding<Int>,
+        onActivate: @escaping (Int) -> Void
     ) -> PaletteMenuContent? {
         let actions = ExtensionScreen.actions(in: screen.actionPanel(forItemAt: selection))
         guard !actions.isEmpty else { return nil }
+        var pendingSection = false
+        var filteredActions: [ExtensionAction] = []
+        var filteredSectionStarts: [Bool] = []
+        var bestMatch: (index: Int, score: Int)?
+        for action in actions {
+            if action.startsSection { pendingSection = true }
+            guard let score = searchQuery.score(action.title) else { continue }
+            filteredSectionStarts.append(pendingSection && !filteredActions.isEmpty)
+            filteredActions.append(action)
+            pendingSection = false
+            if score > (bestMatch?.score ?? .min) {
+                bestMatch = (filteredActions.count - 1, score)
+            }
+        }
         let screen = screen
         let assetsPath = assetsPath
         let extensions = extensions
+        var items = ExtensionActionsMenu.rows(filteredActions, assetsPath: assetsPath)
+        for index in items.indices { items[index].startsSection = filteredSectionStarts[index] }
         return PaletteMenuContent(
-            rowCount: actions.count,
+            rowCount: filteredActions.count, preferredSelection: bestMatch?.index,
             view: { _ in
                 AnyView(
                     ExtensionActionsPanel(
                         header: ExtensionActionsMenu.header(screen: screen, selection: selection),
-                        items: ExtensionActionsMenu.rows(actions, assetsPath: assetsPath),
-                        selection: menuSelection, onActivate: onActivate))
+                        items: items, selection: menuSelection, onActivate: onActivate))
             },
             activate: { index in
-                guard let handler = actions[index].handler else { return }
+                guard let handler = filteredActions[index].handler else { return }
                 extensions.dispatch(handler: handler)
             },
             clipPath: { bounds, metrics, _ in
@@ -125,7 +143,13 @@ struct ExtensionCommandScreen: PaletteScreen {
     }
 
     func activate(at selection: Int) {
-        guard let handler = primaryAction(at: selection)?.handler else { return }
+        guard let primary = primaryAction(at: selection) else { return }
+        if primary.enclosingSubmenuTitle != nil {
+            vm.selection = selection
+            openActions()
+            return
+        }
+        guard let handler = primary.handler else { return }
         extensions.dispatch(handler: handler)
     }
 
@@ -151,24 +175,35 @@ struct ExtensionCommandScreen: PaletteScreen {
 
     /// Its choices as a palette menu, so the arrows, ↵, Escape and the click-away come free.
     func searchAccessoryMenu(
-        menuSelection: Binding<Int>, onActivate: @escaping (Int) -> Void
+        searchQuery: ActionMenuSearchQuery, menuSelection: Binding<Int>,
+        onActivate: @escaping (Int) -> Void
     ) -> PaletteMenuContent? {
         guard let accessory = searchAccessory else { return nil }
+        var items: [ExtensionPickerItem] = []
+        var bestMatch: (index: Int, score: Int)?
+        for item in accessory.items {
+            guard let score = searchQuery.score(item.title) else { continue }
+            items.append(item)
+            if score > (bestMatch?.score ?? .min) {
+                bestMatch = (items.count - 1, score)
+            }
+        }
         let chosen = extensions.accessorySelection(accessory).map { Set([$0]) } ?? []
         let assetsPath = assetsPath
         let extensions = extensions
         return PaletteMenuContent(
-            rowCount: accessory.items.count,
+            rowCount: items.count, preferredSelection: bestMatch?.index,
             view: { _ in
                 AnyView(
                     ExtensionPickerList(
-                        items: accessory.items, selection: menuSelection.wrappedValue,
+                        items: items, selection: menuSelection.wrappedValue,
                         chosen: chosen, assetsPath: assetsPath,
-                        width: ExtensionSearchAccessoryButton.listWidth, onSelect: onActivate,
+                        width: ExtensionSearchAccessoryButton.listWidth,
+                        searchPlaceholder: "Search…".localizedUI, onSelect: onActivate,
                         onHighlight: { menuSelection.wrappedValue = $0 }))
             },
             activate: { index in
-                extensions.chooseAccessorySelection(accessory, value: accessory.items[index].value)
+                extensions.chooseAccessorySelection(accessory, value: items[index].value)
             },
             clipPath: { bounds, metrics, _ in
                 RoundedRectangle(cornerRadius: metrics.radius.menuPanel, style: .continuous)

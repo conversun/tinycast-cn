@@ -427,12 +427,6 @@ struct UpdatesTests {
         expect(UpdateReadiness.evaluate(busy) == .recordingHotKey, "a live recorder holds the update")
 
         busy = UpdateActivity()
-        busy.isPromptingForArguments = true
-        expect(
-            UpdateReadiness.evaluate(busy) == .promptingForArguments,
-            "an argument prompt holds the update")
-
-        busy = UpdateActivity()
         busy.isUninstalling = true
         expect(UpdateReadiness.evaluate(busy) == .uninstalling, "a running uninstall holds the update")
 

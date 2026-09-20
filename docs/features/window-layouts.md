@@ -24,6 +24,9 @@ resolution-independent by construction.
   Left Half press read as "the user moved it", and would overwrite the single-level restore point.
   The visible consequence: Restore after a layout run returns the frame from before the last *window
   command*, not from before the layout.
+- **At most one entry ends a run frontmost, by construction.** The mark is
+  `WindowLayout.frontmostEntryID`, never a per-entry flag, so no sanitising can find two. A mark
+  whose entry is gone is cleared, and a duplicate carries it to the copy's entry by position.
 - **Capture always writes `usesPreferredGap: false` and describes against the raw `visibleFrame`.**
   Capturing against the gapped box would bake the current gap into every fraction and residual, so
   changing `windowGap` in Settings would move every window in every captured layout.
@@ -42,13 +45,13 @@ resolution-independent by construction.
 | `Model/WindowLayoutGeometry.swift` | Foundation + CoreGraphics | **Pure.** `resolve` and its inverse |
 | `Model/WindowLayoutPlan.swift` | Foundation + CoreGraphics | **Pure.** What a run will do, decided before any write |
 | `Model/WindowLayoutStore.swift` | Foundation | The library, as JSON in `UserDefaults` |
-| `Model/WindowLayoutDraft.swift` | Foundation + CoreGraphics | One in-flight edit, owned by the sheet |
+| `Model/WindowLayoutDraft.swift` | Foundation + CoreGraphics | One in-flight edit, owned by the panel |
 | `Service/AXWindowAccess.swift` | AppKit + ApplicationServices | Every `AXUIElement` call, shared with the mover |
 | `Service/AXScreens.swift` | AppKit + ColorSync | `AXGeometry`, and displays with their UUIDs |
 | `Service/WindowInventory.swift` | AppKit + ApplicationServices | What is on screen, read once per gesture |
 | `Service/WindowLayoutRunner.swift` | AppKit | Applies a plan; opens what isn't running |
 | `UI/WindowLayoutCoordinator.swift` | AppKit | The one run funnel, the library, the editor handoff |
-| `Settings/WindowLayout*.swift` | SwiftUI | The pane's section and the editor sheet |
+| `Settings/WindowLayout*.swift` | SwiftUI | The pane's section and the editor panel |
 
 The first seven compile into `Tests/window-layout-test.swift`, so none of them may gain an AppKit,
 SwiftUI or `NSScreen` dependency.
@@ -83,8 +86,8 @@ the one bug the round-trip sweep caught.
 
 `WindowLayoutCoordinator.runWindowLayout(id:)` is the one funnel for a palette row, a global shortcut
 and the pane's Run button alike, so the feature switch cannot be bypassed. It hides the palette with
-`restoreFocus: false` — a layout activates the apps it places, and handing focus back first pulls a
-different app forward mid-pass.
+`restoreFocus: false` — an app the layout opens activates itself, and handing focus back first
+pulls a different app forward mid-pass.
 
 `WindowLayoutRunner.run` then:
 
@@ -95,6 +98,7 @@ different app forward mid-pass.
 4. Places every window that already exists, in one go with no `await` between them, so a
    multi-window layout lands in one visible step.
 5. Opens what is missing, then waits for each window and places it.
+6. Focuses the frontmost entry's window, if the layout names one and the plan placed it.
 
 **Binding windows to entries** is greedy nearest-centre: among the app's unclaimed windows, the one
 whose centre is closest to the entry's target wins. An already-correct desktop is then a no-op and
@@ -106,6 +110,13 @@ argument describe one window, so the second is reported as `duplicateTarget`.
 `AXEnhancedUserInterface` is suppressed **per application**, not per window, and restored in a
 `defer` — the flag is application-scoped, and restoring per group means a long launch wait never
 leaves it off.
+
+**Focus comes last, once.** Every opened app activates itself on launch, so focusing any earlier
+lets a later launch take the front back; focusing each app in turn would flicker across displays
+and Spaces. The cost is that a layout waiting on a slow launch focuses only when that wait ends,
+up to the deadline below. A cancelled run focuses nothing, and neither does a run whose frontmost
+app, when the wait ends, is neither the one it started with nor one it opened — the user has moved
+on. `AXWindowAccess.focus` is the same raise-and-activate sequence Switch Windows uses.
 
 ### The launch wait
 
@@ -128,23 +139,26 @@ invariant true for every frame in the pass.
 
 **Create Layout from Current Windows** is `describe` applied to the desktop. It reads every window
 that is `AXStandardWindow`, not minimized, not natively fullscreen, reports geometry, and is
-positionable — a stricter filter than the mover's, because a Save sheet must never become an entry.
+positionable — a stricter filter than the mover's, because a Save panel must never become an entry.
 Candidates come from `AppLauncher.quitAllTargets()`'s rule, excluded **by pid** rather than by
 activation policy, since opening About flips Tinycast itself to `.regular`.
 
 Only Accessibility is needed: `AXPosition` and `AXSize` are AX attributes. Screen Recording gates
 window *titles*, which nothing here reads.
 
+The frontmost app's focused window, when it is one of the captured windows, is marked **Bring to
+front**. Capturing from Settings marks nothing, because Tinycast itself is frontmost then.
+
 Capture never saves silently — the draft opens in the editor so it can be seen, trimmed and named.
 
 ## The editor
 
-A settings sheet at `Theme.Size.layoutEditorSheet`, presented from the Window Management pane so the
+A Settings editor panel at `Theme.Size.layoutEditorSheet`, presented from Window Management so the
 two launcher commands can open it too. Two columns split two to one: a read-only preview, and the
 inspector. Both the width and the height are stated — the inspector reveals four field groups the
-moment an app is picked, and a sheet sized to its content would resize under the pointer.
+moment an app is picked, and a panel sized to its content would resize under the pointer.
 
-- **The preview is handed its screens once** by the sheet and re-reads them only on
+- **The preview is handed its screens once** by the panel and re-reads them only on
   `didChangeScreenParameters`. Resolving displays inside `body` would cost an AX round trip per
   keystroke.
 - **The plate is the display**, drawn at its own aspect ratio and letterboxed inside the box — fit,
@@ -170,6 +184,9 @@ moment an app is picked, and a sheet sized to its content would resize under the
 - **Save is `⌘↵`, not `.defaultAction`.** Plain ↵ belongs to whichever field has focus. The footer
   draws the cap because here the cap and the behaviour come from one `.keyboardShortcut`, so the
   drift `docs/ui.md`'s no-caps-on-buttons rule guards against cannot happen.
+
+**Bring to front** is a switch on the selected entry. Turning it on for a second entry moves the
+mark rather than refusing, because the draft holds one ID, not a flag per entry.
 
 A **quicklink argument is copied as its link text, not referenced.** A run is one non-interactive
 pass, so a quicklink that later grows a `{placeholder}` would have nothing to prompt with; copying
@@ -197,8 +214,10 @@ also removes a whole failure class and any run-time dependency on `QuicklinkStor
 AX-orientation lock, exact resolver frames, off-origin and negative-coordinate displays, offsets and
 their clamping, degenerate fractions, gap arithmetic, `describe` at every anchor, the round-trip
 identity, per-axis anchor independence, absent-display skipping, window binding and its determinism,
-Codable round trips including a minimal hand-written payload, store CRUD, validation, sanitisation and
-persistence, and a fuzz sweep over every anchor × fraction × offset × gap × display.
+Codable round trips including a minimal hand-written payload, the frontmost mark surviving the
+plan only when its entry is placed, store CRUD including a duplicate's remapped mark, validation,
+sanitisation and persistence, and a fuzz sweep over every anchor × fraction × offset × gap ×
+display.
 
 `AXWindowAccess`, `AXScreens`, `WindowInventory` and `WindowLayoutRunner` are not compiled into the
 harness and have no automated coverage, exactly as `WindowMover` and `SpaceSwitcher` do not. They need

@@ -15,6 +15,11 @@ enum InstalledAIStreamDecoder {
         switch kind {
         case .openCode: return openCode(object, type: type)
         case .claude: return claude(object, type: type)
+        case .cursor: return cursor(object, type: type)
+        case .grok:
+            var frame = claude(object, type: type)
+            frame.sessionID = object["session_id"] as? String
+            return frame
         case .codex: return InstalledAIStreamFrame()
         }
     }
@@ -79,6 +84,51 @@ enum InstalledAIStreamDecoder {
         }
         frame.completed = true
         return frame
+    }
+
+    private static func cursor(
+        _ object: [String: Any], type: String
+    ) -> InstalledAIStreamFrame {
+        var frame = InstalledAIStreamFrame()
+        if let sessionID = object["session_id"] as? String, !sessionID.isEmpty {
+            frame.sessionID = sessionID
+        }
+        switch type {
+        case "assistant":
+            // Live deltas carry timestamp_ms; buffered flushes omit it or carry model_call_id.
+            guard object["timestamp_ms"] != nil, object["model_call_id"] == nil else {
+                return frame
+            }
+            if let text = assistantText(in: object), !text.isEmpty {
+                frame.events = [.text(text)]
+            }
+        case "result":
+            if object["is_error"] as? Bool == true
+                || (object["subtype"] as? String) == "error"
+            {
+                frame.error =
+                    (object["result"] as? String)
+                    ?? message(in: object)
+                    ?? "Cursor could not finish the response."
+                return frame
+            }
+            frame.completed = true
+        default:
+            break
+        }
+        return frame
+    }
+
+    private static func assistantText(in object: [String: Any]) -> String? {
+        guard let message = object["message"] as? [String: Any],
+            let content = message["content"] as? [[String: Any]]
+        else { return nil }
+        let parts = content.compactMap { part -> String? in
+            guard (part["type"] as? String) == "text" || part["type"] == nil else { return nil }
+            return part["text"] as? String
+        }
+        let text = parts.joined()
+        return text.isEmpty ? nil : text
     }
 
     private static func integer(_ value: Any?) -> Int? {

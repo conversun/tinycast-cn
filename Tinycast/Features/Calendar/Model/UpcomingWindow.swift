@@ -33,6 +33,14 @@ struct UpcomingWindow: Sendable {
         return "Now"
     }
 
+    /// A row's pill: only a meeting under way or starting within the hour earns one.
+    static func rowCountdown(for event: MeetingEvent, now: Date) -> String? {
+        if event.isInProgress(now: now) { return "Now" }
+        let delta = event.start.timeIntervalSince(now)
+        guard delta > 0, delta <= 60 * 60 else { return nil }
+        return countdown(to: event.start, now: now)
+    }
+
     /// The menu bar names the time left once a meeting has been underway for five minutes.
     static func menuBarCountdown(for event: MeetingEvent, now: Date) -> String {
         if now < event.start { return countdown(to: event.start, now: now) }

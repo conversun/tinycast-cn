@@ -170,6 +170,7 @@ export default function Command() {
 const nodeSource = `
 import path from "node:path";
 import os from "node:os";
+import fs from "node:fs";
 import crypto from "node:crypto";
 import { Buffer } from "node:buffer";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -236,6 +237,15 @@ export default function Command() {
     errorCode(() => fileURLToPath("file://user@localhost/tmp/a")),
     errorCode(() => fileURLToPath("file://localhost:/tmp/a")),
     errorCode(() => fileURLToPath("file:///C:/a", { windows: true })),
+    // fs validates URL schemes the way Node does: a vscode-remote:// workspace URI whose stripped
+    // pathname exists locally ("/" always does) must not pass existsSync — Raycast's Search Recent
+    // Projects relies on that guard before handing the URI to fileURLToPath.
+    String(fs.existsSync(new URL("vscode-remote://ssh-remote%2Bucg/"))),
+    String(fs.existsSync(new URL("vscode-remote://ssh-remote%2Bserver/etc/docker/daemon.json"))),
+    String(fs.existsSync(new URL("file:///etc/hosts"))),
+    String(fs.existsSync("/etc/hosts")),
+    errorCode(() => fs.statSync(new URL("https://example.com/a"))),
+    errorCode(() => fs.readFileSync(new URL("https://example.com/a"))),
   ];
   return <Detail markdown={parts.join("\\n")} />;
 }
@@ -379,6 +389,146 @@ export default async function Command() {
     request.on("error", reject);
     request.end("ping");
   });
+}
+`;
+
+// Hide My Email hands axios a cookie jar through axios-cookiejar-support, whose http-cookie-agent
+// extends `http.Agent` at load time and hooks each request in `addRequest` — the same way this does.
+// A bundled `ws` reaches the network the way this does: upgrade, then raw frames on the socket.
+// multicast-dns drives `dgram` the way this does, down to the packet it writes.
+const dgramSource = `
+import dgram from "node:dgram";
+
+function query(name, type) {
+  const labels = name.split(".");
+  const packet = Buffer.alloc(12 + labels.reduce((total, label) => total + label.length + 1, 1) + 4);
+  packet.writeUInt16BE(0x1234, 0);
+  packet.writeUInt16BE(1, 4);
+  let offset = 12;
+  for (const label of labels) {
+    packet[offset] = label.length;
+    packet.write(label, offset + 1);
+    offset += label.length + 1;
+  }
+  packet.writeUInt16BE(type, offset + 1);
+  packet.writeUInt16BE(1, offset + 3);
+  return packet;
+}
+
+export default async function Command() {
+  const socket = dgram.createSocket({ type: "udp4" });
+  globalThis.__dgram = await new Promise((resolve) => {
+    socket.on("message", (message, rinfo) => resolve({ hex: message.toString("hex"), port: rinfo.port }));
+    socket.bind(5353, undefined, () => {
+      const service = query("_services._dns-sd._udp.local", 12);
+      socket.send(service, 0, service.length, 5353, "224.0.0.251");
+      const packet = query("homeassistant.local", 1);
+      socket.send(packet, 0, packet.length, 5353, "224.0.0.251");
+    });
+  });
+}
+`;
+
+const websocketSource = `
+import https from "node:https";
+
+export default async function Command() {
+  globalThis.__ws = await new Promise((resolve, reject) => {
+    const request = https.request({
+      host: "example.test",
+      path: "/socket",
+      headers: {
+        Connection: "Upgrade",
+        Upgrade: "websocket",
+        "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
+        "Sec-WebSocket-Version": "13",
+        "Sec-WebSocket-Extensions": "permessage-deflate",
+      },
+    });
+    request.on("error", reject);
+    request.on("upgrade", (response, socket) => {
+      const frames = [];
+      socket.on("data", (chunk) => frames.push(chunk.toString("hex")));
+      const payload = Buffer.from("ping", "utf8");
+      const mask = Buffer.from([1, 2, 3, 4]);
+      socket.write(
+        Buffer.concat([
+          Buffer.from([0x81, 0x80 | payload.length]),
+          mask,
+          Buffer.from(payload.map((byte, index) => byte ^ mask[index % 4])),
+        ]),
+      );
+      socket.write(Buffer.from([0x89, 0x80, 1, 2, 3, 4]));
+      setTimeout(
+        () =>
+          resolve({
+            status: response.statusCode,
+            accept: response.headers["sec-websocket-accept"],
+            extensions: response.headers["sec-websocket-extensions"] ?? null,
+            frames,
+          }),
+        40,
+      );
+    });
+    request.end();
+  });
+}
+`;
+
+const cookieAgentSource = `
+import * as http from "node:http";
+import * as url from "node:url";
+
+class CookieAgent extends http.Agent {
+  constructor(options) {
+    super(options);
+    this.jar = new Map();
+  }
+
+  addRequest(request, options) {
+    const target = url.format({ host: request.host, pathname: request.path, protocol: request.protocol });
+    const implicitHeader = request._implicitHeader.bind(request);
+    request._implicitHeader = () => {
+      if (this.jar.size) request.setHeader("Cookie", [...this.jar].map(([k, v]) => k + "=" + v).join("; "));
+      implicitHeader();
+    };
+    const emit = request.emit.bind(request);
+    request.emit = (event, ...args) => {
+      if (event === "response") {
+        for (const line of args[0].headers["set-cookie"] ?? []) {
+          const [pair] = line.split(";");
+          const [name, value] = pair.split("=");
+          this.jar.set(name, value);
+        }
+        this.urls.push(target);
+      }
+      return emit(event, ...args);
+    };
+    super.addRequest(request, options);
+  }
+}
+
+const send = (agent, path) =>
+  new Promise((resolve, reject) => {
+    const request = http.request("https://example.test" + path, { agent }, (response) => {
+      response.resume();
+      response.on("end", () => resolve(response));
+    });
+    request.on("error", reject);
+    request.end();
+  });
+
+export default async function Command() {
+  const agent = new CookieAgent({ keepAlive: true });
+  agent.urls = [];
+  const first = await send(agent, "/signin?step=1");
+  await send(agent, "/account");
+  globalThis.__cookieAgent = {
+    isAgent: agent instanceof http.Agent,
+    setCookie: first.headers["set-cookie"],
+    rawHeaders: first.rawHeaders,
+    urls: agent.urls,
+  };
 }
 `;
 
@@ -685,6 +835,12 @@ export async function runFixtures() {
       "ERR_INVALID_URL",
       "ERR_INVALID_URL",
       "Error",
+      "false",
+      "false",
+      "true",
+      "true",
+      "ERR_INVALID_URL_SCHEME",
+      "ERR_INVALID_URL_SCHEME",
     ];
     expected.forEach((value, index) => check(`shim ${index}: ${value}`, markdown[index] === value, markdown[index]));
   });
@@ -807,6 +963,98 @@ export async function runFixtures() {
             url: "https://example.test/data",
             bodyBase64: Buffer.from('{"ok":true}').toString("base64"),
           };
+        },
+      },
+    },
+  );
+
+  const socketOpens = [];
+  const lookups = [];
+  await run(
+    "dgram answers an mDNS query out of the resolver",
+    dgramSource,
+    "no-view",
+    async (harness) => {
+      const result = harness.call("globalThis.__dgram");
+      check("resolves the name the query asked for", lookups[0] === "homeassistant.local", String(lookups[0]));
+      check("leaves a service question alone", lookups.length === 1, JSON.stringify(lookups));
+      check("answers the query it was sent", result?.hex?.startsWith("123484000001000100000000"), String(result?.hex));
+      check("names the host in the answer", result?.hex?.includes("0d686f6d65617373697374616e74056c6f63616c00"), String(result?.hex));
+      check("carries the address as an A record", result?.hex?.endsWith("00010001000000780004c0a801e2"), String(result?.hex));
+    },
+    {
+      stubs: {
+        "dns.resolve": (args) => {
+          lookups.push(args[0]);
+          return ["192.168.1.226"];
+        },
+      },
+    },
+  );
+
+  const socketSends = [];
+  let socketReads = 0;
+  let socketPings = 0;
+  await run(
+    "a websocket upgrade hands back a socket that frames both ways",
+    websocketSource,
+    "no-view",
+    async (harness) => {
+      const result = harness.call("globalThis.__ws");
+      check("opens the native socket over wss", socketOpens[0]?.url === "wss://example.test/socket", JSON.stringify(socketOpens[0]?.url));
+      check("drops the handshake headers", socketOpens[0]?.headers?.upgrade === undefined, JSON.stringify(socketOpens[0]?.headers));
+      check("reports the upgrade", result?.status === 101, String(result?.status));
+      check("answers the key the way a server would", result?.accept === "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=", String(result?.accept));
+      check("never accepts an extension", result?.extensions === null, String(result?.extensions));
+      check("unmasks an outgoing frame", socketSends[0]?.text === "ping", JSON.stringify(socketSends[0]));
+      check("frames an incoming message", result?.frames?.[0] === "8104706f6e67", JSON.stringify(result?.frames));
+      check("asks the peer before answering a ping", socketPings === 1, String(socketPings));
+      check("pongs once the peer answered", result?.frames?.includes("8a00"), JSON.stringify(result?.frames));
+    },
+    {
+      stubs: {
+        "websocket.open": (args) => {
+          socketOpens.push(args[0]);
+          return { id: 7, protocol: "" };
+        },
+        "websocket.send": (args) => {
+          socketSends.push(args[0]);
+          return null;
+        },
+        "websocket.ping": () => {
+          socketPings++;
+          return null;
+        },
+        // The second read never settles, which is what an idle socket looks like from JS.
+        "websocket.receive": () => (socketReads++ === 0 ? { type: "text", text: "pong" } : new Promise(() => {})),
+      },
+    },
+  );
+
+  const cookieSpecs = [];
+  const cookies = ["a=1; Expires=Wed, 21 Oct 2037 07:28:00 GMT; Path=/", "b=2; Path=/"];
+  await run(
+    "an http.Agent subclass carries cookies between requests",
+    cookieAgentSource,
+    "no-view",
+    async (harness) => {
+      const result = harness.call("globalThis.__cookieAgent");
+      const setCookie = JSON.stringify(result?.setCookie);
+      const rawHeaders = JSON.stringify(result?.rawHeaders);
+      const urls = JSON.stringify(result?.urls);
+      const sent = cookieSpecs[1]?.headers;
+      check("http.Agent survives esbuild's namespace import", result?.isAgent === true, JSON.stringify(result));
+      check("splits a folded Set-Cookie without cutting its Expires date", setCookie === JSON.stringify(cookies), setCookie);
+      check("rawHeaders repeats the name per cookie", rawHeaders === JSON.stringify(cookies.flatMap((c) => ["set-cookie", c])), rawHeaders);
+      check("url.format builds the request URL from its parts", result?.urls?.[0] === "https://example.test/signin%3Fstep=1", urls);
+      check("the second request sends every cookie the first received", sent?.cookie === "a=1; b=2", JSON.stringify(sent));
+    },
+    {
+      stubs: {
+        "fetch.request": (args) => {
+          cookieSpecs.push(args[0]);
+          const headers = cookieSpecs.length === 1 ? { "set-cookie": cookies.join(", ") } : {};
+          return { status: 200, statusText: "OK", headers, url: args[0].url, bodyBase64: "" };
         },
       },
     },

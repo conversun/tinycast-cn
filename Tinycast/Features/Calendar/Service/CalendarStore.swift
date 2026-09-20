@@ -170,19 +170,28 @@ final class CalendarStore {
             isDeclined: me?.participantStatus == .declined,
             calendarID: calendar.calendarIdentifier,
             calendarName: calendar.title,
+            calendarColor: color(of: calendar),
             calendarItemID: event.calendarItemIdentifier,
             link: MeetingLink.detect(
                 fields: [event.url?.absoluteString, event.location, event.notes],
                 account: accountEmail(of: me ?? event.organizer)))
     }
 
+    private static func color(of calendar: EKCalendar) -> MeetingEvent.CalendarColor? {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+            let components = calendar.cgColor?.converted(
+                to: space, intent: .defaultIntent, options: nil)?.components,
+            components.count >= 3
+        else { return nil }
+        return MeetingEvent.CalendarColor(
+            red: components[0], green: components[1], blue: components[2])
+    }
+
     /// The organizer covers an event booked with no guests and so no attendee list.
     private static func accountEmail(of participant: EKParticipant?) -> String? {
-        guard let participant, participant.isCurrentUser,
-            participant.url.scheme?.lowercased() == "mailto"
-        else { return nil }
-        let address = participant.url.path(percentEncoded: false)
-        return address.contains("@") ? address : nil
+        guard let participant else { return nil }
+        return MeetingLink.accountAddress(
+            of: participant.url, isCurrentUser: participant.isCurrentUser)
     }
 
     func event(id: String) -> MeetingEvent? {

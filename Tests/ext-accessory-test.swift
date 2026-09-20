@@ -13,6 +13,7 @@ enum ExtensionPreferenceValue: Equatable {
     case string(String)
     case number(Double)
     case bool(Bool)
+    case application(String)
 }
 
 struct ExtensionPreferenceSchema {
@@ -21,6 +22,10 @@ struct ExtensionPreferenceSchema {
     let effectiveDefault: ExtensionPreferenceValue
 
     var displayTitle: String { name }
+
+    func runtimeValue(_ stored: ExtensionPreferenceValue?) -> ExtensionPreferenceValue? {
+        stored ?? effectiveDefault
+    }
 }
 
 /// The search-bar dropdown's pure rules: how its choices are read, and which one it starts on.
@@ -156,6 +161,8 @@ struct ExtensionSearchAccessoryTests {
         let storage = ExtensionStorage(directory: directory)
         storage.setLocalStorage(extension: "sample", key: "filter", value: .string("extension-data"))
         storage.setAccessoryValue(extension: "sample", key: "filter", value: "selected")
+        storage.setPreference(
+            extension: "sample", key: "editor", value: .application("/Applications/Editor.app"))
         check(
             "a pick never lands in the namespace JavaScript reads",
             storage.localStorageValue(extension: "sample", key: "filter") == .string("extension-data"))
@@ -168,6 +175,10 @@ struct ExtensionSearchAccessoryTests {
         check(
             "a pick survives a reload",
             reloaded.accessoryValue(extension: "sample", key: "filter") == "selected")
+        check(
+            "an app picker persists as its path",
+            reloaded.preference(extension: "sample", key: "editor")
+                == .string("/Applications/Editor.app"))
 
         // A store written before dropdowns held anything: the missing key must cost nothing.
         storage.setLocalStorage(extension: "older", key: "kept", value: .string("value"))

@@ -16,10 +16,6 @@ struct FeatureCommandsSection: View {
             }
         } header: {
             SettingsSectionHeader(anchor)
-        } footer: {
-            Text("A shortcut works even when its command is hidden from the launcher.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 }
@@ -41,6 +37,7 @@ struct FeatureCommandRow: View {
             Toggle("", isOn: visibilityBinding)
                 .labelsHidden()
                 .toggleStyle(.checkbox)
+                .launcherVisibilityHelp()
                 .accessibilityLabel("Show \(entry.name) in launcher")
         }
     }

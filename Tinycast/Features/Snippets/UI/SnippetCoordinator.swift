@@ -81,7 +81,9 @@ final class SnippetCoordinator {
     /// Either switch off means the feature reaches the launcher not at all — rows and commands.
     func applySnippetsLauncherPresence() {
         let visible = settings.snippetsEnabled && settings.snippetsShowInLauncher
-        appIndex.setCommandsVisible([.searchSnippets, .createSnippet], visible)
+        let commands: Set<CommandID> = [.searchSnippets, .createSnippet]
+        appIndex.setCommandsVisible(commands, settings.snippetsEnabled)
+        appIndex.setCommandsListed(commands, settings.snippetsShowInLauncher)
         appIndex.updateSnippets(visible ? store.snippets : [])
     }
 
@@ -222,30 +224,39 @@ final class SnippetCoordinator {
         automaticGeneration: UInt?,
         confirmation: String?
     ) {
-        guard
-            let arguments = SnippetArgumentsPrompt.run(
-                snippetName: record.snippet.name,
-                arguments: missingArgs,
-                metrics: settings.interfaceSize.metrics)
-        else {
+        // The open dialog would refuse this prompt, and its end must not clear the flag under it.
+        guard !core.isShowingDialog else {
             injector.cancelArgumentPrompt(
                 automaticGeneration: automaticGeneration,
                 target: target)
             return
         }
+        listener.isPromptingForArguments = true
+        Task {
+            let arguments = await core.fillSnippetArguments(
+                snippetName: record.snippet.name,
+                arguments: missingArgs)
+            listener.isPromptingForArguments = false
+            guard let arguments else {
+                injector.cancelArgumentPrompt(
+                    automaticGeneration: automaticGeneration,
+                    target: target)
+                return
+            }
 
-        let result = SnippetTemplateEngine.expand(
-            record,
-            snippets: records,
-            context: context,
-            userArguments: arguments)
-        completeSnippetExpansion(
-            result,
-            target: target,
-            expectedKeyword: expectedKeyword,
-            keywordLength: keywordLength,
-            automaticGeneration: automaticGeneration,
-            confirmation: confirmation)
+            let result = SnippetTemplateEngine.expand(
+                record,
+                snippets: records,
+                context: context,
+                userArguments: arguments)
+            completeSnippetExpansion(
+                result,
+                target: target,
+                expectedKeyword: expectedKeyword,
+                keywordLength: keywordLength,
+                automaticGeneration: automaticGeneration,
+                confirmation: confirmation)
+        }
     }
 
     private func completeSnippetExpansion(

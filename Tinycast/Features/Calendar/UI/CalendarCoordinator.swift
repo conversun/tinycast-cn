@@ -105,9 +105,11 @@ final class CalendarCoordinator {
     /// Publishes or withdraws everything the feature contributes to the launcher.
     func applyEnabled() {
         let enabled = settings.calendarEnabled
-        appIndex.setCommandsVisible(
-            [.joinNextMeeting, .copyMeetingLink, .mySchedule, .openInCalendar, .createEvent],
-            enabled && settings.calendarShowInLauncher)
+        let commands: Set<CommandID> = [
+            .joinNextMeeting, .copyMeetingLink, .mySchedule, .openInCalendar, .createEvent
+        ]
+        appIndex.setCommandsVisible(commands, enabled)
+        appIndex.setCommandsListed(commands, settings.calendarShowInLauncher)
         guard enabled else {
             store.stop()
             clock.stop()
@@ -297,7 +299,9 @@ final class CalendarCoordinator {
                     confirmRole: .standard, dismissTitle: "Not Now")
             else { return }
         }
-        if MeetingLauncher.join(link) { return }
+        if await MeetingLauncher.join(link, browserBundleID: settings.meetingBrowserBundleID) {
+            return
+        }
         _ = await core.reportFailure(
             title: "Couldn't open the meeting link",
             message: "Nothing on this Mac would open \(link.url.absoluteString).",

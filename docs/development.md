@@ -144,7 +144,7 @@ The comment policy in [standards.md](standards.md#comments) is deliberately not 
 and this script cannot disagree. `.swift-format` at the repo root tunes it to this tree; without it the
 stock config defaults to 2-space indent and rewrites all 200 files.
 
-Both `*.generated.swift` files are excluded: formatting one is hand-editing it, and the next
+Every `*.generated.swift` file is excluded: formatting one is hand-editing it, and the next
 `node Scripts/gen-emoji.js` would revert it. swift-format also refuses any file that does not parse, so
 a failure from either command is a syntax error rather than a tooling problem — and it is why ⌘S looks
 like it does nothing while a file is mid-edit with unbalanced braces.
@@ -162,19 +162,22 @@ Xcode's re-indent (⌃I), as it always has been. Two consequences worth knowing:
 - `force_try` is an error; `force_cast` only warns, because the AX and AppKit bridges have four
   legitimate ones.
 
-Errors block, warnings do not. CI runs this same script on every PR and annotates the diff with each
-violation — see [release.md](release.md#continuous-integration) — so run it locally first rather than
-finding out from a review.
+Errors block, warnings do not. No CI runs this script; CodeRabbit runs SwiftLint on each PR but not
+the settings-search check, so run it locally before you open one.
 
 ## Generated data
 
-Two Swift files are emitted by scripts and must never be hand-edited. Both download their source, so
+Three Swift files are emitted by scripts and must never be hand-edited. Each downloads its source, so
 run them online, then commit the result:
 
 ```sh
 node Scripts/gen-emoji.js            # -> Tinycast/Features/Emoji/Model/EmojiData.generated.swift
 node Scripts/gen-currencies.js       # -> Tinycast/Features/Calculator/Model/CurrencyData.generated.swift
+node Scripts/gen-countries.js        # -> Tinycast/Features/Calculator/Model/CountryZoneData.generated.swift
 ```
+
+`gen-countries.js` joins IANA's `zone.tab` with CLDR's `en` territory names on the ISO 3166 code. Re-run
+it when IANA adds or moves a country's zone; see [calculator.md](features/calculator.md#time-zones).
 
 `gen-currencies.js` joins three sources on the ISO code: the **fiat rate feed**'s own quote list — the
 same feed `CurrencyRateStore` fetches rates from, so the table and the rate source cannot drift apart

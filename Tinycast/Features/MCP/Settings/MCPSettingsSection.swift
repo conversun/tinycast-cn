@@ -40,15 +40,11 @@ struct MCPSettingsSection: View {
         } header: {
             SettingsSectionHeader(.aiMCPServers)
         } footer: {
-            Text(
-                ("Tools from every enabled server are offered to the model; type @slug to address "
-                    + "one directly. The first call of a chat asks before it runs. Credentials "
-                    + "stay in your login Keychain.").localizedUI
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("Type @slug to address one server. A chat asks before its first tool call.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .sheet(item: $editor) { target in
+        .settingsEditorPanel(item: $editor) { target in
             MCPServerEditor(target: target, onSave: save, onCancel: { editor = nil })
         }
         .confirmationDialog(
@@ -65,7 +61,7 @@ struct MCPSettingsSection: View {
         Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } })
     }
 
-    /// A returned message is shown in the sheet; nil closes it.
+    /// A returned message is shown in the panel; nil closes it.
     private func save(_ server: MCPServer, _ secrets: MCPSecretStore.Secrets) -> String? {
         do {
             try MCPSecretStore().save(secrets, for: server.id)

@@ -1,8 +1,10 @@
 name: Website
 
-# Builds the Next.js site in website/ and deploys it to GitHub Pages at
-# https://abue-ammar.github.io/tinycast/. Requires: repo Settings → Pages →
-# Source = "GitHub Actions" (one-time setup).
+# Builds the Next.js site in website/ and deploys it to Cloudflare at https://tinycast.dev/.
+# The old GitHub Pages URL stays alive purely to 301 to it — see the `redirect` job.
+# Requires: CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID secrets, repo Settings → Pages →
+# Source = "GitHub Actions", and Custom domain = tinycast.dev (all one-time setup). None of which a
+# fork has, so both jobs check the repository first rather than failing in someone else's Actions tab.
 on:
   push:
     branches: [main]
@@ -16,18 +18,20 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one Pages deploy at a time, but never cancel an in-progress one:
+# Allow only one website deploy at a time, but never cancel an in-progress one:
 # cancelling a live deploy-pages run corrupts the deployment and the next run
 # fails with "Deployment failed, try again later". Queued runs coalesce instead.
 concurrency:
-  group: pages
+  group: website
   cancel-in-progress: false
 
 jobs:
-  build:
-    # Upstream only: a fork has no Pages target, so deploy-pages 404s on every push.
+  cloudflare:
     if: github.repository == 'abue-ammar/tinycast'
     runs-on: ubuntu-latest
+    environment:
+      name: cloudflare
+      url: https://tinycast.dev/
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -38,16 +42,30 @@ jobs:
         run: |
           npm install
           npm run build
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: website/out
+      - name: Deploy to Cloudflare
+        working-directory: website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          POLAR_ACCESS_TOKEN: ${{ secrets.POLAR_ACCESS_TOKEN }}
+        run: |
+          secrets="$RUNNER_TEMP/worker-secrets.json"
+          jq -n '{POLAR_ACCESS_TOKEN: env.POLAR_ACCESS_TOKEN}' > "$secrets"
+          npm run deploy -- --secrets-file "$secrets"
 
-  deploy:
-    needs: build
+  # Publishes nothing but a CNAME, which is what makes GitHub 301 abue-ammar.github.io/tinycast/*
+  # to tinycast.dev/* at its own edge — no HTML, no meta refresh. Independent of the Cloudflare
+  # job on purpose: a failed deploy there must not take the forwarder down with it.
+  redirect:
+    if: github.repository == 'abue-ammar/tinycast'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v7
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: website/redirect
       - id: deployment
         uses: actions/deploy-pages@v5

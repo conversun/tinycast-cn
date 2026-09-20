@@ -26,10 +26,6 @@ struct SearchScopesSection: View {
             }
         } header: {
             SettingsSectionHeader(.applicationsSearchScopes)
-        } footer: {
-            Text("Folders searched when indexing applications.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .onAppear(perform: refreshMissing)
         .onChange(of: settings.searchScopes) { _, _ in refreshMissing() }

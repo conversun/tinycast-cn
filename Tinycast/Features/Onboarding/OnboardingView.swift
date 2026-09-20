@@ -387,7 +387,7 @@ final class OnboardingModel {
 
     var fileSubtitle: String {
         guard let name = file?.lastPathComponent else {
-            return String(localized: "Choose a .rayconfig file exported from Raycast.")
+            return String(localized: "Choose a .rayconfig file exported from Raycast v2.0 or newer.")
         }
         return "\(name) — \((isRaycastExport ? "Raycast export" : "not a Raycast export").localizedUI)"
     }

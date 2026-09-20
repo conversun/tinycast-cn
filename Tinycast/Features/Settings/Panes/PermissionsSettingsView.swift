@@ -11,64 +11,43 @@ struct PermissionsSettingsView: View {
         Form {
             Section {
                 LabeledContent {
-                    Label(
-                        accessibilityTrusted
-                            ? String(localized: "Granted") : String(localized: "Not granted"),
-                        systemImage: accessibilityTrusted
-                            ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                    )
-                    .foregroundStyle(accessibilityTrusted ? Color.green : Color.orange)
-                } label: {
-                    SettingsRowTitle(.permissionsAccessibility, "Accessibility")
-                    Text("Lets Tinycast paste a clipboard item into the app you were using.")
-                }
-
-                LabeledContent {
-                    Button(
-                        accessibilityTrusted
-                            ? String(localized: "Open…") : String(localized: "Grant Access…")
-                    ) {
-                        Permissions.openAccessibilitySettings()
+                    HStack(spacing: Theme.Spacing.lg) {
+                        Label(accessibilityStatus.title.localizedUI, systemImage: accessibilityStatus.symbol)
+                            .foregroundStyle(accessibilityStatus.tint)
+                        Button(accessibilityTrusted ? String(localized: "Open…") : String(localized: "Grant Access…")) {
+                            Permissions.openAccessibilitySettings()
+                        }
+                        .help("Opens Privacy & Security › Accessibility.")
                     }
                 } label: {
-                    Text(
-                        accessibilityTrusted
-                            ? String(localized: "Manage in System Settings")
-                            : String(localized: "Grant access"))
-                    Text("Opens Privacy & Security › Accessibility.")
+                    SettingsRowTitle(.permissionsAccessibility, "Accessibility")
+                    Text("Pastes into the app you were using.")
                 }
             } header: {
                 SettingsSectionHeader(.permissionsAccessibility)
-            } footer: {
-                Text("Access Tinycast needs to work with other apps.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             Section {
                 LabeledContent {
-                    Label(calendarStatus.title.localizedUI, systemImage: calendarStatus.symbol)
-                        .foregroundStyle(calendarStatus.tint)
-                } label: {
-                    SettingsRowTitle(.permissionsCalendars, "Calendars")
-                    Text("Lets Tinycast find the join link for the meeting you are about to be in.")
-                }
-
-                LabeledContent {
-                    Button(calendarNeedsPrompt ? "Grant Access…" : "Open…") {
-                        // Settings lists no app TCC was never asked about, so asking is the way in.
-                        if calendarNeedsPrompt {
-                            core.calendarCoordinator.setCalendarEnabled(true)
-                        } else {
-                            Permissions.openCalendarSettings()
+                    HStack(spacing: Theme.Spacing.lg) {
+                        Label(calendarStatus.title.localizedUI, systemImage: calendarStatus.symbol)
+                            .foregroundStyle(calendarStatus.tint)
+                        Button(calendarNeedsPrompt ? String(localized: "Grant Access…") : String(localized: "Open…")) {
+                            // Settings lists no app TCC was never asked about, so asking is the way in.
+                            if calendarNeedsPrompt {
+                                core.calendarCoordinator.setCalendarEnabled(true)
+                            } else {
+                                Permissions.openCalendarSettings()
+                            }
                         }
+                        .help(
+                            calendarNeedsPrompt
+                                ? String(localized: "Turns the calendar on, then asks macOS for access.")
+                                : String(localized: "Opens Privacy & Security › Calendars."))
                     }
                 } label: {
-                    Text(calendarNeedsPrompt ? "Grant access" : "Manage in System Settings")
-                    Text(
-                        calendarNeedsPrompt
-                            ? "Turns the calendar on, then asks macOS for access."
-                            : "Opens Privacy & Security › Calendars.")
+                    SettingsRowTitle(.permissionsCalendars, "Calendars")
+                    Text("Finds the join link for your next meeting.")
                 }
             } header: {
                 SettingsSectionHeader(.permissionsCalendars)
@@ -81,6 +60,12 @@ struct PermissionsSettingsView: View {
     }
 
     private var calendarNeedsPrompt: Bool { calendarAccess == .notDetermined }
+
+    private var accessibilityStatus: (title: String, symbol: String, tint: Color) {
+        accessibilityTrusted
+            ? ("Granted", "checkmark.circle.fill", .green)
+            : ("Not granted", "exclamationmark.triangle.fill", .orange)
+    }
 
     private var calendarStatus: (title: String, symbol: String, tint: Color) {
         switch calendarAccess {

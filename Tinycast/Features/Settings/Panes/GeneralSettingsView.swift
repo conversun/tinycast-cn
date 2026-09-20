@@ -18,15 +18,8 @@ struct GeneralSettingsView: View {
 
     /// The missing-permission half is its own row, so it can carry the button that fixes it.
     private var hyperSubtitle: String {
-        guard settings.hyperKey != .none else {
-            return String(
-                format: "Select a physical key to remap to the %@ modifier keys simultaneously."
-                    .localizedUI, hyperGlyphs)
-        }
-        return String(
-            format: "Pressing %@ will trigger the left %@ modifier keys.".localizedUI,
-            hyperKeyName, hyperGlyphs)
-            + " " + "Hyper Key shortcuts are shown in Tinycast with ✦.".localizedUI
+        guard settings.hyperKey != .none else { return String(localized: "Remap one key to \(hyperGlyphs) held together.") }
+        return String(localized: "\(hyperKeyName) sends \(hyperGlyphs), shown as ✦ in shortcuts.")
     }
 
     var body: some View {
@@ -38,29 +31,76 @@ struct GeneralSettingsView: View {
                 }
             } header: {
                 SettingsSectionHeader(.generalGlobalShortcuts)
-            } footer: {
-                Text("Summon the fuzzy app launcher.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             Section {
-                LabeledContent {
-                    Button("Reset…", role: .destructive) {
-                        confirmingRankingReset = true
+                Toggle(isOn: $settings.launchAtLogin) {
+                    SettingsRowTitle(.generalGeneral, "Launch at login")
+                }
+                Toggle(isOn: $showInMenuBar) {
+                    SettingsRowTitle(.generalGeneral, "Show in menu bar")
+                    Text("Shortcuts still work when hidden.")
+                }
+                Picker(selection: $settings.popToRootTimeout) {
+                    ForEach(PopToRootTimeout.allCases) { timeout in
+                        Text(timeout.title.localizedUI).tag(timeout)
                     }
-                    .disabled(launcherRanking.isEmpty)
                 } label: {
-                    SettingsRowTitle(.generalSearch, "Learned ranking")
+                    SettingsRowTitle(.generalGeneral, "Pop to Root Search")
+                    Text("After the launcher closes.")
+                }
+                Picker(selection: $settings.escapeKeyBehavior) {
+                    ForEach(EscapeKeyBehavior.allCases) { behavior in
+                        Text(behavior.title.localizedUI).tag(behavior)
+                    }
+                } label: {
+                    SettingsRowTitle(.generalGeneral, "Escape Key Behavior")
+                    Text("When the search field is empty.")
+                }
+                // Empty only when TIS fails; one layout still lists, so the row stays put.
+                if !inputSources.isEmpty {
+                    Picker(selection: $settings.autoSwitchInputSourceID) {
+                        Text("None").tag(nil as String?)
+                        ForEach(inputSources) { source in
+                            Text(source.title).tag(Optional(source.id))
+                        }
+                    } label: {
+                        SettingsRowTitle(.generalGeneral, "Auto-switch input source")
+                        Text("While the launcher is open.")
+                    }
                 }
             } header: {
-                SettingsSectionHeader(.generalSearch)
-            } footer: {
-                Text(
-                    "Tinycast privately learns which results you choose for each query. Reset all learned choices to restore the default order."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                SettingsSectionHeader(.generalGeneral)
+            }
+
+            Section {
+                Picker(selection: $settings.appearance) {
+                    ForEach(AppAppearance.allCases) { appearance in
+                        Text(appearance.title.localizedUI).tag(appearance)
+                    }
+                } label: {
+                    SettingsRowTitle(.generalAppearance, "Theme")
+                }
+                InterfaceSizeRow()
+                PaletteTransparencyRow()
+                Toggle(isOn: $settings.compactMode) {
+                    SettingsRowTitle(.generalAppearance, "Compact mode")
+                    Text("A slim search bar that expands as you type.")
+                }
+                Toggle(isOn: $settings.showFavoritesInCompactMode) {
+                    SettingsRowTitle(.generalAppearance, "Show favorites in compact mode")
+                    Text("Launch them with ⌘1–⌘5.")
+                }
+                .settingsEnabled(settings.compactMode)
+                Toggle(isOn: $settings.openOnCursorScreen) {
+                    SettingsRowTitle(.generalAppearance, "Follow the cursor across displays")
+                }
+                Toggle(isOn: $settings.paletteDraggable) {
+                    SettingsRowTitle(.generalAppearance, "Drag to reposition")
+                    Text("Drag the strip above the search field.")
+                }
+            } header: {
+                SettingsSectionHeader(.generalAppearance)
             }
 
             Section {
@@ -83,7 +123,7 @@ struct GeneralSettingsView: View {
                         Button("Grant Access…") { Permissions.openAccessibilitySettings() }
                     } label: {
                         Label(
-                            "Tinycast needs Accessibility access to remap keys.",
+                            "Remapping needs Accessibility access.",
                             systemImage: "exclamationmark.triangle"
                         )
                         .foregroundStyle(.orange)
@@ -99,15 +139,12 @@ struct GeneralSettingsView: View {
                         Text("Trigger Escape").tag(HyperKeyQuickPress.escape)
                     } label: {
                         SettingsRowTitle(.generalHyperKey, "Quick Press")
-                        Text(
-                            "Select an action to perform when \(hyperKeyName) is pressed without any other keys."
-                        )
+                        Text("When \(hyperKeyName) is pressed alone.")
                     }
                 }
 
                 Toggle(isOn: $settings.hyperKeyIncludesShift) {
                     SettingsRowTitle(.generalHyperKey, "Include Shift (⇧)")
-                    Text("Hyper Key will remap to the \(hyperGlyphs) modifier keys.")
                 }
                 // Flipping it re-points recorded chords, so it needs a chord to mean.
                 .settingsEnabled(settings.hyperKey != .none)
@@ -116,82 +153,31 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                Picker(selection: $settings.appearance) {
-                    ForEach(AppAppearance.allCases) { appearance in
-                        Text(appearance.title.localizedUI).tag(appearance)
+                Picker(selection: $settings.calcNumberStyle) {
+                    ForEach(CalcNumberStyle.allCases) { style in
+                        let sample = core.regionNumberFormat.format(for: style).localized("1,234,567.89")
+                        Text("\(style.title.localizedUI) (\(sample))").tag(style)
                     }
                 } label: {
-                    SettingsRowTitle(.generalAppearance, "Theme")
-                    Text("Match macOS, or pin Tinycast to Light or Dark.")
-                }
-                InterfaceSizeRow()
-                PaletteTransparencyRow()
-                Toggle(isOn: $settings.compactMode) {
-                    SettingsRowTitle(.generalAppearance, "Compact mode")
-                    Text(
-                        "Open the launcher as a slim search bar that expands into the full list as you type."
-                    )
-                }
-                Toggle(isOn: $settings.showFavoritesInCompactMode) {
-                    SettingsRowTitle(.generalAppearance, "Show favorites in compact mode")
-                    Text("Pin favorite app icons to the right of the compact bar (⌘1–⌘5 to launch).")
-                }
-                .disabled(!settings.compactMode)
-                Toggle(isOn: $settings.openOnCursorScreen) {
-                    SettingsRowTitle(.generalAppearance, "Follow the cursor across displays")
-                    Text(
-                        "Open the launcher on whichever display the pointer is on, rather than the one with the menu bar."
-                    )
-                }
-                Toggle(isOn: $settings.paletteDraggable) {
-                    SettingsRowTitle(.generalAppearance, "Drag to reposition")
-                    Text(
-                        "Grab the thin strip just above the search field to move the launcher out of the way."
-                    )
+                    SettingsRowTitle(.generalCalculator, "Number format")
+                    Text("With a decimal comma, ; separates arguments.")
                 }
             } header: {
-                SettingsSectionHeader(.generalAppearance)
+                SettingsSectionHeader(.generalCalculator)
             }
 
             Section {
-                Toggle(isOn: $settings.launchAtLogin) {
-                    SettingsRowTitle(.generalGeneral, "Launch at login")
-                    Text("Start Tinycast automatically when you log in.")
-                }
-                Toggle(isOn: $showInMenuBar) {
-                    SettingsRowTitle(.generalGeneral, "Show in menu bar")
-                    Text("Keep the Tinycast icon in the menu bar. Shortcuts still work when hidden.")
-                }
-                Picker(selection: $settings.popToRootTimeout) {
-                    ForEach(PopToRootTimeout.allCases) { timeout in
-                        Text(timeout.title.localizedUI).tag(timeout)
+                LabeledContent {
+                    Button("Reset…", role: .destructive) {
+                        confirmingRankingReset = true
                     }
+                    .disabled(launcherRanking.isEmpty)
                 } label: {
-                    SettingsRowTitle(.generalGeneral, "Pop to Root Search")
-                    Text("Reset to the launcher this long after the window closes.")
-                }
-                Picker(selection: $settings.escapeKeyBehavior) {
-                    ForEach(EscapeKeyBehavior.allCases) { behavior in
-                        Text(behavior.title.localizedUI).tag(behavior)
-                    }
-                } label: {
-                    SettingsRowTitle(.generalGeneral, "Escape Key Behavior")
-                    Text("What Escape does once the search field is already empty.")
-                }
-                // Empty only when TIS fails; one layout still lists, so the row stays put.
-                if !inputSources.isEmpty {
-                    Picker(selection: $settings.autoSwitchInputSourceID) {
-                        Text("None").tag(nil as String?)
-                        ForEach(inputSources) { source in
-                            Text(source.title).tag(Optional(source.id))
-                        }
-                    } label: {
-                        SettingsRowTitle(.generalGeneral, "Auto-switch input source")
-                        Text("Switch the keyboard to this source while the launcher is open.")
-                    }
+                    SettingsRowTitle(.generalSearch, "Learned ranking")
+                    Text("Learned privately from the results you pick.")
                 }
             } header: {
-                SettingsSectionHeader(.generalGeneral)
+                SettingsSectionHeader(.generalSearch)
             }
         }
         .formStyle(.grouped)
@@ -233,8 +219,7 @@ private struct InterfaceSizeRow: View {
     var body: some View {
         SettingsRow(
             title: "Interface size",
-            subtitle: "Scale the launcher and the windows that float with it. Settings stay put.",
-            subtitleLineLimit: 2,
+            subtitle: "Scales the launcher and its panels, not Settings.",
             anchor: .generalAppearance
         ) {
             HStack(spacing: Theme.Spacing.xxs) {
@@ -284,12 +269,7 @@ private struct PaletteTransparencyRow: View {
     }
 
     var body: some View {
-        SettingsRow(
-            title: "Background transparency",
-            subtitle: "The level of transparency of the glass background.",
-            subtitleLineLimit: 2,
-            anchor: .generalAppearance
-        ) {
+        SettingsRow(title: "Background transparency", anchor: .generalAppearance) {
             Slider(
                 value: value, in: -100...100, step: 50, neutralValue: 0,
                 label: { EmptyView() },

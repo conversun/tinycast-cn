@@ -126,7 +126,7 @@ struct ExtensionFormView: View {
                 ExtensionPickerField(
                     items: ExtensionPickerItem.items(in: field),
                     chosen: [field.string("value") ?? ""].filter { !$0.isEmpty },
-                    placeholder: field.string("placeholder") ?? "Select…",
+                    placeholder: field.string("placeholder") ?? "Select…".localizedUI,
                     title: field.string("title") ?? "Dropdown",
                     info: field.string("info"),
                     error: field.string("error"),
@@ -141,7 +141,7 @@ struct ExtensionFormView: View {
                 ExtensionPickerField(
                     items: ExtensionPickerItem.items(in: field),
                     chosen: field.array("value").compactMap(\.stringValue),
-                    placeholder: field.string("placeholder") ?? "Select…",
+                    placeholder: field.string("placeholder") ?? "Select…".localizedUI,
                     title: field.string("title") ?? "Tags",
                     info: field.string("info"),
                     error: field.string("error"),

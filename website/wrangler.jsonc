@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tinycast-website",
+  "compatibility_date": "2026-09-17",
+  // Code runs for the Polar routes only; every other path is served from `out/` without it.
+  "main": "./worker/index.ts",
+  "assets": {
+    "directory": "./out",
+    "binding": "ASSETS",
+    // `trailingSlash: true` exports every route as a directory index, so /docs/install/ resolves.
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/supporters", "/api/checkout"],
+  },
+  // Per visitor; namespace_id is any number unique within the Cloudflare account.
+  "ratelimits": [
+    {
+      "name": "CHECKOUT_LIMIT",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 },
+    },
+  ],
+  "vars": {
+    "POLAR_SERVER": "production",
+    "POLAR_PRODUCT_MONTHLY": "2133bfd9-3a03-4315-bdc8-dc87795eae2e",
+    "POLAR_PRODUCT_ONE_TIME": "673a92cd-b7e9-4647-9d23-60b30f229e0d",
+  },
+  // The apex only. www is a redirect rule in the Cloudflare dashboard, not a second origin.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "tinycast.dev", "custom_domain": true }],
+}

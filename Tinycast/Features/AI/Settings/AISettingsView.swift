@@ -23,7 +23,7 @@ struct AISettingsView: View {
             Section {
                 Toggle(isOn: $appSettings.aiEnabled) {
                     SettingsRowTitle(.aiAI, "Enable AI")
-                    Text("Chat with the model you choose; nothing is loaded or sent until it is on.")
+                    Text("Nothing is loaded or sent while it is off.")
                 }
                 SettingsRow(
                     title: "Providers", subtitle: providerSummary, anchor: .aiProviders
@@ -48,8 +48,8 @@ struct AISettingsView: View {
         }
         .formStyle(.grouped)
         .settingsScrollTarget(.ai)
-        .sheet(isPresented: $providersPresented) {
-            providersSheet
+        .settingsEditorPanel(isPresented: $providersPresented) {
+            providersPanel
         }
         .onAppear {
             core.applyInstalledAILifecycle()
@@ -77,11 +77,9 @@ struct AISettingsView: View {
                 select: { $0.map(settings.select) },
                 modelLabel: {
                     SettingsRowTitle(.aiDefault, "Default model")
-                    Text("Used by Tinycast features unless they ask you to choose another model.")
                 },
                 effortLabel: {
                     SettingsRowTitle(.aiDefault, "Reasoning effort")
-                    Text("Applied when the default model supports reasoning effort.")
                 }
             )
         } header: {
@@ -95,11 +93,11 @@ struct AISettingsView: View {
 
     private var defaultModelFooter: String {
         if settings.defaultModel?.isOnDevice == true {
-            return "Apple Intelligence runs on this Mac. No key, no account, and nothing leaves it."
+            return "Apple Intelligence runs on this Mac. Nothing leaves it."
         }
         return settings.defaultModel == nil
             ? "Turn on Apple Intelligence, or add a provider above."
-            : "Tinycast contacts only the selected provider when an AI feature runs."
+            : "Only the selected provider is contacted."
     }
 
     /// Why the on-device route is missing from the picker, or `nil` when it is there.
@@ -110,7 +108,7 @@ struct AISettingsView: View {
     private var providerSummary: String {
         var providers: [String] = []
         if subscription.isConnected { providers.append("Codex") }
-        for kind in [InstalledAIKind.claude, .openCode]
+        for kind in InstalledAIKind.managedCLIKinds
         where installedAI.status(for: kind).isReady {
             providers.append(kind.title)
         }
@@ -128,15 +126,10 @@ struct AISettingsView: View {
         return Section {
             Toggle(isOn: $settings.webSearchEnabled) {
                 SettingsRowTitle(.aiChat, "Web search")
-                Text(
-                    "Sends prompts on to a search engine when the route offers one — Codex and OpenRouter.")
+                Text("Codex and OpenRouter only. Prompts go to a search engine.")
             }
         } header: {
             SettingsSectionHeader(.aiChat)
-        } footer: {
-            Text("Images pasted into the chat go to any model that accepts them; others never see one.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -147,32 +140,27 @@ struct AISettingsView: View {
                 ForEach(AIOpensTo.allCases) { Text($0.title.localizedUI).tag($0) }
             } label: {
                 SettingsRowTitle(.aiConversations, "Opens to")
-                Text("What summoning AI Chat lands on.")
             }
             if settings.opensTo == .recent {
                 Picker(selection: $settings.newChatAfter) {
                     ForEach(AINewChatAfter.allCases) { Text($0.title.localizedUI).tag($0) }
                 } label: {
                     SettingsRowTitle(.aiConversations, "Start a new conversation after")
-                    Text("Idle this long and the next summon starts fresh instead.")
                 }
             }
             Picker(selection: $settings.retention) {
                 ForEach(AIRetention.allCases) { Text($0.title.localizedUI).tag($0) }
             } label: {
                 SettingsRowTitle(.aiConversations, "Keep conversations")
-                Text("Older conversations are deleted permanently.")
+                Text("Older ones are deleted.")
             }
             .onChange(of: settings.retention) { core.aiChatCoordinator.applyRetention() }
         } header: {
             SettingsSectionHeader(.aiConversations)
         } footer: {
-            Text(
-                ("Conversations stay on this Mac. Nothing here is carried in a settings backup — which "
-                    + "chats a Mac keeps is that Mac's business.").localizedUI
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("Conversations stay on this Mac, outside settings backups.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -181,50 +169,47 @@ struct AISettingsView: View {
         return Section {
             Toggle(isOn: $settings.systemPromptEnabled) {
                 SettingsRowTitle(.aiSystemPrompt, "Send a system prompt")
-                Text("Off sends nothing ahead of your message, not even what Tinycast says about itself.")
+                Text("Off also skips Tinycast's own prompt.")
             }
             SystemPromptEditor(text: $settings.systemPrompt)
                 .settingsEnabled(settings.systemPromptEnabled)
         } header: {
             SettingsSectionHeader(.aiSystemPrompt)
         } footer: {
-            Text(
-                ("Your text is sent ahead of every message in every chat, after what Tinycast "
-                    + "already tells the model about itself. Both are billed again on each turn.").localizedUI
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("Sent before every message, after Tinycast's own. Both are billed each turn.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
-    private var providersSheet: some View {
+    private var providersPanel: some View {
         @Bindable var settings = settings
         return VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text("AI Providers").font(.title2.weight(.bold))
-                Text("Use an installed account or connect an API endpoint.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, Theme.Spacing.xxl)
-            .padding(.top, Theme.Spacing.xxl)
+            SettingsEditorHeader(
+                title: "AI Providers",
+                subtitle: "Use an installed account or connect an API endpoint."
+            )
+            .padding(.horizontal, Theme.Spacing.dialogInset)
+            .padding(.top, Theme.Spacing.dialogInset)
 
             Form {
                 installedAISection
                 apiConnectionsSection
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
 
-            HStack {
-                Spacer()
+            HStack(spacing: Theme.Spacing.md) {
                 Button("Done") { providersPresented = false }
+                    .buttonStyle(.modalAction(.primary))
                     .keyboardShortcut(.defaultAction)
             }
-            .padding(Theme.Spacing.xxl)
+            .padding(Theme.Spacing.dialogInset)
         }
         .frame(width: Theme.Size.editorSheetWidth, height: 600)
-        .sheet(item: $editor) { target in
-            AIConnectionEditorSheet(
+        .settingsEditorPanelSurface()
+        .settingsEditorPanel(item: $editor) { target in
+            AIConnectionEditorPanel(
                 target: target,
                 onSave: saveConnection,
                 onCancel: { editor = nil })
@@ -260,16 +245,15 @@ struct AISettingsView: View {
                 }
             }
             installedConnection(.claude)
+            installedConnection(.grok)
             installedConnection(.openCode)
+            installedConnection(.cursor)
         } header: {
             SettingsSectionHeader(.aiInstalledAI)
         } footer: {
-            Text(
-                ("Tinycast uses the Codex, Claude and OpenCode commands already installed and signed "
-                    + "in on this Mac. Tinycast never stores or asks for their API keys.").localizedUI
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("Uses the command-line tools signed in on this Mac. Their keys are never stored.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -330,7 +314,7 @@ struct AISettingsView: View {
                     }
                 } label: {
                     Text("Codex · Not installed")
-                    Text(message)
+                    Text(message.localizedUI)
                 }
             case .failed(let message):
                 LabeledContent {
@@ -341,7 +325,7 @@ struct AISettingsView: View {
                 } label: {
                     Label("Codex check failed", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
-                    Text(message)
+                    Text(message.localizedUI)
                 }
             }
         } else {
@@ -373,9 +357,7 @@ struct AISettingsView: View {
                     }
                 } label: {
                     Text("\(kind.title) · Ready")
-                    Text(
-                        status.version.map { "Version \($0) · \(modelCount(status.models))" }
-                            ?? modelCount(status.models))
+                    Text(readyDetail(kind, status))
                 }
             case .signInRequired:
                 LabeledContent {
@@ -414,7 +396,7 @@ struct AISettingsView: View {
                 } label: {
                     Label("\(kind.title) check failed", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
-                    Text(message)
+                    Text(message.localizedUI)
                 }
             }
         } else {
@@ -482,12 +464,9 @@ struct AISettingsView: View {
         } header: {
             SettingsSectionHeader(.aiAPIConnections)
         } footer: {
-            Text(
-                ("OpenAI, Claude, Gemini and OpenRouter are presets. Custom OpenAI-compatible "
-                    + "endpoints are supported too. API keys stay in your login Keychain.").localizedUI
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("Presets or any OpenAI-compatible endpoint. Keys stay in your login Keychain.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -503,7 +482,7 @@ struct AISettingsView: View {
             codexModels: enabledProviders.contains(.codex) ? subscription.models : [],
             isUnavailable: !enabledProviders.contains(.codex) || subscription.phase == .signedOut
                 || subscription.phase.isUnavailable)
-        for kind in [InstalledAIKind.claude, .openCode] {
+        for kind in InstalledAIKind.managedCLIKinds {
             let status = installedAI.status(for: kind)
             settings.reconcile(
                 installed: kind,
@@ -547,20 +526,15 @@ struct AISettingsView: View {
     private func saveConnection(
         _ connection: AIConnection, key: String, isNew: Bool
     ) -> String? {
-        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        let outcome = AIConnectionKeyPolicy.resolve(
+            enteredKey: key, connection: connection, saved: settings.connection(id: connection.id),
+            hasStoredKey: keyStatuses[connection.id] == true)
         do {
-            let retargeted = keyStatuses[connection.id] == true && pointsSomewhereNew(connection)
-            if !key.isEmpty {
-                try keyStore.setSecret(key, for: connection.id)
-            } else if retargeted, AIEndpointPolicy.isLoopback(connection.baseURL) {
-                try keyStore.removeSecret(for: connection.id)
-            } else if retargeted {
-                return String(
-                    localized: "Enter an API key for this endpoint — the saved key stays with the old one.")
-            } else if !AIEndpointPolicy.isLoopback(connection.baseURL)
-                && keyStatuses[connection.id] != true
-            {
-                return String(localized: "Enter an API key for this remote provider.")
+            switch outcome {
+            case .store(let key): try keyStore.setSecret(key, for: connection.id)
+            case .removeStored: try keyStore.removeSecret(for: connection.id)
+            case .keep: break
+            case .reject(let message): return message
             }
             settings.save(connection)
             editor = nil
@@ -573,12 +547,6 @@ struct AISettingsView: View {
                 ? String(localized: "The key could not be saved to Keychain.")
                 : String(localized: "The saved key could not be updated in Keychain.")
         }
-    }
-
-    /// The same rule where the secret actually persists: a retarget brings its own key, or none.
-    private func pointsSomewhereNew(_ connection: AIConnection) -> Bool {
-        guard let saved = settings.connection(id: connection.id) else { return false }
-        return !AIEndpointPolicy.sameDestination(connection, saved)
     }
 
     private func removeConnection(_ connection: AIConnection) {
@@ -594,11 +562,19 @@ struct AISettingsView: View {
 
     private func copySignInCommand(_ kind: InstalledAIKind) {
         Paster.copyPlainText(kind.signInCommand)
-        core.showMessage("Copied \(kind.signInCommand)")
+        core.showMessage(String(localized: "Copied \(kind.signInCommand)"))
+    }
+
+    private func readyDetail(_ kind: InstalledAIKind, _ status: InstalledAIStatus) -> String {
+        var parts: [String] = []
+        if let version = status.version { parts.append(String(localized: "Version \(version)")) }
+        parts.append(modelCount(status.models))
+        if let caveat = kind.isolationCaveat { parts.append(caveat.localizedUI) }
+        return parts.joined(separator: " · ")
     }
 
     private func modelCount(_ models: [InstalledAIModel]) -> String {
-        models.count == 1 ? "1 model" : "\(models.count) models"
+        models.count == 1 ? "1 model".localizedUI : String(localized: "\(models.count) models")
     }
 
     private func loadKeyStatuses() {
@@ -614,13 +590,6 @@ struct AISettingsView: View {
             keyError = true
         }
     }
-}
-
-private struct AIConnectionEditorTarget: Identifiable {
-    let connection: AIConnection
-    let hasStoredKey: Bool
-    let isNew: Bool
-    var id: UUID { connection.id }
 }
 
 private struct AIConnectionRow: View {
@@ -663,413 +632,4 @@ private struct AIConnectionRow: View {
             ? String(localized: "1 model")
             : String(localized: "\(connection.models.count) models")
     }
-}
-
-private struct AIConnectionEditorSheet: View {
-    let target: AIConnectionEditorTarget
-    let onSave: (AIConnection, String, Bool) -> String?
-    let onCancel: () -> Void
-
-    @State private var connection: AIConnection
-    @State private var key = ""
-    @State private var modelQuery = ""
-    @State private var discovery: ModelDiscoveryState = .waitingForKey
-    @State private var discoveryRevision = 0
-    @State private var error: String?
-
-    private let modelDiscovery = AIModelDiscoveryService()
-
-    init(
-        target: AIConnectionEditorTarget,
-        onSave: @escaping (AIConnection, String, Bool) -> String?,
-        onCancel: @escaping () -> Void
-    ) {
-        self.target = target
-        self.onSave = onSave
-        self.onCancel = onCancel
-        _connection = State(initialValue: target.connection)
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                Section {
-                    editorField("Name") {
-                        TextField(
-                            "Name", text: $connection.name, prompt: Text("Optional label"))
-                    }
-                    editorField("Provider") {
-                        Picker("Provider", selection: $connection.provider) {
-                            ForEach(AIProviderKind.allCases) { provider in
-                                Text(provider.title).tag(provider)
-                            }
-                        }
-                        .labelsHidden()
-                    }
-                    editorField("Base URL") {
-                        TextField(
-                            "Base URL", text: $connection.baseURL,
-                            prompt: Text(connection.provider.defaultBaseURL))
-                    }
-                    editorField("API Key") {
-                        SecureField(
-                            "API Key", text: $key, prompt: Text(apiKeyPlaceholder))
-                    }
-                    if storedKeyMatchesTarget {
-                        Label("A key is already stored in Keychain", systemImage: "lock.fill")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else if target.hasStoredKey {
-                        Label(
-                            ("The saved key stays with the endpoint it was saved for. "
-                                + "Enter a key for this one.").localizedUI,
-                            systemImage: "exclamationmark.triangle"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                    }
-                    if let error {
-                        Text(error).foregroundStyle(.orange)
-                    }
-                } header: {
-                    Text(target.isNew
-                        ? String(localized: "Add API Connection")
-                        : String(localized: "Edit API Connection"))
-                }
-
-                Section {
-                    modelDiscoveryContent
-                } header: {
-                    HStack {
-                        Text("Models")
-                        Spacer()
-                        if !connection.models.isEmpty {
-                            Text("\(connection.models.count) selected")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textCase(nil)
-                        }
-                    }
-                } footer: {
-                    Text(
-                        String(
-                            localized:
-                                "Search the models available to this key and add one or more. Exact model ")
-                            + String(localized: "IDs remain available when discovery is unsupported.")
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
-            .formStyle(.grouped)
-
-            Divider()
-            HStack(spacing: Theme.Spacing.lg) {
-                Spacer()
-                Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction)
-                Button("Save", action: save).keyboardShortcut(.defaultAction)
-            }
-            .padding(Theme.Spacing.xl)
-        }
-        .frame(width: 620, height: 540)
-        .task(id: discoveryRevision) {
-            try? await Task.sleep(for: .milliseconds(450))
-            guard !Task.isCancelled else { return }
-            await discoverModels()
-        }
-        .onChange(of: key) { discoveryRevision += 1 }
-        .onChange(of: connection.baseURL) { discoveryRevision += 1 }
-        .onChange(of: connection.provider) { oldProvider, newProvider in
-            if connection.baseURL.isEmpty || connection.baseURL == oldProvider.defaultBaseURL {
-                connection.baseURL = newProvider.defaultBaseURL
-            }
-            connection.reasoningOptions = nil
-            discoveryRevision += 1
-        }
-    }
-
-    @ViewBuilder
-    private var modelDiscoveryContent: some View {
-        switch discovery {
-        case .waitingForKey:
-            ForEach(connection.models, id: \.self) { model in selectedModelRow(model) }
-            if AIEndpointPolicy.isLoopback(connection.baseURL) {
-                Label("Checking this local endpoint for models…", systemImage: "network")
-                    .foregroundStyle(.secondary)
-            } else {
-                Label("Enter an API key to search its available models.", systemImage: "key")
-                    .foregroundStyle(.secondary)
-            }
-        case .loading:
-            ForEach(connection.models, id: \.self) { model in selectedModelRow(model) }
-            HStack(spacing: Theme.Spacing.md) {
-                ProgressView().controlSize(.small)
-                Text("Loading available models…").foregroundStyle(.secondary)
-            }
-        case .loaded(let models):
-            ForEach(connection.models, id: \.self) { model in selectedModelRow(model) }
-            if models.isEmpty {
-                Label("No compatible text models were returned.", systemImage: "info.circle")
-                    .foregroundStyle(.secondary)
-                manualModelField
-            } else {
-                editorField("Find a model") {
-                    TextField(
-                        "Find a model", text: $modelQuery,
-                        prompt: Text(modelSearchPlaceholder)
-                    )
-                    .onSubmit { addExactMatch(from: models) }
-                }
-                modelSearchResults(models)
-            }
-        case .failed(let message, let allowsManualEntry):
-            LabeledContent {
-                Button("Try Again") { discoveryRevision += 1 }
-            } label: {
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-            }
-            ForEach(connection.models, id: \.self) { model in
-                selectedModelRow(model)
-            }
-            if allowsManualEntry { manualModelField }
-        }
-    }
-
-    @ViewBuilder
-    private func modelSearchResults(_ models: [AIModelDiscovery.Model]) -> some View {
-        let query = modelQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matches = matchingModels(in: models)
-        if query.isEmpty {
-            Text("Type a model or company name. \(models.count) models available.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else if matches.isEmpty {
-            if connection.models.contains(where: { $0.caseInsensitiveCompare(query) == .orderedSame }) {
-                Label("This model is already added.", systemImage: "checkmark.circle")
-                    .foregroundStyle(.secondary)
-            } else {
-                Label("No available model matches this key.", systemImage: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                if connection.provider == .openAICompatible {
-                    Button("Use “\(query)” anyway") { addModel(query) }
-                }
-            }
-        } else {
-            ForEach(matches) { model in
-                Button {
-                    addModel(model)
-                } label: {
-                    HStack(spacing: Theme.Spacing.md) {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                            Text(model.name)
-                            if model.name != model.id {
-                                Text(model.id)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                        Image(systemName: "plus.circle")
-                            .foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Add \(model.name)")
-            }
-        }
-    }
-
-    private var manualModelField: some View {
-        editorField("Model ID") {
-            TextField("Model ID", text: $modelQuery, prompt: Text(modelPlaceholder))
-                .onSubmit(addManualModel)
-        }
-    }
-
-    private func editorField<Content: View>(
-        _ title: String, @ViewBuilder content: () -> Content
-    ) -> some View {
-        LabeledContent {
-            content()
-                .labelsHidden()
-                .textFieldStyle(.roundedBorder)
-                // LabeledContent right-aligns its value text, caret and all; a field reads left.
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        } label: {
-            // A String parameter takes Text's non-localizing overload; the caller's literal is a key.
-            Text(title.localizedUI).font(.callout.weight(.medium))
-        }
-    }
-
-    private func selectedModelRow(_ model: String) -> some View {
-        LabeledContent(model) {
-            Button {
-                removeModel(model)
-            } label: {
-                Image(systemName: "minus.circle").foregroundStyle(.red)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove \(model)")
-        }
-    }
-
-    private var modelPlaceholder: String {
-        switch connection.provider {
-        case .openAI, .openAICompatible: return String(localized: "Model ID (e.g. gpt-5.4-mini)")
-        case .anthropic: return String(localized: "Model ID (e.g. claude-sonnet-4-6)")
-        case .gemini: return String(localized: "Model ID (e.g. gemini-3.7-flash)")
-        case .openRouter: return String(localized: "Model ID (e.g. openai/gpt-5.4-mini)")
-        }
-    }
-
-    /// Discovery honours the Save rule: a retarget asks for a key rather than reuse the old host's.
-    private var storedKeyMatchesTarget: Bool {
-        target.hasStoredKey && AIEndpointPolicy.sameDestination(connection, target.connection)
-    }
-
-    private var apiKeyPlaceholder: String {
-        if storedKeyMatchesTarget { return String(localized: "Leave blank to keep saved key") }
-        if AIEndpointPolicy.isLoopback(connection.baseURL) {
-            return String(localized: "Optional for local endpoint")
-        }
-        return String(localized: "Paste API key")
-    }
-
-    private var modelSearchPlaceholder: String {
-        connection.provider == .openRouter
-            ? String(localized: "Search by model or company")
-            : String(localized: "Search available models")
-    }
-
-    private func matchingModels(
-        in models: [AIModelDiscovery.Model]
-    ) -> [AIModelDiscovery.Model] {
-        AIModelDiscovery.search(
-            models, query: modelQuery, excluding: Set(connection.models), limit: 12)
-    }
-
-    private func addExactMatch(from models: [AIModelDiscovery.Model]) {
-        let query = modelQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard
-            let match = models.first(where: {
-                $0.id.caseInsensitiveCompare(query) == .orderedSame
-                    || $0.name.caseInsensitiveCompare(query) == .orderedSame
-            })
-        else { return }
-        addModel(match)
-    }
-
-    private func removeModel(_ model: String) {
-        connection.models.removeAll { $0 == model }
-        connection.visionModels.removeAll { $0 == model }
-        connection.reasoningOptions?[model] = nil
-    }
-
-    private func discoverModels() async {
-        let enteredKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        let apiKey: String
-        if !enteredKey.isEmpty {
-            apiKey = enteredKey
-        } else if storedKeyMatchesTarget {
-            do {
-                apiKey = try KeychainSecretStore.aiAPIKeys.secret(for: connection.id) ?? ""
-            } catch {
-                discovery = .failed(
-                    String(localized: "The saved key could not be read from Keychain."),
-                    allowsManualEntry: false)
-                return
-            }
-        } else if AIEndpointPolicy.isLoopback(connection.baseURL) {
-            apiKey = ""
-        } else {
-            discovery = .waitingForKey
-            return
-        }
-
-        let baseURL: URL
-        do {
-            baseURL = try AIEndpointPolicy.validate(connection.baseURL)
-        } catch {
-            discovery = .failed(
-                (error as? LocalizedError)?.errorDescription
-                    ?? String(localized: "Enter a valid provider base URL."),
-                allowsManualEntry: false)
-            return
-        }
-        discovery = .loading
-        do {
-            let models = try await modelDiscovery.models(
-                provider: connection.provider, baseURL: baseURL, apiKey: apiKey)
-            guard !Task.isCancelled else { return }
-            discovery = .loaded(models)
-        } catch is CancellationError {
-            return
-        } catch {
-            guard !Task.isCancelled else { return }
-            let catalogError = error as? AIModelDiscovery.DiscoveryError
-            discovery = .failed(
-                catalogError?.errorDescription
-                    ?? String(localized: "The provider could not load models. Enter one manually."),
-                allowsManualEntry: catalogError != .rejectedKey)
-        }
-    }
-
-    private func addManualModel() {
-        addModel(modelQuery)
-    }
-
-    private func addModel(_ model: AIModelDiscovery.Model) {
-        addModel(
-            model.id, acceptsImages: model.acceptsImages,
-            reasoningOptions: model.reasoningOptions)
-    }
-
-    private func addModel(
-        _ value: String, acceptsImages: Bool? = nil,
-        reasoningOptions: AIConnection.ReasoningOptions? = nil
-    ) {
-        let model = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !model.isEmpty else { return }
-        if !connection.models.contains(model) { connection.models.append(model) }
-        if acceptsImages == true, !connection.visionModels.contains(model) {
-            connection.visionModels.append(model)
-        }
-        if connection.provider == .openRouter, let reasoningOptions,
-            !reasoningOptions.efforts.isEmpty
-        {
-            if connection.reasoningOptions == nil { connection.reasoningOptions = [:] }
-            connection.reasoningOptions?[model] = reasoningOptions
-        }
-        modelQuery = ""
-    }
-
-    private func save() {
-        if case .failed(_, let allowsManualEntry) = discovery, !allowsManualEntry {
-            error = String(localized: "Resolve the API key or endpoint error before saving.")
-            return
-        }
-        guard !connection.models.isEmpty else {
-            error = String(localized: "Select or add at least one model.")
-            return
-        }
-        do {
-            _ = try AIEndpointPolicy.validate(connection.baseURL)
-        } catch {
-            self.error =
-                (error as? LocalizedError)?.errorDescription
-                ?? String(localized: "Enter a valid provider base URL.")
-            return
-        }
-        error = onSave(connection, key, target.isNew)
-    }
-}
-
-private enum ModelDiscoveryState: Equatable {
-    case waitingForKey
-    case loading
-    case loaded([AIModelDiscovery.Model])
-    case failed(String, allowsManualEntry: Bool)
 }

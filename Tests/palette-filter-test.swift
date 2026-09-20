@@ -33,6 +33,9 @@ struct PaletteFilterTests {
             resolve(mode: .fileSearch), .fileSearchFilter,
             "file search has a header filter of its own")
         expect(
+            resolve(mode: .emoji), .emojiCategory,
+            "the emoji picker exposes its category selector through ⌘P")
+        expect(
             resolve(mode: .extensionCommand, accessory: true), .extensionAccessory,
             "a running command's own dropdown answers ⌘P on its own screen")
 
@@ -51,8 +54,8 @@ struct PaletteFilterTests {
 
         // Every other mode was untouched by ⌘P before and has to stay that way.
         for mode in [
-            PaletteMode.launcher, .ai, .aiHistory, .emoji, .calculatorHistory,
-            .quicklinks, .snippets, .schedule, .uninstall, .customCommandArguments
+            PaletteMode.launcher, .ai, .aiHistory, .calculatorHistory,
+            .quicklinks, .snippets, .schedule, .uninstall
         ] {
             expect(
                 resolve(mode: mode), .ignored,
@@ -63,7 +66,7 @@ struct PaletteFilterTests {
         }
 
         // Collapsed there is no header to hang a button off, so no filter may open.
-        for mode in [PaletteMode.clipboard, .fileSearch, .extensionCommand, .launcher] {
+        for mode in [PaletteMode.clipboard, .fileSearch, .emoji, .extensionCommand, .launcher] {
             expect(
                 resolve(collapsed: true, mode: mode, accessory: true), .ignored,
                 "the compact bar draws no filter button, so ⌘P opens nothing on \(mode.rawValue)")

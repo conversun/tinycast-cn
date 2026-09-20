@@ -28,16 +28,20 @@ struct PaletteEscapeTests {
 
     /// The shipped default, so a case only spells out what it is actually about.
     static func resolve(
-        menuOpen: Bool = false, argumentFocused: Bool = false, query: String = "",
-        mode: PaletteMode = .launcher, canGoBack: Bool = false,
+        menuOpen: Bool = false, menuQuery: String = "", argumentFocused: Bool = false,
+        query: String = "", mode: PaletteMode = .launcher, canGoBack: Bool = false,
         behavior: EscapeKeyBehavior = .navigateBackOrClose
     ) -> PaletteEscapeAction {
         PaletteEscapeAction.resolve(
-            menuOpen: menuOpen, argumentFocused: argumentFocused, query: query, mode: mode,
-            canGoBack: canGoBack, behavior: behavior)
+            menuOpen: menuOpen, menuQuery: menuQuery, argumentFocused: argumentFocused,
+            query: query, mode: mode, canGoBack: canGoBack, behavior: behavior)
     }
 
     static func main() {
+        expect(
+            resolve(menuOpen: true, menuQuery: "paste"),
+            .clearMenuQuery,
+            "an open menu clears its own query before it closes")
         expect(
             resolve(menuOpen: true, query: "notes"),
             .closeMenu,
@@ -58,15 +62,7 @@ struct PaletteEscapeTests {
             resolve(),
             .hidePalette,
             "an empty launcher query hides the palette")
-        // The two surfaces where the field is not a search field: an argument answer, a chat draft.
-        expect(
-            resolve(query: "blue", mode: .customCommandArguments),
-            .clearQuery,
-            "a half-typed argument clears before the pending command is abandoned")
-        expect(
-            resolve(mode: .customCommandArguments),
-            .hidePalette,
-            "an empty argument field hides the palette, which cancels the pending command")
+        // The surface where the field is not a search field: a chat draft.
         expect(
             resolve(query: "why is the sky", mode: .ai),
             .clearQuery,

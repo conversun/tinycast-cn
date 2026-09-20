@@ -22,6 +22,8 @@ import {
 import { ReadableStream, TransformStream, WritableStream } from "./web-streams.js";
 import { fileURLToPath, pathToFileURL, URL, URLSearchParams } from "./url.js";
 import { punycode } from "./punycode.js";
+import { upgradeToWebSocket } from "./websocket.js";
+import { dgram } from "./dgram.js";
 
 // ─── path ───────────────────────────────────────────────────────────
 
@@ -127,6 +129,21 @@ export function configureNodeShims(info) {
 
 const processListeners = new Map();
 
+const SIGNALS = {
+  SIGHUP: 1, SIGINT: 2, SIGQUIT: 3, SIGILL: 4, SIGTRAP: 5, SIGABRT: 6, SIGIOT: 6, SIGFPE: 8, SIGKILL: 9,
+  SIGBUS: 10, SIGSEGV: 11, SIGSYS: 12, SIGPIPE: 13, SIGALRM: 14, SIGTERM: 15, SIGURG: 16, SIGSTOP: 17,
+  SIGTSTP: 18, SIGCONT: 19, SIGCHLD: 20, SIGTTIN: 21, SIGTTOU: 22, SIGIO: 23, SIGXCPU: 24, SIGXFSZ: 25,
+  SIGVTALRM: 26, SIGPROF: 27, SIGWINCH: 28, SIGINFO: 29, SIGUSR1: 30, SIGUSR2: 31,
+};
+
+function signalNumber(signal) {
+  if (typeof signal === "number") return signal;
+  if (Object.hasOwn(SIGNALS, signal)) return SIGNALS[signal];
+  const error = new TypeError(`Unknown signal: ${signal}`);
+  error.code = "ERR_UNKNOWN_SIGNAL";
+  throw error;
+}
+
 const process = {
   // Axios gates its Node http adapter on this tag; untagged, axios takes the fetch path.
   [Symbol.toStringTag]: "process",
@@ -151,6 +168,10 @@ const process = {
   },
   exit: () => {
     throw new Error("process.exit is not supported in Tinycast extensions.");
+  },
+  kill(pid, signal = "SIGTERM") {
+    hostCallSync("proc", "kill", [Number(pid), signalNumber(signal)]);
+    return true;
   },
   nextTick: (callback, ...args) => {
     queueMicrotask(() => {
@@ -238,7 +259,7 @@ const os = {
   networkInterfaces: () => ({}),
   endianness: () => "LE",
   devNull: "/dev/null",
-  constants: { signals: { SIGTERM: 15 }, errno: {} },
+  constants: { signals: SIGNALS, errno: {} },
 };
 
 // ─── fs ─────────────────────────────────────────────────────────────
@@ -311,7 +332,10 @@ class Dirent {
 }
 
 function fsPath(input) {
-  if (input instanceof URL) return decodeURIComponent(input.pathname);
+  // Node validates URL inputs through fileURLToPath: a non-file scheme (say a VS Code
+  // vscode-remote:// workspace URI) must throw ERR_INVALID_URL_SCHEME rather than quietly
+  // degrading to its pathname — extensions like Search Recent Projects guard on that failure.
+  if (input instanceof URL) return fileURLToPath(input);
   if (input instanceof Uint8Array) return utf8Decode(input);
   return String(input);
 }
@@ -484,9 +508,52 @@ const fs = {
     stream.path = target;
     return stream;
   },
+  opendirSync(dir) {
+    return new Dir(fsPath(dir), fs.readdirSync(dir, { withFileTypes: true }));
+  },
   Stats,
   Dirent,
 };
+
+// The host has no directory handles, so a Dir walks a snapshot taken when it was opened.
+class Dir {
+  #entries;
+  #closed = false;
+  constructor(path, entries) {
+    this.path = path;
+    this.#entries = entries;
+  }
+  #assertOpen() {
+    if (!this.#closed) return;
+    const error = new Error("Directory handle was closed");
+    error.code = "ERR_DIR_CLOSED";
+    throw error;
+  }
+  readSync() {
+    this.#assertOpen();
+    return this.#entries.shift() ?? null;
+  }
+  read(callback) {
+    if (!callback) return (async () => this.readSync())();
+    callbackify(() => this.readSync())(callback);
+  }
+  closeSync() {
+    this.#assertOpen();
+    this.#closed = true;
+  }
+  close(callback) {
+    if (!callback) return (async () => this.closeSync())();
+    callbackify(() => this.closeSync())(callback);
+  }
+  async *[Symbol.asyncIterator]() {
+    try {
+      for (let entry = this.readSync(); entry; entry = this.readSync()) yield entry;
+    } finally {
+      if (!this.#closed) this.closeSync();
+    }
+  }
+}
+fs.Dir = Dir;
 
 // Callback forms: run the same sync host call, hand the result back on a microtask.
 function callbackify(syncFn) {
@@ -514,6 +581,7 @@ for (const [name, sync] of [
   ["stat", fs.statSync],
   ["lstat", fs.lstatSync],
   ["readdir", fs.readdirSync],
+  ["opendir", fs.opendirSync],
   ["mkdir", fs.mkdirSync],
   ["rm", fs.rmSync],
   ["rmdir", fs.rmdirSync],
@@ -546,6 +614,7 @@ const fsPromises = {
   stat: promisify1(fs.statSync),
   lstat: promisify1(fs.lstatSync),
   readdir: promisify1(fs.readdirSync),
+  opendir: promisify1(fs.opendirSync),
   mkdir: promisify1(fs.mkdirSync),
   rm: promisify1(fs.rmSync),
   rmdir: promisify1(fs.rmdirSync),
@@ -561,6 +630,12 @@ const fsPromises = {
 fs.promises = fsPromises;
 
 // ─── child_process ──────────────────────────────────────────────────
+
+/// Node stringifies every defined value, so `{ ...process.env, DEBUG: 1 }` must not drop the override.
+function childEnv(env) {
+  if (env == null) return env;
+  return Object.fromEntries(Object.entries(env).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)]));
+}
 
 function normalizeExecResult(raw, options) {
   const wantsBuffer = options?.encoding === "buffer" || options?.encoding === null;
@@ -583,7 +658,7 @@ function execError(result, command) {
 const childProcess = {
   execSync(command, options = {}) {
     const raw = hostCallSync("proc", "run", [
-      { shell: true, command: String(command), args: [], cwd: options.cwd, env: options.env, timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null },
+      { shell: true, command: String(command), args: [], cwd: options.cwd, env: childEnv(options.env), timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null },
     ]);
     const result = normalizeExecResult(raw, options);
     if (result.status !== 0) throw execError(result, command);
@@ -595,7 +670,7 @@ const childProcess = {
       args = [];
     }
     const raw = hostCallSync("proc", "run", [
-      { shell: false, command: String(file), args: args.map(String), cwd: options.cwd, env: options.env, timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null },
+      { shell: false, command: String(file), args: args.map(String), cwd: options.cwd, env: childEnv(options.env), timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null },
     ]);
     const result = normalizeExecResult(raw, options);
     if (result.status !== 0) throw execError(result, file);
@@ -607,7 +682,7 @@ const childProcess = {
       args = [];
     }
     const raw = hostCallSync("proc", "run", [
-      { shell: !!options.shell, command: String(file), args: args.map(String), cwd: options.cwd, env: options.env, timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null },
+      { shell: !!options.shell, command: String(file), args: args.map(String), cwd: options.cwd, env: childEnv(options.env), timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null },
     ]);
     const result = normalizeExecResult(raw, options);
     return { ...result, pid: 0, output: [null, result.stdout, result.stderr], error: undefined };
@@ -654,6 +729,18 @@ const childProcess = {
 
 // ─── crypto ─────────────────────────────────────────────────────────
 
+function cryptoBytes(value, encoding) {
+  if (typeof value === "string") return Buffer.from(value, encoding || "utf8");
+  if (ArrayBuffer.isView(value)) return Buffer.from(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+  return Buffer.from(value);
+}
+
+function cryptoError(message, code, ErrorType = Error) {
+  const error = new ErrorType(message);
+  error.code = code;
+  return error;
+}
+
 class Hash {
   constructor(algorithm, hmacKeyBase64) {
     this._algorithm = String(algorithm).toLowerCase().replace(/-/g, "");
@@ -661,7 +748,7 @@ class Hash {
     this._chunks = [];
   }
   update(data, encoding) {
-    this._chunks.push(typeof data === "string" ? Buffer.from(data, encoding || "utf8") : Buffer.from(data));
+    this._chunks.push(cryptoBytes(data, encoding));
     return this;
   }
   digest(encoding) {
@@ -673,6 +760,63 @@ class Hash {
     const bytes = Buffer.from(base64ToBytes(base64));
     return encoding ? bytes.toString(encoding) : bytes;
   }
+}
+
+// Buffers until `final`: a block cipher's concatenated output still matches Node's byte for byte.
+class Cipher {
+  constructor(algorithm, key, iv, decrypt) {
+    const name = String(algorithm).toLowerCase().replace(/^aes(128|192|256)$/, "aes-$1-cbc");
+    const match = /^aes-(128|192|256)-(cbc|ecb)$/.exec(name);
+    if (!match) throw cryptoError("Unknown cipher", "ERR_CRYPTO_UNKNOWN_CIPHER");
+    this._mode = match[2];
+    this._key = cryptoBytes(key);
+    this._iv = iv == null ? Buffer.alloc(0) : cryptoBytes(iv);
+    if (this._key.length !== Number(match[1]) / 8) {
+      throw cryptoError("Invalid key length", "ERR_CRYPTO_INVALID_KEYLEN", RangeError);
+    }
+    if (this._iv.length !== (this._mode === "cbc" ? 16 : 0)) {
+      throw cryptoError("Invalid initialization vector", "ERR_CRYPTO_INVALID_IV", TypeError);
+    }
+    this._decrypt = decrypt;
+    this._padding = true;
+    this._chunks = [];
+    this._finished = false;
+  }
+  update(data, inputEncoding, outputEncoding) {
+    if (this._finished) throw new Error("Trying to add data in unsupported state");
+    this._chunks.push(cryptoBytes(data, inputEncoding));
+    return outputEncoding ? "" : Buffer.alloc(0);
+  }
+  final(outputEncoding) {
+    if (this._finished) throw cryptoError("Invalid state", "ERR_CRYPTO_INVALID_STATE");
+    this._finished = true;
+    const base64 = hostCallSync("crypto", "cipher", [
+      this._mode,
+      this._decrypt,
+      bytesToBase64(this._key),
+      bytesToBase64(this._iv),
+      bytesToBase64(Buffer.concat(this._chunks)),
+      this._padding,
+    ]);
+    const bytes = Buffer.from(base64ToBytes(base64));
+    return outputEncoding ? bytes.toString(outputEncoding) : bytes;
+  }
+  setAutoPadding(enabled = true) {
+    if (this._finished) throw cryptoError("Invalid state", "ERR_CRYPTO_INVALID_STATE");
+    this._padding = Boolean(enabled);
+    return this;
+  }
+}
+
+function pbkdf2Sync(password, salt, iterations, keylen, digest) {
+  const base64 = hostCallSync("crypto", "pbkdf2", [
+    String(digest),
+    bytesToBase64(cryptoBytes(password)),
+    bytesToBase64(cryptoBytes(salt)),
+    Number(iterations),
+    Number(keylen),
+  ]);
+  return Buffer.from(base64ToBytes(base64));
 }
 
 const cryptoModule = {
@@ -700,7 +844,17 @@ const cryptoModule = {
     return min + (value % (max - min));
   },
   createHash: (algorithm) => new Hash(algorithm),
-  createHmac: (algorithm, key) => new Hash(algorithm, bytesToBase64(typeof key === "string" ? Buffer.from(key, "utf8") : Buffer.from(key))),
+  createHmac: (algorithm, key) => new Hash(algorithm, bytesToBase64(cryptoBytes(key))),
+  createCipheriv: (algorithm, key, iv) => new Cipher(algorithm, key, iv, false),
+  createDecipheriv: (algorithm, key, iv) => new Cipher(algorithm, key, iv, true),
+  pbkdf2Sync,
+  pbkdf2(password, salt, iterations, keylen, digest, callback) {
+    if (typeof callback !== "function") {
+      throw cryptoError('The "callback" argument must be of type function.', "ERR_INVALID_ARG_TYPE", TypeError);
+    }
+    const key = pbkdf2Sync(password, salt, iterations, keylen, digest);
+    queueMicrotask(() => callback(null, key));
+  },
   timingSafeEqual: (a, b) => Buffer.from(a).equals(Buffer.from(b)),
   getRandomValues: (target) => cryptoModule.randomFillSync(target),
   webcrypto: null,
@@ -792,19 +946,19 @@ class BufferedChildProcess extends EventEmitter {
     if (this._started) return;
     this._started = true;
     const input = this._input.length ? bytesToBase64(Buffer.concat(this._input)) : null;
-    hostCall("proc", "run", [
-      {
-        shell: !!options.shell,
-        command: file,
-        args,
-        cwd: options.cwd,
-        env: options.env,
-        timeout: options.timeout,
-        input,
-        // `detached` only makes a process group; only an unread child may answer before it exits.
-        detached: !!options.detached && (Array.isArray(options.stdio) ? options.stdio[1] : options.stdio) === "ignore",
-      },
-    ]).then(
+    const { pid, exit } = startChild({
+      shell: !!options.shell,
+      command: file,
+      args,
+      cwd: options.cwd,
+      env: childEnv(options.env),
+      timeout: options.timeout,
+      input,
+      // `detached` only makes a process group; only an unread child may answer before it exits.
+      detached: !!options.detached && (Array.isArray(options.stdio) ? options.stdio[1] : options.stdio) === "ignore",
+    });
+    this.pid = pid;
+    exit.then(
       (raw) => {
         this.exitCode = raw.status;
         this.stdin.emit("finish");
@@ -830,9 +984,8 @@ class BufferedChildProcess extends EventEmitter {
     );
   }
 
-  kill() {
-    this.killed = true;
-    return false;
+  kill(signal) {
+    return this.exitCode === null && signalChild(this, signal);
   }
 
   // Node uses these to detach a child from the event loop. Nothing here keeps the runtime alive, so
@@ -874,7 +1027,7 @@ childProcess.execFile[PROMISIFY_CUSTOM] = (file, args, options) =>
   });
 
 function pickRunOptions(options = {}) {
-  return { cwd: options.cwd, env: options.env, timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null };
+  return { cwd: options.cwd, env: childEnv(options.env), timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null };
 }
 
 /// Node guarantees `stdout` / `stderr` on a failed exec's error, and extensions inspect them (an
@@ -890,9 +1043,36 @@ function decorateProcessError(error, label) {
   return decorated;
 }
 
-/// The async forms get a real async host call so a slow command can't stall the JS thread.
+/// Launched synchronously because extensions store `child.pid` right away to `process.kill` it later.
+function startChild(spec) {
+  try {
+    const pid = hostCallSync("proc", "start", [spec]);
+    const exit = spec.detached ? Promise.resolve({ stdout: "", stderr: "", status: 0 }) : hostCall("proc", "wait", [pid]);
+    return { pid, exit };
+  } catch (error) {
+    return { pid: undefined, exit: Promise.reject(error) };
+  }
+}
+
+/// Node's `ChildProcess.kill` reports an undeliverable signal by returning false, never by throwing.
+function signalChild(child, signal) {
+  if (!child.pid) return false;
+  try {
+    process.kill(child.pid, signal);
+  } catch {
+    return false;
+  }
+  child.killed = true;
+  return true;
+}
+
 function runAsync(spec, options, callback, label) {
-  const promise = hostCall("proc", "run", [spec])
+  const { pid, exit } = startChild(spec);
+  let exited = false;
+  const promise = exit
+    .finally(() => {
+      exited = true;
+    })
     .then((raw) => normalizeExecResult(raw, options))
     .catch((error) => {
       throw decorateProcessError(error, label);
@@ -904,7 +1084,7 @@ function runAsync(spec, options, callback, label) {
     );
   }
   // Node returns a ChildProcess; extensions mostly ignore it or await the promisified form.
-  const handle = { pid: 0, kill: () => false, on: () => handle, stdout: null, stderr: null };
+  const handle = { pid, killed: false, kill: (signal) => !exited && signalChild(handle, signal), on: () => handle, stdout: null, stderr: null };
   handle.then = promise.then.bind(promise);
   handle.catch = promise.catch.bind(promise);
   handle[Symbol.for("nodejs.util.promisify.custom")] = () => promise;
@@ -930,9 +1110,18 @@ class IncomingMessage extends PassThrough {
         ([name]) => name !== "content-encoding" && name !== "content-length",
       ),
     );
-    this.rawHeaders = Object.entries(this.headers).flat();
+    // URLSession folds repeated `Set-Cookie` headers into one line; Node always hands out an array.
+    if (typeof this.headers["set-cookie"] === "string") {
+      this.headers["set-cookie"] = this.headers["set-cookie"].split(SET_COOKIE_BOUNDARY);
+    }
+    this.rawHeaders = Object.entries(this.headers).flatMap(([name, value]) =>
+      [value].flat().flatMap((item) => [name, item]),
+    );
   }
 }
+
+/// A comma that starts another `name=` — never the one inside an `Expires` date.
+const SET_COOKIE_BOUNDARY = /,\s*(?=[^;,=\s]+=)/;
 
 const HEADER_TOKEN = /^[\^`\-\w!#$%&'*+.|~]+$/;
 const HEADER_VALUE = /[^\t\u0020-\u007e\u0080-\u00ff]/;
@@ -958,10 +1147,29 @@ function validateHeaderValue(name, value) {
   }
 }
 
+/// The bridge owns every socket; `addRequest` is only a hook for cookie agents to override.
+class Agent extends EventEmitter {
+  constructor(options) {
+    super();
+    this.options = { ...options };
+  }
+
+  addRequest() {}
+
+  destroy() {}
+}
+
 class ClientRequest extends EventEmitter {
   constructor(url, options, callback) {
     super();
     this.url = url;
+    // A malformed URL still fails the way it always has: as an `error` once the bridge rejects it.
+    if (URL.canParse(url)) {
+      const target = new URL(url);
+      this.protocol = target.protocol;
+      this.host = target.hostname;
+      this.path = target.pathname + target.search;
+    }
     this.method = String(options.method ?? "GET").toUpperCase();
     this.writable = true;
     this.writableEnded = false;
@@ -970,7 +1178,12 @@ class ClientRequest extends EventEmitter {
     this._destroyed = false;
     for (const [name, value] of Object.entries(options.headers ?? {})) this.setHeader(name, value);
     if (callback) this.once("response", callback);
+    // Any other agent shape — agent-base 6 extends EventEmitter — would try to open a socket.
+    if (options.agent instanceof Agent) options.agent.addRequest(this, options);
   }
+
+  /// Node's last chance to touch headers before they go out; cookie agents wrap it.
+  _implicitHeader() {}
 
   setHeader(name, value) {
     this._headers.set(String(name).toLowerCase(), Array.isArray(value) ? value.join(", ") : String(value));
@@ -996,6 +1209,7 @@ class ClientRequest extends EventEmitter {
 
   end(chunk) {
     if (chunk !== undefined && chunk !== null) this.write(chunk);
+    this._implicitHeader();
     this.writableEnded = true;
     this._send();
     return this;
@@ -1030,6 +1244,7 @@ class ClientRequest extends EventEmitter {
   flushHeaders() {}
 
   async _send() {
+    if (String(this.getHeader("upgrade") ?? "").toLowerCase() === "websocket") return this._upgrade();
     // Content negotiation belongs to the transport, which decodes for us and reports the result.
     this.removeHeader("accept-encoding");
     const body = this._chunks.length ? Buffer.concat(this._chunks) : null;
@@ -1053,21 +1268,64 @@ class ClientRequest extends EventEmitter {
       if (!this._destroyed) this.emit("error", error instanceof Error ? error : new Error(String(error)));
     }
   }
+
+  /// The host opens the socket, so the 101 is synthesised — never with an extension, so no deflate.
+  async _upgrade() {
+    const headers = this.getHeaders();
+    try {
+      const { socket, protocol } = await upgradeToWebSocket({
+        url: this.url.replace(/^http/, "ws"),
+        protocols: splitList(headers["sec-websocket-protocol"]),
+        headers: Object.fromEntries(
+          Object.entries(headers).filter(([name]) => !HANDSHAKE_HEADERS.has(name)),
+        ),
+      });
+      clearTimeout(this._timer);
+      if (this._destroyed) return socket.destroy();
+      const accept = new Hash("sha1").update(`${headers["sec-websocket-key"] ?? ""}${WEBSOCKET_GUID}`).digest("base64");
+      const response = new IncomingMessage({
+        status: 101,
+        statusText: "Switching Protocols",
+        headers: {
+          upgrade: "websocket",
+          connection: "Upgrade",
+          "sec-websocket-accept": accept,
+          ...(protocol ? { "sec-websocket-protocol": protocol } : {}),
+        },
+      });
+      if (!this.emit("upgrade", response, socket, Buffer.alloc(0))) socket.destroy();
+    } catch (error) {
+      clearTimeout(this._timer);
+      if (!this._destroyed) this.emit("error", error instanceof Error ? error : new Error(String(error)));
+    }
+  }
 }
 
-function httpRequest(input, options, callback) {
-  if (typeof options === "function") return httpRequest(input, {}, options);
+const WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+/// URLSession writes the handshake itself; forwarding these would have it refuse the request.
+const HANDSHAKE_HEADERS = new Set([
+  "connection", "upgrade", "host", "sec-websocket-key", "sec-websocket-version",
+  "sec-websocket-extensions", "sec-websocket-protocol",
+]);
+
+function splitList(value) {
+  return String(value ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function httpRequest(input, options, callback, scheme = "http:") {
+  if (typeof options === "function") return httpRequest(input, {}, options, scheme);
   if (typeof input === "string" || input instanceof URL) {
     return new ClientRequest(String(input), options ?? {}, callback);
   }
   const spec = input ?? {};
   const host = spec.hostname ?? spec.host ?? "localhost";
   const port = spec.port ? `:${spec.port}` : "";
-  return new ClientRequest(`${spec.protocol ?? "http:"}//${host}${port}${spec.path ?? "/"}`, spec, callback);
+  return new ClientRequest(`${spec.protocol ?? scheme}//${host}${port}${spec.path ?? "/"}`, spec, callback);
 }
 
-function httpGet(input, options, callback) {
-  return httpRequest(input, options, callback).end();
+function httpGet(input, options, callback, scheme) {
+  return httpRequest(input, options, callback, scheme).end();
 }
 
 // ─── util ───────────────────────────────────────────────────────────
@@ -1239,6 +1497,19 @@ const querystring = {
   unescape: decodeURIComponent,
 };
 
+/// Node's legacy `url.format`, which also takes the parts object http-cookie-agent builds per request.
+function formatURL(value) {
+  if (typeof value !== "object" || value === null || value instanceof URL) return String(value);
+  const protocol = value.protocol ? value.protocol.replace(/:?$/, ":") : "";
+  const slashes = value.slashes || /^(https?|ftp|gopher|file|wss?):$/.test(protocol) ? "//" : "";
+  const auth = value.auth ? `${value.auth}@` : "";
+  const host = value.host ?? (value.hostname ? value.hostname + (value.port ? `:${value.port}` : "") : "");
+  const pathname = (value.pathname ?? "").replace(/[?#]/g, encodeURIComponent);
+  const query = value.query && typeof value.query === "object" ? querystring.stringify(value.query) : "";
+  const search = value.search ?? (query ? `?${query}` : "");
+  return `${protocol}${slashes}${auth}${host}${pathname}${search}${value.hash ?? ""}`;
+}
+
 function assert(value, message) {
   if (!value) throw new Error(message || "Assertion failed");
 }
@@ -1309,13 +1580,15 @@ function makeUnsupported(label) {
 
 const httpLike = (name) =>
   unsupportedModule(name, {
-    request: httpRequest,
-    get: httpGet,
+    // The scheme rides with the module: `ws` and axios both pass an options bag with no protocol.
+    request: (input, options, callback) => httpRequest(input, options, callback, `${name}:`),
+    get: (input, options, callback) => httpGet(input, options, callback, `${name}:`),
     validateHeaderName,
     validateHeaderValue,
     IncomingMessage,
     ClientRequest,
-    globalAgent: {},
+    Agent,
+    globalAgent: new Agent(),
     STATUS_CODES: {},
     METHODS: [],
   });
@@ -1369,12 +1642,13 @@ export const nodeModules = {
   assert,
   string_decoder: { StringDecoder },
   // node-fetch spreads a parsed URL into its request options and reads the legacy `path` off it.
-  url: { URL, URLSearchParams, fileURLToPath, pathToFileURL, parse: (text) => Object.assign(new URL(text), { path: new URL(text).pathname + new URL(text).search }), format: (value) => String(value), resolve: (from, to) => new URL(to, from).href },
+  url: { URL, URLSearchParams, fileURLToPath, pathToFileURL, parse: (text) => Object.assign(new URL(text), { path: new URL(text).pathname + new URL(text).search }), format: formatURL, resolve: (from, to) => new URL(to, from).href },
   timers: { setTimeout, clearTimeout, setInterval, clearInterval, setImmediate, clearImmediate },
   "timers/promises": { setTimeout: (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms)) },
   perf_hooks: { performance: globalThis.performance },
   http: httpLike("http"),
   https: httpLike("https"),
+  dgram,
   net: unsupportedModule("net"),
   tls: unsupportedModule("tls"),
   dns: unsupportedModule("dns"),
@@ -1398,10 +1672,10 @@ function requireStub(name) {
 }
 
 // Every remaining Node builtin resolves to a refuse-on-use stub. Bundles reference the whole
-// long tail (dgram, http2, domain, repl, …) from dependencies that only touch them on paths an
+// long tail (http2, domain, repl, …) from dependencies that only touch them on paths an
 // extension never reaches, so a require-time throw would fail extensions that actually work.
 const REMAINING_BUILTINS = [
-  "assert/strict", "console", "dgram", "diagnostics_channel", "dns/promises", "domain", "http2",
+  "assert/strict", "console", "diagnostics_channel", "dns/promises", "domain", "http2",
   "inspector/promises", "path/posix", "path/win32", "readline/promises", "repl",
   "stream/consumers", "sys", "trace_events", "util/types", "wasi", "sea", "sqlite", "test",
   "test/reporters",

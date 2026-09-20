@@ -9,8 +9,17 @@ struct NotesSettingsView: View {
             Section {
                 Toggle(isOn: $settings.notesEnabled) {
                     SettingsRowTitle(.notesNotes, "Enable Notes")
-                    Text("Keep plain Markdown notes in a floating editor, loaded only when needed.")
+                    Text("Plain Markdown in a floating editor.")
                 }
+                Toggle(isOn: $settings.notesRendersMarkdown) {
+                    SettingsRowTitle(.notesNotes, "Render Markdown")
+                    Text("Formats as you type.")
+                }
+                .settingsEnabled(settings.notesEnabled)
+                Toggle(isOn: $settings.notesShowsFormattingBar) {
+                    SettingsRowTitle(.notesNotes, "Show Formatting Bar")
+                }
+                .settingsEnabled(settings.notesEnabled && settings.notesRendersMarkdown)
             } header: {
                 SettingsSectionHeader(.notesNotes)
             }

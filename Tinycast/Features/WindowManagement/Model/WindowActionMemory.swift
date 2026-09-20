@@ -8,15 +8,20 @@ struct WindowActionMemory<Key: Hashable> {
         var restoreFrame: CGRect
         /// Where we *observed* it after our last write — not what we asked for. See `decide`.
         var appliedFrame: CGRect
-        var command: WindowCommand.ID
+        /// Nil for a custom size, which never cycles and is never a tile.
+        var command: WindowCommand.ID?
         var step: Int
+        /// Where it landed; a press from any other display starts a new chain.
         var screenID: Int
+        var originScreenID: Int
         var at: Date
     }
 
     struct Decision: Equatable, Sendable {
         /// Cycle position for this press, fed straight into `WindowPlacementEngine.Input.step`.
         var step: Int
+        /// The display the chain started on, which the display cycle counts `step` from.
+        var originScreenID: Int
         /// The frame `commit` should persist as this window's restore point.
         var restoreFrame: CGRect
         /// False on first sight: there is nothing to go back to, so Restore must do nothing.
@@ -48,23 +53,26 @@ struct WindowActionMemory<Key: Hashable> {
 
     /// Resolves the cycle step and restore point; `commit` writes once the mover knows what landed.
     func decide(
-        key: Key, command: WindowCommand.ID, currentFrame: CGRect, currentScreenID: Int,
+        key: Key, command: WindowCommand.ID?, currentFrame: CGRect, currentScreenID: Int,
         cycleLength: Int, now: Date
     ) -> Decision {
         // First sight: capture where it was, so Restore works for a never-moved window.
         guard let record = records[key] else {
             return Decision(
-                step: 0, restoreFrame: currentFrame, canRestore: false, lastTileCommand: nil)
+                step: 0, originScreenID: currentScreenID, restoreFrame: currentFrame,
+                canRestore: false, lastTileCommand: nil)
         }
 
         // Against the observed frame, never the requested one. docs/features/window-management.md
         guard approximatelyEqual(currentFrame, record.appliedFrame) else {
             return Decision(
-                step: 0, restoreFrame: currentFrame, canRestore: true, lastTileCommand: nil)
+                step: 0, originScreenID: currentScreenID, restoreFrame: currentFrame,
+                canRestore: true, lastTileCommand: nil)
         }
 
-        let lastTileCommand =
-            WindowPlacementEngine.isTileCommand(record.command) ? record.command : nil
+        let lastTileCommand = record.command.flatMap {
+            WindowPlacementEngine.isTileCommand($0) ? $0 : nil
+        }
         let expired = cycleTimeout.map { now.timeIntervalSince(record.at) > $0 } ?? false
         // A length of 1 covers both a non-cycling command and cycling switched off entirely.
         let continues =
@@ -72,17 +80,19 @@ struct WindowActionMemory<Key: Hashable> {
             && currentScreenID == record.screenID && !expired
         return Decision(
             step: continues ? (record.step + 1) % cycleLength : 0,
+            originScreenID: continues ? record.originScreenID : currentScreenID,
             restoreFrame: record.restoreFrame, canRestore: true, lastTileCommand: lastTileCommand)
     }
 
     /// Records what actually landed. `appliedFrame` must be read back from the window, not assumed.
     mutating func commit(
-        key: Key, command: WindowCommand.ID, decision: Decision, appliedFrame: CGRect,
+        key: Key, command: WindowCommand.ID?, decision: Decision, appliedFrame: CGRect,
         screenID: Int, now: Date
     ) {
         records[key] = Record(
             restoreFrame: decision.restoreFrame, appliedFrame: appliedFrame, command: command,
-            step: decision.step, screenID: screenID, at: now)
+            step: decision.step, screenID: screenID, originScreenID: decision.originScreenID,
+            at: now)
         touch(key)
     }
 
@@ -90,6 +100,7 @@ struct WindowActionMemory<Key: Hashable> {
     mutating func forgetCycle(key: Key) {
         guard var record = records[key] else { return }
         record.step = 0
+        record.originScreenID = record.screenID
         records[key] = record
     }
 

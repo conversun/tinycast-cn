@@ -43,4 +43,9 @@ struct EmojiGridGeometry {
         let lastRowStart = ((previousCount - 1) / columns) * columns
         return starts[s - 1] + min(lastRowStart + local % columns, previousCount - 1)
     }
+
+    /// Keep the same visual slot after a pin disappears, falling back to the preceding last slot.
+    static func selectionAfterRemovingPin(at index: Int, remainingCount: Int) -> Int {
+        min(max(index, 0), max(remainingCount - 1, 0))
+    }
 }

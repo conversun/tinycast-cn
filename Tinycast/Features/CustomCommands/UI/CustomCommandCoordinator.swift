@@ -4,7 +4,6 @@ import AppKit
 @MainActor
 final class CustomCommandCoordinator {
     private let store: CustomCommandStore
-    private let argumentSession: CustomCommandArgumentSession
     private let settings: AppSettings
     private let appIndex: AppIndex
     private let paletteCoordinator: PaletteCoordinator
@@ -30,7 +29,6 @@ final class CustomCommandCoordinator {
 
     init(
         store: CustomCommandStore,
-        argumentSession: CustomCommandArgumentSession,
         settings: AppSettings,
         appIndex: AppIndex,
         paletteCoordinator: PaletteCoordinator,
@@ -44,7 +42,6 @@ final class CustomCommandCoordinator {
         core: AppCore
     ) {
         self.store = store
-        self.argumentSession = argumentSession
         self.settings = settings
         self.appIndex = appIndex
         self.paletteCoordinator = paletteCoordinator
@@ -160,18 +157,16 @@ final class CustomCommandCoordinator {
 
     // MARK: - Running
 
-    /// The one funnel for palette and hotkey, so neither form nor confirmation is bypassed.
-    func runCustomCommand(id: UUID) {
+    /// The one funnel, so no entry point skips a required value or the confirmation.
+    func runCustomCommand(id: UUID, values: [String: String] = [:]) {
         // Also the feature switch: with it off a registered hotkey must run nothing.
         guard settings.customCommandsEnabled else { return }
         guard let command = store.command(id: id), command.isEnabled else { return }
-        guard command.arguments.isEmpty else {
-            argumentSession.begin(command: command)
-            // Never a restored mode: this screen is always a fresh prompt, never a resumed one.
-            paletteCoordinator.showPalette(mode: .customCommandArguments)
+        guard let arguments = command.positionalValues(from: values) else {
+            paletteCoordinator.showArguments(of: AppEntry(command), values: values)
             return
         }
-        perform(command, arguments: [])
+        perform(command, arguments: arguments)
     }
 
     /// The launcher fallback: a one-off shell line, streamed into the window every run uses.
@@ -192,19 +187,6 @@ final class CustomCommandCoordinator {
     private func rerunOutput(id: UUID) {
         guard let last = lastShellCommand, last.id == id else { return runCustomCommand(id: id) }
         runShellCommand(last.text)
-    }
-
-    /// ↵ in the argument form. Returns false while more arguments remain.
-    @discardableResult
-    func submitCustomCommandArgument(_ value: String) -> Bool {
-        guard let filled = argumentSession.submit(value) else { return false }
-        argumentSession.cancel()
-        perform(filled.command, arguments: filled.values)
-        return true
-    }
-
-    func cancelCustomCommandArguments() {
-        argumentSession.cancel()
     }
 
     /// A Dock click while a command is running belongs to its window, not to a fresh launcher.

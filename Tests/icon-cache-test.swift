@@ -35,6 +35,13 @@ struct IconCacheTests {
 
     static func bitmap(_ image: NSImage) -> Data? { image.tiffRepresentation }
 
+    static func semanticSymbolNames() {
+        expect(
+            SystemSymbolName.resolve("face.smiling") == "face.smiling.inverse",
+            "the swapped smiley pair is compensated in both appearances")
+        expect(SystemSymbolName.resolve("star") == "star", "other symbols stay unchanged")
+    }
+
     /// A restyle has to both drop what is cached and move the generation views key their fetch on.
     static func restyling() {
         let before = IconCache.style.generation
@@ -191,6 +198,7 @@ struct IconCacheTests {
         rowLifetime()
         rowRendering()
         await asynchronousRows()
+        semanticSymbolNames()
         tintedTiles()
         restyling()
         styleFingerprint()

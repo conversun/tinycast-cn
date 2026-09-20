@@ -22,7 +22,7 @@ struct LauncherItemsSection: View {
         Section {
             Toggle(isOn: enabledBinding) {
                 SettingsRowTitle(anchor, "Enable \(anchor.title)")
-                Text("Off hides them all and stops their shortcuts. Uncheck one below to hide just that one.")
+                Text("Off hides all of them and stops their shortcuts.")
             }
         } header: {
             SettingsSectionHeader(anchor)
@@ -30,30 +30,11 @@ struct LauncherItemsSection: View {
 
         Section {
             SettingsFilterField(prompt: searchPrompt, query: $query)
-
-            if entries.isEmpty {
-                Text(query.isEmpty
-                    ? String(localized: "Nothing here yet.")
-                    : String(localized: "No matches for “\(query)”."))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-            } else {
-                // One row holding a lazy stack: a `Form` realizes every row it is handed.
-                LazyVStack(spacing: 0) {
-                    ForEach(entries) { entry in
-                        if entry.id != entries.first?.id { Divider() }
-                        LauncherItemRow(entry: entry)
-                            .padding(.vertical, Self.rowPadding)
-                    }
-                }
-                .padding(.vertical, -Self.rowPadding)
-            }
+            LauncherItemsList(
+                entries: entries, query: query, isEnabled: visibility.isKindEnabled(kind))
         }
         .settingsEnabled(visibility.isKindEnabled(kind))
     }
-
-    /// A grouped `Form` row's own vertical padding.
-    private static let rowPadding: CGFloat = 15
 
     private var enabledBinding: Binding<Bool> {
         Binding(
@@ -63,13 +44,55 @@ struct LauncherItemsSection: View {
     }
 }
 
-private struct LauncherItemRow: View {
+/// The rows under a filter field, or what to say when there are none; shared by item panes.
+struct LauncherItemsList: View {
+    let entries: [AppEntry]
+    let query: String
+    let isEnabled: Bool
+
+    @Environment(VisibilityStore.self) private var visibility
+    @Environment(AliasStore.self) private var aliases
+    @Environment(HotKeyManager.self) private var hotKeys
+    @State private var recorderFrame: CGRect?
+
+    var body: some View {
+        if entries.isEmpty {
+            Text(query.isEmpty ? String(localized: "Nothing here yet.") : String(localized: "No matches for “\(query)”."))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+        } else {
+            // One row holding the table: a `Form` realizes every row it is handed.
+            LauncherItemsTable(
+                entries: entries, isEnabled: isEnabled,
+                visibility: visibility, aliases: aliases, hotKeys: hotKeys,
+                recorderFrame: $recorderFrame
+            )
+            .overlay(alignment: .topLeading) { recorderStandIn }
+        }
+    }
+
+    /// The open recorder's anchor can't leave its hosted row, so this republishes its bounds here.
+    @ViewBuilder
+    private var recorderStandIn: some View {
+        if let recorderFrame {
+            Color.clear
+                .frame(width: recorderFrame.width, height: recorderFrame.height)
+                .anchorPreference(key: ShortcutRecorderAnchorKey.self, value: .bounds) { $0 }
+                .position(x: recorderFrame.midX, y: recorderFrame.midY)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+/// One launcher item's row; a table cell hosts it and hands it new entries as the list scrolls.
+struct LauncherItemRow: View {
     let entry: AppEntry
     @Environment(VisibilityStore.self) private var visibility
 
     var body: some View {
         SettingsRow(title: entry.name) {
-            AppIconView(app: entry).frame(width: 18, height: 18)
+            // Keyed so a reused cell seeds the new entry's icon on its first frame.
+            AppIconView(app: entry).frame(width: 18, height: 18).id(entry.iconKey)
         } trailing: {
             AliasField(entry: entry)
             if let action = entry.hotKeyAction {
@@ -78,6 +101,7 @@ private struct LauncherItemRow: View {
             Toggle("", isOn: itemBinding)
                 .labelsHidden()
                 .toggleStyle(.checkbox)
+                .launcherVisibilityHelp()
                 .accessibilityLabel("Show \(entry.name) in launcher")
         }
     }

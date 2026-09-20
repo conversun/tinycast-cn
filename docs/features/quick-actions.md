@@ -43,12 +43,21 @@ provider protocol and the connections behind it.
 - **Quick Actions route themselves.** `quickActionModel` is a second routing decision, defaulting to
   Apple Intelligence and falling back to chat's model. A shortcut pressed all day should not bill an
   API every time, and that is not a choice chat's default can make on its behalf.
-- **Installed providers are ordinary routes.** The model picker reads the same live Codex, Claude and
-  OpenCode catalogs as AI Settings. Execution still goes through `AIProviderFactory`, so Quick Actions
+- **An action may override that route, and only by choice.** `quickActionModelOverrides` is keyed by
+  `QuickAction.id`, so the built-in four and custom actions share one lookup,
+  `QuickActionSettingsStore.model(for:)`. An absent entry follows `quickActionModel`, so nothing
+  changes until the reader picks a model in the action's sheet. Translate never takes one.
+- **A dead override is dropped, never rerouted.** Repair walks every override beside the shared
+  route: a vanished catalog model moves to its command's first model, like the shared route, but a
+  removed connection or an unavailable command deletes the entry instead of borrowing chat's model.
+  The action then follows the route its pane names, not one the reader never chose for it.
+- **Installed providers are ordinary routes.** The model picker reads the same live Codex, Claude, Grok,
+  OpenCode and Cursor catalogs as AI Settings. Execution still goes through `AIProviderFactory`, so Quick Actions
   inherit the same installed login, tool restrictions and process cleanup without owning CLI logic.
 - **The model picker is the AI picker.** Both panes render `AIModelOption.groupedCatalog`, with the
   same provider sections, model labels and provider-supported reasoning levels. An installed-model
-  selection stores its effort in `quickActionModel`, independently of chat's effort.
+  selection stores its effort in `quickActionModel`, independently of chat's effort. The sheets use the
+  same `AIModelSelectionRows`, with **Same as Quick Actions** as the `nil` choice.
 - **The reader's own text gets permissive guardrails.** `AppCore.quickActionProvider()` asks for
   `SystemLanguageModel.Guardrails.permissiveContentTransformations`. The default filter is tuned for
   a model writing fresh prose and refuses to transform text somebody already wrote, which is the
@@ -60,13 +69,14 @@ provider protocol and the connections behind it.
 - **A custom prompt cannot drop that boundary.** An override on a shipped action may replace
   `boundary`, because the sheet shows the whole prompt. A custom action *is* the prompt, so `boundary`
   is prepended and no control removes it.
-- **Each model action owns its instructions.** The pencil on Fix Grammar, Rewrite and Summarize opens
-  a sheet prefilled with the exact built-in prompt. Saving replaces that prompt for only that action;
-  Use Default restores it. Translate has no editor because no model handles translation. The same
+- **Each model action owns its instructions and its route.** The pencil on Fix Grammar, Rewrite and
+  Summarize opens a sheet prefilled with the exact built-in prompt and the action's model. Saving
+  replaces both for only that action; Use Default restores the prompt. Translate has no editor because no model handles translation. The same
   pencil on a custom action opens its editor, which owns the name and glyph too.
-- **A custom action never travels in a backup.** Neither the record nor its shortcut, for the reason
-  `quickActionInstructions` already doesn't: an import must never change what a shortcut does to
-  somebody's documents. Its JSON sits outside `UserDefaults`, so no settings key can sweep it up.
+- **A custom action never travels in a backup.** Neither the record, its shortcut nor its route, for
+  the reason `quickActionInstructions` already doesn't: an import must never change what a shortcut
+  does to somebody's documents. Its JSON sits outside `UserDefaults`, so no settings key can sweep it
+  up, and `quickActionModelOverrides` is excluded like `quickActionModel`.
 
 ## The actions
 
@@ -122,7 +132,7 @@ install; one that exists but will not decode sets `isAvailable` false and makes 
 `QuicklinkStore`'s rule: authored data is reported on, never written over.
 
 **Deleting unwinds only once the record is gone.** Confirm, remove, *then* drop the binding, the
-favorite, the alias, the visibility key and the ranking. `WindowLayoutCoordinator`'s order: a failed
+route override, the favorite, the alias, the visibility key and the ranking. `WindowLayoutCoordinator`'s order: a failed
 delete must never leave a kept record stripped of its shortcut.
 
 Only Fix Grammar applies unseen: it changes what was wrong, where a rewrite changes the voice.
@@ -151,19 +161,20 @@ loads asynchronously, so the coordinator holds it as observed state rather than 
 Names come from `minimalIdentifier` — the maximal form carries the script, and `es` would read
 "Spanish (Latin, Spain)" in a menu that should say "Spanish".
 
-A pair that is supported but not downloaded **opens the panel**, whatever the action's usual result.
-Fetching one needs SwiftUI's `translationTask`, and there is no other API for it — so the download
-has a surface to live on rather than a shortcut that silently does nothing, and text is never
-replaced once a download the reader never saw has finished.
+A pair that is supported but not downloaded **opens the panel**, whatever the action's usual result,
+so a shortcut never silently does nothing. **The download happens in System Settings.**
+`prepareTranslation` never showed its sheet over this non-activating panel, so the prompt says where
+to go — Language & Region → Translation Languages… — and its one button opens that pane and closes
+the panel. System Settings has no anchor for the sheet itself, so the last click stays the reader's.
 
 ## The panel
 
 `QuickActionPanel` is Tinycast's **fourth borderless surface**, beside the dialog, the notes panel
 and the join preview. It takes the same recipe — `panelScrim`, then `VisualEffectView`, then the
 clip — and sits at `.floating` like the join preview, so a failure report still lands on top of it.
-Its buttons are the system's own — `Button` with `.borderedProminent` on Replace — not a copy of
-`DialogButton`. A dialog asks a question and styles its answers; this panel presents a result, and
-standard controls are what a reader expects to act on one with.
+Its footer speaks the same button language as a dialog's — `ModalActionButtonStyle`, with Replace
+as the `.primary` role — so every borderless surface answers in one voice rather than dropping Aqua
+controls onto vibrancy.
 
 It could not have been built on `HUDPresenter`: `HUDPanel` sets `ignoresMouseEvents` and returns
 `false` from `canBecomeKey`, so it is click-through and hosts no buttons. Nor on `DialogAccessory`,
@@ -193,10 +204,10 @@ makes it visible but lays its bars *over* the content instead of insetting it, s
 the buttons and escapes the corner clip. And a ramp starting at the panel edge rather than below the
 bar leaves text about 60% visible behind the title.
 
-`TextDiffEngine` shows what changed when the output is the input, edited. Its LCS matrix is
+`TextDiffEngine` shows what changed when the output is the input, edited. Its traceback is
 quadratic, so past `maxTokens` a side it degrades to whole-text rather than asking for gigabytes.
-At the cap the matrix is the feature's largest allocation, so its cells are `UInt16` rather than
-`Int` — no LCS length can exceed `maxTokens`, and the six bytes an `Int` adds are 96 MB of zeroes.
+It keeps one rolling `UInt16` score row and one insert-or-delete bit per token pair — equality is
+re-checked during traceback — so the cap costs about 2 MB where a full score matrix cost 32 MB.
 
 ## Reading the selection
 
@@ -261,8 +272,13 @@ failure handler, so automatic expansion stays silent as before.
   `quickActionPanelBody`.
 - Replace Rewrite's instructions, confirm only Rewrite follows them after relaunch, then use the
   modal's default and confirm the shipped behaviour returns.
-- Translate into a language that has not been downloaded: the panel offers the download, then
-  translates.
+- Give Summarize its own model and effort: the row names them, only Summarize uses them, and they
+  survive a relaunch. Turn that provider off in AI Settings and Summarize follows the shared model.
+- Save a custom action with its own model, delete it, and confirm no route is left in
+  `quickActionModelOverrides`.
+- Translate into a language that has not been downloaded: the panel names the language, and its
+  button closes the panel and opens Language & Region.
 - Revoke Accessibility while enabled: a HUD explains instead of failing silently.
-- Harnesses: `quick-action-test` (action metadata, prompt boundaries, preview choices, diffs) and
+- Harnesses: `quick-action-test` (action metadata, prompt boundaries, preview choices, routes and
+  their repair, diffs) and
   `text-diff-test` (exact chunks, Unicode, ties, token boundaries and fast paths).

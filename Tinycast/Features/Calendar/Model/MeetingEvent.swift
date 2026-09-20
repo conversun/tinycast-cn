@@ -11,6 +11,7 @@ struct MeetingEvent: Identifiable, Hashable, Sendable {
     let isDeclined: Bool
     let calendarID: String
     let calendarName: String
+    let calendarColor: CalendarColor?
     /// EventKit's `calendarItemIdentifier` — the only handle Calendar.app's `ical://` URL accepts.
     let calendarItemID: String
     let link: MeetingLink?
@@ -25,4 +26,13 @@ struct MeetingEvent: Identifiable, Hashable, Sendable {
     }
 
     func isInProgress(now: Date) -> Bool { start <= now && now < end }
+}
+
+extension MeetingEvent {
+    /// The owning calendar's colour as sRGB components, so the model stays free of AppKit.
+    struct CalendarColor: Hashable, Sendable {
+        let red: Double
+        let green: Double
+        let blue: Double
+    }
 }

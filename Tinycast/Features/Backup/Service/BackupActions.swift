@@ -257,6 +257,9 @@ enum BackupActions {
     private static let snippetsNeedEnablingText =
         "Turn on Snippets in Settings to use their keywords."
 
+    /// Not everything an import applies settles in the running app, so say to relaunch.
+    private static let restartAfterImportText = "Quit and reopen Tinycast to finish."
+
     /// One sentence per Raycast category that actually moved, shared by the pane and onboarding.
     static func raycastText(_ outcome: RaycastOutcome) -> String {
         var parts: [String] = []
@@ -283,6 +286,7 @@ enum BackupActions {
         if outcome.missingImages > 0 {
             message += " \(outcome.missingImages) images were unavailable and skipped."
         }
+        if !parts.isEmpty { message += " \(restartAfterImportText)" }
         return message
     }
 
@@ -294,9 +298,13 @@ enum BackupActions {
         if s.favorites > 0 { parts.append("\(s.favorites) favorites") }
         if s.hiddenItems > 0 { parts.append("\(s.hiddenItems) hidden items") }
         if s.aliases > 0 { parts.append("\(s.aliases) aliases") }
+        if s.pinnedEmoji > 0 { parts.append("\(s.pinnedEmoji) pinned emoji and symbols") }
         if s.customCommands > 0 { parts.append("\(s.customCommands) custom commands") }
         if s.quicklinks > 0 { parts.append("\(s.quicklinks) quicklinks") }
         if s.windowLayouts > 0 { parts.append("\(s.windowLayouts) window layouts") }
+        if s.customWindowSizes > 0 {
+            parts.append("\(s.customWindowSizes) custom window sizes")
+        }
         guard !parts.isEmpty else { return nil }
         return String(format: "Applied %@.".localizedUI, parts.joined(separator: ", "))
     }

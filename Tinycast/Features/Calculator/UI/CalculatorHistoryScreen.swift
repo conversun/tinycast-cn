@@ -21,8 +21,10 @@ struct CalculatorHistoryScreen: PaletteScreen {
         }
     }
 
-    private var calc: CalcResult? { CalcMemo.evaluate(vm.query, rates: currencyRates.rates) }
-    private var entries: [CalcHistoryEntry] { history.search(vm.query) }
+    private var format: CalcNumberFormat { core.calcNumberFormat }
+    private var calc: CalcResult? { CalcMemo.evaluate(vm.query, rates: currencyRates.rates, format: format) }
+    /// History is stored canonical, so a localized query is searched in the same spelling.
+    private var entries: [CalcHistoryEntry] { history.search(format.canonical(vm.query) ?? vm.query) }
 
     var rows: [Row] {
         let entries = entries.map(Row.entry)
@@ -80,14 +82,26 @@ struct CalculatorHistoryScreen: PaletteScreen {
         return true
     }
 
+    func perform(_ shortcut: PaletteShortcut, at selection: Int) -> Bool {
+        switch shortcut {
+        case .commandDelete, .delete:
+            delete(at: selection)
+            return true
+        case .deleteAll:
+            deleteAll()
+            return true
+        default: return false
+        }
+    }
+
     /// ⌘⌫ / ⌃X — the screen owns the chord, but the inline card can't be deleted.
-    func delete(at selection: Int) {
+    private func delete(at selection: Int) {
         guard let entry = entry(at: selection) else { return }
         history.remove(entry)
     }
 
     /// ⌃⇧X — mirrors the Actions row, confirmation included; the live inline card isn't history.
-    func deleteAll() {
+    private func deleteAll() {
         Task { await core.calculatorCoordinator.deleteAllHistory() }
     }
 
@@ -140,7 +154,7 @@ enum CalcHistoryActionsMenu {
         -> PopoverMenuContent
     {
         PopoverMenuContent(
-            header: entry.expression,
+            header: core.calcNumberFormat.localizedExpression(entry.expression),
             items: [
                 PopoverMenuItem(title: "Copy Answer", systemImage: "doc.on.doc", shortcut: "↵") {
                     core.calculatorCoordinator.copyHistoryEntry(entry)

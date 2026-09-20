@@ -178,6 +178,11 @@ final class AppSettings {
         didSet { defaults.set(emojiSkinTone.rawValue, forKey: Key.emojiSkinTone.rawValue) }
     }
 
+    /// Grid density used when the emoji picker opens; in-session zoom remains temporary.
+    var emojiGridColumns: EmojiGridColumns {
+        didSet { defaults.set(emojiGridColumns.rawValue, forKey: Key.emojiGridColumns.rawValue) }
+    }
+
     /// How long a closed palette keeps its state before popping back to the root launcher.
     var popToRootTimeout: PopToRootTimeout {
         didSet { defaults.set(popToRootTimeout.rawValue, forKey: Key.popToRootTimeout.rawValue) }
@@ -191,6 +196,11 @@ final class AppSettings {
     /// Follow macOS, or pin Tinycast to one appearance. Applied by `AppCore.applyAppearance()`.
     var appearance: AppAppearance {
         didSet { defaults.set(appearance.rawValue, forKey: Key.appearance.rawValue) }
+    }
+
+    /// Which separators the calculator reads and writes; `.system` follows Language & Region.
+    var calcNumberStyle: CalcNumberStyle {
+        didSet { defaults.set(calcNumberStyle.rawValue, forKey: Key.calcNumberStyle.rawValue) }
     }
 
     /// Scales the palette and its floating siblings only. Read through `InterfaceSize.metrics`.
@@ -235,16 +245,21 @@ final class AppSettings {
         didSet { defaults.set(paletteDraggable, forKey: Key.paletteDraggable.rawValue) }
     }
 
-    /// Where a drag left the panel's top-left; nil means the default placement.
-    var palettePosition: CGPoint? {
-        didSet {
-            guard let palettePosition else {
-                defaults.removeObject(forKey: Key.palettePosition.rawValue)
-                return
-            }
-            defaults.set(
-                [palettePosition.x, palettePosition.y], forKey: Key.palettePosition.rawValue)
+    /// Where a drag left the panel's top-left, per display and relative to it.
+    var palettePositions: [String: [Double]] {
+        didSet { defaults.set(palettePositions, forKey: Key.palettePosition.rawValue) }
+    }
+
+    func palettePosition(on display: String) -> CGPoint? {
+        palettePositions[display].flatMap { $0.count == 2 ? CGPoint(x: $0[0], y: $0[1]) : nil }
+    }
+
+    func setPalettePosition(_ offset: CGPoint?, on display: String) {
+        guard let offset else {
+            palettePositions.removeValue(forKey: display)
+            return
         }
+        palettePositions[display] = [offset.x, offset.y]
     }
 
     // Feature switches, off out of the box, and off means fully off.
@@ -266,6 +281,14 @@ final class AppSettings {
 
     var notesEnabled: Bool {
         didSet { defaults.set(notesEnabled, forKey: Key.notesEnabled.rawValue) }
+    }
+
+    var notesRendersMarkdown: Bool {
+        didSet { defaults.set(notesRendersMarkdown, forKey: Key.notesRendersMarkdown.rawValue) }
+    }
+
+    var notesShowsFormattingBar: Bool {
+        didSet { defaults.set(notesShowsFormattingBar, forKey: Key.notesShowsFormattingBar.rawValue) }
     }
 
     /// Off by default: connecting a server is consent to run code Tinycast did not write.
@@ -395,6 +418,17 @@ final class AppSettings {
         didSet { defaults.set(cameraPreview, forKey: Key.cameraPreview.rawValue) }
     }
 
+    /// Nil opens meeting links in the default browser.
+    var meetingBrowserBundleID: String? {
+        didSet {
+            guard let meetingBrowserBundleID else {
+                defaults.removeObject(forKey: Key.meetingBrowser.rawValue)
+                return
+            }
+            defaults.set(meetingBrowserBundleID, forKey: Key.meetingBrowser.rawValue)
+        }
+    }
+
     var menuBarEvents: MenuBarEvents {
         didSet { defaults.set(menuBarEvents.rawValue, forKey: Key.menuBarEvents.rawValue) }
     }
@@ -461,6 +495,11 @@ final class AppSettings {
         }
     }
 
+    /// Off means the Shortcuts tool is never run, down to a bound shortcut running nothing.
+    var appleShortcutsEnabled: Bool {
+        didSet { defaults.set(appleShortcutsEnabled, forKey: Key.appleShortcutsEnabled.rawValue) }
+    }
+
     /// Ask for a new window rather than a tab; off is the macOS default.
     var quicklinkOpensNewWindow: Bool {
         didSet {
@@ -520,6 +559,9 @@ final class AppSettings {
             ?? .none
         emojiSkinTone =
             defaults.string(forKey: Key.emojiSkinTone.rawValue).flatMap(EmojiSkinTone.init) ?? .none
+        emojiGridColumns =
+            EmojiGridColumns(rawValue: defaults.integer(forKey: Key.emojiGridColumns.rawValue))
+            ?? .default
         popToRootTimeout =
             PopToRootTimeout(rawValue: defaults.integer(forKey: Key.popToRootTimeout.rawValue))
             ?? .immediately
@@ -528,6 +570,9 @@ final class AppSettings {
             ?? .navigateBackOrClose
         appearance =
             defaults.string(forKey: Key.appearance.rawValue).flatMap(AppAppearance.init) ?? .system
+        calcNumberStyle =
+            defaults.string(forKey: Key.calcNumberStyle.rawValue).flatMap(CalcNumberStyle.init)
+            ?? .system
         interfaceSize =
             defaults.string(forKey: Key.interfaceSize.rawValue).flatMap(InterfaceSize.init)
             ?? .standard
@@ -545,9 +590,9 @@ final class AppSettings {
             || defaults.bool(forKey: Key.openOnCursorScreen.rawValue)
         autoSwitchInputSourceID = defaults.string(forKey: Key.autoSwitchInputSource.rawValue)
         paletteDraggable = defaults.bool(forKey: Key.paletteDraggable.rawValue)
-        // A half-written pair is no position at all, so both coordinates have to be there.
-        palettePosition = (defaults.array(forKey: Key.palettePosition.rawValue) as? [Double])
-            .flatMap { $0.count == 2 ? CGPoint(x: $0[0], y: $0[1]) : nil }
+        palettePositions =
+            defaults.dictionary(forKey: Key.palettePosition.rawValue)
+            as? [String: [Double]] ?? [:]
         fileSearchEnabled = defaults.bool(forKey: Key.fileSearchEnabled.rawValue)
         // Unset seeds home; a stored empty array is a cleared list that searches nothing.
         fileSearchScopes =
@@ -556,6 +601,12 @@ final class AppSettings {
         fileSearchIgnorePatterns =
             defaults.stringArray(forKey: Key.fileSearchIgnorePatterns.rawValue) ?? []
         notesEnabled = defaults.bool(forKey: Key.notesEnabled.rawValue)
+        notesRendersMarkdown =
+            defaults.object(forKey: Key.notesRendersMarkdown.rawValue) == nil
+            || defaults.bool(forKey: Key.notesRendersMarkdown.rawValue)
+        notesShowsFormattingBar =
+            defaults.object(forKey: Key.notesShowsFormattingBar.rawValue) == nil
+            || defaults.bool(forKey: Key.notesShowsFormattingBar.rawValue)
         aiEnabled = defaults.bool(forKey: Key.aiEnabled.rawValue)
         mcpEnabled = defaults.bool(forKey: Key.mcpEnabled.rawValue)
         customCommandsEnabled = defaults.bool(forKey: Key.customCommandsEnabled.rawValue)
@@ -590,7 +641,7 @@ final class AppSettings {
         calendarLauncherLimit =
             defaults.object(forKey: Key.calendarLauncherLimit.rawValue)
             .flatMap { $0 as? Int }
-            .flatMap(CalendarLauncherLimit.init(rawValue:)) ?? .three
+            .flatMap(CalendarLauncherLimit.init(rawValue:)) ?? .five
         calendarIncludesTomorrow =
             defaults.object(forKey: Key.calendarIncludesTomorrow.rawValue) == nil
             || defaults.bool(forKey: Key.calendarIncludesTomorrow.rawValue)
@@ -601,6 +652,7 @@ final class AppSettings {
             defaults.object(forKey: Key.autoJoinConfirms.rawValue) == nil
             || defaults.bool(forKey: Key.autoJoinConfirms.rawValue)
         cameraPreview = defaults.bool(forKey: Key.cameraPreview.rawValue)
+        meetingBrowserBundleID = defaults.string(forKey: Key.meetingBrowser.rawValue)
         // Both default to their zero case, so an unset key needs no presence check.
         menuBarEvents =
             MenuBarEvents(rawValue: defaults.integer(forKey: Key.menuBarEvents.rawValue)) ?? .today
@@ -634,6 +686,7 @@ final class AppSettings {
         quicklinksShowInLauncher =
             defaults.object(forKey: Key.quicklinksShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.quicklinksShowInLauncher.rawValue)
+        appleShortcutsEnabled = defaults.bool(forKey: Key.appleShortcutsEnabled.rawValue)
         quicklinkOpensNewWindow = defaults.bool(forKey: Key.quicklinkOpensNewWindow.rawValue)
         quicklinkSelectionFallback =
             defaults.string(forKey: Key.quicklinkSelectionFallback.rawValue)

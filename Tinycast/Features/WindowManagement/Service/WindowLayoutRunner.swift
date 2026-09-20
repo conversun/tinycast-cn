@@ -37,31 +37,67 @@ enum WindowLayoutRunner {
         var outcome = Outcome(skipped: plan.skipped)
         guard !plan.placements.isEmpty else { return outcome }
 
-        var claimed: [String: [AXUIElement]] = [:]
-        placeExisting(plan, snapshot: snapshot, claimed: &claimed, outcome: &outcome)
+        let startingApp = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        var bound: [UUID: WindowInventory.Element] = [:]
+        placeExisting(plan, snapshot: snapshot, bound: &bound, outcome: &outcome)
 
         let pending = plan.opens
-        guard !pending.isEmpty else { return outcome }
-        await open(pending, outcome: &outcome)
-        await placeOpened(pending, claimed: &claimed, outcome: &outcome)
+        if !pending.isEmpty {
+            await open(pending, outcome: &outcome)
+            await placeOpened(pending, bound: &bound, outcome: &outcome)
+        }
+        // Last, so no app this run opened can activate over the one the layout names.
+        if !Task.isCancelled, let frontmost = plan.frontmostEntryID.flatMap({ bound[$0] }),
+            !userSwitchedApps(since: startingApp, opening: pending)
+        {
+            AXWindowAccess.focus(frontmost.window, in: frontmost.application, of: frontmost.app)
+        }
         return outcome
     }
 
-    /// Every window a layout could name, described as entries against the display it sits on.
-    static func captureCurrentWindows() -> [WindowLayoutEntry] {
-        guard Permissions.ensureAccessibility() else { return [] }
+    /// A launch taking the front is expected; any other app there means the user moved on.
+    private static func userSwitchedApps(
+        since startingApp: pid_t?, opening placements: [WindowLayoutPlan.Placement]
+    ) -> Bool {
+        guard let current = NSWorkspace.shared.frontmostApplication,
+            current.processIdentifier != startingApp
+        else { return false }
+        return !placements.contains { $0.bundleID == current.bundleIdentifier }
+    }
+
+    /// Every window a layout could name, with the focused one marked to end a run frontmost.
+    static func captureCurrentWindows() -> (entries: [WindowLayoutEntry], frontmostEntryID: UUID?) {
+        guard Permissions.ensureAccessibility() else { return ([], nil) }
         let snapshot = WindowInventory.snapshot(positionableOnly: true)
         let screens = snapshot.screens
-        return snapshot.windows.compactMap { window in
+        let focusedHandle = focusedWindowHandle(in: snapshot)
+        var frontmostEntryID: UUID?
+        let entries = snapshot.windows.compactMap { window -> WindowLayoutEntry? in
             guard
                 let host = WindowPlacementEngine.screen(
                     containing: window.frame, in: screens.map(\.screen)),
                 let target = screens.first(where: { $0.screen.id == host.id })
             else { return nil }
-            return WindowLayoutGeometry.entry(
+            let entry = WindowLayoutGeometry.entry(
                 bundleID: window.bundleID, display: target.display, frame: window.frame,
                 on: target.screen)
+            if window.handle == focusedHandle { frontmostEntryID = entry.id }
+            return entry
         }
+        return (entries, frontmostEntryID)
+    }
+
+    /// Nil when Tinycast itself is frontmost, as it is when capturing from Settings.
+    private static func focusedWindowHandle(in snapshot: WindowInventory.Snapshot) -> Int? {
+        guard let app = NSWorkspace.shared.frontmostApplication,
+            let focused = AXWindowAccess.element(
+                AXWindowAccess.application(for: app.processIdentifier),
+                kAXFocusedWindowAttribute)
+        else { return nil }
+        return snapshot.elements.first { _, element in
+            element.app.processIdentifier == app.processIdentifier
+                && CFEqual(element.window, focused)
+        }?.key
     }
 
     // MARK: - Placing
@@ -69,7 +105,7 @@ enum WindowLayoutRunner {
     /// One suppress/restore per application, not per window: the flag is application-scoped.
     private static func placeExisting(
         _ plan: WindowLayoutPlan, snapshot: WindowInventory.Snapshot,
-        claimed: inout [String: [AXUIElement]], outcome: inout Outcome
+        bound: inout [UUID: WindowInventory.Element], outcome: inout Outcome
     ) {
         let existing = plan.placements.filter { $0.source != .launch }
         for (_, group) in Dictionary(grouping: existing, by: \.bundleID) {
@@ -83,7 +119,7 @@ enum WindowLayoutRunner {
                     let element = snapshot.elements[handle]
                 else { continue }
                 if place(placement, on: element.window) { outcome.placed += 1 }
-                claimed[placement.bundleID, default: []].append(element.window)
+                bound[placement.entryID] = element
             }
         }
     }
@@ -133,8 +169,8 @@ enum WindowLayoutRunner {
 
     /// A bounded wait inside this gesture's own task: no timer, no observer, nothing left behind.
     private static func placeOpened(
-        _ placements: [WindowLayoutPlan.Placement], claimed: inout [String: [AXUIElement]],
-        outcome: inout Outcome
+        _ placements: [WindowLayoutPlan.Placement],
+        bound: inout [UUID: WindowInventory.Element], outcome: inout Outcome
     ) async {
         var pending = placements
         // `ContinuousClock`, so a clock step or a sleep cannot shorten or extend the wait.
@@ -143,15 +179,17 @@ enum WindowLayoutRunner {
             try? await Task.sleep(for: pollInterval, tolerance: pollInterval)
             guard !Task.isCancelled else { break }
             pending = pending.filter { placement in
-                guard let (application, _) = WindowInventory.application(for: placement.bundleID),
+                guard let (application, app) = WindowInventory.application(for: placement.bundleID),
                     let window = WindowInventory.unclaimedWindows(
-                        of: application, excluding: claimed[placement.bundleID] ?? []
+                        of: application, excluding: bound.values.lazy.map(\.window)
                     ).first
                 else { return true }
                 let restore = AXWindowAccess.suppressEnhancedUserInterface(on: application)
                 defer { restore() }
                 if place(placement, on: window) { outcome.placed += 1 }
-                claimed[placement.bundleID, default: []].append(window)
+                bound[placement.entryID] = WindowInventory.Element(
+                    bundleID: placement.bundleID, app: app, application: application,
+                    window: window)
                 return false
             }
         }

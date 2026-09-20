@@ -10,6 +10,7 @@ enum WindowInventory {
     /// Live AX handles for one window. Never `Sendable`: these do not leave the main actor.
     struct Element {
         let bundleID: String
+        let app: NSRunningApplication
         let application: AXUIElement
         let window: AXUIElement
     }
@@ -41,7 +42,7 @@ enum WindowInventory {
                         handle: handle, bundleID: bundleID, frame: frame,
                         title: AXWindowAccess.string(window, kAXTitleAttribute) ?? ""))
                 elements[handle] = Element(
-                    bundleID: bundleID, application: application, window: window)
+                    bundleID: bundleID, app: app, application: application, window: window)
             }
         }
         return Snapshot(
@@ -51,7 +52,7 @@ enum WindowInventory {
 
     /// The windows of one app that this run has not already written to.
     static func unclaimedWindows(
-        of application: AXUIElement, excluding claimed: [AXUIElement]
+        of application: AXUIElement, excluding claimed: some Collection<AXUIElement>
     ) -> [AXUIElement] {
         AXWindowAccess.windows(in: application).filter { window in
             AXUIElementSetMessagingTimeout(window, sweepTimeout)

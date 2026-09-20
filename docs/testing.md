@@ -15,8 +15,8 @@ The mechanical bar, in one place so it cannot drift. All five pass before a chan
 | A clean build | `xcodebuild … -configuration Debug CODE_SIGNING_ALLOWED=NO`, zero **new** warnings |
 | Docs still true | any doc your change made wrong, fixed in the same commit |
 
-CI runs the first two and does not build the app at all — so the build, the purity grep and the docs
-are on you. Each is expanded below; the manual sweep at the end of this file is the sixth, judged by
+There is no CI: every item is on you, run locally. CodeRabbit reviews each PR, but it is a reviewer,
+not a gate. Each is expanded below; the manual sweep at the end of this file is the sixth, judged by
 what you touched.
 
 ## The harnesses
@@ -45,8 +45,8 @@ which is worth it only where the run dominates the compile — `raycast-test` sp
 scrypt at `-Onone` and one second at `-O`. `slow` dispatches it in the first wave, so the longest
 harnesses are not still running after everything else has finished.
 
-The script is the **only** place the harness set is written down — CI runs exactly this, so the two
-cannot drift. Adding a harness means adding one `run` line.
+The script is the **only** place the harness set is written down. Nothing runs it for you, so run it
+before you open a PR. Adding a harness means adding one `run` line.
 
 Each harness compiles the **shipped sources** it guards rather than a copy of them, which is what makes
 the pure-layer boundary real: a harness that stops *compiling* means AppKit or SwiftUI has leaked into a
@@ -86,6 +86,7 @@ If a change touches anything in the right column, the harness on the left is man
 | `file-search-test` | `FileSearch/Model/`, plus the shared `FuzzyMatch` scorer |
 | `file-search-session-test` | serialized query execution, debounce coalescing and cancellation |
 | `menu-search-test` | `MenuSearch/Model/` decisions, `MenuSearch/Service/` session filtering, the shared `FuzzyMatch` scorer |
+| `action-menu-search-test` | Action-menu query normalization and shared fuzzy matching |
 | `ranking-test` | `Launcher/Model/LauncherRankingStore.swift` |
 | `scopes-test` | `Launcher/Model/SearchScopes.swift` |
 | `app-name-test` | `Platform/AppDisplayName.swift` — every path that names a scanned bundle |
@@ -103,17 +104,19 @@ If a change touches anything in the right column, the harness on the left is man
 | `palette-placement-test` | `DesignSystem/Theme.swift`, `Palette/PalettePlacement.swift` |
 | `hotkey-test` | `HotKeys/Model/DoubleTapModifier.swift`, `DoubleTapDetector.swift`, `HyperKey.swift`, `HotKeyAction.swift`, `Service/KeyShortcut.swift`, and the command→action mapping in `Launcher/Model/CommandID.swift` |
 | `fallback-test` | `Launcher/Model/Fallback.swift`, plus the `CommandID` and `Quicklink` ids it is built from |
+| `dictionary-test` | `Dictionary/Model/DictionaryEntry.swift`, `DictionaryMarkup.swift` — a real XHTML record and the plain-text fallback, read into page blocks |
 | `callout-test` | `DesignSystem/Theme.swift`, `HotKeys/UI/CalloutPlacement.swift` |
 | `system-action-test` | `SystemActions/Model/SystemAction.swift` |
 | `volume-test` | `SystemActions/Model/VolumeLevel.swift` |
 | `window-command-test` | `WindowManagement/WindowCommand.swift`, `WindowPlacementEngine.swift`, `WindowActionMemory.swift` |
-| `window-layout-test` | `WindowManagement/Model/WindowLayout*.swift` — the layout record, its geometry and its inverse, the plan and the store |
+| `window-layout-test` | `WindowManagement/Model/WindowLayout*.swift` and `CustomWindowSize*.swift` — the layout record, its geometry and its inverse, the plan and the store; custom sizes' units, frames and store |
 | `custom-command-test` | `CustomCommands/Model/CustomCommand.swift`, `Service/ShellCommandRunner.swift` |
 | `uninstall-test` | all five pure files in `Uninstall/Model/` |
 | `quicklink-test` | all of `Quicklinks/Model/` |
+| `apple-shortcut-test` | all of `AppleShortcuts/Model/` — the `shortcuts list` parser and entry ids |
 | `snippets-test` | all of `Snippets/Model/` and `Snippets/Service/`, plus `Platform/HealthTicker.swift` |
-| `notes-test` | all of `Notes/Model/` and `Notes/Service/`, plus the real fuzzy matcher and signposts |
-| `notes-editor-test` | the literal Notes editor with real TextKit 2 and AppKit editing objects |
+| `notes-test` | all of `Notes/Model/` and `Notes/Service/`, including the Markdown parser, edit plans and reveal policy, plus the real fuzzy matcher and signposts |
+| `notes-editor-test` | the Notes editor, rendered and literal, with real TextKit 2 and AppKit editing objects: styling, reveal, layout fragments, keys, chords, checkboxes and links |
 | `raycast-test` | `Backup/Service/RaycastDecoder.swift`, `Scrypt.swift`, `Platform/Compression/Zlib.swift` |
 | `symbols-test` | `Extensions/Service/SymbolCatalog.swift`, against this machine's CoreGlyphs |
 | `ext-store-test` | `Extensions/Model/` — the registry model and both registry APIs' parsers |
@@ -154,7 +157,8 @@ grep -rln 'import AppKit\|import SwiftUI\|import Cocoa' Tinycast/Features/*/Mode
 Beyond the imports, the injected-environment half is not mechanically checkable, so it is worth an eye
 when touching a pure file:
 
-- `Calculator/Model/` still takes its clock via `now`/`calendar` and its rates via `rates`
+- `Calculator/Model/` still takes its clock via `now`/`calendar`, its rates via `rates` and its
+  separators via `format`
 - `Uninstall/Model/`'s deciding half still receives directory **names** and a `PathFacts`, never URLs
 - `HotKeys/Model/DoubleTap*` still take the clock as a parameter
 - `WindowManagement/Model/` still touches no `NSScreen` and makes no AX call, layouts included
@@ -164,7 +168,7 @@ when touching a pure file:
 
 ## Build and size checks
 
-A clean build is part of the bar; CI does not build the app, so this is on you.
+A clean build is part of the bar; nothing builds the app for you, so this is on you.
 
 ```sh
 xcodegen generate                 # only after editing project.yml
@@ -263,6 +267,25 @@ swiftc -O -swift-version 6 Tinycast/Features/Emoji/Model/{EmojiCatalog,EmojiData
 /tmp/emoji-search-performance --names
 ```
 
+`Tests/notes-editor-performance.swift` installs a 100,000-character note in a real rendered editor and
+prints, as JSON, the median over 30 runs of the install with its full restyle, one typed character at
+the end, middle and start, and a caret move between distant lines. The budget is 150 ms, 8 ms (end and
+middle) and 4 ms:
+
+```sh
+N=Tinycast/Features/Notes
+swiftc -O -swift-version 6 Tinycast/Platform/{Signposts,Appearance,NotificationToken}.swift \
+    Tinycast/DesignSystem/{Theme,InterfaceMetrics}.swift \
+    Tinycast/Features/TextInjection/Service/InjectableTextView.swift \
+    $N/Model/{NoteDocument,NoteMarkdown,NoteMarkdownParser,NoteInlineScanner}.swift \
+    $N/Model/{NoteEditPlan,NoteEditAction,NoteFormatting,NoteMarkdownEditing,NoteRevealPolicy}.swift \
+    $N/UI/{NoteMarkdownTypography,NoteBlockDecoration,NoteMarkdownStyler,NoteMarkdownRenderer}.swift \
+    $N/UI/{NoteCheckboxGeometry,NoteBlockLayoutFragment,NoteLayoutFragmentProvider}.swift \
+    $N/UI/{NoteTextViewEditing,NoteTextView,NoteEditorView}.swift \
+    Tests/notes-editor-performance.swift -o /tmp/notes-editor-performance
+/tmp/notes-editor-performance
+```
+
 `Signposts.interval` owns an explicit `defer` around the wrapped work on purpose. The obvious spelling
 leaks the interval when the work throws, because the `.end` emit is skipped on the throw path and the
 instrument then shows an interval that never closes.
@@ -286,6 +309,7 @@ Measured at the end of the 2026 refactor, on `main`. Useful as orders of magnitu
 | `palette-selection-test` | 111,684 assertions — a tripwire: a change in this count means the row-order model moved |
 | `SnippetKeywordPolicy` match | 7 µs/keystroke at 50 keywords, 59 µs at 1,000 — the `lowercased()` is 0.09 µs of it |
 | `ClipboardStore.pinnedItems` | 27–127 µs per uncached search, 1,000-row window — no cache earns its invalidation yet |
+| Rendered Notes editor, 100,000 characters | 30 ms install and full restyle; 7.5, 5.9 and 3.3 ms per character typed at the end, middle and start (5.2, 3.1 and 0.6 ms with rendering off); 0.6 ms per caret move |
 | `count items of trash` | 5,000 ms against a cold Finder on an *empty* Trash, 110 ms warm — why AppleScript is detached |
 
 Launch time, allocation counts and RSS have never been captured as numbers. The signposts are in place,
@@ -324,10 +348,22 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - ⌃N/⌃P move the highlight as ↓/↑ do; ⌃F/⌃B step the emoji grid's selection, and the caret elsewhere
 - The highlight always sits on the row the footer pill describes
 - With a calculation typed, the calculator card is first and is selected first
+- With macOS set to a decimal-comma region (Italian), `2,3 + 1,5` answers `3,8`, `max(2,5; 3)`
+  answers `3`, and ↵ pastes `3,8`; General ▸ Calculator ▸ Number format `English` restores `2.3 + 1.5`
+  and re-renders past Calculator History in the chosen format
 - Section headers appear in order: Favorites, Applications, System Settings, Quicklinks, Snippets,
   System Actions, Window Management, Custom Commands, Commands
 - With a non-ASCII input source active, ⌘K opens Actions; ↑/↓ move it, ↵ activates, Escape closes it
-- While a menu is open, typing does **not** change the query and the caret is hidden
+- In either ⌘K Actions panel, typing filters immediately in the bottom search band without changing
+  the palette query; sections survive filtering, **No Results** is centred, and no dissolve covers the
+  last row. The native caret blinks; mouse drag and ⌘A select text; ←/→ move through it; ↑/↓ still
+  move the menu highlight. Escape clears a non-empty query, then closes the menu on the next press
+- The bottom-left app menu also searches from its bottom band; every header menu — including Emoji
+  categories, File Search filters and extension dropdowns — searches from its top band
+- A long menu opens with unchanged row insets; while scrolling, rows can reach the panel edges
+- A click in the palette but outside its menu closes only the menu; a click outside the palette
+  closes both, regardless of the menu query; the next summon accepts typing immediately
+- Footer menus are about 30pt wider; their row hover keeps the shared 10pt menu-row corner
 - Tab toggles launcher ↔ clipboard; bare Backspace on an empty query backs out of a sub-screen
 - Launching an app focuses it; escaping the palette returns focus to the app you came from
 - Paste from clipboard history lands in that app, not in Tinycast
@@ -337,6 +373,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 - A copy appears at the top within about a second; an image copy records a thumbnail
 - Search is correct both under and over three characters
+- The type filter searches from its top band, retains its active checkmark when matched, and shows
+  centred **No Results** without changing the clipboard query; its native field supports selection
 - ⌘. pins and the highlight follows the row into Pinned; ⌘⌫ deletes; ⌘↵ copies without pasting
 - ⌃X deletes the selected entry and ⌃⇧X clears the history, from the list and from an open ⌘K menu
 - ⌃⇧X asks first, through Tinycast's own dialog; Cancel and Esc both leave every entry in place
@@ -350,7 +388,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 ### Launcher and icons
 
 - Every installed app appears; Settings panes appear under System Settings; running apps show the dot
-- Icons render with no placeholder flash on reopen, and Settings ▸ Applications scrolls without hitching
+- Icons render with no placeholder flash on reopen, and Settings ▸ Applications scrolls without hitching,
+  even with the scrollbar thumb dragged from end to end in under a second
 - An app removed since the last open drops out after a reopen
 - Learned ranking still surfaces your habitual result for a short query
 
@@ -380,6 +419,16 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - `{selection}` falls back per the Settings choice
 - Pin, duplicate, delete and Open with Default all behave; import and export round-trip
 - Display order is pinned first by pin time, then by name
+
+### Apple Shortcuts
+
+- Off out of the box: the pane lists nothing and no shortcut reaches the launcher
+- Switching on lists every shortcut with the Shortcuts app's icon; ↵ on a row runs it
+- A shortcut added in Shortcuts appears on the next launcher open
+- A row's hotkey runs it with the palette closed; switching the feature off silences it
+- Unchecking a row hides it from search, and its hotkey still fires
+- Deleting a shortcut in Shortcuts frees its alias and hotkey on the next launcher open
+- A shortcut that fails shows Tinycast's dialog with the tool's error
 
 ### File Search
 
@@ -422,14 +471,61 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Delete confirms through Tinycast, moves the file to Trash, and selecting another note never loses an
   unsaved edit
 - An existing `Floating Note.md` appears as an ordinary note without conversion
-- Markdown source remains completely literal: markers stay visible, links are not activated, and task
-  syntax is ordinary text; there is no preview, formatting menu, or task overlay
-- Return, Tab, Delete, and formatting-looking shortcuts retain native plain-text behavior
+- A note using every construct renders in Dark and Light: sized headings, emphasis, strikethrough,
+  inline code, coloured links, bullets, numbers, checkboxes with space between tasks, lists nested at
+  two and four spaces, quote bars, a code band with its language label, and a rule
+- The caret's line shows raw Markdown in the tertiary colour and re-renders when the caret leaves; a
+  multi-line selection reveals every selected line, and Select All shows the whole source
+- Dragging a selection across rendered lines does not jump under the pointer; the lines reveal on
+  mouse-up
+- Clicking another app renders the whole note; clicking back reveals the caret line again
+- Inside a code block both fences show and Markdown inside it stays literal
+- A table shows as its literal source in the code font, with no styling inside it; adding the `| --- |`
+  row under existing rows turns them all into the table at once
+- Bullets, numbers and checkboxes are a neutral gray, bullet, numbered and task items are evenly spaced,
+  and revealing a bullet or numbered line leaves its text where it was
+- A checkbox click toggles without moving the caret, autosaves, and Command-Z restores it; the file on
+  disk shows `[x]`
+- A link click opens the browser, a click at the label's edge places the caret, a `file:` link does
+  nothing, and a link on the caret's line is editable text
+- Return continues and leaves lists and quotes, Tab and Shift-Tab nest, ordered lists renumber, `[] `
+  becomes a task, and every formatting shortcut works and undoes in one step
+- Pasting a URL over selected text makes a link; pasting anything else is plain text
+- Copy from a rendered line pastes raw Markdown into another app; a snippet keyword expands inside a
+  rendered note and is styled at once
+- The derived title of an Untitled note shows no Markdown markers
+- A narrow window wraps list items under their text, not under the marker
+- With Render Markdown **off**, the note is fully literal (markers visible, links inert, task syntax
+  plain) and Return, Tab, Delete, and formatting-looking shortcuts keep native plain-text behavior;
+  flipping it back re-renders without dirtying the note or touching undo
 - Edit one note, switch to a shorter note, then Undo and Redo: the new note remains intact and the app
   does not terminate
 - Marked-text input, emoji, combining marks, Copy, Cut, Paste, Select All, Undo, Redo, and Find preserve
   exact source
 - An empty note shows `Start writing…`; the footer count is right after typing, pasting and undoing
+- With Render Markdown and Show Formatting Bar on, the band under a note holds the character count on
+  the left and the round formatting button on the right; with either setting off, the old centred
+  count footer is back and nothing else moved
+- The bar starts collapsed, ⌥⌘T and the round button both expand and collapse it, the buttons slide out
+  from behind that button, and the state survives switching notes, hiding the window and a relaunch
+- Every bar button applies its formatting, undoes in one step with ⌘Z, and autosaves; clicking keeps the
+  caret where it was and the caret's line stays revealed
+- Buttons light for the selection: inside bold, on a list, quote, heading or code line; clicking a lit
+  button removes that formatting and the button goes dark
+- Hovering a button shows its name and shortcut above it, fully visible and not clipped by the capsule;
+  the heading button's tooltip does not show while its menu is open
+- The heading menu opens above the capsule, aligned to its left edge, shows the current level checked,
+  and applies a level on click; it closes on Escape, on a click anywhere in the note window (including
+  the heading button itself, which must not reopen it), on typing, on ⌘P, and when another app is clicked
+- At the smallest window size all eleven controls show and the count is hidden, the note's text keeps
+  its inset in both states, the heading menu still opens in full above the capsule, and widening the
+  window brings the count back
+- ⌥⌘C and ⇧⌘B toggle a code block and a quote; with Render Markdown off they do nothing special
+- Settings > Notes > Show Formatting Bar is disabled while Render Markdown is off, Settings search for
+  "formatting" lands on it, and a backup round trip restores it
+- With VoiceOver, the bar reads as "Formatting" with each button named, lit ones as selected, the round
+  button announcing Expanded or Collapsed, and the heading button its level; menu rows read their titles
+  and the current one as selected
 - Traffic lights sit top-left, the title is centred **on the window**, and the capsule is top-right, all
   on one line; the yellow light is disabled and green zooms
 - Each capsule button shows a hover capsule and a native tooltip, and fires its action
@@ -512,6 +608,10 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Holding a bound hotkey does **not** stack dialogs
 - Window commands move the window you were last in; cycle-on-repeat steps ½ → ⅓ → ⅔
 - "Top Half" lands flush with the top of the visible frame, on a secondary display too
+- A command with the Notes window focused places Notes, not the app behind it
+- Cycling, Restore, custom sizes and display moves all work on Notes and on Settings
+- Fullscreen on Settings toggles it; on the Notes window it does nothing
+- With the note switcher open a command places Notes; the switcher and HUDs are never placed
 
 ### Extensions
 

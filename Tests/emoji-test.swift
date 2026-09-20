@@ -38,6 +38,31 @@ struct EmojiTests {
         expect(command?.category == .keysAndTechnical, "⌘ landed in Keys & Technical")
         let apple = entries.first { $0.glyph == "\u{F8FF}" }
         expect(apple?.keywords.contains("apple") == true, " is searchable as apple")
+        expect(
+            EmojiCategory.allCases.allSatisfy { !$0.systemImage.isEmpty },
+            "every category has a menu symbol")
+        expect(
+            EmojiCategoryFilter.allCases.count == EmojiCategory.allCases.count + 3,
+            "all, pinned and frequent precede every catalog category")
+        expect(EmojiCategoryFilter.allCases.first == .all, "All Categories is the default row")
+        expect(EmojiCategory.symbols.itemTitle == "Symbol", "symbol categories use Symbol actions")
+        expect(EmojiCategory.flags.itemTitle == "Emoji", "emoji categories use Emoji actions")
+
+        // Density is bounded to the five user-facing choices, with eight as the default.
+        expect(
+            EmojiGridColumns.allCases.map(\.rawValue) == [6, 7, 8, 9, 10],
+            "grid densities cover six through ten columns")
+        expect(EmojiGridColumns.default == .eight, "the default grid has eight columns")
+        expect(EmojiGridColumns.six.applying(.zoomIn, default: .eight) == nil, "zoom-in stops at six")
+        expect(EmojiGridColumns.ten.applying(.zoomOut, default: .eight) == nil, "zoom-out stops at ten")
+        expect(EmojiGridColumns.eight.applying(.zoomIn, default: .eight) == .seven, "zoom-in drops one")
+        expect(EmojiGridColumns.eight.applying(.zoomOut, default: .eight) == .nine, "zoom-out adds one")
+        expect(
+            EmojiGridColumns.six.applying(.actualSize, default: .nine) == .nine,
+            "actual size returns to the configured default")
+        expect(
+            EmojiGridColumns.nine.applying(.actualSize, default: .nine) == nil,
+            "actual size at the default changes nothing")
 
         // Skin tone application
         expect(EmojiCatalog.applyTone(.dark, to: "👋") == "👋🏿", "modifier appended")
@@ -74,6 +99,20 @@ struct EmojiTests {
         expect(single.down(from: 2) == 2, "single row: down is a no-op")
         expect(single.up(from: 2) == 2, "single row: up is a no-op")
         expect(EmojiGridGeometry(counts: [], columns: 8).down(from: 0) == 0, "empty grid is safe")
+        expect(
+            EmojiGridGeometry.selectionAfterRemovingPin(at: 1, remainingCount: 3) == 1,
+            "unpin selects the neighbour that shifts into the removed slot")
+        expect(
+            EmojiGridGeometry.selectionAfterRemovingPin(at: 2, remainingCount: 2) == 1,
+            "unpinning the last pin selects its preceding neighbour")
+        expect(
+            EmojiGridGeometry.selectionAfterRemovingPin(at: 0, remainingCount: 0) == 0,
+            "unpinning the only pin leaves a safe empty selection")
+
+        let sixColumns = EmojiGridGeometry(counts: [12, 8], columns: 6)
+        expect(sixColumns.down(from: 2) == 8, "six-column navigation keeps its visual column")
+        let tenColumns = EmojiGridGeometry(counts: [20], columns: 10)
+        expect(tenColumns.down(from: 7) == 17, "ten-column navigation keeps its visual column")
 
         if failures == 0 {
             print("emoji-test: all checks passed (\(entries.count) records)")

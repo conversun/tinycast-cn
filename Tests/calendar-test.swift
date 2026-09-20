@@ -25,6 +25,7 @@ struct CalendarTests {
         cardWindow()
         chordFallsBackWiderThanTheCard()
         countdownStrings()
+        rowCountdowns()
         dayBuckets()
         readSpan()
         menuBarWindow()
@@ -168,6 +169,28 @@ struct CalendarTests {
             hosted("https://meet.google.com/abc-defg-hij", "user@domain.com")?.url.absoluteString
                 == "https://meet.google.com/abc-defg-hij",
             "the link as written is what Copy Meeting Link keeps")
+        expect(
+            hosted("https://meet.google.com/abc", participant("mailto:user@domain.com"))?.webURL
+                .absoluteString == "https://meet.google.com/abc?authuser=user@domain.com",
+            "the current user's mailto address reaches the Meet link as its account")
+        expect(
+            hosted(
+                "https://meet.google.com/abc",
+                participant("mailto:user@domain.com", isCurrentUser: false))?.webURL
+                .absoluteString == "https://meet.google.com/abc",
+            "another participant's address is never used as ours")
+        expect(
+            participant("mailto:user%40domain.com") == "user@domain.com",
+            "a percent-encoded address is decoded once, here")
+        expect(
+            participant("mailto:a+b@domain.com") == "a+b@domain.com",
+            "a plus survives the decode, so accountURL can encode it again")
+        expect(
+            participant("urn:uuid:1F2A") == nil,
+            "a non-mailto participant URL yields no address")
+        expect(
+            participant("mailto:unknownorganizer@calendar.google.com") != nil,
+            "a placeholder organizer address is still an address, left for isCurrentUser to refuse")
     }
 
     // MARK: - The join window
@@ -246,6 +269,19 @@ struct CalendarTests {
         expect(
             window.joinable(from: [event(id: "past", start: -120)], now: now) == nil,
             "a meeting that is over is not offered")
+    }
+
+    static func rowCountdowns() {
+        let meeting = event(id: "review", start: 120, minutes: 30)
+        func pill(_ offset: TimeInterval) -> String? {
+            UpcomingWindow.rowCountdown(for: meeting, now: at(120).addingTimeInterval(offset))
+        }
+        expect(pill(-60 * 60) == "in 60 min", "exactly an hour out still earns a pill")
+        expect(pill(-60 * 60 - 1) == nil, "past the hour a row shows only its time")
+        expect(pill(-25 * 60) == "in 25 min", "inside the hour a row counts down")
+        expect(pill(0) == "Now", "the start reads as Now")
+        expect(pill(29 * 60) == "Now", "a meeting under way stays Now")
+        expect(pill(30 * 60) == nil, "a finished meeting earns no pill")
     }
 
     static func countdownStrings() {
@@ -522,6 +558,10 @@ struct CalendarTests {
         MeetingLink.detect(fields: [text], account: account)
     }
 
+    static func participant(_ url: String, isCurrentUser: Bool = true) -> String? {
+        MeetingLink.accountAddress(of: URL(string: url)!, isCurrentUser: isCurrentUser)
+    }
+
     static func provider(_ text: String) -> MeetingLink.Provider? { link(text)?.provider }
 
     static func event(
@@ -532,7 +572,7 @@ struct CalendarTests {
             id: id, title: id, start: at(minutes),
             end: at(minutes).addingTimeInterval(TimeInterval(duration * 60)),
             isAllDay: isAllDay, isDeclined: isDeclined, calendarID: "cal", calendarName: "Work",
-            calendarItemID: id, link: link)
+            calendarColor: nil, calendarItemID: id, link: link)
     }
 
     static func event(
@@ -543,7 +583,7 @@ struct CalendarTests {
             id: id, title: id, start: start,
             end: start.addingTimeInterval(TimeInterval(duration * 60)),
             isAllDay: false, isDeclined: false, calendarID: "cal", calendarName: "Work",
-            calendarItemID: id, link: link)
+            calendarColor: nil, calendarItemID: id, link: link)
     }
 
     static func expect(_ condition: Bool, _ label: String) {

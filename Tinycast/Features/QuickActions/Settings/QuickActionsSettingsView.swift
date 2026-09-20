@@ -21,15 +21,13 @@ struct QuickActionsSettingsView: View {
             Section {
                 Toggle(isOn: enabledBinding) {
                     SettingsRowTitle(.quickActionsQuickActions, "Enable Quick Actions")
-                    Text(
-                        ("Act on the text you have selected in any app. Nothing is read until you "
-                            + "press a shortcut.").localizedUI)
+                    Text("Act on selected text. Nothing is read until you press a shortcut.")
                 }
                 if appSettings.quickActionsEnabled, !isTrusted {
                     // Every shortcut fails without it; better said here than found one press later.
                     SettingsRow(
                         title: "Accessibility permission required",
-                        subtitle: "Tinycast can't read your selection until it is granted."
+                        subtitle: "Needed to read your selection."
                     ) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(Theme.Colors.destructive)
@@ -52,19 +50,24 @@ struct QuickActionsSettingsView: View {
         .formStyle(.grouped)
         .settingsScrollTarget(.quickActions)
         .onReceive(refreshTimer) { _ in isTrusted = Permissions.isAccessibilityTrusted() }
-        .sheet(item: $editingAction) { action in
-            InstructionsEditorSheet(
+        .settingsEditorPanel(item: $editingAction) { action in
+            InstructionsEditorPanel(
                 action: action,
-                instructionOverride: store.settings.instructionOverride(for: action)
-            ) { instructionOverride in
+                instructionOverride: store.settings.instructionOverride(for: action),
+                modelOverride: store.modelOverride(for: .builtIn(action))
+            ) { instructionOverride, modelOverride in
                 store.settings.setInstructionOverride(instructionOverride, for: action)
+                store.setModelOverride(modelOverride, for: .builtIn(action))
             }
         }
-        .sheet(item: $customEditing) { request in
-            CustomQuickActionEditorSheet(request: request)
+        .settingsEditorPanel(item: $customEditing) { request in
+            CustomQuickActionEditorPanel(
+                request: request,
+                model: request.action.flatMap { store.modelOverride(for: .custom($0)) })
         }
         .onAppear {
             core.quickActionCoordinator.loadLanguages()
+            store.repairModel(against: aiSettings.connections, fallback: aiSettings.defaultModel)
             store.resolveModel(
                 appleIntelligenceAvailable: aiSettings.isAppleIntelligenceAvailable(),
                 fallback: aiSettings.defaultModel)
@@ -84,7 +87,7 @@ struct QuickActionsSettingsView: View {
         Section {
             ForEach(BuiltInQuickAction.allCases, content: builtInRow)
             ForEach(customActions.actions) { action in
-                SettingsRow(title: action.name, subtitle: nil) {
+                SettingsRow(title: action.name, subtitle: subtitle(for: .custom(action))) {
                     SymbolImage(name: action.symbol, size: Theme.Size.quickActionHeaderIcon)
                         .frame(width: Theme.Size.settingsRowIcon)
                 } trailing: {
@@ -105,19 +108,15 @@ struct QuickActionsSettingsView: View {
         } header: {
             SettingsSectionHeader(.quickActionsActions)
         } footer: {
-            Text(
-                ("Replace puts the result straight into your document — undo in the app you were in "
-                    + "brings it back. Preview shows it in a panel first. The checkbox lists the "
-                    + "action in the launcher; its shortcut works either way.").localizedUI
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("Replace writes into your document, and undo restores it. Preview shows a panel first.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
     private func builtInRow(_ action: BuiltInQuickAction) -> some View {
         let entry = CommandCatalog.entry(for: CommandID(action))
-        return SettingsRow(title: action.title, subtitle: subtitle(for: action)) {
+        return SettingsRow(title: action.title, subtitle: subtitle(for: .builtIn(action))) {
             Image(systemName: action.symbol)
                 .frame(width: Theme.Size.settingsRowIcon)
         } trailing: {
@@ -156,6 +155,7 @@ struct QuickActionsSettingsView: View {
         Toggle("", isOn: launcherBinding(entry))
             .labelsHidden()
             .toggleStyle(.checkbox)
+            .launcherVisibilityHelp()
             .accessibilityLabel("Show \(title.localizedUI) in launcher")
     }
 
@@ -166,22 +166,18 @@ struct QuickActionsSettingsView: View {
                 select: store.select,
                 modelLabel: {
                     SettingsRowTitle(.quickActionsModel, "Model")
-                    Text("Used by every action except Translate.")
+                    Text("Unless an action sets its own.")
                 },
                 effortLabel: {
                     SettingsRowTitle(.quickActionsModel, "Reasoning effort")
-                    Text("Applied when the selected model supports reasoning effort.")
                 }
             )
         } header: {
             SettingsSectionHeader(.quickActionsModel)
         } footer: {
-            Text(
-                ("Separate from chat's model on purpose: a shortcut you press all day should not "
-                    + "bill an API every time. Apple Intelligence runs on this Mac for nothing.")
-                    .localizedUI)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("Separate from AI Chat's, so frequent use needn't bill an API.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -194,22 +190,28 @@ struct QuickActionsSettingsView: View {
                 }
             } label: {
                 SettingsRowTitle(.quickActionsTranslate, "Translate to")
-                Text("The panel can still translate into another language once it is open.")
             }
         } header: {
             SettingsSectionHeader(.quickActionsTranslate)
         } footer: {
-            Text(
-                "Translation uses Apple's own translator on this Mac, so it costs nothing and ".localizedUI
-                    + "reaches no provider. A language downloads the first time you use it.".localizedUI
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("Apple's translator, on this Mac. A language downloads on first use.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
-    private func subtitle(for action: BuiltInQuickAction) -> String? {
-        action.alwaysPreviews ? "Always shown in a panel" : nil
+    private func subtitle(for action: QuickAction) -> String? {
+        let details = [
+            action.alwaysPreviews ? "Always shown in a panel" : nil,
+            store.modelOverride(for: action).map(routeTitle)
+        ].compactMap(\.self)
+        return details.isEmpty ? nil : details.joined(separator: " · ")
+    }
+
+    private func routeTitle(_ selection: AIModelSelection) -> String {
+        let model = modelChoices.first { $0.matches(selection) }?.title ?? selection.model
+        guard let effort = selection.effort else { return model }
+        return "\(model) (\(ChatGPTSubscription.Effort(id: effort, detail: nil).title))"
     }
 
     private var enabledBinding: Binding<Bool> {
@@ -264,7 +266,7 @@ struct QuickActionsSettingsView: View {
         {
             unavailable.insert(.codex)
         }
-        for kind in [InstalledAIKind.claude, .openCode] {
+        for kind in InstalledAIKind.managedCLIKinds {
             let phase = core.installedAI.status(for: kind).phase
             guard
                 !aiSettings.enabledInstalledProviders.contains(kind)
@@ -277,62 +279,62 @@ struct QuickActionsSettingsView: View {
             fallback: aiSettings.defaultModel)
     }
 
-    private struct InstructionsEditorSheet: View {
-        @Environment(\.dismiss) private var dismiss
+    private struct InstructionsEditorPanel: View {
+        @Environment(\.settingsEditorDismiss) private var dismiss
         @State private var instructions: String
+        @State private var model: AIModelSelection?
 
         let action: BuiltInQuickAction
         let builtIn: String
-        let onSave: (String?) -> Void
+        let onSave: (String?, AIModelSelection?) -> Void
 
         init(
             action: BuiltInQuickAction, instructionOverride: String?,
-            onSave: @escaping (String?) -> Void
+            modelOverride: AIModelSelection?,
+            onSave: @escaping (String?, AIModelSelection?) -> Void
         ) {
             self.action = action
             let builtIn = QuickActionPrompt.instructions(for: action)
             _instructions = State(initialValue: instructionOverride ?? builtIn)
+            _model = State(initialValue: modelOverride)
             self.builtIn = builtIn
             self.onSave = onSave
         }
 
         var body: some View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-                Text("Customize \(action.title.localizedUI)")
-                    .font(.title2.weight(.bold))
-
-                Text("Tell Tinycast how you want \(action.title.localizedUI) to handle your selected text.")
-                    .foregroundStyle(.secondary)
+                SettingsEditorHeader(
+                    title: String(localized: "Customize \(action.title.localizedUI)"),
+                    subtitle: String(
+                        localized: "Tell Tinycast how you want \(action.title.localizedUI) to handle your selected text."
+                    )
+                )
 
                 TextEditor(text: $instructions)
                     .font(.body)
-                    .scrollContentBackground(.hidden)
-                    .padding(Theme.Spacing.sm)
-                    .frame(height: Theme.Size.editorTextHeight * 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-                            .fill(Theme.Colors.cardFill)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.row, style: .continuous)
-                            .strokeBorder(Theme.Colors.cardStroke, lineWidth: 1)
-                    )
+                    .settingsEditorTextArea(height: Theme.Size.editorTextHeight * 2)
 
-                HStack {
+                QuickActionModelPicker(selection: $model)
+
+                HStack(spacing: Theme.Spacing.md) {
                     Button("Use Default") { instructions = builtIn }
+                        .buttonStyle(.modalAction(.standard, fillsWidth: false))
                         .disabled(instructions == builtIn)
                     Spacer()
                     Button("Cancel") { dismiss() }
+                        .buttonStyle(.modalAction(.cancel))
                         .keyboardShortcut(.cancelAction)
                     Button("Save") {
-                        onSave(instructions == builtIn ? nil : instructions)
+                        onSave(instructions == builtIn ? nil : instructions, model)
                         dismiss()
                     }
+                    .buttonStyle(.modalAction(.primary))
                     .keyboardShortcut(.defaultAction)
                 }
             }
-            .padding(Theme.Spacing.xxl)
+            .padding(Theme.Spacing.dialogInset)
             .frame(width: Theme.Size.editorSheetWidth)
+            .settingsEditorPanelSurface()
         }
     }
 }

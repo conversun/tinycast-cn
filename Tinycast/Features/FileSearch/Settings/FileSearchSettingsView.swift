@@ -9,7 +9,7 @@ struct FileSearchSettingsView: View {
             Section {
                 Toggle(isOn: $settings.fileSearchEnabled) {
                     SettingsRowTitle(.fileSearchFileSearch, "Enable File Search")
-                    Text("Find files and folders through the system Spotlight index, only on demand.")
+                    Text("Uses the Spotlight index, only when you search.")
                 }
             } header: {
                 SettingsSectionHeader(.fileSearchFileSearch)
@@ -56,14 +56,9 @@ private struct FileSearchScopesSection: View {
         } header: {
             SettingsSectionHeader(.fileSearchSearchScopes)
         } footer: {
-            Text(
-                """
-                Your home folder expands to its visible folders and cloud drives, never to its Library. \
-                An empty list searches nothing.
-                """
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("Home covers its visible folders and cloud drives, never Library.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .onAppear(perform: refreshMissing)
         .onChange(of: settings.fileSearchScopes) { _, _ in refreshMissing() }
@@ -145,15 +140,9 @@ private struct FileSearchIgnoreSection: View {
         } header: {
             SettingsSectionHeader(.fileSearchIgnorePatterns)
         } footer: {
-            Text(
-                """
-                A pattern without a slash matches any file or folder name, like *.tmp or node_modules; \
-                one with a slash matches the whole path, like **/[Cc]ache/**. The built-in patterns \
-                always apply.
-                """
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("No slash matches a name, like *.tmp. A slash matches the path, like **/[Cc]ache/**.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

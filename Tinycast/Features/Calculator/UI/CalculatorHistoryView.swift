@@ -106,9 +106,12 @@ struct CalculatorHistoryList: View {
 private struct CalcHistoryRow: View {
 
     @Environment(\.metrics) private var metrics
+    @Environment(AppCore.self) private var core
     let entry: CalcHistoryEntry
     let selected: Bool
     @State private var hovered = false
+
+    private var format: CalcNumberFormat { core.calcNumberFormat }
 
     private var fill: Color {
         if selected { return Theme.Colors.selection }
@@ -127,13 +130,13 @@ private struct CalcHistoryRow: View {
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.secondary)
                 )
-            Text(entry.expression)
+            Text(format.localizedExpression(entry.expression))
                 .font(metrics.typography.rowTitle)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: metrics.spacing.xl)
-            Text(entry.result)
+            Text(format.localized(entry.result))
                 .font(metrics.typography.rowTitle.weight(.semibold))
                 .lineLimit(1)
         }

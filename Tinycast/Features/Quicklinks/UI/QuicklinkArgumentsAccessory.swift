@@ -15,27 +15,33 @@ enum QuicklinkArgumentsAccessory {
     ) -> PaletteHeaderAccessory? {
         guard let quicklink else { return nil }
         let metrics = core.settings.interfaceSize.metrics
-        let arguments = core.quicklinkCoordinator.promptedArguments(for: quicklink)
+        let arguments = core.quicklinkCoordinator.promptedArguments(for: quicklink).map {
+            InlineArgument(
+                id: $0.name, title: $0.name, options: $0.options,
+                isOptional: !QuicklinkCoordinator.requiresValue($0))
+        }
         guard !arguments.isEmpty else { return nil }
 
         // Its own screen already shows the row the fields belong to, so the glyph would repeat it.
         let symbol = placement == .afterQuery ? quicklink.symbol : nil
         let value = { (name: String) in binding(quicklink: quicklink, name: name, vm: vm) }
         return PaletteHeaderAccessory(
-            width: QuicklinkArgumentsRow.totalWidth(
+            width: InlineArgumentFields.totalWidth(
                 for: arguments, hasIcon: symbol != nil, metrics: metrics),
-            fieldNames: arguments.map(\.name),
-            firstIncompleteField: arguments.first { value($0.name).wrappedValue.isEmpty }?.name,
-            optionsMenu: { name in
-                guard let argument = arguments.first(where: { $0.name == name }),
+            fieldNames: arguments.map(\.id),
+            firstIncompleteField: arguments.first {
+                !$0.isOptional && value($0.id).wrappedValue.isEmpty
+            }?.id,
+            optionsMenu: { id in
+                guard let argument = arguments.first(where: { $0.id == id }),
                     !argument.options.isEmpty
                 else { return nil }
-                return menu(for: argument, value: value(name))
+                return menu(for: argument, value: value(id))
             },
             placement: placement,
             // Identity per row, so "which fields were left unanswered" starts clean on the next one.
             view: AnyView(
-                QuicklinkArgumentsRow(
+                InlineArgumentFields(
                     arguments: arguments, symbol: symbol, value: value, focused: focus,
                     openOptions: onOpenOptions, onSubmit: onSubmit
                 )
@@ -63,10 +69,10 @@ enum QuicklinkArgumentsAccessory {
     }
 
     private static func menu(
-        for argument: SnippetTemplateEngine.MissingArgument, value: Binding<String>
+        for argument: InlineArgument, value: Binding<String>
     ) -> PopoverMenuContent {
         PopoverMenuContent(
-            header: argument.name,
+            header: argument.title,
             items: argument.options.map { option in
                 PopoverMenuItem(
                     title: option,

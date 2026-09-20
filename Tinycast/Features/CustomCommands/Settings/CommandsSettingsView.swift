@@ -19,20 +19,19 @@ struct CommandsSettingsView: View {
             FeatureSwitchSection(
                 anchor: .commandsCustomCommands,
                 enableTitle: "Enable custom commands",
-                enableSubtitle:
-                    "Commands run with your user account in /bin/zsh, so use full executable paths.",
-                launcherSubtitle: "Find your commands in launcher search.",
+                enableSubtitle: "Run as you in /bin/zsh. Use full executable paths.",
                 isEnabled: $settings.customCommandsEnabled,
                 showsInLauncher: $settings.customCommandsShowInLauncher)
 
             Section {
                 if store.commands.isEmpty {
-                    Text("Add one to make it searchable from the launcher.")
+                    Text("No custom commands yet.")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(sortedCommands) { command in
                         CustomCommandSettingsRow(
                             command: command,
+                            showsInLauncher: settings.customCommandsShowInLauncher,
                             isEnabled: Binding(
                                 get: { command.isEnabled },
                                 set: {
@@ -54,20 +53,17 @@ struct CommandsSettingsView: View {
                     SettingsRowTitle(.commandsCustomCommands, "Import Raycast Scripts")
                 }
             } footer: {
-                Text(
-                    "Name it, then give it a shortcut if you want one. Importing reads a folder of "
-                        + "Raycast script commands, one command per script."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text("Import reads a folder of Raycast script commands.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .settingsEnabled(settings.customCommandsEnabled)
         }
         .formStyle(.grouped)
         .settingsScrollTarget(.commands)
         .releasesFocusOnOutsideClick()
-        .sheet(item: $editor) { target in
-            CustomCommandEditorSheet(command: target.command)
+        .settingsEditorPanel(item: $editor) { target in
+            CustomCommandEditorPanel(command: target.command)
         }
         .alert(item: $pendingDeletion) { command in
             Alert(
@@ -94,6 +90,7 @@ private struct EditorTarget: Identifiable {
 
 private struct CustomCommandSettingsRow: View {
     let command: CustomCommand
+    let showsInLauncher: Bool
     @Binding var isEnabled: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -102,6 +99,10 @@ private struct CustomCommandSettingsRow: View {
         SettingsRow(title: command.name, subtitle: command.command) {
             Image(systemName: command.symbol)
         } trailing: {
+            // An alias only reaches the ranker through the launcher slice, so it dims with it.
+            AliasField(key: command.entryID, name: command.name)
+                .settingsEnabled(command.isEnabled && showsInLauncher)
+
             // A disabled command's shortcut fires into the funnel's refusal, so it dims too.
             ShortcutRecorder(action: .customCommand(id: command.id))
                 .settingsEnabled(command.isEnabled)

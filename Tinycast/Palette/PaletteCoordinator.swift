@@ -10,6 +10,8 @@ final class PaletteCoordinator {
     private let menuSearch: MenuSearchSession
     private let windowSwitch: WindowSwitchSession
     private let windowController: PaletteWindowController
+    /// Features whose launcher rows are read from outside Tinycast re-read them on each open.
+    var onLauncherShown: (() -> Void)?
 
     init(
         palette: PaletteState,
@@ -38,6 +40,9 @@ final class PaletteCoordinator {
         windowController.isVisible
             ? windowController.previousApp : NSWorkspace.shared.frontmostApplication
     }
+
+    /// The own window the palette covered, for anything acting on it after the palette hides.
+    var previousOwnWindow: NSWindow? { windowController.previousOwnWindow }
 
     /// Up and pointed at `mode`, which is the state a mode command's second invocation closes.
     func isShowing(_ mode: PaletteMode) -> Bool {
@@ -85,7 +90,21 @@ final class PaletteCoordinator {
         if palette.mode == .menuSearch { menuSearch.filter(palette.query) }
         if palette.mode == .switchWindows { windowSwitch.filter(palette.query) }
         // Re-scan on open so an app uninstalled since the last scan drops out of the launcher.
-        if palette.mode == .launcher { Task { await appIndex.refresh() } }
+        if palette.mode == .launcher {
+            Task { await appIndex.refresh() }
+            onLauncherShown?()
+        }
+    }
+
+    /// Root search onto `entry` alone, as Raycast opens a command whose shortcut lacks values.
+    func showArguments(of entry: AppEntry, values: [String: String]) {
+        showPalette(mode: .launcher, seeding: entry.name)
+        // After the show: `prepare` runs inside it and would clear everything set beforehand.
+        palette.argumentEntryID = entry.id
+        for (field, value) in values {
+            palette.commandArguments[PaletteState.argumentKey(entry.id, field)] = value
+        }
+        palette.pendingArgumentEntryID = entry.id
     }
 
     func hidePalette(restoreFocus: Bool = true) {

@@ -8,13 +8,13 @@ enum ExecutableLocator {
         extraHomePaths: [String] = [],
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) async -> URL? {
-        let candidates = wellKnown(command, extraHomePaths: extraHomePaths, environment: environment)
-        if let url = candidates.first(where: isExecutable) {
-            return url
+        // The shell's answer wins: a stale install in a well-known prefix can shadow the working one.
+        if let path = await loginShellLookup(command) {
+            let url = URL(fileURLWithPath: path)
+            if isExecutable(url) { return url }
         }
-        guard let path = await loginShellLookup(command) else { return nil }
-        let url = URL(fileURLWithPath: path)
-        return isExecutable(url) ? url : nil
+        return wellKnown(command, extraHomePaths: extraHomePaths, environment: environment)
+            .first(where: isExecutable)
     }
 
     nonisolated private static func wellKnown(
@@ -53,8 +53,8 @@ enum ExecutableLocator {
     nonisolated private static func loginShellLookup(_ command: String) async -> String? {
         await Task.detached {
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-            process.arguments = ["-ilc", "command -v \(command)"]
+            process.executableURL = loginShell()
+            process.arguments = ["-ilc", #"command -v -- "$1""#, "tinycast-locator", command]
             process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
             process.environment = ProcessInfo.processInfo.environment.merging(["TINYCAST": "1"]) {
                 _, new in new
@@ -76,5 +76,15 @@ enum ExecutableLocator {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return path.hasPrefix("/") ? path : nil
         }.value
+    }
+
+    /// The lookup script is POSIX, so a shell like fish falls back to zsh, the macOS default.
+    nonisolated private static func loginShell() -> URL {
+        let posixShells: Set = ["zsh", "bash", "sh", "ksh", "dash"]
+        guard let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell else {
+            return URL(fileURLWithPath: "/bin/zsh")
+        }
+        let url = URL(fileURLWithPath: String(cString: shell))
+        return posixShells.contains(url.lastPathComponent) ? url : URL(fileURLWithPath: "/bin/zsh")
     }
 }

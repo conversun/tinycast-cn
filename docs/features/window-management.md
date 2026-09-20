@@ -2,8 +2,8 @@
 
 Rectangle-style window actions — halves, quarters, fourths, thirds, sizing, nudging, display moves,
 native fullscreen and Space switching — searchable in the palette and bindable to global shortcuts.
-35 commands, no new dependencies and no new permission: they reuse the Accessibility grant clipboard
-paste already needs.
+35 commands, plus any number of user-defined [custom sizes](#custom-sizes), no new dependencies and
+no new permission: they reuse the Accessibility grant clipboard paste already needs.
 
 Ships **off**. Settings › Window Management is the switch, and while it is off there are no launcher
 entries and a still-registered shortcut moves nothing.
@@ -23,9 +23,13 @@ entries and a still-registered shortcut moves nothing.
 - **`AXWindowAccess` is the one AX layer**, shared by the mover, the layout runner and
   [Navigation](navigation.md)'s window switcher. Its `write` is the size → position → size sequence:
   two copies of it would land a stubborn app two ways.
+- **Our own windows are written through AppKit, never AX.** `WindowMover.Surface` is the split:
+  an `AXUIElement` write into our own process would stall the main thread that services it.
+  `WindowInventory` still excludes us entirely, so layouts never name one of our windows.
 - **A Space command never reaches `WindowMover`.** `WindowPlacementEngine.placement` answers only for
   `.geometry` and `.restore`, and `WindowCommandCoordinator` branches on `SpaceDirection` first — the
-  mover requires a target app and a resolvable AX window, and a Space switch has neither.
+  mover needs a `WindowTarget` naming a window to place, and a Space switch names none. An external
+  target additionally needs a resolvable AX window; `.own` needs neither an app nor AX.
 
 ## Layout
 
@@ -40,7 +44,11 @@ entries and a still-registered shortcut moves nothing.
 | `Service/AXScreens.swift`            | AppKit + ColorSync           | `@MainActor`. `AXGeometry`, the one coordinate flip                 |
 | `Service/WindowMover.swift`          | AppKit + ApplicationServices | `@MainActor`. Command policy: cycle, restore, fullscreen            |
 | `Service/SpaceSwitcher.swift`        | CoreGraphics                 | `@MainActor`. Every `CGEvent` call and the payload splice           |
+| `Service/WindowTarget.swift`         | AppKit                       | `@MainActor`. Which window a command acts on                        |
+| `Model/CustomWindowSize.swift`       | Foundation + CoreGraphics    | **Pure.** A custom size, its units and the frame it resolves to     |
+| `Model/CustomWindowSizeStore.swift`  | Foundation                   | The custom-size library, as JSON in `UserDefaults`                  |
 | `UI/WindowCommandCoordinator.swift`  | AppKit                       | The one funnel from a palette row or a global hotkey                |
+| `UI/CustomWindowSizeCoordinator.swift` | Foundation                 | Custom sizes' launcher presence, edits and a deletion's cleanup     |
 
 The feature also owns **[Window Layouts](window-layouts.md)** — saved multi-display arrangements
 applied in one pass. They share this feature's switch, its Accessibility grant and its gap setting.
@@ -107,6 +115,35 @@ edge rather than shoving the window off the far side. Maximize Height and Maximi
 untouched axis's position but clamp it, so a window sitting off the display doesn't come back
 full-height and still off-screen.
 
+## Custom sizes
+
+A **custom size** is a user-defined command: a name, a width and a height — each in points or as a
+percentage — a position on the 3×3 grid [Window Layouts](window-layouts.md) uses, and an optional
+offset in points on top of that position. It acts on the focused window exactly as a built-in
+command does, and is the answer for a display where Reasonable Size is wrong: no single built-in
+size suits every screen, so the size is the user's.
+
+- **It stays on the window's display.** A custom size never names a display; it resolves on the one
+  the window already sits on, so one shortcut works on the laptop and at the desk.
+- **The box is the free-floating canvas**, `visibleFrame` inset by the global gap, exactly as for
+  Reasonable Size. A percentage is of that box; a point size is capped by it, so an oversized request
+  fills the display rather than overflowing it. The length floors at 1 pt, as a layout entry does.
+- **`CustomWindowSize.frame` is the only arithmetic**, and it reuses `WindowLayoutAnchor.placement`
+  and `WindowPlacementEngine.rounded` rather than restating either. The offset is applied after the
+  anchor and then clamped into the box, exactly as a layout entry's is, so it never pushes a window off
+  its display.
+- **It goes through `WindowMover`'s one placement sequence**, so a window that refuses to shrink is
+  re-anchored to the chosen position, and **Restore undoes it** like any command.
+  `WindowActionMemory` records it with a `nil` command: it never cycles and is never a tile, so a
+  following Next Display scales the window rather than re-deriving a tile.
+- **A unit switch in the editor converts** the number against the main display, so 50% becomes the
+  points it was on that screen. Stored values are whole numbers, clamped rather than rejected — a
+  bad import keeps the record.
+
+A custom size shares the window commands' `AppEntry.Kind`, their launcher section and their
+`windowManagementShowInLauncher` switch, the way custom Quick Actions share the shipped four's:
+`WindowCommandCatalog` claims an entry first, and `CustomWindowSize.id(fromEntryID:)` the rest.
+
 ## Cycling and Restore
 
 Both reduce to one question — _has the user moved this window themselves since our last action?_ — so
@@ -146,8 +183,11 @@ so a repeat press stays idempotent unless asked otherwise:
 - **`.displays`** — every display contributes two half-slots to one strip, ordered left-to-right by
   `ordered(_:)`. Left and Top walk it backwards, Right and Bottom forwards, both wrapping, so one
   shortcut sweeps the whole desktop in one direction: on two displays, Left Half gives
-  D1-left → D2-right → D2-left → D1-right. One display makes the mode a quiet no-op — a length of 1 —
-  rather than a left/right flip in place, matching Next Display's own single-display behaviour.
+  D1-left → D2-right → D2-left → D1-right. The walk counts from the display the chain started on,
+  which `decide` carries as `originScreenID`: from the second press the window already sits on the
+  display it was moved to, and counting from there would overshoot a slot. One display makes the
+  mode a quiet no-op — a length of 1 — rather than a left/right flip in place, matching Next
+  Display's own single-display behaviour.
 
 The two are deliberately exclusive rather than composable: a 12-press chain over two displays is not a
 shortcut any more, and Raycast's own setting is the same single choice. `Half` carries the (axis, edge)
@@ -158,12 +198,42 @@ Growth is bounded three ways: an LRU cap of 64, an `NSWorkspace.didTerminateAppl
 observer (the house `NotificationToken` RAII idiom) dropping a quit app's keys, and lazy invalidation
 when a read fails. Nothing is persisted.
 
+## Choosing a target
+
+Our panels are `.nonactivatingPanel`, so opening one never makes Tinycast frontmost and
+`NSWorkspace.frontmostApplication` keeps naming the app *behind* it rather than the window the user
+is looking at. `WindowTarget` is the answer to "what does this command act on": it prefers a key
+window of ours, falling back to the frontmost app only when there is none.
+
+`canBecomeMain` is the filter, and it needed no new flag — every transient panel in the app already
+declines it, which leaves exactly the Notes editor and the `AppWindowController` windows. When a key
+child is in front, such as the note switcher that `addChildWindow`s itself onto the editor,
+`WindowTarget` looks one level up through `parent` so the command still places the editor.
+
+`PalettePanel` is the one main-capable panel of ours and would pass the filter. It never reaches
+here, because `WindowCommandCoordinator.handOffTarget()` branches on `paletteCoordinator.isVisible`
+first and a hidden palette cannot be key. **That ordering is the invariant; do not reorder those two
+branches.** The palette branch reads `previousOwnWindow`, which `PaletteWindowController` records
+from whatever held key at summon time regardless of which app was frontmost — for the same reason
+this section exists.
+
+Fullscreen on a window of ours fires when it is `.resizable` and its `collectionBehavior` opts out of
+neither `.fullScreenAuxiliary` nor `.fullScreenNone`. AppKit fullscreens a resizable window without
+ever setting `.fullScreenPrimary` on it, so testing that flag would make Fullscreen a silent no-op on
+Settings. The Notes panel is `.fullScreenAuxiliary` and stays a no-op, as an unwilling external
+window already is.
+
+This mirrors `InjectionTarget` in [Text injection](text-injection.md), which solved the same problem
+for keystrokes: same shape, same `Service/` position, one idea applied twice.
+
 ## Applying a placement
 
 `WindowMover.perform(_:target:gap:cycle:)` is the only entry point. `target` is **explicit**
 because the palette is frontmost when a command dispatches from it — `WindowCommandCoordinator` passes
-`windowController.previousApp`, the same recorded app the paste path targets, and restores focus to it
-rather than dropping it. It is synchronous: every AX call is a bounded mach round trip capped by a 1s
+a `WindowTarget`, which is either an external app or one of our own windows (see
+[Choosing a target](#choosing-a-target)), and restores focus to it rather than dropping it. The own
+case skips AX and the Accessibility prompt entirely: placing our own window needs no grant. It is
+synchronous: every AX call is a bounded mach round trip capped by a 1s
 messaging timeout, and `await` would only add reentrancy between a held hotkey's repeats. The timeout
 is set on the application element _and again_ on the window element — it is per-element and never
 inherited.
@@ -217,7 +287,9 @@ framework linkage and no SIP change — only public `CGEvent` calls carrying und
 
 `SpaceSwitcher` posts three phases — began, changed, ended — to `.cgSessionEventTap`. A two-phase
 gesture is ignored. Fields 55 (`DockControl`), 110 (dock-swipe HID type), 132 (phase), 123 (horizontal
-motion) and 124 (progress) are common to both encodings; **positive is always "next"**. Progress is
+motion) and 124 (progress) are common to both encodings; **positive is "next"**, except that macOS 27
+applies Natural Scrolling to the synthetic swipe, so `SpaceSwitcher` reverses the direction while
+`com.apple.swipescrolldirection` is on (its default when the key is absent). Progress is
 deliberately the smallest representable nudge: a real distance makes the WindowServer draw the slide.
 
 **macOS 27 changed the contract.** Through macOS 26 the public fields are enough, and velocity (129 and
@@ -265,6 +337,11 @@ quantize to zero and the gesture would do nothing.
   and hides the palette with `restoreFocus: false`: restoring focus reactivates the recorded previous
   app, and activating an app that lives on another Space pulls that Space forward — a race against the
   gesture that can land on the opposite Space from the one asked for.
+- **`HotKeyAction.customWindowSize(id:)`** — persisted under `hotkey.customWindowSize.<uuid>` with a
+  `boundCustomWindowSizeIDs` index, the shape window layouts use. It dispatches through
+  `WindowCommandCoordinator.runCustomWindowSize(id:)`, the same funnel and the same feature gate.
+- **`AppIndex.setCustomWindowSizes(_:)`** publishes the custom-size slice immediately after the
+  window commands, inside the same section. Custom sizes and their bindings ride in settings backups.
 - **Settings** — `windowManagementEnabled` (off), `windowManagementShowInLauncher` (on), `windowGap`
   (0) and `windowCycle` (`.off`). All four ride in settings backups: unlike `snippetsEnabled` they
   grant no permission class of their own.
@@ -275,18 +352,23 @@ quantize to zero and the gesture would do nothing.
 
 ## Testing
 
-`Tests/window-command-test.swift` (357 assertions) covers the catalog, the AX-space convention lock,
+`Tests/window-command-test.swift` (500 assertions) covers the catalog, the AX-space convention lock,
 tiling on divisible and non-divisible screens, off-origin and negative-coordinate displays, gap
 arithmetic including degenerate values, sizing, the Make Larger/Smaller round trip, nudges, display
-moves and wrapping, both cycling modes including the strip walk and its wrap, restore recovery, every
-`WindowActionMemory` rule, and a fuzz sweep over every command × gap × screen × cycle × step ×
-degenerate window frame checking for non-finite output, negative dimensions, off-screen results,
-non-determinism and, at step 0, drift on repeat.
+moves and wrapping, both cycling modes including the strip walk, its wrap and a run of real presses
+across displays, restore recovery, every `WindowActionMemory` rule, and a fuzz sweep over every
+command × gap × screen × cycle × step × degenerate window frame checking for non-finite output,
+negative dimensions, off-screen results, non-determinism and, at step 0, drift on repeat.
 
 `Tests/space-gesture-test.swift` (121 assertions) covers the other pure half: the fixed-point encoding
 and its ±1 floor, both field tables and the sign convention shared between them, the ended-only fling
 on the augmented path, the payload's size, record offsets and every scalar in it, and the big-endian
 framing of the field-4205 record.
+
+Custom sizes are covered in `Tests/window-layout-test.swift`, beside the anchor grid they share: the
+entry id, unit clamping and conversion, exact frames on every fixture display, gap and offset
+arithmetic, the host-display placement, and store CRUD, validation, import sanitising and
+persistence.
 
 Everything runs headless because the layer is pure. `WindowMover` and `SpaceSwitcher` are not compiled
 into either harness and have no automated coverage — the AX and `CGEvent` paths need manual
@@ -300,7 +382,7 @@ verification, particularly:
 4. Cycling, in both modes: under `.sizes`, three presses of Left Half, then drag the window and confirm
    the next press restarts at ½. Under `.displays` on two monitors, four presses of Left Half must
    visit every half-slot once and return to the first.
-5. Restore on a window Tinycast has never moved.
+5. Restore on a window Tinycast has never moved, and after a custom size.
 6. **Space switching, on the real desktop with three or more Spaces.** Next and Previous each move
    exactly one Space with no visible slide, in and out of a fullscreen Space, and a held shortcut does
    not wedge the Dock or land two Spaces at once. A Space switch is not observable until it settles —

@@ -66,7 +66,7 @@ Each command has a checkbox, a shortcut recorder and an alias field in **Setting
 ### Meetings in search
 
 Upcoming meetings also show up in launcher search, in their own **Meetings** section.
-**Upcoming meetings in launcher** sets how many: **1 next**, **3 next** (default), **5 next** or
+**Upcoming meetings in launcher** sets how many: **1 next**, **3 next**, **5 next** (default) or
 **All**. **Show in launcher** takes the meetings and the calendar commands out of search. The join
 card, the menu bar and your shortcuts keep working.
 

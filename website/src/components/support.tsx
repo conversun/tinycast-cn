@@ -1,7 +1,6 @@
-import { Heart } from "lucide-react";
 import { site } from "../data/site";
 import { Button } from "./ui/button";
-import { GitHubLogo, Logo } from "./ui/icon";
+import { GitHubLogo, Logo, SupportIcon } from "./ui/icon";
 
 // The mark alone on a violet glow, so the page ends on the brand.
 function GlowingMark() {
@@ -9,7 +8,7 @@ function GlowingMark() {
     <span className="relative mx-auto flex size-28 items-center justify-center sm:size-32">
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-24 bg-[radial-gradient(closest-side,rgb(134_59_255/0.32),transparent)]"
+        className="mark-bloom pointer-events-none absolute -inset-32"
       />
       <Logo size={72} className="relative" />
     </span>
@@ -18,23 +17,20 @@ function GlowingMark() {
 
 export function Support() {
   return (
-    <section
-      id="support"
-      className="px-5 pb-24 pt-12 text-center sm:px-10 sm:pb-32"
-    >
+    <section id="support" className="px-4 pb-24 pt-24 text-center sm:px-10 ">
       <div aria-hidden="true">
         <GlowingMark />
       </div>
       <h2 className="mx-auto mt-14 max-w-2xl text-closing">
-        Keep Tinycast free.
+        Enjoying Tinycast?
       </h2>
       <p className="mx-auto mt-4 max-w-lg text-pretty text-body-lg text-fg-muted">
-        Tinycast is free and open source, with no account and no telemetry. If
-        it has earned a place on your Mac, your support keeps development going.
+        Tinycast is free and open source, and it stays that way. If you would
+        like to support its development, you can chip in. Entirely optional.
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Button href={site.support} size="lg">
-          <Heart size={16} />
+          <SupportIcon size={18} />
           Support development
         </Button>
         <Button href={site.repo} variant="ghost" size="lg">

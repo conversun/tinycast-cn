@@ -12,6 +12,7 @@ extension SettingsAnchor {
     static let generalSearch = Self(tab: .general, title: "Search")
     static let generalHyperKey = Self(tab: .general, title: "Hyper Key")
     static let generalAppearance = Self(tab: .general, title: "Appearance")
+    static let generalCalculator = Self(tab: .general, title: "Calculator")
     static let generalGeneral = Self(tab: .general, title: "General")
 
     static let applicationsSearchScopes = Self(tab: .applications, title: "Search Scopes")
@@ -28,6 +29,9 @@ extension SettingsAnchor {
     static let quicklinksCommands = Self(tab: .quicklinks, title: "Commands")
     static let quicklinksBehaviour = Self(tab: .quicklinks, title: "Behaviour")
     static let quicklinksImportExport = Self(tab: .quicklinks, title: "Import & Export")
+
+    static let appleShortcutsAppleShortcuts = Self(tab: .appleShortcuts, title: "Apple Shortcuts")
+    static let appleShortcutsShortcuts = Self(tab: .appleShortcuts, title: "Shortcuts")
 
     static let fallbacksFallbacks = Self(tab: .fallbacks, title: "Fallbacks")
 
@@ -69,6 +73,7 @@ extension SettingsAnchor {
     static let windowManagementLayoutCommands = Self(
         tab: .windowManagement, title: "Layout Commands")
     static let windowManagementOptions = Self(tab: .windowManagement, title: "Options")
+    static let windowManagementCustomSizes = Self(tab: .windowManagement, title: "Custom Sizes")
 
     static let clipboardClipboard = Self(tab: .clipboard, title: "Clipboard")
     static let clipboardCommands = Self(tab: .clipboard, title: "Commands")
