@@ -19,7 +19,7 @@ struct LocalizationTests {
             "Create Window Layout",
             "No external providers ready",
             "Turn on Apple Intelligence, or add a provider above.",
-            "Save an arrangement once, then put every window back with one shortcut.",
+            "Save an arrangement, then restore it with one shortcut.",
             "Clipboard changes from these apps won't be recorded.",
             "Triggering a half again re-applies the same frame.",
             "Hyper Key",
