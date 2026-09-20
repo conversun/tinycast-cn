@@ -1,15 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+verify() {
+  node Scripts/check-localization.js "$@"
+  node --test Tests/localization-check-test.js
+}
 case "${1:-}" in
-  "") node Scripts/check-localization.js ;;
+  "") verify ;;
   --extract)
     location=$(mktemp -d "${TMPDIR:-/tmp}/tinycast-localization.XXXXXX")
     trap 'rm -rf "$location"' EXIT
     xcodebuild -exportLocalizations -project Tinycast.xcodeproj \
       -localizationPath "$location" -exportLanguage zh-Hans SWIFT_EMIT_LOC_STRINGS=YES \
       > "$location/export.log" 2>&1 || { cat "$location/export.log"; exit 1; }
-    node Scripts/check-localization.js --extracted \
+    verify --extracted \
       "$location/zh-Hans.xcloc/Source Contents/Tinycast/en.lproj/Localizable.strings"
     ;;
   --help)
