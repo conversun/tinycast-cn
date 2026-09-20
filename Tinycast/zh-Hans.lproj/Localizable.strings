@@ -2118,3 +2118,6 @@
 "Notes commands" = "笔记命令";
 "Window commands" = "窗口命令";
 "%@ returned an oversized response." = "%@ 返回的响应过大。";
+"AI" = "AI";
+"Showing choices" = "正在显示选项";
+"%@, searching %@" = "%@，正在搜索 %@";
