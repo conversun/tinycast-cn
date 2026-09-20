@@ -67,6 +67,9 @@ jobs:
           XCODE_PATH="$(printf '%s\n' "${XCODE_CANDIDATES[@]}" | sort -V | tail -n1)"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
 
+      - name: Check Chinese localization
+        run: ./Scripts/check-localization.sh --extract
+
       - name: Import signing certificate
         env:
           P12_BASE64: ${{ secrets.SIGNING_P12_BASE64 }}

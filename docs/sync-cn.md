@@ -153,3 +153,19 @@ gh workflow run release-cn.yml --repo conversun/tinycast-cn \
 备份分类与 Esc 行为还需核对模型字符串：既要有词条，也要在显示处调用 `.localizedUI`。
 本次为用户反馈的备份、Esc 与扩展兼容性文案加入了 `localization-test` 回归检查；继续用
 Xcode 抽取核对字面量，并单独核对目录、模型及拼接文案，不能只依赖该测试。
+
+## 防漏检查：区分词条覆盖与渲染覆盖
+
+```sh
+./Scripts/check-localization.sh           # 秒级检查，lint.sh 也会运行
+./Scripts/check-localization.sh --extract # Xcode 抽取 + 词条差集，首次需要编译
+```
+
+快速检查会拒绝重复或空词条、格式参数不一致、已登记目录中的缺失词条，以及可识别的
+`Text(计算属性)` 直接接收已有译文的英文分支。新增动态标题目录时，必须更新
+`Scripts/check-localization.js` 的目录清单；这不是全 Swift 数据流分析器。
+
+CN 发布工作流在签名和打包前执行完整抽取检查；失败不发布。它只能证明被抽取的词条与
+已登记的动态目录完整，不能证明所有运行时路径都查表。发布前还要以简体中文运行 Dev 版，
+实际打开受影响页面和编辑器，检查空状态、菜单、提示与错误状态。先完成检查，再派发发布。
+第三方扩展及用户命名内容保持原文，不能靠“界面不含英文”判断完整性。

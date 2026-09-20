@@ -22,4 +22,6 @@ if ! node Scripts/check-settings-search.js; then
     exit 1
 fi
 
+if ! ./Scripts/check-localization.sh; then exit 1; fi
+
 echo "✓ lint-clean"
