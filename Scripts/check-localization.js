@@ -58,7 +58,7 @@ const catalogs = [
   "Tinycast/Features/Launcher/Model/CommandID.swift",
 ];
 for (const file of catalogs) {
-  for (const match of read(file).matchAll(/case\s+[^\n]+:\s*return\s+"([^"\\]*)"/g)) {
+  for (const match of read(file).matchAll(/case\s+[^\n]+:\s*(?:return\s+)?"([^"\\]*)"/g)) {
     const key = match[1];
     if (!/[A-Z]/.test(key) || key.includes(":")) continue;
     requireKey(key, file);
