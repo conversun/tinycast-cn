@@ -1,17 +1,12 @@
 import Foundation
 
 enum FuzzyMatch {
-    /// All but `.subsequence` are literal hits: the query's own characters, contiguous.
-    enum Tier: Sendable, CaseIterable {
+    enum Tier: Sendable {
         case exact
         case prefix
         case wordStart
         case substring
         case subsequence
-
-        var isLiteral: Bool { self != .subsequence }
-        /// Anchored at the candidate's start: what a short, deliberate field must match.
-        var isAnchored: Bool { self == .exact || self == .prefix }
     }
 
     struct Match: Sendable {
@@ -40,15 +35,30 @@ enum FuzzyMatch {
         }
     }
 
+    /// A candidate folded once, for an index that matches the same text against every query.
+    struct Candidate: Sendable {
+        let text: String
+        fileprivate let length: Int
+
+        init(_ raw: String) {
+            text = FuzzyMatch.normalized(raw)
+            length = text.count
+        }
+    }
+
     /// The tier a query hits a candidate at, with the geometry `SearchRelevance.shape` reads.
     static func match(query: String, candidate: String) -> Match? {
         match(Query(query), candidate: candidate)
     }
 
     static func match(_ query: Query, candidate: String) -> Match? {
+        match(query, candidate: Candidate(candidate))
+    }
+
+    static func match(_ query: Query, candidate: Candidate) -> Match? {
         let q = query.text
-        let c = normalized(candidate)
-        let length = c.count
+        let c = candidate.text
+        let length = candidate.length
         guard !q.isEmpty else {
             return Match(
                 tier: .exact, offset: 0, queryLength: 0, candidateLength: length, spread: 0)
@@ -86,6 +96,10 @@ enum FuzzyMatch {
         match(query, candidate: candidate).map(rawScore)
     }
 
+    static func score(_ query: Query, candidate: Candidate) -> Int? {
+        match(query, candidate: candidate).map(rawScore)
+    }
+
     /// FileSearch ranks one field and wants a single ordering, not a role-aware one.
     fileprivate static func rawScore(_ match: Match) -> Int {
         switch match.tier {
@@ -97,7 +111,7 @@ enum FuzzyMatch {
         }
     }
 
-    /// The one fold in the launcher: matching, learned-ranking keys and dedup all call it.
+    /// The one fold every search shares: matching, learned-ranking keys and dedup all call it.
     static func normalized(_ value: String) -> String {
         guard value.unicodeScalars.contains(where: { $0.value >= 0xAD }) else {
             return value.lowercased()
@@ -160,60 +174,25 @@ enum FuzzyMatch {
     }
 }
 
-/// One string an entry can be found by; ranking reads `role` and `looseness` and nothing else.
+/// One string an entry can be found by; ranking reads `role` and nothing else.
 struct SearchAlias: Sendable, Hashable {
-    /// A closed ladder: a new criterion picks a role from it and never adds a case.
-    enum Role: Int, Sendable, CaseIterable {
-        /// Machine-facing: bundle id, executable name.
-        case technical = 0
-        /// What provides the entry rather than what it is — the extension a command came from.
-        case owner = 1
-        /// Another way to say the same name: a localization, an alternate, a romanization.
-        case translation = 2
-        /// The name the entry is presented under, and anything identifying it just as strongly.
-        case name = 3
-        /// The user's own word for the entry; deliberate, so it outranks every vendor string.
-        case userAlias = 4
-
-        /// The loosest match this role trusts. Shared or machine text floods on a fuzzy hit.
-        var looseness: Looseness {
-            switch self {
-            case .translation, .name: .fuzzy
-            case .technical, .owner, .userAlias: .literal
-            }
-        }
-    }
-
-    /// How weak a match an alias will accept. Tightening one is how a flood-prone string opts out.
-    enum Looseness: Sendable, Hashable {
-        case fuzzy
-        case literal
-        case exact
-
-        func accepts(_ tier: FuzzyMatch.Tier) -> Bool {
-            switch self {
-            case .fuzzy: true
-            case .literal: tier.isLiteral
-            case .exact: tier == .exact
-            }
-        }
+    enum Role: Sendable {
+        /// What provides the entry rather than what it is: a menu's path, a window's app.
+        case owner
+        /// The name the entry is presented under.
+        case name
     }
 
     let text: String
     let role: Role
-    let looseness: Looseness
 
-    init(_ text: String, _ role: Role, looseness: Looseness? = nil) {
+    init(_ text: String, _ role: Role) {
         self.text = text
         self.role = role
-        self.looseness = looseness ?? role.looseness
     }
 
     static func name(_ text: String) -> Self { Self(text, .name) }
-    static func translation(_ text: String) -> Self { Self(text, .translation) }
     static func owner(_ text: String) -> Self { Self(text, .owner) }
-    static func technical(_ text: String) -> Self { Self(text, .technical) }
-    static func userAlias(_ text: String) -> Self { Self(text, .userAlias) }
 }
 
 /// Never flatten these into one string — which alias matched is half of what picks the cell.
@@ -226,43 +205,24 @@ struct SearchFields: Sendable, Hashable, ExpressibleByArrayLiteral {
     mutating func append(_ alias: SearchAlias) { aliases.append(alias) }
 }
 
-/// How well a query fits an entry: every gap below is a pick count, and one gap is a firewall.
+/// How well a query fits a menu item or a window: the strongest field's cell, ordered by shape.
 enum SearchRelevance {
-    /// The lowest protected cell. Nothing below it is reachable at any usage.
-    static let protectionFloor = 6_500
-    /// The strongest unprotected cell, and the weakest evidence the index will show at all.
-    static let poolTop = 3_100
-    static let poolBottom = 600
     /// `shape` orders inside one cell and can never leave it.
     static let shapeSpan = 99
-    /// The exclusive bound every usage term must respect, or the firewall stops holding.
-    static let usageCeiling = 3_000
 
-    /// The closed table. A new naming criterion picks a role; it never adds a row here.
     static func cell(_ role: SearchAlias.Role, _ tier: FuzzyMatch.Tier) -> Int? {
         switch (role, tier) {
-        case (.userAlias, .exact): 7_000
-        case (.name, .exact): protectionFloor
-        case (.userAlias, .prefix): poolTop
+        case (.name, .exact): 6_500
         case (.name, .prefix): 3_000
-        case (.translation, .exact): 2_700
         case (.owner, .exact): 2_500
         case (.name, .wordStart): 2_400
-        case (.translation, .prefix): 2_200
         case (.owner, .prefix): 2_000
         case (.name, .substring): 1_800
-        case (.translation, .wordStart): 1_700
         case (.owner, .wordStart): 1_500
-        case (.technical, .exact): 1_400
-        case (.translation, .substring): 1_200
         case (.owner, .substring): 1_100
         case (.name, .subsequence): 1_000
-        case (.technical, .prefix): 900
-        case (.translation, .subsequence): 800
-        case (.technical, .wordStart): 700
-        case (.technical, .substring): poolBottom
-        // `Looseness` refuses these, so no query can reach them.
-        case (.userAlias, _), (.owner, .subsequence), (.technical, .subsequence): nil
+        // Every entry an owner provides shares its text, so a subsequence hit would flood.
+        case (.owner, .subsequence): nil
         }
     }
 
@@ -290,12 +250,8 @@ enum SearchRelevance {
         var best: Int?
         for alias in fields.aliases {
             guard let match = FuzzyMatch.match(query, candidate: alias.text),
-                alias.looseness.accepts(match.tier)
+                let cell = cell(alias.role, match.tier)
             else { continue }
-            // A user alias earns its own cell only from its start; inside, it is a translation.
-            let role: SearchAlias.Role =
-                alias.role == .userAlias && !match.tier.isAnchored ? .translation : alias.role
-            guard let cell = cell(role, match.tier) else { continue }
             best = max(best ?? Int.min, cell + shape(match))
         }
         return best

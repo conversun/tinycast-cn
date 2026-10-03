@@ -1,19 +1,13 @@
 import AVKit
 import SwiftUI
-import UniformTypeIdentifiers
 
-/// QuickLook draws a movie's first frame but never plays one inside a non-activating panel.
+/// A movie or a recording, played by AVKit.
 struct FileSearchMediaPlayer: View {
 
     @Environment(PaletteState.self) private var palette
     let url: URL
     let autoplays: Bool
     @State private var player: AVPlayer?
-
-    static func plays(_ url: URL) -> Bool {
-        guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
-        return type.conforms(to: .movie) || type.conforms(to: .audio)
-    }
 
     /// One key for both teardown triggers, so no `onChange` races the task.
     private struct PlaybackKey: Equatable {

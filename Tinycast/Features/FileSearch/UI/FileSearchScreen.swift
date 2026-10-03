@@ -103,7 +103,8 @@ struct FileSearchScreen: PaletteScreen {
                     onActions: { result in
                         if let index = rows.firstIndex(of: result) { vm.selection = index }
                         openActions()
-                    }
+                    },
+                    onDropped: { core.paletteCoordinator.dragLanded() }
                 )
                 .frame(width: metrics.size.clipboardListWidth)
                 Rectangle()
@@ -157,6 +158,9 @@ enum FileSearchActionsMenu {
                 ) { coordinator.showInFinder(result) },
                 PopoverMenuItem(title: "Quick Look", systemImage: "eye", shortcut: "⌘Y") {
                     vm.fileSearchQuickLook = true
+                },
+                PopoverMenuItem(title: "Share…", systemImage: "square.and.arrow.up") {
+                    coordinator.share(result)
                 },
                 PopoverMenuItem(
                     title: "Copy File", systemImage: "doc.on.clipboard", startsSection: true,

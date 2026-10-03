@@ -41,8 +41,6 @@ extension SettingsAnchor {
     static let aiChat = Self(tab: .ai, title: "Chat")
     static let aiConversations = Self(tab: .ai, title: "Conversations")
     static let aiSystemPrompt = Self(tab: .ai, title: "System prompt")
-    static let aiInstalledAI = Self(tab: .ai, title: "Installed AI")
-    static let aiAPIConnections = Self(tab: .ai, title: "API Connections")
     static let aiMCPServers = Self(tab: .ai, title: "MCP Servers")
     static let aiCommands = Self(tab: .ai, title: "Commands")
 
@@ -57,6 +55,7 @@ extension SettingsAnchor {
     static let fileSearchIgnorePatterns = Self(tab: .fileSearch, title: "Ignore Patterns")
 
     static let notesNotes = Self(tab: .notes, title: "Notes")
+    static let notesOptions = Self(tab: .notes, title: "Options")
     static let notesCommands = Self(tab: .notes, title: "Commands")
 
     static let snippetsSnippets = Self(tab: .snippets, title: "Snippets")
@@ -70,8 +69,9 @@ extension SettingsAnchor {
     static let windowManagementWindowManagement = Self(
         tab: .windowManagement, title: "Window Management")
     static let windowManagementLayouts = Self(tab: .windowManagement, title: "Window Layouts")
+    static let windowManagementRooms = Self(tab: .windowManagement, title: "Rooms")
     static let windowManagementLayoutCommands = Self(
-        tab: .windowManagement, title: "Layout Commands")
+        tab: .windowManagement, title: "Layout and Room Commands")
     static let windowManagementOptions = Self(tab: .windowManagement, title: "Options")
     static let windowManagementCustomSizes = Self(tab: .windowManagement, title: "Custom Sizes")
 
@@ -86,7 +86,6 @@ extension SettingsAnchor {
 
     static let calendarCalendar = Self(tab: .calendar, title: "Calendar")
     static let calendarCommands = Self(tab: .calendar, title: "Commands")
-    static let calendarSchedule = Self(tab: .calendar, title: "Schedule")
     static let calendarJoining = Self(tab: .calendar, title: "Joining")
     static let calendarMenuBar = Self(tab: .calendar, title: "Menu Bar")
     static let calendarCalendars = Self(tab: .calendar, title: "Calendars")
@@ -103,6 +102,7 @@ extension SettingsAnchor {
     static let backupExport = Self(tab: .backup, title: "Export")
     static let backupImport = Self(tab: .backup, title: "Import")
     static let backupImportFromRaycast = Self(tab: .backup, title: "Import from Raycast")
+    static let backupSettingsFile = Self(tab: .backup, title: "Settings File")
 
     static let aboutAbout = Self(tab: .about, title: "About")
     static let aboutLinks = Self(tab: .about, title: "Links")

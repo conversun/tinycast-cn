@@ -11,10 +11,10 @@ struct LauncherItemsTable: NSViewRepresentable {
     /// The open recorder's bounds in this view's space; nil while nothing is recording.
     @Binding var recorderFrame: CGRect?
 
-    /// A grouped `Form` row's own vertical padding, which the first and last rows already carry.
-    static let rowPadding: CGFloat = 15
-    /// A trailing control's 24 pt plus that padding above and below it.
-    static let rowHeight: CGFloat = 24 + 2 * rowPadding
+    /// Leave a little of the Form's edge inset at the first and last rows.
+    static let tableOverhang: CGFloat = 10
+    static let searchDividerHeight: CGFloat = 1
+    static let rowHeight: CGFloat = 45
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -35,7 +35,10 @@ struct LauncherItemsTable: NSViewRepresentable {
         table.dataSource = context.coordinator
         table.delegate = context.coordinator
         context.coordinator.table = table
-        let container = OverhangingTableView(table: table, overhang: Self.rowPadding)
+        let container = OverhangingTableView(
+            table: table,
+            topOverhang: Self.tableOverhang + Self.searchDividerHeight,
+            bottomOverhang: Self.tableOverhang)
         context.coordinator.container = container
         return container
     }
@@ -46,7 +49,9 @@ struct LauncherItemsTable: NSViewRepresentable {
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSView, context: Context) -> CGSize? {
         let rows = CGFloat(entries.count) * Self.rowHeight
-        return CGSize(width: proposal.width ?? nsView.frame.width, height: rows - 2 * Self.rowPadding)
+        return CGSize(
+            width: proposal.width ?? nsView.frame.width,
+            height: rows - 2 * Self.tableOverhang - Self.searchDividerHeight)
     }
 
     @MainActor
@@ -125,11 +130,13 @@ struct LauncherItemsTable: NSViewRepresentable {
 /// Hangs the table into the `Form` row's padding: negative padding doesn't move an AppKit view.
 private final class OverhangingTableView: NSView {
     private let table: NSTableView
-    private let overhang: CGFloat
+    private let topOverhang: CGFloat
+    private let bottomOverhang: CGFloat
 
-    init(table: NSTableView, overhang: CGFloat) {
+    init(table: NSTableView, topOverhang: CGFloat, bottomOverhang: CGFloat) {
         self.table = table
-        self.overhang = overhang
+        self.topOverhang = topOverhang
+        self.bottomOverhang = bottomOverhang
         super.init(frame: .zero)
         addSubview(table)
     }
@@ -141,7 +148,9 @@ private final class OverhangingTableView: NSView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        table.frame = bounds.insetBy(dx: 0, dy: -overhang)
+        table.frame = NSRect(
+            x: bounds.minX, y: bounds.minY - topOverhang,
+            width: bounds.width, height: bounds.height + topOverhang + bottomOverhang)
     }
 }
 
@@ -225,26 +234,26 @@ private struct LauncherItemCell: View {
     var onTab: @MainActor () -> Bool = { false }
 
     var body: some View {
-        LauncherItemRow(entry: entry)
-            // Rows are separate hosting views; the key view loop doesn't run from one to the next.
-            .onKeyPress(.tab, phases: .down) { press in
-                !press.modifiers.contains(.shift) && onTab() ? .handled : .ignored
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(alignment: .top) {
-                if showsDivider { Divider() }
-            }
-            .disabled(!isEnabled)
-            // The recorder's anchor can't leave this hosting view; its bounds go out by hand.
-            .overlayPreferenceValue(ShortcutRecorderAnchorKey.self) { anchor in
-                GeometryReader { proxy in
-                    Color.clear.onChange(of: anchor.map { proxy[$0] }, initial: true) { _, frame in
-                        onRecorderFrame(frame)
-                    }
+        VStack(spacing: 0) {
+            Divider().opacity(showsDivider ? 1 : 0)
+            LauncherItemRow(entry: entry)
+                // Rows are separate hosting views; the key view loop doesn't run from one to the next.
+                .onKeyPress(.tab, phases: .down) { press in
+                    !press.modifiers.contains(.shift) && onTab() ? .handled : .ignored
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .disabled(!isEnabled)
+        // The recorder's anchor can't leave this hosting view; its bounds go out by hand.
+        .overlayPreferenceValue(ShortcutRecorderAnchorKey.self) { anchor in
+            GeometryReader { proxy in
+                Color.clear.onChange(of: anchor.map { proxy[$0] }, initial: true) { _, frame in
+                    onRecorderFrame(frame)
                 }
             }
-            .environment(visibility)
-            .environment(aliases)
-            .environment(hotKeys)
+        }
+        .environment(visibility)
+        .environment(aliases)
+        .environment(hotKeys)
     }
 }

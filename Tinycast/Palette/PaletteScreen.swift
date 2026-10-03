@@ -111,6 +111,8 @@ private extension MenuPanelCorner {
     var hidesSearchField: Bool { get }
     /// True when the footer and ⌘K still act with no rows — a form's action belongs to the screen.
     var actsWithoutRows: Bool { get }
+    /// Where an open, a new query or a new filter puts the highlight; past row 0 it is centred.
+    var landingSelection: Int { get }
 
     /// False when the selection can't be acted on, which hides the footer pill and swallows ⌘K.
     func hasPrimaryAction(at selection: Int) -> Bool
@@ -120,6 +122,8 @@ private extension MenuPanelCorner {
     func ownsVerticalKeys(at selection: Int) -> Bool
     /// Where ⇥ goes inside the screen, or nil to leave the key to the palette's own ring.
     func tabTarget(from selection: Int, backwards: Bool) -> Int?
+    /// True when the screen acted on ⇥ itself, which it then owns ahead of `tabTarget`.
+    func tab(at selection: Int, backwards: Bool) -> Bool
     /// The ⌘K rows as the palette's own menu; nil when there are none.
     func actions(at selection: Int) -> PopoverMenuContent?
     /// Defaults to wrapping `actions(at:)`, so a screen implements one or the other.
@@ -130,6 +134,8 @@ private extension MenuPanelCorner {
     func activate(at selection: Int)
     /// ⌘↵. False when the selection has no secondary action, leaving the key unhandled.
     func secondary(at selection: Int) -> Bool
+    /// ⌃⌘↵. False when the selection has no third action, leaving the chord to `secondary`.
+    func tertiary(at selection: Int) -> Bool
     /// ⌥↵. False on every screen with nothing to paste, which is most of them.
     func pasteKeepingWindowOpen(at selection: Int) -> Bool
     /// False when the screen has no answer to the chord, leaving the key unhandled.
@@ -149,8 +155,10 @@ extension PaletteScreen {
     func hasActions(at selection: Int) -> Bool { true }
     var hidesSearchField: Bool { false }
     var actsWithoutRows: Bool { false }
+    var landingSelection: Int { 0 }
     func ownsVerticalKeys(at selection: Int) -> Bool { false }
     func tabTarget(from selection: Int, backwards: Bool) -> Int? { nil }
+    func tab(at selection: Int, backwards: Bool) -> Bool { false }
     func actions(at selection: Int) -> PopoverMenuContent? { nil }
     func menuContent(
         at selection: Int, searchQuery: ActionMenuSearchQuery, menuSelection: Binding<Int>,
@@ -164,6 +172,7 @@ extension PaletteScreen {
                 placeholder: "Search for actions…", placement: .bottom),
             onActivate: onActivate, preferredSelection: filtered.bestMatch)
     }
+    func tertiary(at selection: Int) -> Bool { false }
     func pasteKeepingWindowOpen(at selection: Int) -> Bool { false }
     func perform(_ shortcut: PaletteShortcut, at selection: Int) -> Bool { false }
     func move(_ delta: Int, axis: PaletteAxis, from selection: Int) -> Int? { nil }

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Deliberately not a focusable control. See docs/features/hotkeys.md#recorder.
@@ -7,8 +8,8 @@ struct ShortcutRecorder: View {
     var isQuiet = false
 
     @Environment(HotKeyManager.self) private var hotKeys
-    /// Observed so a bound double-tap surfaces its warning the moment the grant changes.
-    private var doubleTapMonitor: DoubleTapMonitor { hotKeys.doubleTapMonitor }
+    /// Observed so a modifier-only binding surfaces its warning when the grant changes.
+    private var modifierTapMonitor: ModifierTapMonitor { hotKeys.modifierTapMonitor }
     @State private var hovered = false
 
     private var isRecording: Bool { hotKeys.recordingAction == action }
@@ -24,17 +25,17 @@ struct ShortcutRecorder: View {
         // The width is kept either way, so a column of recorders stays aligned as they fill in.
         let showsFill = !isQuiet || isRecording || hovered || hotKeys.binding(for: action) != nil
         content
-            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.horizontal, Theme.Spacing.sm + 1)
             .frame(width: Theme.Size.shortcutRecorder, height: 24)
             .background(shape.fill(Theme.Colors.cardFill).opacity(showsFill ? 1 : 0))
-            .overlay(
-                shape.strokeBorder(
-                    isRecording ? Color.accentColor : Theme.Colors.cardStroke, lineWidth: 1)
-            )
+            .background {
+                if isRecording { ShortcutRecorderHitRegion(capture: hotKeys.capture) }
+            }
+            .overlay(shape.strokeBorder(Theme.Colors.cardStroke, lineWidth: 1))
             // An over-long binding truncates rather than resizing the field.
             .clipShape(shape)
             .contentShape(shape)
-            .onTapGesture { hotKeys.recordingAction = action }
+            .onTapGesture { hotKeys.recordingAction = isRecording ? nil : action }
             .onHover { hovered = $0 }
             // Hand the callout this field's bounds while it's the open one.
             .anchorPreference(key: ShortcutRecorderAnchorKey.self, value: .bounds) {
@@ -54,16 +55,17 @@ struct ShortcutRecorder: View {
         if let binding = hotKeys.binding(for: action) {
             boundLabel(binding)
         } else {
-            Text(isRecording ? "Listening…" : "Record")
+            Text(isRecording ? "Listening…" : "Record Hotkey")
                 .font(Theme.Typography.keyCap)
                 .foregroundStyle(unsetInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private func boundLabel(_ binding: HotKeyBinding) -> some View {
         HStack(spacing: Theme.Spacing.xs) {
-            // A double-tap binding is dead without the grant, so say so where the binding is.
-            if binding.doubleTapModifier != nil, doubleTapMonitor.needsAccessibility {
+            // A modifier-only binding is dead without the grant, so say so where the binding is.
+            if binding.usesModifierTapMonitor, modifierTapMonitor.needsAccessibility {
                 Button {
                     Permissions.openAccessibilitySettings()
                 } label: {
@@ -71,7 +73,8 @@ struct ShortcutRecorder: View {
                         .foregroundStyle(.orange)
                 }
                 .buttonStyle(.plain)
-                .help("Double-tap shortcuts need Accessibility access. Click to grant it.")
+                .accessibilityLabel("Open Accessibility settings")
+                .help("Modifier-only hotkeys need Accessibility access. Click to grant it.")
             }
             ForEach(Array(binding.keycaps.enumerated()), id: \.offset) { _, cap in
                 Text(cap)
@@ -103,5 +106,32 @@ struct ShortcutRecorder: View {
             .opacity(hovered ? 1 : 0)
             .allowsHitTesting(hovered)
         }
+    }
+}
+
+private struct ShortcutRecorderHitRegion: NSViewRepresentable {
+    let capture: ShortcutCaptureSession
+
+    func makeNSView(context: Context) -> PassiveView {
+        let view = PassiveView()
+        view.capture = capture
+        capture.setActiveRecorderView(view)
+        return view
+    }
+
+    func updateNSView(_ view: PassiveView, context: Context) {
+        if view.capture !== capture { view.capture?.clearActiveRecorderView(view) }
+        view.capture = capture
+        capture.setActiveRecorderView(view)
+    }
+
+    static func dismantleNSView(_ view: PassiveView, coordinator: ()) {
+        view.capture?.clearActiveRecorderView(view)
+    }
+
+    final class PassiveView: NSView {
+        weak var capture: ShortcutCaptureSession?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }

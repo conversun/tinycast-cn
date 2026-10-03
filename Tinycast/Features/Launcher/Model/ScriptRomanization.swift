@@ -11,38 +11,21 @@ enum ScriptRomanization {
         case other
     }
 
-    /// The aliases a name earns: each reading joined, plus its initials when it has several parts.
-    static func typedForms(of name: String) -> [String] {
-        // ICU reads Han a character at a time, so 音乐 comes back "yinle"; `Pinyin` segments words first.
-        if script(of: name) == .han { return Pinyin.aliases(for: name) }
-        var seen = Set<String>()
-        var result: [String] = []
-        for reading in latinForms(of: name) {
-            let words = reading.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-            let joined = words.joined()
-            guard !joined.isEmpty, seen.insert(joined).inserted else { continue }
-            result.append(joined)
-            // A Chinese user types the pinyin initials far more often than the full reading.
-            guard words.count > 1 else { continue }
-            let initials = String(words.compactMap(\.first))
-            if seen.insert(initials).inserted { result.append(initials) }
-        }
-        return result
-    }
-
-    /// Every Latin reading of a name, or nothing when the name is Latin already.
-    static func latinForms(of name: String) -> [String] {
-        guard let script = script(of: name) else { return [] }
-        let readings: [String] =
+    /// Words one space apart, folded; nil when the name is Latin already.
+    static func latin(_ name: String) -> String? {
+        guard let script = script(of: name) else { return nil }
+        let reading: String? =
             switch script {
-            case .han: [transform(name, .mandarinToLatin)].compactMap { $0 }
+            case .han: hanReading(of: name)
             // Only the kana romanize: ICU would read the kanji as Mandarin, which is a wrong word.
-            case .japanese: [transform(dropping(name, in: hanRanges), .toLatin)].compactMap { $0 }
-            case .hangul: hangulReadings(of: name)
-            case .cyrillic: [cyrillicReading(of: name)]
-            case .other: [transform(name, .toLatin)].compactMap { $0 }
+            case .japanese: transform(dropping(name, in: hanRanges), .toLatin)
+            case .hangul, .other: transform(name, .toLatin)
+            case .cyrillic: cyrillicReading(of: name)
             }
-        return readings.filter { !$0.isEmpty && $0 != typedForm(of: name) }
+        guard let reading else { return nil }
+        let spaced = reading.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let folded = FuzzyMatch.normalized(spaced)
+        return folded.isEmpty || folded == FuzzyMatch.normalized(name) ? nil : folded
     }
 
     /// The first script with a rule of its own, kana before Han so a Japanese title routes right.
@@ -71,13 +54,6 @@ enum ScriptRomanization {
         return hasOther ? .other : nil
     }
 
-    /// ICU spells every ㄹ `l`; revised romanization spells it `r` between vowels, so index both.
-    private static func hangulReadings(of name: String) -> [String] {
-        guard let icu = transform(name, .toLatin) else { return [] }
-        let alternate = icu.replacingOccurrences(of: "l", with: "r")
-        return icu == alternate ? [icu] : [icu, alternate]
-    }
-
     /// ICU's Cyrillic is scientific — `Яндекс` becomes `Ândeks`, never the `yandex` users type.
     private static func cyrillicReading(of name: String) -> String {
         var result = ""
@@ -91,6 +67,30 @@ enum ScriptRomanization {
             }
         }
         return result
+    }
+
+    private static func hanReading(of name: String) -> String? {
+        let text = FuzzyMatch.normalized(name) as NSString
+        guard let tokenizer = CFStringTokenizerCreate(
+            kCFAllocatorDefault, text as CFString, CFRangeMake(0, text.length),
+            kCFStringTokenizerUnitWord, Locale(identifier: "zh_Hans") as CFLocale)
+        else { return nil }
+        var words: [String] = []
+        while CFStringTokenizerAdvanceToNextToken(tokenizer) != [] {
+            let range = CFStringTokenizerGetCurrentTokenRange(tokenizer)
+            let word = text.substring(with: NSRange(location: range.location, length: range.length))
+            guard word.unicodeScalars.allSatisfy({ contains(hanRanges, $0) }) else {
+                words.append(word)
+                continue
+            }
+            guard let transcription = CFStringTokenizerCopyCurrentTokenAttribute(
+                tokenizer, kCFStringTokenizerAttributeLatinTranscription) as? String
+            else { continue }
+            let reading = FuzzyMatch.normalized(transcription).filter(\.isLetter)
+            guard !reading.isEmpty else { continue }
+            words += Pinyin.syllables(of: reading, count: word.count) ?? [reading]
+        }
+        return words.joined(separator: " ")
     }
 
     private static let cyrillicLatin: [Character: String] = [
@@ -108,11 +108,6 @@ enum ScriptRomanization {
 
     private static func dropping(_ value: String, in ranges: [ClosedRange<UInt32>]) -> String {
         String(String.UnicodeScalarView(value.unicodeScalars.filter { !contains(ranges, $0) }))
-    }
-
-    /// Both sides compare on what a user would actually type: letters and digits, nothing else.
-    private static func typedForm(of name: String) -> String {
-        name.folding(options: FuzzyMatch.folding, locale: nil).filter { $0.isLetter || $0.isNumber }
     }
 
     private static func contains(_ ranges: [ClosedRange<UInt32>], _ scalar: Unicode.Scalar) -> Bool {

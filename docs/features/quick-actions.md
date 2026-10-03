@@ -9,8 +9,8 @@ action.
 A **custom Quick Action** is a name, a glyph and a prompt, run through the same provider. It takes a
 shortcut and a launcher row like any other.
 
-Quick Actions is the provider layer's second consumer. It shares nothing with AI Chat but the
-provider protocol and the connections behind it.
+Quick Actions is the provider layer's second consumer. It shares the provider connections and
+selectable Markdown renderer with AI Chat.
 
 ## Invariants
 
@@ -23,17 +23,18 @@ provider protocol and the connections behind it.
   grants keystroke delivery into other apps, so like `snippetsEnabled` it is excluded from settings
   backups — an import must never arm it.
 - **One funnel, whichever way an action started.** A shortcut and a launcher row both land on
-  `QuickActionCoordinator.run(_:)`, which reads `paletteCoordinator.targetApp` **before** hiding the
-  palette — once the palette is gone, the frontmost app is Tinycast, and the action would read its
-  own window. Hiding there rather than at each caller is what keeps the two paths identical.
+  `QuickActionCoordinator.run(_:)`, which captures the target **before** hiding the palette. An
+  external app remains the usual target; a selected passage in the Notes editor is captured directly
+  from its text view. Hiding there rather than at each caller keeps the two paths identical.
 - **Enabling is consent, and it is the only place Accessibility is requested.** The toggle confirms
   through `DialogController` first and then calls `Permissions.ensureAccessibility()`, the pattern
   `SnippetCoordinator.setSnippetsEnabled` established. Everything else — a shortcut press, a
   delivery — uses `isAccessibilityTrusted()` and degrades to a HUD.
 - **Tinycast is never an event target.** `QuickActionRunner.selection(in:using:)` refuses our own
   bundle identifier, and `TextInjector.targetAcceptsInjection` refuses it again before every event post,
-  along with anything raised while Secure Event Input is up. A shortcut pressed with Settings
-  frontmost, or in a password field, does nothing and says so.
+  along with anything raised while Secure Event Input is up. Notes is the narrow in-process exception:
+  its own editor supplies and replaces a selected passage without Accessibility, clipboard or events.
+  A shortcut pressed with Settings frontmost, or in a password field, does nothing and says so.
 - **One run at a time.** Two overlapping runs would race for one selection, and the second would
   replace text the first had already changed. `QuickActionCoordinator` holds a single task and
   refuses a second while it lives; a generation token stops a task that finishes after being
@@ -170,7 +171,7 @@ the panel. System Settings has no anchor for the sheet itself, so the last click
 ## The panel
 
 `QuickActionPanel` is Tinycast's **fourth borderless surface**, beside the dialog, the notes panel
-and the join preview. It takes the same recipe — `panelScrim`, then `VisualEffectView`, then the
+and the join preview. It takes the same recipe — `panelScrim`, then `GlassEffectView`, then the
 clip — and sits at `.floating` like the join preview, so a failure report still lands on top of it.
 Its footer speaks the same button language as a dialog's — `ModalActionButtonStyle`, with Replace
 as the `.primary` role — so every borderless surface answers in one voice rather than dropping Aqua
@@ -183,8 +184,9 @@ which is a closed two-case enum measured once at present time — a growing stre
 Non-activating, so the target app keeps its selection while the panel holds key. Keys go through
 `sendEvent`: `↵` replaces, `⌘C` copies, `esc` dismisses; click-away dismisses like every other
 borderless surface. The panel is anchored by its **top-left** and re-measured as the reply arrives —
-centring on every measure would walk it up the screen. `MarkdownView` and `MarkdownBlock.parse` are
-reused from chat; neither takes palette state.
+centring on every measure would walk it up the screen. Summarize uses chat's `ChatMarkdownText` and
+`MarkdownBlock.parse`, keeping its whole result selectable across paragraphs and headings, with the
+same math as chat; `midStream` is on while it runs, so an equation still arriving is held back.
 
 The body is a `ScrollView` with its height **set** rather than capped: a scroll view has no ideal
 height, so `NSHostingView.fittingSize` measures it as nothing and the body collapses to a slot. The
@@ -199,7 +201,7 @@ result already fits, since dimming text that needs no scrolling reads as a defec
 
 Three things here were settled by rendering them, not by reasoning:
 `scrollEdgeEffectStyle` draws nothing in this panel — it renders a material where a scroll view meets
-a safe area, and over `panelScrim` + `VisualEffectView` that composites to nothing. `safeAreaBar`
+a safe area, and over `panelScrim` + `GlassEffectView` that composites to nothing. `safeAreaBar`
 makes it visible but lays its bars *over* the content instead of insetting it, so text runs through
 the buttons and escapes the corner clip. And a ramp starting at the panel edge rather than below the
 bar leaves text about 60% visible behind the title.
@@ -210,6 +212,9 @@ It keeps one rolling `UInt16` score row and one insert-or-delete bit per token p
 re-checked during traceback — so the cap costs about 2 MB where a full score matrix cost 32 MB.
 
 ## Reading the selection
+
+When the target is the Notes editor, the coordinator captures its selected source text before any
+window changes focus. Empty and oversized selections use the same limits as external text.
 
 Two tiers, in order. `AccessibilityText.read` asks for `kAXSelectedTextAttribute`, then the
 text-marker range browsers use instead. `AXManualAccessibility` is set on the application element
@@ -232,7 +237,12 @@ selected"; otherwise the app told us nothing either way and says so.
 
 ## Delivery
 
-`TextInjector` — shared with Snippets and Quicklinks, and owned by `AppCore` — does the replacement.
+Notes replaces the captured range through its own TextKit edit path, with undo and autosave. If the
+note, source or selection changed while the result was generated, delivery declines and copies the
+result instead of replacing another passage.
+
+For external apps, `TextInjector` — shared with Snippets and Quicklinks, and owned by `AppCore` — does
+the replacement.
 `replaceSelection(with:in:)` takes the interactive path: no keyword to match, no generation to
 cancel, because a shortcut is an explicit gesture rather than an expansion the app decided to
 attempt. Its serial delivery queue is what stops two features fighting over the pasteboard lease.
@@ -253,6 +263,8 @@ failure handler, so automatic expansion stays silent as before.
 
 - Select text in Safari, Chrome, Brave, Slack, Mail, Notes, VS Code and Terminal, press Fix Grammar,
   and confirm the selection is **replaced** rather than appended to.
+- Select text in a Tinycast floating note and run Fix Grammar by shortcut and launcher row. Confirm
+  replacement, Undo, and that changing the note before pressing Replace copies instead.
 - In a Chromium target, run one on a **short** selection whose result stays under 100 characters on
   one line: the whole result lands, not its first four characters.
 - Replace mode, with a slow route selected: the message pill says `Fixing Grammar…` with a blue

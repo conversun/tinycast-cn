@@ -24,12 +24,19 @@ struct ChatMessage: Identifiable, Equatable, Sendable {
     var searches: [ChatSearch]
     /// Tools the reply called, pinned the same way; the calls themselves never enter the context.
     var toolUses: [ChatToolUse]
+    /// What the model shared of its thinking, a block per stretch of it, each where it happened.
+    var reasoning: [ChatReasoning]
+    /// What the route reported for this reply; the context card reads the latest one.
+    var usage: AIUsage?
+    /// The server a question was addressed to with `@server`; the text is stored without it.
+    let toolScope: String?
 
     init(
         id: UUID = UUID(), role: Role, text: String, state: State = .complete,
         sentAt: Date = Date(), images: [AIImage] = [], documents: [AIDocument] = [],
         searches: [ChatSearch] = [],
-        toolUses: [ChatToolUse] = []
+        toolUses: [ChatToolUse] = [], reasoning: [ChatReasoning] = [], usage: AIUsage? = nil,
+        toolScope: String? = nil
     ) {
         self.id = id
         self.role = role
@@ -40,21 +47,51 @@ struct ChatMessage: Identifiable, Equatable, Sendable {
         self.documents = documents
         self.searches = searches
         self.toolUses = toolUses
+        self.reasoning = reasoning
+        self.usage = usage
+        self.toolScope = toolScope
     }
 
-    /// The reply split around what it did: text, search or tool, text… rendered where it happened.
+    /// Text still arrives only into the last of a streaming reply's `count` segments.
+    func isArriving(segmentAt offset: Int, of count: Int) -> Bool {
+        state == .streaming && offset == count - 1
+    }
+
+    /// The next search or call's place among the reply's: with no text between, offsets tie.
+    var nextSequence: Int { searches.count + toolUses.count }
+
+    /// Every block joined, for find and for a transcript copied out whole.
+    var reasoningText: String {
+        reasoning.map(\.text).joined(separator: "\n\n")
+    }
+
+    /// The reply split around what it did: thinking, search or tool, text… each where it happened.
     var segments: [ChatSegment] {
+        // At one offset, thinking came first: a model thinks, then searches or calls.
         let interruptions =
-            (searches.map { (offset: $0.textOffset, segment: ChatSegment.search($0)) }
-            + toolUses.map { (offset: $0.textOffset, segment: ChatSegment.tool($0)) })
-            .sorted { $0.offset < $1.offset }
+            (reasoning.map {
+                (offset: $0.textOffset, sequence: -1, segment: ChatSegment.reasoning($0))
+            }
+            + searches.map {
+                (offset: $0.textOffset, sequence: $0.sequence, segment: ChatSegment.search($0))
+            }
+            + toolUses.map {
+                (offset: $0.textOffset, sequence: $0.sequence, segment: ChatSegment.tools([$0]))
+            })
+            .sorted { ($0.offset, $0.sequence) < ($1.offset, $1.sequence) }
         var segments: [ChatSegment] = []
         var rest = Substring(text)
         var consumed = 0
         for interruption in interruptions {
             let take = max(0, min(interruption.offset - consumed, rest.count))
             if take > 0 { segments.append(.text(String(rest.prefix(take)))) }
-            segments.append(interruption.segment)
+            if case .tools(let uses) = interruption.segment,
+                case .tools(let previous) = segments.last
+            {
+                segments[segments.count - 1] = .tools(previous + uses)
+            } else {
+                segments.append(interruption.segment)
+            }
             rest = rest.dropFirst(take)
             consumed += take
         }
@@ -68,6 +105,7 @@ struct ChatSearch: Equatable, Hashable, Sendable {
     var isComplete: Bool
     /// Characters of reply text that had arrived when the search began.
     let textOffset: Int
+    let sequence: Int
 }
 
 /// One tool call inside a reply: live while it runs, a record of what ran once it is done.
@@ -84,6 +122,7 @@ struct ChatToolUse: Equatable, Hashable, Sendable {
     var state: State
     /// Characters of reply text that had arrived when the call started.
     let textOffset: Int
+    let sequence: Int
 
     var label: String {
         let verb = state == .running ? "Calling" : "Called"
@@ -91,8 +130,30 @@ struct ChatToolUse: Equatable, Hashable, Sendable {
     }
 }
 
+extension Array where Element == ChatToolUse {
+    var runningCall: ChatToolUse? { last { $0.state == .running } }
+    var isLive: Bool { runningCall != nil }
+    var failedCount: Int { count { $0.state == .failed } }
+
+    var completedLabel: String {
+        let label = "Called \(count) tools"
+        let failures = failedCount
+        return failures == 0 ? label : "\(label) · \(failures) failed"
+    }
+}
+
+/// One stretch of thinking: a reply may think, answer, then think again before going on.
+struct ChatReasoning: Equatable, Hashable, Sendable {
+    var text: String
+    /// Characters of reply text that had arrived when this stretch began.
+    let textOffset: Int
+    /// Until the answer resumed, or the reply ended; nil while it is still thinking.
+    var duration: TimeInterval?
+}
+
 enum ChatSegment: Equatable, Hashable {
     case text(String)
     case search(ChatSearch)
-    case tool(ChatToolUse)
+    case tools([ChatToolUse])
+    case reasoning(ChatReasoning)
 }

@@ -31,6 +31,7 @@ struct InterfaceMetrics: Equatable, Sendable {
         var emojiSectionSpacing: CGFloat { scaledPoints(Theme.Spacing.emojiSectionSpacing, scale) }
         var chatTranscriptBottom: CGFloat { scaledPoints(Theme.Spacing.chatTranscriptBottom, scale) }
         var chatFollowTailSlack: CGFloat { scaledPoints(Theme.Spacing.chatFollowTailSlack, scale) }
+        var chatLine: CGFloat { scaledPoints(Theme.Spacing.chatLine, scale) }
     }
 
     struct Radius: Equatable, Sendable {
@@ -60,12 +61,14 @@ struct InterfaceMetrics: Equatable, Sendable {
         var panelHeight: CGFloat { scaledPoints(Theme.Size.panelHeight, scale) }
         var headerHeight: CGFloat { scaledPoints(Theme.Size.headerHeight, scale) }
         var headerIconSlot: CGFloat { scaledPoints(Theme.Size.headerIconSlot, scale) }
+        var searchFieldMinWidth: CGFloat { scaledPoints(Theme.Size.searchFieldMinWidth, scale) }
         var headerPadding: CGFloat { scaledPoints(Theme.Size.headerPadding, scale) }
         /// Derived, not scaled: the compact bar must stay exactly the header in symmetric slack.
         var compactHeight: CGFloat { headerHeight + headerPadding * 2 }
         var bottomBarHeight: CGFloat { scaledPoints(Theme.Size.bottomBarHeight, scale) }
         var barButtonHeight: CGFloat { scaledPoints(Theme.Size.barButtonHeight, scale) }
         var rowIcon: CGFloat { scaledPoints(Theme.Size.rowIcon, scale) }
+        var resultRowIcon: CGFloat { scaledPoints(Theme.Size.resultRowIcon, scale) }
         var colorDot: CGFloat { scaledPoints(Theme.Size.colorDot, scale) }
         var calendarBarWidth: CGFloat { scaledPoints(Theme.Size.calendarBarWidth, scale) }
         var calendarBarHeight: CGFloat { scaledPoints(Theme.Size.calendarBarHeight, scale) }
@@ -175,6 +178,16 @@ struct InterfaceMetrics: Equatable, Sendable {
         var menuRow: Font { font(Theme.Typography.menuRow, .body) }
         var menuShortcut: Font { font(Theme.Typography.menuShortcut, .callout) }
         var menuIcon: Font { font(Theme.Typography.menuIcon, .body) }
+
+        /// The AppKit twin of a text style, for text an `NSTextView` draws beside SwiftUI's own.
+        func textNSFont(
+            _ style: NSFont.TextStyle, weight: NSFont.Weight? = nil, monospaced: Bool = false
+        ) -> NSFont {
+            let base = nsFont(style)
+            if monospaced { return .monospacedSystemFont(ofSize: base.pointSize, weight: weight ?? .regular) }
+            guard let weight else { return base }
+            return .systemFont(ofSize: base.pointSize, weight: weight)
+        }
 
         /// Composed like `Theme`'s own: the style carries the face, an explicit weight overrides it.
         private func font(

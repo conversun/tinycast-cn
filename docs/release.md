@@ -67,7 +67,9 @@ needed. Run it from the **Actions** tab (`Release` → **Run workflow**) and pic
 
 It builds on a `macos-26` runner with Xcode 26 and publishes a GitHub Release tagged
 `v<full-version>` with a versioned DMG and zip asset, marked prerelease for beta. On success it also
-bumps the matching cask in the tap and announces the release on Discord.
+bumps the matching cask in the tap and announces the release on Discord. A stable run also
+dispatches the Website workflow, because the site reads the latest version and the
+[changelog](https://tinycast.dev/changelog/) from GitHub at build time.
 
 A stable run then fans out to a second job, `universal`, which rebuilds the same commit with
 `ARCHS="arm64 x86_64"` and attaches `Tinycast-Universal-<version>.dmg` / `.zip` to the release the

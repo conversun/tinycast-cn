@@ -1,12 +1,12 @@
 ---
 title: System Settings
-description: Every macOS Settings pane, searchable from the launcher.
+description: Search every macOS Settings pane from the launcher.
 ---
 
-Tinycast lists the panes of System Settings as ordinary launcher entries. Type `bluetooth` or
-`display` and the pane opens directly, instead of opening System Settings and hunting for it.
+Tinycast lists System Settings panes as regular launcher entries. Type `bluetooth` or `display` and
+the pane opens directly, without opening System Settings and looking for it.
 
-They get their own **System Settings** section, right after Applications. Pane names follow your
+Panes have their own **System Settings** section, right after Applications. Pane names use your
 Mac's language, and the English names still match.
 
 ## Actions
@@ -21,15 +21,15 @@ Mac's language, and the English names still match.
 
 ## Settings
 
-**Settings → System Settings** lists every pane with:
+**Settings → System Settings** lists every pane, with:
 
-- **Enable System Settings** at the top, which takes every pane out of search and turns off their
+- **Enable System Settings** at the top, which removes every pane from search and turns off their
   shortcuts
-- a checkbox per pane, which only hides that pane from search
-- a global **shortcut** recorder per pane
-- an **alias** field per pane
+- a checkbox for each pane, which only hides that pane from search
+- a global **shortcut** recorder for each pane
+- an **alias** field for each pane
 
-Giving a shortcut to a pane you open often, like Displays before a presentation, is the main reason
-to spend time here.
+This is most useful for giving a shortcut to a pane you open often, like Displays before a
+presentation.
 
 See [Hotkeys](/docs/reference/hotkeys) for recording shortcuts.

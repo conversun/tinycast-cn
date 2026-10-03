@@ -119,7 +119,7 @@ private struct MenuSearchRow: View {
                         .fill(Theme.Colors.iconPlaceholder)
                 }
             }
-            .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
+            .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
             Text(item.title)
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)

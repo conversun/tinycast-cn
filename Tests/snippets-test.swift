@@ -40,6 +40,12 @@ struct SnippetsTests {
         check("stored identity is the standardized source path", first.id == "/tmp/one.md")
         check("identical snippets at different paths keep distinct identities", first.id != second.id)
         check(
+            "a launcher entry id resolves back to its snippet",
+            StoredSnippet.id(fromEntryID: first.entryID) == first.id)
+        check(
+            "another kind's entry id resolves to no snippet",
+            StoredSnippet.id(fromEntryID: "quicklink:" + first.id) == nil)
+        check(
             "source revision is deterministic",
             SnippetSourceRevision(content: "same") == SnippetSourceRevision(content: "same"))
         check(
@@ -223,6 +229,19 @@ struct SnippetsTests {
         let secondLoad = try stable.load()
         check("a repeated load of an empty library stays empty", secondLoad.records.isEmpty)
 
+        let chosenFolder = root.appendingPathComponent("dotfiles/snippets", isDirectory: true)
+        let chosen = SnippetRepository(
+            bundleIdentifier: "com.tinycast.app", applicationSupportRoot: channelRoot,
+            snippetsDirectory: chosenFolder)
+        let signOff = try chosen.create(Snippet(name: "Sign-off", text: "Thanks"))
+        let stableAfter = try stable.load()
+        let chosenAfter = try chosen.load()
+        check(
+            "a chosen folder holds the library instead of the channel's",
+            signOff.fileURL.deletingLastPathComponent().standardizedFileURL.path
+                == chosenFolder.standardizedFileURL.path
+                && stableAfter.records.isEmpty && chosenAfter.records.count == 1)
+
         let corruptRoot = root.appendingPathComponent("partial-load", isDirectory: true)
         let corruptRepository = SnippetRepository(
             bundleIdentifier: "com.example.partial",
@@ -243,6 +262,9 @@ struct SnippetsTests {
             "malformed files are returned as per-file issues",
             partial.issues.count == 1
                 && partial.issues[0].fileURL.standardizedFileURL.path == invalidURL.standardizedFileURL.path)
+        check(
+            "a malformed file still counts as present on disk",
+            partial.fileIDs == [validURL.standardizedFileURL.path, invalidURL.standardizedFileURL.path])
 
         let directoryEntryURL = corruptRepository.snippetsDirectory.appendingPathComponent(
             "folder.md",

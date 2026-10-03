@@ -37,8 +37,9 @@ commands and global shortcuts can show, search, or extend the collection.
   clamps it to the floor below which the title bar's own parts collide.
 - **The editor is the one surface snippets expand into.** `NoteTextView` adopts `InjectableTextView`,
   so a typed keyword — and the Snippets browser's ↵ — is written straight into the text storage
-  rather than posted as events at whichever app happens to be frontmost. Nothing else in Tinycast
-  adopts it: see [snippets.md](snippets.md#text-delivery-and-pasteboard-safety).
+  rather than posted as events at whichever app happens to be frontmost. Quick Actions also read and
+  replace its selected text in process. Nothing else in Tinycast adopts it: see
+  [snippets.md](snippets.md#text-delivery-and-pasteboard-safety).
 
 ## Storage and identity
 
@@ -47,6 +48,11 @@ The per-channel directory is:
 ```text
 ~/Library/Application Support/<bundle-id>/Notes/
 ```
+
+**Notes Folder** in the Notes pane, or `notes.folder` in the [settings file](settings-file.md), uses
+another folder, absolute or under `~/`, as it is: nothing moves out of the old one. `NotesStore.relocate`
+saves the open draft where it was before it lists the new folder. The folder is excluded from backups,
+since it names a place on this Mac.
 
 `NoteID` is the relative filename. A rename therefore returns a new identity; there are no per-note
 launcher items, hotkeys, favorites, or visibility settings that could retain the old one. Immediate
@@ -100,8 +106,9 @@ failed flush retains the draft for retry.
 - **Create Note** creates and selects one unique Untitled note, including from an empty channel.
 - **Search Notes** shows the same panel with the switcher open and its search field focused.
 
-Command-N creates, Command-P opens or refocuses the switcher, Command-O opens the Notes folder, Escape
-closes the switcher before hiding, and Command-W and the red traffic light both hide directly. Hiding
+Command-N creates, Command-P opens or refocuses the switcher, Command-O opens the Notes folder, and
+Command-F opens AppKit's find bar in the active note. Escape closes the find bar or switcher before
+hiding; Command-W and the red traffic light both hide directly. Hiding
 restores the prior external application or Tinycast window and flushes without delaying the order-out —
 but only while that app is still the frontmost one, so closing a window the user has already left behind
 leaves them in whatever app they moved to.
@@ -109,11 +116,13 @@ Command-Q is bound to nothing app-wide, so no chord over Notes can quit Tinycast
 
 Both windows are one `NotesPanel`, a non-activating floating panel that owns the Escape rule and reads
 ⌘⌫. They differ only in style mask and in the `commandChords` their controller installs: the note window
-claims ⌘N, ⌘P, ⌘O and ⌘W, and the switcher reads ⌘N plus ⌘W and ⌘P as dismissals.
+claims ⌘N, ⌘P, ⌘O, ⌘F and ⌘W, and the switcher reads ⌘N plus ⌘W and ⌘P as dismissals.
 
 AppKit draws the note window's chrome. Its 52-point title bar holds the traffic lights, the centred
 active title, and one frosted capsule of Create, Browse, and Open Folder. The title is drawn, not
 native, so it centres on the window; it is not hit-testable, so dragging it moves the window.
+The yellow and green traffic lights are disabled; double-clicking the free title bar moves the
+unchanged window to the top-right of its current screen's visible area.
 
 The switcher is a borderless child window centred on its host and hung below the title bar, not an
 in-window screen — a note window may be 180pt tall, and the list must not be. It carries the same glass
@@ -173,12 +182,16 @@ never shifts them; a wrapped item keeps normal line spacing. A restyle writes st
 `beginEditing` and `endEditing`, then invalidates layout for those lines. It never calls
 `shouldChangeText`, which is what keeps styling off the undo stack.
 
+A bullet or numbered marker becomes a list only after a space or tab; a lone `-` or `1.` stays literal.
+
 `NoteRevealPolicy` picks the lines that show raw Markdown: every line under the selection, plus both
 fences of a code block the selection is in. Nothing is revealed unless the editor is first responder in
 the key window. Revealed markers use `textTertiary`. During a drag selection the reveal waits for
-mouse-up, because revealing moves text under the pointer. A revealed list or quote line hangs its
-marker left of the content indent, so its text stays where the rendered line had it. Since the caret's line is always raw, the
-caret never sits inside hidden text and the arrow keys need no special handling.
+mouse-up, because revealing moves text under the pointer. Bullets keep their dot under the caret;
+other revealed list markers keep the rendered marker's `textSecondary` colour. Revealed non-bullet list
+and quote lines hang their source marker left of the content indent, so text stays where the rendered
+line had it. Empty list items keep body-sized invisible markers so their line height does not collapse.
+Other caret lines are raw, keeping the caret out of hidden text.
 
 ### Block drawing
 
@@ -228,7 +241,8 @@ collide. In a note, ⌘E replaces AppKit's Use Selection for Find.
 AppKit still owns typing, selection, Cut, Copy, Paste, Select All, Find, marked text, emoji, combining
 characters and undo grouping. Copy yields raw Markdown and VoiceOver reads the source. Changing the note
 identity or editor epoch reinstalls and restyles the string and clears the previous document's undo
-history. Snippets expand through `insertText` and are styled like typed text.
+history. Snippets expand through `insertText` and are styled like typed text. The empty-note placeholder
+is drawn in the text view, so opening the find bar moves it with the editor content.
 
 ### The formatting bar
 
@@ -296,7 +310,7 @@ autosave, empty collections, switcher interaction, and cancellation, plus the Ma
 edit plan, the formatting each selection reports and the reveal policy.
 
 `Tests/notes-editor-test.swift` uses real TextKit 2 and AppKit undo objects. It runs the native
-Cut/Copy/Paste, Unicode and marked-text cases with rendering off and on, and covers undo isolation, an
+Cut/Copy/Paste, the native find bar, Unicode and marked-text cases with rendering off and on, and covers undo isolation, an
 exact source after styling, hidden and revealed markers, restyling after edits and after undo, block
 decorations and layout fragments, list keys, chords, the task rule, checkbox toggles, link schemes,
 pasting a URL, and the formatting reports and `format(_:)` the formatting bar uses.

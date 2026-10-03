@@ -187,20 +187,54 @@ enum EmojiCatalog {
         return String(scalars)
     }
 
-    /// Parse the generated `glyph|name|category|tone|keywords|localizedName` records, dropping
-    /// malformed lines.
-    nonisolated static func parse(_ raw: String) -> [EmojiEntry] {
+    /// Malformed lines are dropped; the sixth field carries the CLDR Chinese name.
+    nonisolated static func parse(_ raw: String, localized: [String] = []) -> [EmojiEntry] {
+        let localizedTerms = terms(in: localized)
         var result: [EmojiEntry] = []
         result.reserveCapacity(2200)
         for line in raw.split(separator: "\n") {
             let fields = line.split(separator: "|", maxSplits: 5, omittingEmptySubsequences: false)
             guard fields.count == 6, let category = EmojiCategory(rawValue: String(fields[2]))
             else { continue }
+            let glyph = String(fields[0])
+            var keywords = String(fields[4])
+            for pack in localizedTerms[glyph] ?? [] {
+                if !keywords.isEmpty { keywords += "," }
+                keywords += pack
+            }
             result.append(
                 EmojiEntry(
-                    glyph: String(fields[0]), name: String(fields[1]), category: category,
-                    supportsSkinTone: fields[3] == "1", keywords: String(fields[4]),
+                    glyph: glyph, name: String(fields[1]), category: category,
+                    supportsSkinTone: fields[3] == "1", keywords: keywords,
                     localizedName: String(fields[5])))
+        }
+        return result
+    }
+
+    private nonisolated static func terms(in packs: [String]) -> [String: [Substring]] {
+        var result: [String: [Substring]] = [:]
+        for pack in packs {
+            for line in pack.split(separator: "\n") {
+                let fields = line.split(separator: "|", maxSplits: 1)
+                guard fields.count == 2 else { continue }
+                result[String(fields[0]), default: []].append(fields[1])
+            }
+        }
+        return result
+    }
+
+    /// A pack per language the Mac reads; "en" is the catalog and the matcher's answer to no match.
+    nonisolated static func keywordLanguages(available: [String], preferred: [String]) -> [String] {
+        let candidates = ["en"] + available
+        var result: [String] = []
+        for language in preferred {
+            guard
+                let match = Bundle.preferredLocalizations(
+                    from: candidates, forPreferences: [language]
+                ).first,
+                match != "en", !result.contains(match)
+            else { continue }
+            result.append(match)
         }
         return result
     }

@@ -77,8 +77,8 @@ feature's doc, under its own `## Invariants`.
 - **A networked feature fetches on a private `.ephemeral`, `urlCache = nil` session**, never
   `URLSession.shared`, so its own cache file stays the only copy on disk. `CurrencyRateStore` is the
   reference — copy it rather than inventing a second shape. A flag that grants a capability is never
-  carried by a backup: `snippetsEnabled` is excluded from settings backups so an import cannot grant
-  keystroke listening.
+  carried by a backup or by `settings.json`: `snippetsEnabled` is excluded from settings backups so an
+  import cannot grant keystroke listening.
 - **Extensions stay inside `Features/Extensions/`.** Every view, row, menu, geometry and sizing
   constant an extension needs is written and owned there — never added to `DesignSystem/`, never bolted
   onto `Theme`, and never lifted somewhere another feature can build on it. Another surface may render
@@ -94,8 +94,8 @@ feature's doc, under its own `## Invariants`.
 - **`AppEntry.Kind` is the only thing that says what an entry is.** One case per launcher section and
   per `VisibilityStore` category — never re-derive a category by sniffing an entry ID. Which *pane*
   lists a command is a separate fact, and `SettingsTab.ownedCommands` is the only place that states it.
-- **Generated files are never hand-edited.** `EmojiData.generated.swift` comes from
-  `node Scripts/gen-emoji.js`, `CurrencyData.generated.swift` from `node Scripts/gen-currencies.js`,
+- **Generated files are never hand-edited.** `EmojiData.generated.swift` and
+  `Resources/EmojiKeywords/` come from `node Scripts/gen-emoji.js`, `CurrencyData.generated.swift` from `node Scripts/gen-currencies.js`,
   `CountryZoneData.generated.swift` from `node Scripts/gen-countries.js`, and
   `Resources/RaycastRuntime.generated.js` from `Scripts/raycast-runtime/build.mjs` — the runtime is
   committed so building the app never needs Node.
@@ -105,6 +105,9 @@ feature's doc, under its own `## Invariants`.
 
 ## Conventions worth knowing up front
 
+- **A new preference also gets a `SettingsFileKey`** and its binding in `SettingsFileSchema`, so the
+  opt-in `settings.json` mirror carries it; the exhaustive switch fails the build until it is bound.
+  See [settings-file.md](docs/features/settings-file.md).
 - **A type's suffix says what it *is*** — `Store`, `Coordinator`, `Controller`, `Manager`, `Engine`,
   `Policy` and the rest each name a specific responsibility. **Semantic correctness always wins over
   suffix consistency:** pick the suffix that describes the type honestly, add a new one when none fits,

@@ -68,8 +68,8 @@ export function Gallery() {
       id="gallery"
       index={2}
       label="In action"
-      title="The real app, not a mockup."
-      intro="The palette up top is a recreation. These are captured from Tinycast itself. Open any of them full size."
+      title="Straight from the app."
+      intro="The palette at the top of this page is a recreation. These screenshots come from Tinycast itself. Click one to see it full size."
     >
       <div className="overflow-hidden rounded-xl border border-border/70 bg-surface shadow-xs">
         <div className="flex min-h-11 items-center gap-3 border-b border-border/60 px-4 py-1.5 font-mono text-micro uppercase text-fg-muted">

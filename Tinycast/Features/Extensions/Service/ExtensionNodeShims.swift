@@ -427,13 +427,14 @@ final class ExtensionNodeShims: @unchecked Sendable {
         let stdin = input.map { _ in Pipe() }
         if let stdin { task.standardInput = stdin }
 
+        let exit: ProcessExit
         do {
-            try task.run()
+            exit = try task.runObservingExit()
         } catch {
             throw ShimError.failed("Could not run '\(command)': \(error.localizedDescription)", "ENOENT")
         }
         if let input, let stdin { feed(input, to: stdin) }
-        return ExtensionAsyncProcess.Child(task: task, stdout: stdout, stderr: stderr)
+        return ExtensionAsyncProcess.Child(task: task, exit: exit, stdout: stdout, stderr: stderr)
     }
 
     /// A pipe holds 64 KB, so a larger input written before the child reads it would never finish.

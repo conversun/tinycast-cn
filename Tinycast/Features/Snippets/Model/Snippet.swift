@@ -39,9 +39,18 @@ struct SnippetSourceRevision: Sendable, Hashable {
 }
 
 struct StoredSnippet: Identifiable, Sendable, Hashable {
+    static let entryIDPrefix = "snippet:"
+
     let fileURL: URL
     var snippet: Snippet
     let sourceRevision: SnippetSourceRevision
 
     var id: String { fileURL.standardizedFileURL.path }
+
+    var entryID: String { Self.entryIDPrefix + id }
+
+    static func id(fromEntryID entryID: String) -> ID? {
+        guard entryID.hasPrefix(entryIDPrefix) else { return nil }
+        return String(entryID.dropFirst(entryIDPrefix.count))
+    }
 }

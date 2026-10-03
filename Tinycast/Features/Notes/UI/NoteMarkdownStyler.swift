@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Turns one parsed line into attributes; rendered lines hide their syntax, revealed lines dim it.
+/// Turns a parsed line into attributes; bullets keep their dot even when the caret reveals syntax.
 @MainActor
 enum NoteMarkdownStyler {
     typealias Attributes = [NSAttributedString.Key: Any]
@@ -21,6 +21,10 @@ enum NoteMarkdownStyler {
 
     private static let hidden: Attributes = [
         .font: NoteMarkdownTypography.hidden,
+        .foregroundColor: NSColor.clear
+    ]
+    private static let hiddenEmptyListMarker: Attributes = [
+        .font: NoteMarkdownTypography.body,
         .foregroundColor: NSColor.clear
     ]
 
@@ -54,18 +58,25 @@ enum NoteMarkdownStyler {
             }
             if let marker = line.markerRange { runs.append((marker, markerLook)) }
         case .bullet, .ordered, .task:
-            if let marker = line.markerRange { runs.append((marker, markerLook)) }
+            let revealsMarker = isRevealed && line.kind != .bullet
+            let isEmpty = line.contentRange.length == 0
+            if let marker = line.markerRange {
+                let listMarkerLook: Attributes =
+                    revealsMarker
+                    ? [.foregroundColor: color(Theme.Colors.textSecondary)]
+                    : (isEmpty ? hiddenEmptyListMarker : hidden)
+                runs.append((marker, listMarkerLook))
+            }
             if case .task(checked: true) = line.kind {
                 runs.append((line.contentRange, checkedTask))
             }
             let contentIndent = CGFloat(line.level + 1) * listSlot
-            guard !isRevealed else {
-                base[.paragraphStyle] = hanging(
+            base[.paragraphStyle] =
+                revealsMarker || isEmpty
+                ? hanging(
                     line.markerRange, in: text, contentIndent: contentIndent, spacingAfter: listItemSpacing)
-                break
-            }
-            base[.paragraphStyle] = indented(by: contentIndent, spacingAfter: listItemSpacing)
-            base[.noteBlockDecoration] = listDecoration(line, text: text)
+                : indented(by: contentIndent, spacingAfter: listItemSpacing)
+            if !revealsMarker { base[.noteBlockDecoration] = listDecoration(line, text: text) }
         case .quote(let depth):
             if let marker = line.markerRange { runs.append((marker, markerLook)) }
             runs.append((line.contentRange, [.foregroundColor: color(Theme.Colors.textSecondary)]))

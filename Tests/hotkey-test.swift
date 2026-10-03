@@ -59,6 +59,9 @@ struct DoubleTapDetectorTests {
         layoutCharacters()
         hyperChord()
         hyperRetargeting()
+        spelling()
+        globeTap()
+        globeChord()
         firing()
         timing()
         chords()
@@ -70,7 +73,131 @@ struct DoubleTapDetectorTests {
         if failures > 0 { exit(1) }
     }
 
+    // MARK: - Spelling
+
+    /// Enough of a US layout to spell with; the app reads its own through `ASCIIKeyboardLayout`.
+    private static let usKeys = [
+        kVK_ANSI_K: "k", kVK_ANSI_1: "1", kVK_ANSI_Keypad1: "1", kVK_ANSI_Slash: "/",
+        kVK_ANSI_Equal: "="
+    ]
+    private static let hyperModifiers = controlKey | optionKey | shiftKey | cmdKey
+
+    static func spelling() {
+        let plain = HotKeySpelling(characters: usKeys, hyperModifiers: nil)
+        let hyper = HotKeySpelling(characters: usKeys, hyperModifiers: hyperModifiers)
+        func combo(_ keyCode: Int, _ modifiers: Int) -> HotKeyBinding {
+            .combo(KeyShortcut(carbonKeyCode: keyCode, carbonModifiers: modifiers))
+        }
+        func roundTrips(_ binding: HotKeyBinding, as text: String, _ spelling: HotKeySpelling) {
+            expect(spelling.text(for: binding) == text, "\(text) is how the binding spells")
+            expect(spelling.binding(from: text) == binding, "\(text) reads back as the same binding")
+        }
+
+        roundTrips(combo(kVK_LeftArrow, controlKey | optionKey), as: "ctrl+option+left", plain)
+        roundTrips(combo(kVK_ANSI_K, shiftKey | cmdKey), as: "shift+cmd+k", plain)
+        roundTrips(combo(kVK_Space, optionKey), as: "option+space", plain)
+        roundTrips(combo(kVK_F5, 0), as: "f5", plain)
+        roundTrips(combo(kVK_ANSI_Slash, cmdKey), as: "cmd+/", plain)
+        roundTrips(combo(kVK_UpArrow, kEventKeyModifierFnMask | controlKey), as: "fn+ctrl+up", plain)
+        roundTrips(combo(kVK_ANSI_Keypad1, cmdKey), as: "cmd+keypad-1", plain)
+        roundTrips(combo(kVK_ANSI_1, cmdKey), as: "cmd+1", plain)
+        roundTrips(combo(110, controlKey), as: "ctrl+key-110", plain)
+        roundTrips(.doubleTap(.command), as: "double-tap cmd", plain)
+        roundTrips(.doubleTap(.control), as: "double-tap ctrl", plain)
+        roundTrips(.globe, as: "globe", plain)
+        roundTrips(.doubleGlobe, as: "double-tap globe", plain)
+        roundTrips(combo(kVK_ANSI_K, hyperModifiers), as: "hyper+k", hyper)
+        roundTrips(combo(kVK_ANSI_K, controlKey | optionKey | cmdKey), as: "ctrl+option+cmd+k", hyper)
+
+        expect(
+            plain.binding(from: " Command+Shift+K ") == combo(kVK_ANSI_K, shiftKey | cmdKey),
+            "modifiers read in any order, case and alias")
+        expect(
+            plain.binding(from: "alt+space") == combo(kVK_Space, optionKey), "alt reads as option")
+        expect(
+            plain.binding(from: "double-tap command") == .doubleTap(.command),
+            "a double-tap reads its modifier's alias")
+        expect(
+            plain.text(for: combo(kVK_ANSI_K, hyperModifiers)) == "ctrl+option+shift+cmd+k",
+            "without a Hyper key the chord is spelled out")
+        expect(plain.binding(from: "hyper+k") == nil, "without a Hyper key, hyper means nothing")
+
+        let plusKey = HotKeySpelling(characters: [kVK_ANSI_Equal: "+"], hyperModifiers: nil)
+        expect(
+            plusKey.binding(from: "cmd++") == combo(kVK_ANSI_Equal, cmdKey),
+            "a layout's plus key is spelled after the separator")
+
+        expect(plain.binding(from: "k") == nil, "a bare key is refused, as the recorder refuses it")
+        expect(plain.binding(from: "shift+k") == nil, "Shift alone does not command")
+        expect(plain.binding(from: "cmd+") == nil, "a chord needs a key")
+        expect(plain.binding(from: "cmd+nope") == nil, "an unknown key is refused")
+        expect(plain.binding(from: "cmd+key-999") == nil, "a raw key code must be a real one")
+        expect(plain.binding(from: "double-tap fn") == nil, "fn has no double-tap")
+    }
+
     // MARK: - Model
+
+    static func globeTap() {
+        var detector = GlobeTapDetector()
+        func globe(
+            _ down: Bool, at time: TimeInterval, physical: Bool = true, other: Bool = false
+        ) -> GlobeTapDetector.Gesture? {
+            detector.handle(
+                isGlobeKey: physical, functionDown: down, hasOtherModifiers: other, at: time)
+        }
+
+        expect(globe(true, at: 0) == nil, "Globe press waits for release")
+        expect(globe(false, at: 0.05) == .single, "lone Globe fires on release")
+        expect(globe(false, at: 0.10) == nil, "a second release without a press does nothing")
+        expect(globe(true, at: 0.25) == nil, "a second Globe press waits for release")
+        expect(globe(false, at: 0.30) == .double, "two quick Globe presses form a double tap")
+
+        _ = globe(true, at: 1)
+        _ = globe(true, at: 1.02, physical: false, other: true)
+        expect(globe(false, at: 1.05) == nil, "another modifier cancels Globe")
+
+        _ = globe(true, at: 2)
+        detector.cancel()
+        expect(globe(false, at: 2.05) == nil, "a key press or click cancels Globe")
+        expect(globe(true, at: 3, physical: false) == nil, "an F-key cannot start Globe")
+        expect(globe(false, at: 3.05, physical: false) == nil, "an F-key cannot finish Globe")
+
+        _ = globe(true, at: 4)
+        expect(globe(false, at: 4.05) == .single, "first release remains a single candidate")
+        _ = globe(true, at: 4.40)
+        expect(globe(false, at: 4.45) == .single, "a late second press starts a new tap")
+        _ = globe(true, at: 5)
+        expect(globe(false, at: 5.30) == nil, "holding Globe is not a tap")
+
+        for binding in [HotKeyBinding.globe, .doubleGlobe] {
+            let encoded = try? JSONEncoder().encode(binding)
+            expect(
+                encoded.flatMap { try? JSONDecoder().decode(HotKeyBinding.self, from: $0) }
+                    == binding,
+                "\(binding) round-trips through the existing persistence format")
+        }
+        expect(HotKeyBinding.globe.keycaps == ["🌐︎"], "Globe uses one monochrome keycap")
+        expect(
+            HotKeyBinding.doubleGlobe.keycaps == ["🌐︎", "🌐︎"],
+            "double Globe renders as two monochrome keycaps")
+    }
+
+    static func globeChord() {
+        let shortcut = KeyShortcut(keyCode: kVK_ANSI_J, modifierFlags: [.function])
+        expect(shortcut != nil, "Globe alone can modify a letter")
+        expect(
+            shortcut?.carbonModifiers == kEventKeyModifierFnMask,
+            "Globe uses Carbon's fn modifier bit")
+        expect(shortcut?.keycaps == ["🌐︎", "J"], "Globe and the key have separate caps")
+        expect(
+            KeyShortcut(keyCode: kVK_ANSI_J, modifierFlags: [.function, .command])?.modifierFlags
+                == [.function, .command],
+            "Globe combines with ordinary modifiers")
+        expect(
+            KeyShortcut(carbonKeyCode: kVK_ANSI_J, carbonModifiers: Int.max).carbonModifiers
+                == KeyShortcut.carbonModifiers(from: [.function, .control, .option, .shift, .command]),
+            "decoding keeps fn but still discards unrelated modifier bits")
+    }
 
     static func modifierGlyphs() {
         expect(DoubleTapModifier.allCases.count == 4, "exactly four modifiers are eligible")

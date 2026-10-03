@@ -5,57 +5,36 @@ enum EntryNaming {
     /// Everything a producer knows about what its entry is called.
     struct Sources: Sendable, Hashable {
         var name: String
-        /// Names identifying the entry as strongly as its own: a snippet's keyword, a rename.
-        var strongNames: [String] = []
-        /// Other ways to say the same name: localizations, Spotlight alternates, vendor aliases.
-        var translations: [String] = []
-        /// What provides the entry rather than what it is — the extension a command came from.
-        var ownerName: String?
-        var bundleID: String?
-        var executableName: String?
+        /// Ranked like the title: a translation, a renamed file, a snippet keyword.
+        var alternateTitles: [String] = []
+        /// What the entry comes from, shown beside it: an extension's title.
+        var subtitle: String?
+        /// Found by, never ranked by: a declared name, an extension's keywords.
+        var keywords: [String] = []
 
         init(name: String) { self.name = name }
     }
 
-    /// Every naming criterion this entry carries, lowered to one flat list of tagged aliases.
-    static func aliases(for sources: Sources) -> [SearchAlias] {
-        let strong = usable(sources.strongNames, rejecting: [sources.name])
-        let translations = usable(
-            sources.translations, rejecting: [sources.name] + strong)
-        let romanized = usable(
-            ([sources.name] + strong + translations).flatMap(ScriptRomanization.typedForms),
-            rejecting: [sources.name] + strong + translations)
-
-        var aliases: [SearchAlias] = []
-        aliases.reserveCapacity(5 + strong.count + translations.count + romanized.count)
-        aliases.append(.name(sources.name))
-        for text in strong { aliases.append(.name(text)) }
-        for text in translations + romanized { aliases.append(.translation(text)) }
-        if let owner = sources.ownerName, !owner.isEmpty { aliases.append(.owner(owner)) }
-        if let bundleID = sources.bundleID, !bundleID.isEmpty {
-            aliases.append(.technical(identifyingPart(of: bundleID)))
-            // The whole reverse-DNS id is exact-only: as a prefix, "com" would match every app.
-            aliases.append(SearchAlias(bundleID, .technical, looseness: .exact))
-        }
-        if let executable = sources.executableName,
-            executable.caseInsensitiveCompare(sources.name) != .orderedSame
-        {
-            aliases.append(.technical(executable))
-        }
-        return aliases
+    static func profile(for sources: Sources) -> SearchProfile {
+        let title = SearchText(sources.name, transliterated: true)
+        // Folded, never transliterated: these compare against the query as typed.
+        let alternates = usable(sources.alternateTitles, rejecting: [sources.name])
+            .map { SearchText($0, transliterated: false) }
+        let subtitle = sources.subtitle
+            .map { SearchText($0, transliterated: true) }
+            .flatMap { $0.isEmpty || $0.units == title.units ? nil : $0 }
+        var keywords = usable(sources.keywords, rejecting: [sources.name] + sources.alternateTitles)
+            .map { SearchText($0, transliterated: true) }
+        if let subtitle { keywords += [title.joined(with: subtitle), subtitle.joined(with: title)] }
+        return SearchProfile(
+            title: title, alternateTitles: alternates, subtitle: subtitle, keywords: keywords)
     }
 
     static func strippingAppExtension(_ name: String) -> String {
         name.hasSuffix(".app") ? String(name.dropLast(4)) : name
     }
 
-    /// Drops the leading reverse-DNS component, which prefixes nearly every installed app.
-    static func identifyingPart(of bundleID: String) -> String {
-        guard let dot = bundleID.firstIndex(of: ".") else { return bundleID }
-        return String(bundleID[bundleID.index(after: dot)...])
-    }
-
-    /// Spotlight mixes junk in with the real aliases; indexing it makes `app` match everything.
+    /// Info.plist lists repeat the name and ship `ALTERNATE_NAME_1` placeholders.
     static func usable(_ raw: [String], rejecting existing: [String]) -> [String] {
         var seen = Set(existing.map { FuzzyMatch.normalized(strippingAppExtension($0)) })
         return raw.compactMap { candidate in
@@ -71,4 +50,17 @@ enum EntryNaming {
     private static func isPlaceholder(_ name: String) -> Bool {
         name.contains("_") && !name.contains(where: { $0.isLowercase || $0.isWhitespace })
     }
+}
+
+/// Built by `EntryNaming.profile` alone.
+struct SearchProfile: Sendable, Hashable {
+    var title: SearchText
+    var alternateTitles: [SearchText]
+    var subtitle: SearchText?
+    /// Match to appear, never to rank.
+    var keywords: [SearchText]
+
+    /// What an entry holds before its first index pass: nothing a query can reach.
+    static let unnamed = SearchProfile(
+        title: SearchText(units: []), alternateTitles: [], subtitle: nil, keywords: [])
 }

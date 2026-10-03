@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The My Schedule list, bucketed into Today and Tomorrow.
+/// The My Schedule list, bucketed by day.
 struct ScheduleList: View {
     @Environment(\.metrics) private var metrics
     let results: [MeetingEvent]
@@ -21,20 +21,10 @@ struct ScheduleList: View {
         }
     }
 
-    /// `results` is already in start order, so a bucket change is where a header belongs.
     private var rows: [Row] {
-        var rows: [Row] = []
-        var current: String?
-        for meeting in results {
-            let title =
-                MeetingDay(for: meeting.start, now: now, calendar: .current)?.title ?? "Later"
-            if title != current {
-                rows.append(.header(title))
-                current = title
-            }
-            rows.append(.meeting(meeting))
+        MeetingDayGroup.grouping(results, now: now, calendar: .current).flatMap { group in
+            [.header(group.day.title(calendar: .current))] + group.meetings.map(Row.meeting)
         }
-        return rows
     }
 
     private var firstRowSelected: Bool {
@@ -91,9 +81,9 @@ private struct MeetingRow: View {
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
             SymbolImage(
-                name: meeting.link?.provider.sfSymbol ?? "calendar", size: metrics.size.rowIcon * 0.7
+                name: meeting.link?.provider.sfSymbol ?? "calendar", size: metrics.size.resultRowIcon * 0.7
             )
-            .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
+            .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
             .foregroundStyle(meeting.isInProgress(now: now) ? Theme.Colors.brand : .secondary)
             CalendarBar(color: meeting.calendarColor)
             Text(meeting.title)
@@ -117,7 +107,8 @@ private struct MeetingRow: View {
     private var accessibilityText: String {
         let parts = [
             meeting.title, MeetingTimeFormat.range(of: meeting),
-            UpcomingWindow.rowCountdown(for: meeting, now: now), meeting.calendarName
+            UpcomingWindow.rowPill(for: meeting, now: now, calendar: .current)?.text,
+            meeting.calendarName
         ]
         return parts.compactMap(\.self).joined(separator: ", ")
     }

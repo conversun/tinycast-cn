@@ -26,9 +26,17 @@ enum EmojiSearchBenchmark {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let frequent = FrequentEmojiStore(fileURL: directory.appendingPathComponent("frequency.json"))
+        let arguments = CommandLine.arguments
+        let languages =
+            arguments.firstIndex(of: "--languages")
+            .flatMap { arguments.dropFirst($0 + 1).first }?
+            .split(separator: ",").map(String.init) ?? []
         let index = EmojiIndex()
-        await index.load()
-        var output: [String: Any] = ["loaded": memory()]
+        let loadStart = ContinuousClock.now
+        await index.load(languages: languages, bundle: Bundle(path: "Tinycast/Resources") ?? .main)
+        var output: [String: Any] = [
+            "loaded": memory(), "load_ms": milliseconds(loadStart), "languages": languages
+        ]
         // Alternating queries miss the one-entry memo; repeated queries measure view re-renders.
         let workloads: [(String, [String], Int)] = [
             (

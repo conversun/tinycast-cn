@@ -39,7 +39,7 @@ struct QuickActionResultView: View {
         .overlay(alignment: .bottom) { measured(footer) { footerHeight = $0 } }
         .frame(width: metrics.size.quickActionPanel, height: panelHeight)
         .background(Theme.Colors.panelScrim)
-        .background(VisualEffectView())
+        .background(GlassEffectView())
         .clipShape(RoundedRectangle(cornerRadius: metrics.radius.dialog, style: .continuous))
         .panelEntrance()
         // Reported, not measured: the frame above is ours, so reading it back would feed itself.
@@ -132,8 +132,7 @@ struct QuickActionResultView: View {
             // One `Text` per chunk would break the wrap, so the runs are styled inside one string.
             prose(Text(attributed(chunks)))
         } else if state.action == .summarize {
-            MarkdownView(blocks: MarkdownBlock.parse(state.output))
-                .textSelection(.enabled)
+            ChatMarkdownText(blocks: MarkdownBlock.parse(state.output, midStream: state.isRunning))
         } else {
             prose(Text(state.output))
         }

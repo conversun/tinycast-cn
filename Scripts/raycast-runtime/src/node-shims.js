@@ -25,6 +25,22 @@ import { punycode } from "./punycode.js";
 import { upgradeToWebSocket } from "./websocket.js";
 import { dgram } from "./dgram.js";
 
+// ─── Unsupported-module exports ─────────────────────────────────────
+
+/// Node's function exports per module: a lazy member survives `__toESM` only as an own key.
+const UNSUPPORTED_EXPORTS = {
+  net: ["BlockList", "SocketAddress", "connect", "createConnection", "createServer", "isIP", "isIPv4", "isIPv6", "Server", "Socket", "Stream"],
+  tls: ["getCiphers", "checkServerIdentity", "convertALPNProtocols", "createSecureContext", "SecureContext", "TLSSocket", "Server", "createServer", "connect"],
+  dns: ["lookup", "lookupService", "Resolver", "getServers", "setServers", "getDefaultResultOrder", "setDefaultResultOrder", "resolve", "resolve4", "resolve6", "resolveAny", "resolveCaa", "resolveCname", "resolveMx", "resolveNaptr", "resolveNs", "resolvePtr", "resolveSoa", "resolveSrv", "resolveTlsa", "resolveTxt", "reverse"],
+  vm: ["Script", "createContext", "createScript", "runInContext", "runInNewContext", "runInThisContext", "isContext", "compileFunction", "measureMemory"],
+  readline: ["Interface", "clearLine", "clearScreenDown", "createInterface", "cursorTo", "emitKeypressEvents", "moveCursor"],
+  worker_threads: ["MessagePort", "MessageChannel", "markAsUncloneable", "markAsUntransferable", "isMarkedAsUntransferable", "moveMessagePortToContext", "receiveMessageOnPort", "postMessageToThread", "Worker", "BroadcastChannel", "setEnvironmentData", "getEnvironmentData"],
+  http2: ["connect", "createServer", "createSecureServer", "getDefaultSettings", "getPackedSettings", "getUnpackedSettings", "performServerHandshake", "Http2ServerRequest", "Http2ServerResponse"],
+  domain: ["Domain", "createDomain", "create"],
+  diagnostics_channel: ["channel", "hasSubscribers", "subscribe", "unsubscribe", "tracingChannel", "Channel"],
+  "stream/consumers": ["arrayBuffer", "blob", "buffer", "text", "json"],
+};
+
 // ─── path ───────────────────────────────────────────────────────────
 
 function normalizeSegments(parts, allowAboveRoot) {
@@ -711,16 +727,12 @@ const childProcess = {
       file,
     );
   },
-  /// A buffered `spawn`: the child runs to completion and its output is then emitted as one `data`
-  /// event. That covers the write-query-then-read-all pattern (`@raycast/utils`' `useSQL` spawns
-  /// `sqlite3` exactly this way), which is what extensions actually do with it — true streaming would
-  /// need a duplex channel across the bridge.
   spawn(file, args = [], options = {}) {
     if (!Array.isArray(args)) {
       options = args;
       args = [];
     }
-    return new BufferedChildProcess(String(file), args.map(String), options);
+    return new ChildProcess(String(file), args.map(String), options);
   },
   fork() {
     throw new Error("child_process.fork is not supported in Tinycast extensions.");
@@ -856,6 +868,7 @@ const cryptoModule = {
     queueMicrotask(() => callback(null, key));
   },
   timingSafeEqual: (a, b) => Buffer.from(a).equals(Buffer.from(b)),
+  getHashes: () => ["md5", "sha1", "sha256", "sha384", "sha512"],
   getRandomValues: (target) => cryptoModule.randomFillSync(target),
   webcrypto: null,
   constants: {},
@@ -909,13 +922,30 @@ const zlibImpl = {
   constants: {},
 };
 for (const name of ["gzip", "gunzip", "deflate", "inflate", "deflateRaw", "inflateRaw"]) {
-  zlibImpl[name] = callbackify(zlibImpl[`${name}Sync`]);
+  const sync = zlibImpl[`${name}Sync`];
+  zlibImpl[name] = callbackify(sync);
+  zlibImpl[`create${name[0].toUpperCase()}${name.slice(1)}`] = () => {
+    const chunks = [];
+    return new Transform({
+      transform(chunk, _enc, cb) {
+        chunks.push(Buffer.from(chunk));
+        cb();
+      },
+      flush(cb) {
+        try {
+          cb(null, sync(concatBuffers(chunks)));
+        } catch (error) {
+          cb(error);
+        }
+      },
+    });
+  };
 }
 const zlib = unsupportedModule("zlib", zlibImpl);
 
 // ─── events ─────────────────────────────────────────────────────────
 
-class BufferedChildProcess extends EventEmitter {
+class ChildProcess extends EventEmitter {
   constructor(file, args, options) {
     super();
     this.pid = 0;
@@ -956,13 +986,13 @@ class BufferedChildProcess extends EventEmitter {
       input,
       // `detached` only makes a process group; only an unread child may answer before it exits.
       detached: !!options.detached && (Array.isArray(options.stdio) ? options.stdio[1] : options.stdio) === "ignore",
-    });
+    }, (pid) => Promise.all([pipeChild(pid, 1, this.stdout), pipeChild(pid, 2, this.stderr)]));
     this.pid = pid;
+    if (pid) queueMicrotask(() => this.emit("spawn"));
     exit.then(
       (raw) => {
         this.exitCode = raw.status;
         this.stdin.emit("finish");
-        this.emit("spawn");
         this.stdout.end(Buffer.from(base64ToBytes(raw.stdout)));
         this.stderr.end(Buffer.from(base64ToBytes(raw.stderr)));
         // One host reply carries both, but a reader still expects the output before the exit code.
@@ -1044,14 +1074,37 @@ function decorateProcessError(error, label) {
 }
 
 /// Launched synchronously because extensions store `child.pid` right away to `process.kill` it later.
-function startChild(spec) {
+function startChild(spec, drain) {
   try {
     const pid = hostCallSync("proc", "start", [spec]);
-    const exit = spec.detached ? Promise.resolve({ stdout: "", stderr: "", status: 0 }) : hostCall("proc", "wait", [pid]);
+    const exit = spec.detached
+      ? Promise.resolve({ stdout: "", stderr: "", status: 0 })
+      : Promise.resolve(drain?.(pid)).then(() => hostCall("proc", "wait", [pid]));
     return { pid, exit };
   } catch (error) {
     return { pid: undefined, exit: Promise.reject(error) };
   }
+}
+
+async function pipeChild(pid, fd, stream) {
+  let held = Buffer.alloc(0);
+  for (let chunk; (chunk = await hostCall("proc", "read", [pid, fd])); ) {
+    const bytes = Buffer.concat([held, Buffer.from(base64ToBytes(chunk))]);
+    const cut = utf8Boundary(bytes);
+    held = bytes.subarray(cut);
+    if (cut) stream.write(bytes.subarray(0, cut));
+  }
+  if (held.length) stream.write(held);
+}
+
+/// Holds back a trailing partial UTF-8 character so a chunk never splits one.
+function utf8Boundary(bytes) {
+  for (let i = bytes.length - 1; i >= Math.max(0, bytes.length - 3); i--) {
+    if ((bytes[i] & 0xc0) === 0x80) continue;
+    const need = bytes[i] >= 0xf0 ? 4 : bytes[i] >= 0xe0 ? 3 : bytes[i] >= 0xc0 ? 2 : 1;
+    return bytes.length - i < need ? i : bytes.length;
+  }
+  return bytes.length;
 }
 
 /// Node's `ChildProcess.kill` reports an undeliverable signal by returning false, never by throwing.
@@ -1548,6 +1601,11 @@ class StringDecoder {
 /// so the member has to be a real constructor — and unknown members must exist too, hence the Proxy.
 function unsupportedModule(name, extras = {}) {
   const cache = new Map();
+  const lazy = new Set((UNSUPPORTED_EXPORTS[name] ?? []).filter((each) => !(each in extras)));
+  const manufacture = (member) => {
+    if (!cache.has(member)) cache.set(member, makeUnsupported(`${name}.${member}`));
+    return cache.get(member);
+  };
   return new Proxy(extras, {
     get(target, member) {
       if (member in target) return target[member];
@@ -1555,8 +1613,14 @@ function unsupportedModule(name, extras = {}) {
       // skip the default-wrapping it would otherwise apply, and a truthy `then` makes the module
       // look like a thenable to `await`.
       if (typeof member !== "string" || RESERVED_MEMBERS.has(member)) return undefined;
-      if (!cache.has(member)) cache.set(member, makeUnsupported(`${name}.${member}`));
-      return cache.get(member);
+      return manufacture(member);
+    },
+    // esbuild's `__toESM` snapshots own keys and never reads through `get`.
+    ownKeys: (target) => [...new Set([...Reflect.ownKeys(target), ...lazy])],
+    getOwnPropertyDescriptor(target, member) {
+      const own = Reflect.getOwnPropertyDescriptor(target, member);
+      if (own || !lazy.has(member)) return own;
+      return { value: manufacture(member), writable: true, enumerable: true, configurable: true };
     },
   });
 }
@@ -1623,6 +1687,96 @@ const streamModule = unsupportedModule(
 
 const webStreamModule = { ReadableStream, WritableStream, TransformStream };
 
+/// http2-wrapper reads `new tls.TLSSocket(stream)._handle._parentWrap.constructor` at import time.
+const TLSSocket = class TLSSocket extends Duplex {
+  _handle = { _parentWrap: { constructor: TLSSocket } };
+};
+
+class AsyncLocalStorage {
+  run(_store, fn) {
+    return fn();
+  }
+  getStore() {
+    return undefined;
+  }
+}
+
+/// undici extends this at module scope; with one synchronous context, the scope is just the call.
+class AsyncResource {
+  constructor(type) {
+    this.type = type;
+  }
+  runInAsyncScope(fn, thisArg, ...args) {
+    return Reflect.apply(fn, thisArg, args);
+  }
+  bind(fn, thisArg = this) {
+    return fn.bind(thisArg);
+  }
+  emitDestroy() {
+    return this;
+  }
+  asyncId() {
+    return 0;
+  }
+  triggerAsyncId() {
+    return 0;
+  }
+}
+
+// ─── diagnostics_channel ────────────────────────────────────────────
+
+/// undici opens a channel per instrumentation point at module scope, so `channel` cannot refuse.
+class Channel {
+  constructor(name) {
+    this.name = name;
+    this._subscribers = [];
+  }
+  get hasSubscribers() {
+    return this._subscribers.length > 0;
+  }
+  subscribe(onMessage) {
+    this._subscribers.push(onMessage);
+  }
+  unsubscribe(onMessage) {
+    const index = this._subscribers.indexOf(onMessage);
+    if (index === -1) return false;
+    this._subscribers.splice(index, 1);
+    return true;
+  }
+  publish(message) {
+    for (const onMessage of [...this._subscribers]) {
+      try {
+        onMessage(message, this.name);
+      } catch (error) {
+        reportUncaught(error);
+      }
+    }
+  }
+  bindStore() {}
+  unbindStore() {
+    return false;
+  }
+  runStores(message, fn, thisArg, ...args) {
+    this.publish(message);
+    return Reflect.apply(fn, thisArg, args);
+  }
+}
+
+const channels = new Map();
+
+function channel(name) {
+  if (!channels.has(name)) channels.set(name, new Channel(name));
+  return channels.get(name);
+}
+
+const diagnosticsChannel = unsupportedModule("diagnostics_channel", {
+  Channel,
+  channel,
+  hasSubscribers: (name) => channels.get(name)?.hasSubscribers ?? false,
+  subscribe: (name, onMessage) => channel(name).subscribe(onMessage),
+  unsubscribe: (name, onMessage) => channels.get(name)?.unsubscribe(onMessage) ?? false,
+});
+
 // ─── Registry ───────────────────────────────────────────────────────
 
 export const nodeModules = {
@@ -1650,12 +1804,18 @@ export const nodeModules = {
   https: httpLike("https"),
   dgram,
   net: unsupportedModule("net"),
-  tls: unsupportedModule("tls"),
+  tls: unsupportedModule("tls", { TLSSocket }),
   dns: unsupportedModule("dns"),
   stream: streamModule,
   "stream/web": webStreamModule,
   "stream/promises": { pipeline: (...stages) => pipelinePromise(stages), finished: finishedPromise },
-  worker_threads: unsupportedModule("worker_threads", { isMainThread: true }),
+  // No-ops rather than refusals: undici's `markAsUncloneable || (() => {})` never falls back.
+  worker_threads: unsupportedModule("worker_threads", {
+    isMainThread: true,
+    markAsUncloneable: () => {},
+    markAsUntransferable: () => {},
+    isMarkedAsUntransferable: () => false,
+  }),
   readline: unsupportedModule("readline"),
   tty: { isatty: () => false },
   vm: unsupportedModule("vm"),
@@ -1664,7 +1824,8 @@ export const nodeModules = {
   cluster: { isPrimary: true, isMaster: true },
   inspector: {},
   v8: {},
-  async_hooks: { AsyncLocalStorage: class { run(_store, fn) { return fn(); } getStore() { return undefined; } } },
+  async_hooks: { AsyncLocalStorage, AsyncResource },
+  diagnostics_channel: diagnosticsChannel,
 };
 
 function requireStub(name) {
@@ -1675,7 +1836,7 @@ function requireStub(name) {
 // long tail (http2, domain, repl, …) from dependencies that only touch them on paths an
 // extension never reaches, so a require-time throw would fail extensions that actually work.
 const REMAINING_BUILTINS = [
-  "assert/strict", "console", "diagnostics_channel", "dns/promises", "domain", "http2",
+  "assert/strict", "console", "dns/promises", "domain", "http2",
   "inspector/promises", "path/posix", "path/win32", "readline/promises", "repl",
   "stream/consumers", "sys", "trace_events", "util/types", "wasi", "sea", "sqlite", "test",
   "test/reporters",

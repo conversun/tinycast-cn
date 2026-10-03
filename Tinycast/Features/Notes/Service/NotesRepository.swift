@@ -16,7 +16,7 @@ struct NotesRepository: Sendable {
             case .unreadable(let fileURL):
                 return String(localized: "The note isn't valid UTF-8. (\(fileURL.lastPathComponent))")
             case .invalidLocation(let fileURL):
-                return String(localized: "The note file is outside this Tinycast channel. (\(fileURL.path))")
+                return String(localized: "The note file is outside the notes folder. (\(fileURL.path))")
             case .io(let fileURL, let message):
                 return String(localized: "Could not access \(fileURL.path): \(message)")
             }
@@ -27,13 +27,12 @@ struct NotesRepository: Sendable {
     private let trashOperation: TrashOperation
 
     init(
-        applicationSupportDirectory: URL,
+        notesDirectory: URL,
         trashOperation: @escaping TrashOperation = { url in
             try FileManager.default.trashItem(at: url, resultingItemURL: nil)
         }
     ) {
-        notesDirectory = applicationSupportDirectory.appendingPathComponent(
-            "Notes", isDirectory: true)
+        self.notesDirectory = notesDirectory
         self.trashOperation = trashOperation
     }
 

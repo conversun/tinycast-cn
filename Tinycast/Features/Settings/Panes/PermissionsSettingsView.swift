@@ -12,16 +12,29 @@ struct PermissionsSettingsView: View {
             Section {
                 LabeledContent {
                     HStack(spacing: Theme.Spacing.lg) {
-                        Label(accessibilityStatus.title.localizedUI, systemImage: accessibilityStatus.symbol)
-                            .foregroundStyle(accessibilityStatus.tint)
+                        HStack(spacing: Theme.Spacing.xs) {
+                            Image(systemName: accessibilityStatus.symbol)
+                                .accessibilityHidden(true)
+                            Text(accessibilityStatus.title.localizedUI)
+                        }
+                        .foregroundStyle(accessibilityStatus.tint)
                         Button(accessibilityTrusted ? String(localized: "Open…") : String(localized: "Grant Access…")) {
                             Permissions.openAccessibilitySettings()
                         }
                         .help("Opens Privacy & Security › Accessibility.")
                     }
                 } label: {
-                    SettingsRowTitle(.permissionsAccessibility, "Accessibility")
-                    Text("Pastes into the app you were using.")
+                    HStack(spacing: Theme.Spacing.lg) {
+                        PermissionSettingsIcon(
+                            path:
+                                "/System/Library/ExtensionKit/Extensions/AccessibilitySettingsExtension.appex"
+                        )
+                        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                            SettingsRowTitle(.permissionsAccessibility, "Accessibility")
+                            Text("Pastes into the app you were using.")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             } header: {
                 SettingsSectionHeader(.permissionsAccessibility)
@@ -30,8 +43,12 @@ struct PermissionsSettingsView: View {
             Section {
                 LabeledContent {
                     HStack(spacing: Theme.Spacing.lg) {
-                        Label(calendarStatus.title.localizedUI, systemImage: calendarStatus.symbol)
-                            .foregroundStyle(calendarStatus.tint)
+                        HStack(spacing: Theme.Spacing.xs) {
+                            Image(systemName: calendarStatus.symbol)
+                                .accessibilityHidden(true)
+                            Text(calendarStatus.title.localizedUI)
+                        }
+                        .foregroundStyle(calendarStatus.tint)
                         Button(calendarNeedsPrompt ? String(localized: "Grant Access…") : String(localized: "Open…")) {
                             // Settings lists no app TCC was never asked about, so asking is the way in.
                             if calendarNeedsPrompt {
@@ -46,8 +63,15 @@ struct PermissionsSettingsView: View {
                                 : String(localized: "Opens Privacy & Security › Calendars."))
                     }
                 } label: {
-                    SettingsRowTitle(.permissionsCalendars, "Calendars")
-                    Text("Finds the join link for your next meeting.")
+                    HStack(spacing: Theme.Spacing.lg) {
+                        PermissionSettingsIcon(
+                            path: "/System/Applications/Calendar.app")
+                        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                            SettingsRowTitle(.permissionsCalendars, "Calendars")
+                            Text("Finds the join link for your next meeting.")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             } header: {
                 SettingsSectionHeader(.permissionsCalendars)
@@ -80,5 +104,22 @@ struct PermissionsSettingsView: View {
         if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
         let access = Permissions.calendarAccess()
         if access != calendarAccess { calendarAccess = access }
+    }
+}
+
+private struct PermissionSettingsIcon: View {
+    let path: String
+
+    var body: some View {
+        Image(nsImage: IconCache.icon(forFile: path))
+            .resizable()
+            .renderingMode(.original)
+            .interpolation(.high)
+            .id(IconCache.style.generation)
+            .frame(
+                width: SettingsListMetrics.iconSize,
+                height: SettingsListMetrics.iconSize
+            )
+            .accessibilityHidden(true)
     }
 }

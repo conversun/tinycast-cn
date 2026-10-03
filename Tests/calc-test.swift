@@ -56,6 +56,26 @@ struct CalcTests {
         expectDisplay("10k * 2", "20,000")
         expectBadges("10k", source: "Expression", target: "Result")
 
+        // Magnitude words scale the literal before them, spaced or attached, in any case
+        expectDisplay("13 million", "13,000,000")
+        expectCopy("1.5 billion", "1500000000")
+        expectDisplay("2 Thousand + 1", "2,001")
+        expectDisplay("3million / 2", "1,500,000")
+        expectDisplay("13 million idr to usd", "720.10 USD")
+        expectDisplay("1.5 million idr to sgd", "112.17 SGD")
+        expectDisplay("IDR 13 million to usd", "720.10 USD")
+        expectDisplay("10% of 2 million", "200,000")
+        expectExpression("13 million +", "13 million +")
+        expectBadges("13 million", source: "Expression", target: "Result")
+        expectNil("million")
+        expectNil("2 * million")
+        expectNil("(2 + 3) million")
+        expectNil("13 millions")
+        expectNil("13 million2")
+        expectNil("1e308 billion")
+        expectDisplay("10 milliseconds to s", "0.01 s")
+        expectLocalized("1,5 million", "1.500.000", italian)
+
         // Scientific notation input
         expectDisplay("1e6 + 1", "1,000,001")
         expectDisplay("1.5e-3 * 2", "0.003")
@@ -989,6 +1009,20 @@ struct CalcTests {
         expectDisplayAt("9:30am in nyc", "5:30 AM")
         expectDisplayAt("5pm in tokyo", "2:00 AM (tomorrow)")
         expectBadgesAt("5pm london in sf", source: "London", target: "Los Angeles")
+        // The locale's hour cycle, which the 24-hour switch overrides, picks the clock
+        var hour24 = clock.calendar
+        hour24.locale = Locale(identifier: "en_US@hours=h23")
+        var britain = clock.calendar
+        britain.locale = Locale(identifier: "en_GB")
+        var britain12 = clock.calendar
+        britain12.locale = Locale(identifier: "en_GB@hours=h12")
+        expectDisplayAt("time in tokyo", "09:18", calendar: hour24)
+        expectDisplayAt("5pm in tokyo", "02:00 (tomorrow)", calendar: hour24)
+        expectDisplayAt("unix -1", "31 December, 1969 at 23:59:59", calendar: hour24)
+        expectDisplayAt("now + 90 min", "24 July at 01:48", calendar: hour24)
+        expectDisplayAt("time in sf", "17:18 (yesterday)", calendar: britain)
+        expectBadgesAt("hrs till 9am", source: "00:18", target: "09:00", calendar: britain)
+        expectDisplayAt("time in sf", "5:18 pm (yesterday)", calendar: britain12)
 
         let zoneNow = clock.calendar.date(
             from: DateComponents(year: 2026, month: 9, day: 15, hour: 12))!

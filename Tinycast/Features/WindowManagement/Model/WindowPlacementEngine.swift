@@ -515,6 +515,9 @@ enum WindowPlacementEngine {
         return CGRect(x: x, y: y, width: frame.width, height: frame.height)
     }
 
+    /// The gaps Settings offers, in points; the file is held to the same range.
+    static let gapRange = 0...64
+
     /// A gap wider than the screen would produce zero-width tiles, so cap it before any math.
     static func sanitizedGap(_ gap: CGFloat, in visible: CGRect) -> CGFloat {
         guard gap.isFinite, gap > 0, visible.width > 0, visible.height > 0 else { return 0 }

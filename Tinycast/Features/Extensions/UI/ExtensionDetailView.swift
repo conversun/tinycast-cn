@@ -7,11 +7,15 @@ struct ExtensionDetailBody: View {
     let metadata: RenderNode?
     let isLoading: Bool
     let assetsPath: String?
+    /// A list's detail pane is too narrow for a metadata sidebar.
+    var stacksMetadata = false
+
+    private static let stackedInset: CGFloat = 16
 
     var body: some View {
         HStack(spacing: 0) {
-            markdownPane
-            if let metadata {
+            markdownPane(trailing: stacksMetadata ? metadata : nil)
+            if !stacksMetadata, let metadata {
                 Rectangle().fill(Theme.Colors.separator).frame(width: 1)
                 metadataPane(metadata)
             }
@@ -19,7 +23,7 @@ struct ExtensionDetailBody: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var markdownPane: some View {
+    private func markdownPane(trailing metadata: RenderNode?) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: metrics.spacing.md) {
                 if isLoading && (markdown ?? "").isEmpty {
@@ -28,9 +32,15 @@ struct ExtensionDetailBody: View {
                 if let markdown, !markdown.isEmpty {
                     ExtensionMarkdownView(markdown: markdown)
                 }
+                if let metadata {
+                    ExtensionMetadataView(metadata: metadata, assetsPath: assetsPath, inline: true)
+                        .padding(.top, (markdown ?? "").isEmpty ? 0 : metrics.spacing.xxl)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, metrics.spacing.lg)
+            .padding(
+                .horizontal, stacksMetadata ? metrics.scaled(Self.stackedInset) : metrics.spacing.lg
+            )
             .padding(.vertical, metrics.spacing.md)
             .hideNativeScrollers()
         }
@@ -62,13 +72,23 @@ struct ExtensionMetadataView: View {
     @Environment(\.isDarkAppearance) private var isDark
     let metadata: RenderNode
     let assetsPath: String?
+    var inline = false
+
+    private static let inlineRowHeight: CGFloat = 28
+
+    /// Stripes must count only real rows, so separators are dropped here.
+    private var visibleChildren: [RenderNode] {
+        inline
+            ? metadata.children.filter { $0.type != "Detail.Metadata.Separator" }
+            : metadata.children
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: metrics.spacing.lg) {
-            ForEach(metadata.children) { child in
+        VStack(alignment: .leading, spacing: inline ? 0 : metrics.spacing.lg) {
+            ForEach(Array(visibleChildren.enumerated()), id: \.element.id) { index, child in
                 switch child.type {
                 case "Detail.Metadata.Label":
-                    row(title: child.string("title")) {
+                    row(title: child.string("title"), index: index) {
                         HStack(spacing: metrics.spacing.xs) {
                             if let icon = child.props["icon"] {
                                 ExtensionIconView(
@@ -82,7 +102,7 @@ struct ExtensionMetadataView: View {
                         }
                     }
                 case "Detail.Metadata.Link":
-                    row(title: child.string("title")) {
+                    row(title: child.string("title"), index: index) {
                         if let target = child.string("target"), let url = URL(string: target) {
                             Link(child.string("text") ?? target, destination: url)
                                 .font(metrics.typography.rowTitle)
@@ -91,7 +111,7 @@ struct ExtensionMetadataView: View {
                         }
                     }
                 case "Detail.Metadata.TagList":
-                    row(title: child.string("title")) {
+                    row(title: child.string("title"), index: index) {
                         ExtensionTagListView(tags: child.children, assetsPath: assetsPath)
                     }
                 case "Detail.Metadata.Separator":
@@ -111,14 +131,35 @@ struct ExtensionMetadataView: View {
     }
 
     @ViewBuilder
-    private func row<Content: View>(title: String?, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if let title, !title.isEmpty {
-                Text(title)
-                    .font(metrics.typography.sectionHeader)
+    private func row<Content: View>(
+        title: String?, index: Int, @ViewBuilder content: () -> Content
+    ) -> some View {
+        if inline {
+            HStack(alignment: .firstTextBaseline, spacing: metrics.spacing.xl) {
+                Text(title ?? "")
+                    .font(metrics.typography.rowTitle)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                content()
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
-            content()
+            .padding(.horizontal, metrics.spacing.md)
+            .padding(.vertical, metrics.spacing.xs)
+            .frame(minHeight: metrics.scaled(Self.inlineRowHeight))
+            .background(
+                RoundedRectangle(cornerRadius: metrics.radius.menu, style: .continuous)
+                    .fill(index.isMultiple(of: 2) ? ExtensionColors.detailCardFill : .clear))
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                if let title, !title.isEmpty {
+                    Text(title)
+                        .font(metrics.typography.sectionHeader)
+                        .foregroundStyle(.secondary)
+                }
+                content()
+            }
         }
     }
 }
@@ -207,7 +248,7 @@ struct ExtensionMarkdownView: View {
     @Environment(\.metrics) private var metrics
     let markdown: String
 
-    private enum Block: Identifiable {
+    private enum Block {
         case heading(level: Int, text: String)
         case paragraph(String)
         case bullet(String)
@@ -216,24 +257,13 @@ struct ExtensionMarkdownView: View {
         case code(String)
         case rule
         case image(URL)
-
-        var id: String {
-            switch self {
-            case .heading(let level, let text): return "h\(level):\(text)"
-            case .paragraph(let text): return "p:\(text)"
-            case .bullet(let text): return "b:\(text)"
-            case .numbered(let index, let text): return "n\(index):\(text)"
-            case .quote(let text): return "q:\(text)"
-            case .code(let text): return "c:\(text)"
-            case .rule: return "rule:\(UUID().uuidString)"
-            case .image(let url): return "img:\(url.absoluteString)"
-            }
-        }
+        case table([[String]])
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: metrics.spacing.sm) {
-            ForEach(Self.parse(markdown)) { block in
+            // Positional, so a live image keeps its last frame while the next one decodes.
+            ForEach(Array(Self.parse(markdown).enumerated()), id: \.offset) { _, block in
                 switch block {
                 case .heading(let level, let text):
                     Text(inline(text))
@@ -277,6 +307,21 @@ struct ExtensionMarkdownView: View {
                     Rectangle().fill(Theme.Colors.separator).frame(height: 1)
                 case .image(let url):
                     ExtensionMarkdownImage(url: url)
+                case .table(let rows):
+                    Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+                        ForEach(rows.indices, id: \.self) { r in
+                            GridRow {
+                                ForEach(rows[r].indices, id: \.self) { c in
+                                    Text(inline(rows[r][c])).fontWeight(r == 0 ? .semibold : nil)
+                                        .padding(.vertical, metrics.spacing.lg)
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                        .background(r == 0 ? ExtensionColors.detailCardFill : .clear)
+                                        .border(Theme.Colors.separator, width: 0.5)
+                                }
+                            }
+                        }
+                    }
+                    .font(metrics.typography.rowTitle).monospacedDigit()
                 }
             }
         }
@@ -303,8 +348,10 @@ struct ExtensionMarkdownView: View {
         var paragraph: [String] = []
         var fence: [String]?
         var numberedIndex = 0
+        var table: [[String]] = []
 
         func flushParagraph() {
+            if !table.isEmpty { blocks.append(.table(table)); table.removeAll() }
             guard !paragraph.isEmpty else { return }
             blocks.append(.paragraph(paragraph.joined(separator: " ")))
             paragraph.removeAll()
@@ -338,6 +385,19 @@ struct ExtensionMarkdownView: View {
             if trimmed == "---" || trimmed == "***" || trimmed == "___" {
                 flushParagraph()
                 blocks.append(.rule)
+                continue
+            }
+            if trimmed.hasPrefix("|") {
+                if !paragraph.isEmpty { flushParagraph() }
+                let row = trimmed.replacingOccurrences(
+                    of: #"(?<!\\)((?:\\\\)*)\\\|"#, with: "$1\u{0}", options: .regularExpression)
+                let cells = row.split(separator: "|", omittingEmptySubsequences: false).dropFirst()
+                    .dropLast(row.hasSuffix("|") ? 1 : 0)
+                    .map {
+                        $0.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "\u{0}", with: "|")
+                    }
+                if cells.allSatisfy({ $0.contains("-") && $0.allSatisfy(":-".contains) }) { continue }
+                table.append(cells)
                 continue
             }
             // A standalone image is the one block AttributedString can't show inline.
@@ -377,11 +437,18 @@ struct ExtensionMarkdownView: View {
     }
 
     private static func standaloneImageURL(_ line: String) -> URL? {
-        guard line.hasPrefix("!["), let open = line.lastIndex(of: "("), line.hasSuffix(")") else {
-            return nil
+        let target: String
+        if line.hasPrefix("<img"),
+            let tag = line.wholeMatch(of: #/<img(?:\s[^>]*?)?\ssrc=["']([^"']+)["'][^>]*>/#)
+        {
+            target = String(tag.1)
+        } else {
+            guard line.hasPrefix("!["), let open = line.lastIndex(of: "("), line.hasSuffix(")") else {
+                return nil
+            }
+            let inner = line[line.index(after: open)..<line.index(before: line.endIndex)]
+            target = inner.split(separator: " ").first.map(String.init) ?? String(inner)
         }
-        let inner = line[line.index(after: open)..<line.index(before: line.endIndex)]
-        let target = inner.split(separator: " ").first.map(String.init) ?? String(inner)
         guard let url = URL(string: target), let scheme = url.scheme,
             scheme.hasPrefix("http") || scheme == "data"
         else { return nil }
@@ -400,7 +467,7 @@ extension String {
     }
 }
 
-/// An image inside a Detail's markdown, capped so a large asset can't push the layout around.
+/// An image inside a Detail's markdown, at its own size or the one its URL asks for.
 private struct ExtensionMarkdownImage: View {
     @Environment(\.metrics) private var metrics
     @Environment(\.isDarkAppearance) private var isDark
@@ -417,7 +484,9 @@ private struct ExtensionMarkdownImage: View {
                         Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
                     }
                 }
-                .frame(maxWidth: maxWidth, maxHeight: maxHeight)
+                .frame(
+                    maxWidth: maxWidth ?? (size == nil ? image.size.width : .infinity), maxHeight: maxHeight
+                )
                 .clipShape(RoundedRectangle(cornerRadius: metrics.radius.menu, style: .continuous))
                 .frame(maxWidth: .infinity)
             } else {
@@ -428,11 +497,14 @@ private struct ExtensionMarkdownImage: View {
         }
         // Keyed on the appearance too: an inline SVG's palette resolves at decode, not in the URL.
         .task(id: ExtensionImage.LoadKey(source: source, isDark: isDark)) {
-            image =
+            // A slow remote load must not show the previous row's image meanwhile.
+            if url.scheme != "data" { image = nil }
+            let loaded =
                 url.scheme == "data"
                 ? await ExtensionIconCache.loadInlineAsync(
                     url, palette: ExtensionImage.svgPalette(isDark: isDark))
                 : await ExtensionIconCache.loadRemoteAsync(url, asIcon: false)
+            if !Task.isCancelled { image = loaded }
         }
     }
 
@@ -442,7 +514,7 @@ private struct ExtensionMarkdownImage: View {
 
     private var size: ExtensionImageSize? { ExtensionImageSize(url: url) }
 
-    private var maxWidth: CGFloat { size?.width.map { CGFloat($0) } ?? .infinity }
+    private var maxWidth: CGFloat? { size?.width.map { CGFloat($0) } }
 
-    private var maxHeight: CGFloat { CGFloat(ExtensionImageSize.maxHeight(for: size)) }
+    private var maxHeight: CGFloat { size?.height.map { CGFloat($0) } ?? .infinity }
 }

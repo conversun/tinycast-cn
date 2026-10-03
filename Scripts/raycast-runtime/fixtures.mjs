@@ -38,7 +38,7 @@ async function run(name, source, mode, verify, options) {
   harness.boot(bootConfig());
   const code = compile(source);
   harness.start("s1", code, "/fixtures/cmd.js", "/fixtures", mode, {});
-  await wait();
+  await wait(options?.settle);
   await verify(harness);
   harness.stop("s1");
 }
@@ -357,7 +357,15 @@ export default async function Command() {
     child.on("close", () => resolve(chunks.join("")));
   });
 
-  globalThis.__spawn = { iterated: iterated.join(""), late, grouped };
+  const streamed = await new Promise((resolve) => {
+    const events = [];
+    const child = spawn("/bin/sh", ["-c", "echo a; sleep 0.2; echo b"]);
+    child.on("spawn", () => events.push("spawn"));
+    child.stdout.once("data", () => events.push(child.exitCode === null ? "live" : "after-exit"));
+    child.on("close", () => resolve(events.join(",")));
+  });
+
+  globalThis.__spawn = { iterated: iterated.join(""), late, grouped, streamed };
 }
 `;
 
@@ -472,6 +480,92 @@ export default async function Command() {
     });
     request.end();
   });
+}
+`;
+
+// A member `__toESM` cannot see lands as an opaque `The superclass is not a constructor`.
+const undiciSurfaceSource = `
+import diagnostics from "node:diagnostics_channel";
+import { markAsUncloneable } from "node:worker_threads";
+import { getHashes } from "node:crypto";
+
+class Ping extends Event {
+  constructor() {
+    super("ping", { cancelable: true });
+  }
+}
+
+export default async function Command() {
+  const request = diagnostics.channel("undici:request:create");
+  const idle = request.hasSubscribers;
+  const published = [];
+  diagnostics.subscribe("undici:request:create", (message, name) => published.push([message.id, name]));
+  request.publish({ id: 1 });
+
+  const target = new EventTarget();
+  const calls = [];
+  target.addEventListener("ping", () => calls.push("once"), { once: true });
+  target.addEventListener("ping", { handleEvent: (event) => { calls.push(event.target === target); event.preventDefault(); } });
+  const notCancelled = target.dispatchEvent(new Ping());
+  target.dispatchEvent(new Ping());
+
+  const { port1, port2 } = new MessageChannel();
+  port1.postMessage({ n: 1 });
+  let delivered = false;
+  const received = new Promise((resolve) => port2.addEventListener("message", (event) => resolve((delivered = true) && event.data)));
+  const early = delivered;
+  const data = await received;
+
+  globalThis.__undiciSurface = {
+    idle,
+    subscribed: request.hasSubscribers,
+    published,
+    guarded: typeof (markAsUncloneable || null),
+    hashes: getHashes(),
+    calls,
+    notCancelled,
+    data,
+    early,
+  };
+}
+`;
+
+const namespaceImportSource = `
+import * as net from "node:net";
+import * as vm from "node:vm";
+import { AsyncResource } from "node:async_hooks";
+import { Socket } from "node:net";
+
+class Tracked extends AsyncResource {
+  constructor() {
+    super("tracked");
+    this.seen = [];
+  }
+  record(value) {
+    return this.runInAsyncScope(() => {
+      this.seen.push(value);
+      return this.seen.length;
+    });
+  }
+}
+
+export default async function Command() {
+  const refusal = (fn) => {
+    try {
+      fn();
+      return "none";
+    } catch (error) {
+      return error.message;
+    }
+  };
+  const tracked = new Tracked();
+  globalThis.__namespaceImport = {
+    kinds: [typeof net.Socket, typeof Socket, typeof vm.Script, typeof AsyncResource],
+    keys: Object.keys(net).filter((key) => key !== "default"),
+    refusals: [refusal(() => new net.Socket()), refusal(() => vm.runInNewContext("1"))],
+    scope: [tracked.record("a"), tracked.record("b"), tracked.seen.join("")],
+    type: tracked.type,
+  };
 }
 `;
 
@@ -931,7 +1025,8 @@ export async function runFixtures() {
     check("async iteration collects stdout", result?.iterated === "hello\n", JSON.stringify(result?.iterated));
     check("a listener attached after exit still gets it", result?.late === "world\n", JSON.stringify(result?.late));
     check("a detached child that pipes stdout is still awaited", result?.grouped === "group\n", JSON.stringify(result?.grouped));
-  });
+    check("output streams before exit, after spawn", result?.streamed === "spawn,live", JSON.stringify(result?.streamed));
+  }, { settle: 800 });
 
   const httpSpecs = [];
   await run(
@@ -1033,6 +1128,29 @@ export async function runFixtures() {
 
   const cookieSpecs = [];
   const cookies = ["a=1; Expires=Wed, 21 Oct 2037 07:28:00 GMT; Path=/", "b=2; Path=/"];
+  await run("undici's load-time surface is real", undiciSurfaceSource, "no-view", async (harness) => {
+    const result = harness.call("globalThis.__undiciSurface");
+    check("a fresh channel has no subscribers", result?.idle === false, JSON.stringify(result));
+    check("a subscriber receives what the channel publishes", JSON.stringify(result?.published) === JSON.stringify([[1, "undici:request:create"]]), JSON.stringify(result?.published));
+    check("a channel reports its subscriber", result?.subscribed === true, String(result?.subscribed));
+    check("markAsUncloneable is a function, so an || guard is moot", result?.guarded === "function", String(result?.guarded));
+    check("getHashes lists the digests the host computes", JSON.stringify(result?.hashes) === JSON.stringify(["md5", "sha1", "sha256", "sha384", "sha512"]), JSON.stringify(result?.hashes));
+    check("a once listener fires once and handleEvent sees the target", JSON.stringify(result?.calls) === JSON.stringify(["once", true, true]), JSON.stringify(result?.calls));
+    check("preventDefault cancels a cancelable event", result?.notCancelled === false, String(result?.notCancelled));
+    check("a port delivers a clone after posting returns", result?.data?.n === 1 && result?.early === false, JSON.stringify(result));
+  });
+
+  await run("a namespace import keeps the shim's named members", namespaceImportSource, "no-view", async (harness) => {
+    const result = harness.call("globalThis.__namespaceImport");
+    const kinds = JSON.stringify(result?.kinds);
+    check("every member survives the own-key snapshot", kinds === JSON.stringify(["function", "function", "function", "function"]), kinds);
+    check("net enumerates its exports", result?.keys?.includes("Socket") && result.keys.includes("createConnection"), JSON.stringify(result?.keys));
+    check("an unsupported member still refuses by name", result?.refusals?.[0]?.startsWith("net.Socket is not supported"), JSON.stringify(result?.refusals));
+    check("a refusal names the member that was called", result?.refusals?.[1]?.startsWith("vm.runInNewContext is not supported"), JSON.stringify(result?.refusals));
+    check("AsyncResource runs the callback in place", JSON.stringify(result?.scope) === JSON.stringify([1, 2, "ab"]), JSON.stringify(result?.scope));
+    check("AsyncResource keeps its type", result?.type === "tracked", String(result?.type));
+  });
+
   await run(
     "an http.Agent subclass carries cookies between requests",
     cookieAgentSource,
@@ -1136,6 +1254,48 @@ export async function runFixtures() {
     const dump = describeTree(harness.state.trees.at(-1));
     check("finishes loading", dump.includes("isLoading=false"), dump);
     check("renders the resolved items", dump.includes("alpha") && dump.includes("beta"));
+  });
+
+  await run("Menu bar hooks, alternates and async actions", `
+    import { MenuBarExtra } from "@raycast/api";
+    import { useEffect, useState } from "react";
+    function Alternate() {
+      const [title] = useState("Alternate");
+      return <MenuBarExtra.Item title={title} onAction={() => { globalThis.clicked = "alternate"; }} />;
+    }
+    export default function Command() {
+      const [loading, setLoading] = useState(true);
+      const [title, setTitle] = useState("Before");
+      useEffect(() => { setLoading(false); }, []);
+      return <MenuBarExtra title={title} isLoading={loading} tooltip="Usage">
+        <MenuBarExtra.Section title="Providers">
+          <MenuBarExtra.Item title="Refresh" alternate={<Alternate />} onAction={async (event) => {
+            await new Promise(resolve => setTimeout(resolve, 40));
+            globalThis.clicked = event.type;
+            setTitle("After");
+          }} />
+        </MenuBarExtra.Section>
+      </MenuBarExtra>;
+    }
+  `, "menu-bar", async (harness) => {
+    const tree = harness.state.trees.at(-1);
+    const root = findNode(tree, "MenuBarExtra");
+    const item = findNode(tree, "MenuBarExtra.Item");
+    check("menu-bar mounts hooks", root?.props.isLoading === false && !harness.state.finished);
+    check("alternate mounts through a slot", item?.props.alternate?.props.title === "Alternate");
+    check("alternate retains callback", typeof item?.props.alternate?.props.onAction?.$fn === "string");
+    harness.call(`__tinycast.dispatch("s1", ${JSON.stringify(item.props.onAction.$fn)}, '[{"type":"right-click"}]', true)`);
+    check("async action keeps session alive", !harness.state.finished);
+    await wait(100);
+    check("action receives click type", harness.call("globalThis.clicked") === "right-click");
+    check("async action completes", harness.state.finished);
+    check("action updates menu title", findNode(harness.state.trees.at(-1), "MenuBarExtra")?.props.title === "After");
+  });
+
+  await run("Menu bar can remove its item", `
+    export default function Command() { return null; }
+  `, "menu-bar", async (harness) => {
+    check("null commits an empty screen", harness.state.trees.length > 0 && !findNode(harness.state.trees.at(-1), "MenuBarExtra"));
   });
 
   console.log("\n▶ Errors surface instead of crashing");

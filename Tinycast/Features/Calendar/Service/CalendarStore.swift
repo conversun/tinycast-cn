@@ -9,6 +9,8 @@ final class CalendarStore {
     private(set) var events: [MeetingEvent] = []
     private(set) var calendars: [MeetingCalendar] = []
     private(set) var access: CalendarAccess = Permissions.calendarAccess()
+    /// The details page's meeting, re-read with every reload so an edit never shows stale.
+    private(set) var details: MeetingDetails?
 
     /// Changing it re-reads: nothing may filter a snapshot into a span it never fetched.
     var span: MeetingSpan = .todayAndTomorrow {
@@ -61,6 +63,7 @@ final class CalendarStore {
         lastReloadAt = nil
         publish([])
         calendars = []
+        details = nil
     }
 
     /// Tinycast's own consent dialog has already been accepted by the time this runs.
@@ -116,6 +119,7 @@ final class CalendarStore {
 
     /// `EKEventStore` is not `Sendable`, so this stays on main; only pure values leave.
     func reload() {
+        defer { refreshDetails() }
         refreshAccess()
         guard access == .granted else {
             publish([])
@@ -161,8 +165,7 @@ final class CalendarStore {
         else { return nil }
         let me = event.attendees?.first { $0.isCurrentUser }
         return MeetingEvent(
-            id: (event.eventIdentifier ?? event.calendarItemIdentifier)
-                + "|\(start.timeIntervalSinceReferenceDate)",
+            id: occurrenceID(of: event, start: start),
             title: event.title ?? String(localized: "(No Title)"),
             start: start,
             end: end,
@@ -175,6 +178,11 @@ final class CalendarStore {
             link: MeetingLink.detect(
                 fields: [event.url?.absoluteString, event.location, event.notes],
                 account: accountEmail(of: me ?? event.organizer)))
+    }
+
+    private static func occurrenceID(of event: EKEvent, start: Date) -> MeetingEvent.ID {
+        (event.eventIdentifier ?? event.calendarItemIdentifier)
+            + "|\(start.timeIntervalSinceReferenceDate)"
     }
 
     private static func color(of calendar: EKCalendar) -> MeetingEvent.CalendarColor? {
@@ -196,6 +204,62 @@ final class CalendarStore {
 
     func event(id: String) -> MeetingEvent? {
         events.first { $0.id == id }
+    }
+
+    // MARK: - Details
+
+    func loadDetails(of meeting: MeetingEvent) {
+        let next = fetchDetails(of: meeting)
+        if next != details { details = next }
+    }
+
+    func clearDetails() {
+        if details != nil { details = nil }
+    }
+
+    private func refreshDetails() {
+        guard let shown = details?.meetingID else { return }
+        let next = event(id: shown).flatMap(fetchDetails(of:))
+        if next != details { details = next }
+    }
+
+    /// Only this occurrence's window is queried, so an open page costs one tiny fetch per reload.
+    private func fetchDetails(of meeting: MeetingEvent) -> MeetingDetails? {
+        guard let eventStore, let calendar = eventStore.calendar(withIdentifier: meeting.calendarID)
+        else { return nil }
+        // Padded, or a zero-length event would fall outside its own window.
+        let predicate = eventStore.predicateForEvents(
+            withStart: meeting.start, end: meeting.end.addingTimeInterval(1), calendars: [calendar])
+        let match = eventStore.events(matching: predicate).first { event in
+            event.startDate.map { Self.occurrenceID(of: event, start: $0) } == meeting.id
+        }
+        guard let match else { return nil }
+        return MeetingDetails(
+            meetingID: meeting.id, location: match.location, notes: match.notes,
+            attendees: Self.attendees(of: match))
+    }
+
+    private static func attendees(of event: EKEvent) -> [MeetingDetails.Attendee] {
+        let organizer = event.organizer?.url
+        return (event.attendees ?? []).compactMap { participant in
+            guard let name = participant.name ?? MeetingLink.address(of: participant.url) else {
+                return nil
+            }
+            return MeetingDetails.Attendee(
+                name: name, response: response(to: participant.participantStatus),
+                isOrganizer: participant.url == organizer)
+        }
+    }
+
+    private static func response(
+        to status: EKParticipantStatus
+    ) -> MeetingDetails.Attendee.Response {
+        switch status {
+        case .accepted: .accepted
+        case .tentative: .tentative
+        case .declined: .declined
+        default: .pending
+        }
     }
 
     /// False means there is no such calendar, which is a report, not a silent no-op.

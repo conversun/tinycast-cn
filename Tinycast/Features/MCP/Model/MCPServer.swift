@@ -40,6 +40,7 @@ struct MCPServer: Codable, Equatable, Identifiable, Sendable {
     var transport: MCPTransportKind
     var isEnabled: Bool
     var trust: MCPTrust
+    var oauth: Bool?
 
     init(
         id: UUID = UUID(), name: String = "", slug: String = "",
@@ -58,6 +59,42 @@ struct MCPServer: Codable, Equatable, Identifiable, Sendable {
     var title: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? slug : trimmed
+    }
+
+    /// The shape a CLI runs itself; `bearerToken` is the OAuth session's, lent for the turn.
+    func toolServer(
+        headerValue: String, environment: [String: String], bearerToken: String?
+    ) -> AIToolServer? {
+        switch transport {
+        case .http(let url, let headerName):
+            guard !url.isEmpty else { return nil }
+            if let bearerToken {
+                return AIToolServer(
+                    handle: slug, title: title,
+                    transport: .url(
+                        url, headerName: MCPTransportKind.defaultHeaderName,
+                        headerValue: "Bearer \(bearerToken)"))
+            }
+            // Signed out, an OAuth server could only earn a 401 the CLI cannot explain.
+            guard oauth != true else { return nil }
+            let name = headerName.trimmingCharacters(in: .whitespaces)
+            let value = name.isEmpty ? "" : headerValue
+            return AIToolServer(
+                handle: slug, title: title,
+                transport: .url(url, headerName: name, headerValue: value))
+        case .stdio(let command, let arguments, let environmentKeys):
+            guard !command.isEmpty else { return nil }
+            let values = environment.filter { environmentKeys.contains($0.key) }
+            return AIToolServer(
+                handle: slug, title: title,
+                transport: .command(path: command, arguments: arguments, environment: values))
+        }
+    }
+
+    /// A CLI route starts its own copy of a local server, so one here would only run it twice.
+    func runsInTinycast(whileCLIRouteSelected cliRoute: Bool) -> Bool {
+        guard cliRoute, case .stdio = transport else { return true }
+        return false
     }
 }
 

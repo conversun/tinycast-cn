@@ -129,6 +129,11 @@ final class SettingsEditorPresenter: NSObject {
         override var canBecomeKey: Bool { true }
         override var canBecomeMain: Bool { false }
 
+        /// A child window drags alone, so the drag goes to the window it sits on, as a sheet's does.
+        override func performDrag(with event: NSEvent) {
+            parent?.performDrag(with: event)
+        }
+
         /// The fallback: a panel whose content declares `.cancelAction` handles Escape itself.
         override func cancelOperation(_ sender: Any?) {
             cancelHandler?()
@@ -190,6 +195,8 @@ final class SettingsEditorPresenter: NSObject {
                 return
             }
             target?.makeKeyAndOrderFront(nil)
+            // The dim covers the parent's titlebar, so it has to carry the parent's drag.
+            if event.type == .leftMouseDown { parent?.performDrag(with: event) }
         }
     }
 
@@ -411,11 +418,14 @@ extension View {
             .environment(core.snippetsStore)
             .environment(core.quicklinks)
             .environment(core.windowLayouts)
+            .environment(core.rooms)
+            .environment(core.roomCoordinator)
             .environment(core.customWindowSizes)
             .environment(core.customWindowSizeCoordinator)
             .environment(core.calendarStore)
             .environment(core.aiSettings)
             .environment(core.mcpSettings)
+            .environment(core.mcpCoordinator)
             .environment(core.quickActionSettings)
             .environment(core.customQuickActions)
             .environment(core.chatGPTSubscription)

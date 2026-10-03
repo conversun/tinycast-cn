@@ -1,12 +1,12 @@
 ---
 title: Quicklinks
-description: Turn a URL, search, file or deeplink into a real command, with values you fill in as you open it.
+description: Turn a URL, search, file or deeplink into a command, with values you fill in when you open it.
 ---
 
-A quicklink is a saved destination that behaves like any other launcher entry. You can search for it,
+A quicklink is a saved destination that works like any other launcher entry. You can search for it,
 give it a shortcut, and have it ask for a value, like a search term.
 
-**Settings → Quicklinks** holds the switch. It ships **off**.
+Turn quicklinks on in **Settings → Quicklinks**. They're **off** by default.
 
 | Setting                       | Default    |
 | ----------------------------- | ---------- |
@@ -16,27 +16,27 @@ give it a shortcut, and have it ask for a value, like a search term.
 | When there's no selected text | Ask for it |
 | Confirm before deleting       | On         |
 
-While the feature is off there is no Quicklinks section, no quicklink commands, and nothing opens.
-**Your shortcuts stay recorded**, so turning it back on brings every one of them back.
+While the feature is off, there's no Quicklinks section, no quicklink commands, and nothing opens.
+**Your shortcuts stay saved**, so turning the feature back on restores all of them.
 
 ## Making one
 
-**Add Quicklink** in Settings, or the **Create Quicklink** command, opens the editor.
+Click **Add Quicklink** in Settings, or run the **Create Quicklink** command, to open the editor.
 
-| Field               | What it does                                         |
-| ------------------- | ---------------------------------------------------- |
-| Name                | What you search for                                  |
-| Link                | Where it goes, with any placeholders                 |
-| Open With           | A specific app, or the default app                   |
-| Icon                | A symbol, or **Automatic** to match the kind of link |
-| Pin to top          | Keeps it above your other quicklinks                 |
-| Show in root search | Lists it alongside apps and commands                 |
+| Field               | What it does                                            |
+| ------------------- | ------------------------------------------------------- |
+| Name                | What you search for                                     |
+| Link                | Where it goes, with any placeholders                    |
+| Open With           | A specific app, or the default app                      |
+| Icon                | A symbol, or **Automatic** to match the kind of link    |
+| Pin to top          | Keeps it above your other quicklinks                    |
+| Show in root search | Lists it in the main search with your apps and commands |
 
 The **Insert…** menu adds placeholders for you.
 
 ## Destinations
 
-Tinycast works out what a link is from how it looks:
+Tinycast works out what kind of link you entered from its format:
 
 | You write                                           | It becomes                        |
 | --------------------------------------------------- | --------------------------------- |
@@ -46,8 +46,9 @@ Tinycast works out what a link is from how it looks:
 | `spotify://`, `slack://`, `shortcuts://`, `mailto:` | A deeplink into an app            |
 | `github.com/user/repo`                              | A web page, with `https://` added |
 
-Two shapes are read the way you almost certainly meant them: a single letter before a colon is a
-**Windows drive letter**, and a name followed by a colon and only digits is a **host and port**.
+Two formats get special handling: a single letter followed by a colon is treated as a
+**Windows drive letter**, and a name followed by a colon and only digits is treated as a
+**host and port**.
 
 ## Placeholders
 
@@ -61,71 +62,74 @@ https://chat.openai.com/?q={clipboard}
 ~/Notes/{date format="yyyy-MM-dd"}.md
 ```
 
-`{cursor}` and `{snippet:…}` stay as written in a link, because there is no cursor to place in a URL.
-Raycast's `{query}` is accepted as `{argument}`.
+`{cursor}` and `{snippet:…}` are left as written in a link, because a URL has no cursor. Raycast's
+`{query}` works as `{argument}`.
 
 ### Encoding
 
-Values going into a web link or deeplink are **encoded automatically**, so a search term with a space
-or an `&` cannot break the link. A file path is never encoded, so `%20` in a path stays `%20`.
+Values inserted into a web link or deeplink are **encoded automatically**, so a search term with a
+space or an `&` can't break the link. File paths are never encoded, so `%20` in a path stays `%20`.
 
-`| raw` turns encoding off. It also lets the value decide what kind of link this is: a
-`{clipboard | raw}` holding `file:///Users/me/notes.md` opens a file, not a web page. That is
-powerful and sometimes surprising, which is why you have to ask for it.
+`| raw` turns encoding off. It also lets the value decide what kind of link it is: a
+`{clipboard | raw}` containing `file:///Users/me/notes.md` opens a file instead of a web page. This
+can be useful but also surprising, so you have to turn it on yourself.
 
 ## Filling in values
 
-A quicklink that needs values shows **small fields right in the search bar**, after what you typed,
-while its row is selected. The row stays in view the whole time.
+When you select a quicklink that needs values, **small fields appear in the search bar** after what
+you typed. The quicklink's row stays visible the whole time.
 
 - <kbd>tab</kbd> moves from the search field through each field and back.
-- <kbd>return</kbd> opens the quicklink. If a required field is empty, it jumps there instead.
-- A field with `options=` opens a menu to pick from.
-- <kbd>esc</kbd> moves you from a field back to the search field.
+- <kbd>return</kbd> opens the quicklink. If a required field is empty, it moves to that field
+  instead.
+- A field with `options=` opens a menu of choices.
+- <kbd>esc</kbd> moves from a field back to the search field.
 
-A field only turns red after you have visited it and left it empty. A field you have not touched yet
-is not something you owe.
+A field only turns red after you've visited it and left it empty. Fields you haven't reached yet
+aren't marked.
 
-Values like `{clipboard}`, `{selection}` and `{date}` are read **at the moment the link opens**.
-Opened with a shortcut while the palette is closed, `{selection}` reads from the app you were
-actually using.
+Values like `{clipboard}`, `{selection}` and `{date}` are read **when the link opens**. If you open a
+quicklink with a shortcut while the palette is closed, `{selection}` reads from the app you were
+using.
 
-A shortcut for a quicklink that still needs values opens **Search Quicklinks** on that quicklink,
-with its first empty field ready to type in.
+A shortcut for a quicklink that still needs values opens **Search Quicklinks** with that quicklink
+selected and its first empty field ready for typing.
 
 ### When there is no selection
 
-If a link uses `{selection}`, **When there's no selected text** decides what happens:
+If a link uses `{selection}`, the **When there's no selected text** setting decides what happens:
 
-- **Ask for it** (default): a **Selected Text** field appears. Leave it empty and a real selection is
-  still used; type something and it replaces it.
-- **Use the clipboard**: the clipboard stands in for the selection.
+- **Ask for it** (default): a **Selected Text** field appears. If you leave it empty, any real
+  selection is still used; if you type something, your text replaces it.
+- **Use the clipboard**: the clipboard contents are used instead of a selection.
 
 ## As a fallback
 
-**A quicklink with an `{argument}` also shows under "Use … with"** at the bottom of every search.
-What you typed fills its first argument. See [Fallbacks](/docs/launcher/fallbacks).
+**A quicklink with an `{argument}` also appears under "Use … with"** at the bottom of every search.
+What you typed fills in its first argument. See [Fallbacks](/docs/launcher/fallbacks).
 
 ## Opening
 
-**Open With** remembers a specific app. If that app is later uninstalled, you get a clear message with
-an **Open with Default** button, not a silent switch to another app.
+**Open With** saves a specific app. If you later uninstall that app, Tinycast shows a message with an
+**Open with Default** button instead of silently switching to another app.
 
-**Open in a new window** asks the browser for a new window. Chrome and Firefox listen; **Safari
-ignores it**. With it off, the link opens the way macOS normally does, which usually reuses a tab.
+**Open in a new window** asks the browser to open a new window. Chrome and Firefox respect it, but
+**Safari ignores it**. With the setting off, the link opens the way macOS normally opens links, which
+usually reuses a tab.
 
-A file or folder link is checked first, so a deleted folder tells you it is gone.
+Tinycast checks file and folder links before opening them, so if a folder was deleted, it tells you.
 
 ## Search Quicklinks
 
-Quicklinks get their own launcher section. **Only the name is searchable**, plus any
-[alias](/docs/launcher/aliases) you give it. The link itself is not.
+Quicklinks have their own launcher section. **Only the name is searchable**, along with any
+[alias](/docs/launcher/aliases) you give it. The link itself isn't.
 
-Pinned quicklinks come first, in the order you pinned them, then the rest by name. Pinned means the
-top of the Quicklinks section, not above your apps.
+Pinned quicklinks come first, in the order you pinned them, followed by the rest sorted by name.
+Pinning only affects the order within the Quicklinks section; pinned quicklinks don't appear above
+your apps.
 
 The **Search Quicklinks** command opens a screen with the list on the left and details on the right:
-the link, the app it opens with, its shortcut and when you made it.
+the link, the app it opens with, its shortcut and when you created it.
 
 | Action                          | Shortcut                      |
 | ------------------------------- | ----------------------------- |
@@ -138,26 +142,27 @@ the link, the app it opens with, its shortcut and when you made it.
 | Show in Finder                  | <kbd>⌘</kbd><kbd>F</kbd>      |
 | Delete Quicklink                | <kbd>⌘</kbd><kbd>delete</kbd> |
 
-**Open With Default App** only appears when the quicklink has its own app, and **Show in Finder** only
-for files and folders.
+**Open With Default App** only appears when the quicklink opens with a specific app, and
+**Show in Finder** only appears for files and folders.
 
-## Three ways to put one away
+## Three ways to hide a quicklink
 
-From widest to narrowest:
+From broadest to narrowest:
 
-1. **Show in launcher** in Settings takes every quicklink and the quicklink commands out of search.
-2. The **Enabled** checkbox on a quicklink's row in Settings makes that one quicklink do nothing,
-   while keeping its shortcut and settings.
-3. **Show in root search** off keeps a quicklink out of the main search, but you can still open it
-   from Search Quicklinks or its shortcut.
+1. Turning off **Show in launcher** in Settings removes all quicklinks and quicklink commands from
+   search.
+2. Clearing the **Enabled** checkbox on a quicklink's row in Settings turns off that one quicklink
+   but keeps its shortcut and settings.
+3. Turning off **Show in root search** keeps a quicklink out of the main search, but you can still
+   open it from Search Quicklinks or with its shortcut.
 
-Editing a quicklink keeps its shortcut, favorite, visibility and learned ranking. **Duplicating makes
-a new quicklink**, so the copy does not take the original's shortcut.
+Editing a quicklink keeps its shortcut, favorite, visibility and learned ranking.
+**Duplicating creates a new quicklink**, so the copy doesn't get the original's shortcut.
 
 ## Import and export
 
-**Import Quicklinks** and **Export Quicklinks** use a simple JSON file you can edit by hand. A bare
-list works too, and only `name` and `link` are required.
+**Import Quicklinks** and **Export Quicklinks** use a simple JSON file you can edit by hand. A plain
+list also works, and only `name` and `link` are required.
 
 ```json
 {
@@ -171,14 +176,13 @@ list works too, and only `name` and `link` are required.
 }
 ```
 
-A quicklink is skipped as a duplicate if its **name or its link** matches one you already have, or
-one earlier in the same file. The summary tells you how many were skipped.
+A quicklink is skipped as a duplicate if its **name or link** matches one you already have, or one
+earlier in the same file. The summary shows how many were skipped.
 
-You can also bring quicklinks across from a
-[Raycast export](/docs/reference/import-from-raycast).
+You can also import quicklinks from a [Raycast export](/docs/reference/import-from-raycast).
 
-## Where they are kept
+## Where they're stored
 
-Quicklinks live in `quicklinks.sqlite3` in Tinycast's Application Support folder. If that file ever
-cannot be opened, Tinycast **reports it and never deletes it**. Your links are something you made, not
-something that can be rebuilt.
+Quicklinks are stored in `quicklinks.sqlite3` in Tinycast's Application Support folder. If that file
+can't be opened, Tinycast **reports the problem and never deletes the file**, because your links
+can't be rebuilt from anywhere else.

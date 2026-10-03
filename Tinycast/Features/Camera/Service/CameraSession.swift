@@ -52,7 +52,11 @@ final class CameraSession {
     }
 
     func stop() {
-        guard let capture, capture.isRunning else { return }
+        guard let capture else { return }
+        // A reused session without an output of its own feeds a new preview layer no frames.
+        self.capture = nil
+        photoOutput = nil
+        guard capture.isRunning else { return }
         // The camera light must go out with the panel, so this is never left to deallocation.
         let box = CaptureBox(session: capture)
         Task.detached { box.session.stopRunning() }
@@ -98,9 +102,10 @@ final class CameraSession {
         }.value
     }
 
+    /// Reopens on the camera last switched to, unless it has been unplugged since.
     private func configure() -> AVCaptureSession? {
-        guard let device = AVCaptureDevice.default(for: .video),
-            let input = try? AVCaptureDeviceInput(device: device)
+        let preferred = device?.isConnected == true ? device : AVCaptureDevice.default(for: .video)
+        guard let device = preferred, let input = try? AVCaptureDeviceInput(device: device)
         else { return nil }
         let capture = AVCaptureSession()
         capture.sessionPreset = purpose == .capture ? .photo : .medium

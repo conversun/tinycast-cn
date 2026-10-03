@@ -1,46 +1,46 @@
 ---
 title: Import from Raycast
-description: Read a Raycast export and bring your shortcuts, favorites, snippets, quicklinks and history across.
+description: Import your shortcuts, favorites, snippets, quicklinks and clipboard history from a Raycast export.
 ---
 
-Tinycast reads Raycast's own export file directly, in **Settings → Backup → Raycast Export**, or in
-the welcome screen the first time you open Tinycast.
+Tinycast reads Raycast's export file directly. Import it in **Settings → Backup → Raycast Export**,
+or from the welcome screen the first time you open Tinycast.
 
 ## Which exports it reads
 
-**Raycast v2.0 and newer only.** Tinycast reads the `.rayconfig` file that Raycast v2.0 and later
-write, and nothing else. Check your Raycast version in **Raycast → Settings → About** before you
+**Only Raycast v2.0 and newer.** Tinycast reads the `.rayconfig` file written by Raycast v2.0 and
+later, and no other format. Check your Raycast version in **Raycast → Settings → About** before you
 export.
 
-**Raycast v1.x exports are not supported.** That format was dropped in **Tinycast v0.10.5**, along with
-the Raycast X beta format — both were deleted rather than carried. If your file will not open, export
-it again from a current Raycast.
+**Raycast v1.x exports aren't supported.** Support for that format was removed in
+**Tinycast v0.10.5**, along with the Raycast X beta format. If your file won't open, export it again
+from a current version of Raycast.
 
 ## Steps
 
 1. In Raycast, export your settings and data, and note the passphrase.
 2. In Tinycast, go to **Settings → Backup → Raycast Export** and choose the file.
-3. Type the passphrase, tick the things you want, and import.
+3. Enter the passphrase, select what you want to import, and import.
 4. **Quit Tinycast and open it again.**
 
-**Quit and reopen Tinycast once the import finishes.** Not all of what you brought across takes effect
-in the running app, so a full restart is what makes the whole import live. Quit from the menu-bar icon
-— closing the Settings window is not enough — then open Tinycast again.
+**You need to quit and reopen Tinycast after the import finishes.** Some imported settings don't take
+effect in the running app until it restarts. Quit from the menu bar icon (closing the Settings window
+isn't enough), then open Tinycast again.
 
-Tinycast recognizes the file **before** you type the passphrase, so a wrong passphrase is reported as
-a wrong passphrase, not as "this is not a Raycast file".
+Tinycast recognizes the file **before** you enter the passphrase, so a wrong passphrase is reported
+as a wrong passphrase, not as "this is not a Raycast file".
 
-## About that passphrase
+## About the passphrase
 
-**Raycast encrypts the export even if you never set a password.** It makes one up and keeps it in
+**Raycast encrypts the export even if you never set a password.** It creates one and stores it in
 your login Keychain.
 
-You can see it in **Raycast → Settings → Extensions → Export Settings & Data**, or in Keychain Access
-under the service `Raycast` and account `export_passphrase`.
+You can find it in **Raycast → Settings → Extensions → Export Settings & Data**, or in Keychain
+Access under the service `Raycast` and account `export_passphrase`.
 
-**Tinycast never reads your Keychain.** You paste the passphrase in yourself.
+**Tinycast never reads your Keychain.** You paste the passphrase yourself.
 
-## What comes across
+## What gets imported
 
 | Category            | Notes                                                      |
 | ------------------- | ---------------------------------------------------------- |
@@ -52,54 +52,55 @@ under the service `Raycast` and account `export_passphrase`.
 | Quicklinks          | Name, link and the app it opens with                       |
 | Emoji skin tone     | Raycast's default becomes Tinycast's Default               |
 | Compact mode        | From Raycast's window mode                                 |
-| Pop to root         | Only when the timing matches one Tinycast offers           |
+| Pop to root         | Only when the delay matches an option Tinycast offers      |
 | Launch at login     |                                                            |
 | Menu bar visibility | From Raycast's menu bar icon setting                       |
 
-The list of apps kept out of clipboard history comes across with Clipboard history.
+The list of apps excluded from clipboard history is imported along with Clipboard history.
 
-A shortcut with a modifier Tinycast does not recognize is **skipped whole**, rather than imported as
-something slightly different from what you had.
+If a shortcut uses a modifier Tinycast doesn't recognize, the **whole shortcut is skipped** rather
+than imported as something slightly different.
 
 ## Clipboard history
 
-Images come across only if their files still exist on this Mac. The summary tells you how many were
-missing, rather than dropping them silently.
+Images are only imported if their files still exist on this Mac. The summary tells you how many were
+missing.
 
 ## Snippets
 
-Snippets are added **in their original order, without overwriting anything you already have**. Ones
-that cannot be read are skipped. A name you already use gets a number added, and repeated keywords are
-kept as they are.
+Snippets are added **in their original order, without overwriting any you already have**. Snippets
+that can't be read are skipped. If a name is already in use, a number is added to it, and duplicate
+keywords are kept as they are.
 
-Imported snippets arrive **switched on and visible in the launcher, with confirmation off**.
+Imported snippets are **enabled and visible in the launcher, with confirmation off**.
 
-**Importing never turns on keyword expansion.** That switch is yours alone; see
-[Backup](/docs/reference/backup#a-backup-can-never-grant-a-capability). The summary says so, so a
-keyword that does nothing yet does not look broken.
+**Importing never turns on keyword expansion.** Only you can turn that on; see
+[Backup](/docs/reference/backup#a-backup-can-never-turn-on-a-capability). The summary mentions this,
+so a keyword that doesn't work yet doesn't look broken.
 
-If the snippet files cannot be written, the summary says so, and the other categories still import.
+If the snippet files can't be written, the summary tells you, and the other categories are still
+imported.
 
 ## Quicklinks
 
-Quicklinks are added to your library, never replacing it, and duplicates are skipped just like a
-[quicklink import](/docs/launcher/quicklinks#import-and-export). Raycast's `{Query}` becomes
-`{argument}`.
+Quicklinks are added to your existing library, never replacing it, and duplicates are skipped the
+same way as in a [quicklink import](/docs/launcher/quicklinks#import-and-export). Raycast's `{Query}`
+becomes `{argument}`.
 
-Importing at least one quicklink turns the Quicklinks feature on.
+Importing at least one quicklink turns on the Quicklinks feature.
 
-## What else you can bring
+## Other things you can import
 
-Two things are not in a `.rayconfig`, so they have their own importers:
+Two things aren't part of a `.rayconfig`, so they have their own importers:
 
-- **Extensions.** **Settings → Extensions → Import from Raycast** copies the extensions you have
-  installed. See [Installing extensions](/docs/extensions/installing#import-from-raycast).
-- **Script commands.** **Settings → Commands → Import Raycast Scripts** turns a folder of scripts into
-  custom commands. See [Commands](/docs/launcher/commands#importing-raycast-script-commands).
+- **Extensions.** **Settings → Extensions → Import from Raycast** copies your installed extensions.
+  See [Installing extensions](/docs/extensions/installing#import-from-raycast).
+- **Script commands.** **Settings → Commands → Import Raycast Scripts** turns a folder of scripts
+  into custom commands. See [Commands](/docs/launcher/commands#importing-raycast-script-commands).
 
-## Afterwards
+## Afterward
 
-There is a **Quit Raycast** button in the pane, for when you are ready.
+The pane has a **Quit Raycast** button for when you're ready.
 
-Nothing in Tinycast needs Raycast to be installed, except importing extensions from it, which by
-definition reads its folder.
+Tinycast doesn't need Raycast to be installed, except to import extensions from it, since that reads
+Raycast's folder.

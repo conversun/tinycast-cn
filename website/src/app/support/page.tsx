@@ -11,7 +11,7 @@ import {
 } from "../../data/support";
 
 const description =
-  "Tinycast is free and open source. If you enjoy it, you can support its development monthly or once, securely through Polar.";
+  "Tinycast is free and open source. If you enjoy it, you can support its development with a monthly or one-time payment through Polar.";
 
 export const metadata: Metadata = {
   title: "Support",

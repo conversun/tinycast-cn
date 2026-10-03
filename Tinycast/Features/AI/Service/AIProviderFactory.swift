@@ -3,21 +3,6 @@ import Foundation
 
 @MainActor
 enum AIProviderFactory {
-    /// Chat's route, and the one every existing caller means.
-    static func make(
-        settings: AISettingsStore,
-        subscription: ChatGPTSubscriptionManager,
-        installedAI: InstalledAIManager,
-        keyStore: KeychainSecretStore = .aiAPIKeys
-    ) throws -> any AIProvider {
-        guard let selection = settings.defaultModel else {
-            throw AIProviderError.unavailable(String(localized: "Choose a default AI model in Settings."))
-        }
-        return try make(
-            selection: selection, settings: settings, subscription: subscription,
-            installedAI: installedAI, keyStore: keyStore)
-    }
-
     /// `guardrails` reaches only the on-device model, the one route that filters locally.
     static func make(
         selection: AIModelSelection,
@@ -25,10 +10,14 @@ enum AIProviderFactory {
         subscription: ChatGPTSubscriptionManager,
         installedAI: InstalledAIManager,
         keyStore: KeychainSecretStore = .aiAPIKeys,
-        guardrails: SystemLanguageModel.Guardrails = .default
+        guardrails: SystemLanguageModel.Guardrails = .default,
+        toolServers: AIToolServerSession? = nil
     ) throws -> any AIProvider {
         switch selection {
         case .appleIntelligence:
+            guard settings.isRouteEnabled(.appleIntelligence) else {
+                throw AIProviderError.unavailable("Apple Intelligence is disabled in AI Settings.")
+            }
             if let message = AppleIntelligenceProvider.status().message {
                 throw AIProviderError.unavailable(message)
             }
@@ -38,12 +27,14 @@ enum AIProviderFactory {
                 throw AIProviderError.unavailable("Codex is disabled in AI Settings.")
             }
             return CodexInstalledProvider(
-                turns: subscription.turns, model: model, effort: effort)
+                turns: subscription.turns, model: model, effort: effort,
+                toolServers: toolServers)
         case .claude(let model, let effort):
             guard settings.enabledInstalledProviders.contains(.claude) else {
                 throw AIProviderError.unavailable("Claude is disabled in AI Settings.")
             }
-            return try installedAI.provider(kind: .claude, model: model, effort: effort)
+            return try installedAI.provider(
+                kind: .claude, model: model, effort: effort, toolServers: toolServers)
         case .grok(let model, let effort):
             guard settings.enabledInstalledProviders.contains(.grok) else {
                 throw AIProviderError.unavailable("Grok is disabled in AI Settings.")
@@ -62,6 +53,9 @@ enum AIProviderFactory {
         case .api(let connectionID, let model, let effort):
             guard let connection = settings.connection(id: connectionID) else {
                 throw AIProviderError.unavailable(String(localized: "Choose an API connection in Settings."))
+            }
+            guard settings.isRouteEnabled(.api(connectionID)) else {
+                throw AIProviderError.unavailable("\(connection.title) is disabled in AI Settings.")
             }
             let baseURL: URL
             do {

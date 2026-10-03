@@ -302,6 +302,7 @@ enum BackupActions {
         if s.customCommands > 0 { parts.append("\(s.customCommands) custom commands") }
         if s.quicklinks > 0 { parts.append("\(s.quicklinks) quicklinks") }
         if s.windowLayouts > 0 { parts.append("\(s.windowLayouts) window layouts") }
+        if s.windowRooms > 0 { parts.append("\(s.windowRooms) rooms") }
         if s.customWindowSizes > 0 {
             parts.append("\(s.customWindowSizes) custom window sizes")
         }
@@ -329,6 +330,42 @@ enum BackupActions {
                 + String(localized: "\(outcome.missingImages) images were unavailable and skipped.")
         }
         return message
+    }
+
+    // MARK: - Settings file
+
+    /// Where settings.json lives for this channel, as the pane and its dialog spell it.
+    static var settingsFilePath: String {
+        (AppPaths.settingsFile().path as NSString).abbreviatingWithTildeInPath
+    }
+
+    /// Turning the mirror on over a file that already exists asks which side wins.
+    static func setSettingsFileEnabled(_ enabled: Bool, core: AppCore) async {
+        guard enabled else { return core.stopSettingsFile() }
+        guard FileManager.default.fileExists(atPath: AppPaths.settingsFile().path) else {
+            return core.startSettingsFile(importing: false)
+        }
+        let choice = await core.choose(
+            title: "Import the existing settings file?",
+            message:
+                "\(settingsFilePath) already exists. Import applies its settings here; Replace "
+                + "overwrites it with the current ones.",
+            symbol: importSymbol,
+            options: [
+                DialogAction(title: "Import"),
+                DialogAction(title: "Replace", role: .destructive),
+                DialogAction(title: "Cancel", role: .cancel)
+            ],
+            defaultIndex: 0)
+        switch choice {
+        case 0: core.startSettingsFile(importing: true)
+        case 1: core.startSettingsFile(importing: false)
+        default: break
+        }
+    }
+
+    static func revealSettingsFile() {
+        NSWorkspace.shared.activateFileViewerSelecting([AppPaths.settingsFile()])
     }
 
     private static func confirmExecutableImport(

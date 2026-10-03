@@ -10,11 +10,18 @@ final class ChatGPTSubscriptionManager {
 
     private let client: CodexAppServerClient
     let turns: CodexTurnRunner
+    /// Forwarded to the app-server's launch; a change takes effect at its next start.
+    @ObservationIgnored var launchSettings: () -> InstalledAILaunch {
+        get { client.launchSettings }
+        set { client.launchSettings = newValue }
+    }
 
     private(set) var phase = ChatGPTSubscription.Phase.idle
-    private(set) var account: ChatGPTSubscription.Account?
+    private(set) var access: ChatGPTSubscription.Access?
     private(set) var models: [ChatGPTSubscription.Model] = []
     private(set) var rateLimits: ChatGPTSubscription.RateLimits?
+    /// Copied from the client at each check: the client is not observed, and Settings shows this.
+    private(set) var executable: URL?
 
     @ObservationIgnored private var operationTask: Task<Void, Never>?
     @ObservationIgnored private var idleTask: Task<Void, Never>?
@@ -24,9 +31,9 @@ final class ChatGPTSubscriptionManager {
         client = CodexAppServerClient(
             workspace: root.appending(path: "Workspace", directoryHint: .isDirectory))
         turns = CodexTurnRunner(client: client)
-        turns.connect = { [weak self] in
+        turns.connect = { [weak self] servers in
             guard let self else { throw CancellationError() }
-            try await self.ensureConnected()
+            try await self.ensureConnected(toolServers: servers)
             return self.models
         }
         turns.onTurnEnded = { [weak self] in self?.turnDidEnd() }
@@ -39,7 +46,11 @@ final class ChatGPTSubscriptionManager {
         }
     }
 
-    var isConnected: Bool { account != nil && phase == .connected }
+    var account: ChatGPTSubscription.Account? {
+        if case .account(let account) = access { account } else { nil }
+    }
+
+    var isConnected: Bool { access != nil && phase == .connected }
 
     @discardableResult
     func refresh() -> Task<Void, Never> {
@@ -60,15 +71,22 @@ final class ChatGPTSubscriptionManager {
         client.stop()
     }
 
-    /// What a turn needs before it starts: a running server and a signed-in account.
-    private func ensureConnected() async throws {
+    /// A helper launched with a server no longer offered stops now, not ten idle minutes later.
+    func dropWithdrawnServers(keeping offered: Set<String>) {
+        guard !turns.isActive, client.toolServers.contains(where: { !offered.contains($0.handle) })
+        else { return }
         idleTask?.cancel()
-        try await client.start()
-        if account == nil, try await restoreAccount() {
-            phase = .connected
-            await loadModelsAndLimits()
-        }
-        guard account != nil else {
+        turns.reset()
+        client.stop()
+    }
+
+    /// What a turn needs before it starts: a running server and confirmed access.
+    private func ensureConnected(toolServers: [AIToolServer]) async throws {
+        idleTask?.cancel()
+        // A changed list relaunches, since it is fixed at exec; access outlives the process.
+        try await client.start(toolServers: toolServers)
+        guard access == nil else { return }
+        guard try await verifyAccess() else {
             throw AIProviderError.unavailable("Sign in with `codex login`, then check Codex again.")
         }
     }
@@ -93,18 +111,25 @@ final class ChatGPTSubscriptionManager {
     private func refreshNow() async {
         phase = .starting
         do {
-            try await client.start()
-            guard try await restoreAccount() else {
-                phase = .signedOut
-                client.stop()
-                return
-            }
-            phase = .connected
-            await loadModelsAndLimits()
+            try await client.startForCheck()
+            executable = client.executable
+            guard try await verifyAccess() else { return }
             scheduleIdleShutdown()
         } catch {
             apply(error)
         }
+    }
+
+    /// A check and a turn reach the same verdict, so neither leaves a signed-out server running.
+    private func verifyAccess() async throws -> Bool {
+        guard try await restoreAccess() else {
+            phase = .signedOut
+            client.stop()
+            return false
+        }
+        phase = .connected
+        await loadModelsAndLimits()
+        return true
     }
 
     /// The server stays resident only while it is being used; a stopped one restarts on demand.
@@ -174,17 +199,21 @@ final class ChatGPTSubscriptionManager {
             })
     }
 
-    private func restoreAccount() async throws -> Bool {
+    private func restoreAccess() async throws -> Bool {
         let response = try await client.request(
             method: "account/read", params: ["refreshToken": false])
-        guard let rawAccount = response["account"]?.objectValue else {
+        if let rawAccount = response["account"]?.objectValue {
+            let type = rawAccount["type"]?.stringValue ?? "unknown"
+            access = .account(
+                ChatGPTSubscription.Account(
+                    email: rawAccount["email"]?.stringValue,
+                    plan: rawAccount["planType"]?.stringValue ?? type))
+        } else if response["requiresOpenaiAuth"]?.boolValue == false {
+            access = .provider
+        } else {
             forget()
             return false
         }
-        let type = rawAccount["type"]?.stringValue ?? "unknown"
-        account = ChatGPTSubscription.Account(
-            email: rawAccount["email"]?.stringValue,
-            plan: rawAccount["planType"]?.stringValue ?? type)
         return true
     }
 
@@ -198,7 +227,7 @@ final class ChatGPTSubscriptionManager {
     }
 
     private func forget() {
-        account = nil
+        access = nil
         models = []
         rateLimits = nil
         turns.reset()
@@ -231,8 +260,10 @@ struct CodexInstalledProvider: AIProvider {
     let turns: CodexTurnRunner
     let model: String
     let effort: String?
+    /// Set only by chat: a quick action has nothing to call and arms no server.
+    var toolServers: AIToolServerSession?
 
     func stream(_ request: AIRequest) -> AIProviderStream {
-        turns.stream(request, model: model, effort: effort)
+        turns.stream(request, model: model, effort: effort, toolServers: toolServers)
     }
 }

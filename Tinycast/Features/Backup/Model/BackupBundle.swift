@@ -138,9 +138,9 @@ struct BackupBundle: Sendable {
         }
     }
 
-    func decodeLearning<Value: Decodable>(_ part: LearningPart, as type: [Value].Type) -> [Value]? {
+    func decodeLearning<Value: Decodable>(_ part: LearningPart, as type: Value.Type) -> Value? {
         guard let data = try? Data(contentsOf: learningURL(part)) else { return nil }
-        return try? Self.decoder.decode([Value].self, from: data)
+        return try? Self.decoder.decode(Value.self, from: data)
     }
 
     // MARK: - Coding

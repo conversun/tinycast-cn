@@ -3,124 +3,124 @@ title: Hotkeys
 description: Recording global shortcuts, double-tap modifiers, and the Hyper key.
 ---
 
-**Tinycast ships with nothing bound.** Every global shortcut is one you record.
+**Tinycast doesn't come with any shortcuts.** You record every global shortcut yourself.
 
 ## What can have a shortcut
 
 - The palette itself (**App Launcher**, in Settings → General)
 - Every built-in command, except Open in Browser, Run Shell Command and Quit Tinycast. See
   [Commands](/docs/launcher/commands).
-- Every app, and every System Settings pane
-- Every quicklink, custom command, custom Quick Action and extension command
+- Every app and every System Settings pane
+- Every quicklink, snippet, custom command, custom Quick Action and extension command
 - All 31 [system actions](/docs/launcher/system-actions)
-- All 35 [window commands](/docs/features/window-management), and every
-  [window layout](/docs/features/window-layouts)
+- All 35 [window commands](/docs/features/window-management), every
+  [window layout](/docs/features/window-layouts) and every [room](/docs/features/rooms)
 
-Each shortcut is recorded on the item's row in its Settings pane, and shows as keycaps on its
-launcher row.
+You record each shortcut on the item's row in its Settings pane, and it appears as keycaps on the
+item's launcher row.
 
-A command that opens a screen is a toggle. Press its shortcut once to open the screen, and again to
-close it.
+A command that opens a screen works as a toggle. Press its shortcut once to open the screen, and
+again to close it.
 
 ## Recording one
 
-The recorder is not a normal text field. Click it, then press the keys you want.
+The recorder isn't a regular text field. Click it, then press the keys you want.
 
-A small bubble above the field shows the prompt, then the modifiers you are holding, then a warning if
-the shortcut is already taken, naming exactly what uses it.
+A small bubble above the field shows a prompt, then the modifiers you're holding. If the shortcut is
+already in use, it shows a warning that names what uses it.
 
-Recording needs **no permission**. Only _using_ some kinds of shortcut does.
+Recording a shortcut **doesn't need any permissions**. Only _using_ some kinds of shortcuts does.
 
 ## Double-tap modifiers
 
-Any shortcut can instead be a double tap of one lone <kbd>⌃</kbd>, <kbd>⌥</kbd>, <kbd>⇧</kbd> or
-<kbd>⌘</kbd>.
+Instead of a key combination, a shortcut can be a double tap of a single <kbd>⌃</kbd>,
+<kbd>⌥</kbd>, <kbd>⇧</kbd> or <kbd>⌘</kbd> key.
 
-The exact rules:
+The rules:
 
-- A **tap** is a press of exactly one of those four keys, with nothing else held, no other key and no
-  click, released within **250 ms**.
-- A **double tap** is a second tap of the same key starting within **300 ms** of the first release.
-- **It fires when you let go the second time, not when you press.** The key is already up when the
-  action runs, and "double-tap and hold" does nothing on purpose.
+- A **tap** is a press of exactly one of those four keys, with no other key held and no click,
+  released within **250 ms**.
+- A **double tap** is a second tap of the same key that starts within **300 ms** of releasing the
+  first.
+- **The shortcut runs when you release the key the second time, not when you press it.** The key is
+  already up when the action runs, and double-tapping and holding does nothing.
 
-<kbd>⇧</kbd> works as a double tap, even though <kbd>⇧</kbd> alone cannot be a normal shortcut. Caps
-Lock cannot be used this way; that is what the Hyper key is for. Having Caps Lock _on_ does not get in
-the way.
+<kbd>⇧</kbd> works as a double tap, even though it can't be a regular shortcut on its own. Caps Lock
+can't be used this way; use the Hyper key for that. Having Caps Lock _on_ doesn't interfere.
 
-This needs [Accessibility](/docs/permissions), and **never asks for it on its own**. The shortcut is
-saved anyway, the recorder shows a warning that opens System Settings, and the shortcut starts working
-the moment you grant access.
+This needs [Accessibility](/docs/permissions), but **Tinycast never asks for it on its own**. The
+shortcut is saved anyway, the recorder shows a warning that opens System Settings, and the shortcut
+starts working as soon as you grant access.
 
-Tinycast only watches for double taps **while at least one shortcut uses one**, so if you never do,
-it costs nothing.
+Tinycast only listens for double taps **while at least one shortcut uses one**, so if you don't use
+them, they cost nothing.
 
 ## Hyper key
 
 **Settings → General → Hyper Key** turns one physical key into <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd>,
-or <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⇧</kbd><kbd>⌘</kbd> with **Include Shift** on.
+or into <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⇧</kbd><kbd>⌘</kbd> with **Include Shift** on.
 
 You can choose **Caps Lock**, **Right Control**, **Right Shift**, **Right Option** or
 **Right Command**.
 
-Function keys are not offered. Their media functions fire before Tinycast can see them, so turning F1
-into Hyper would still dim your screen.
+Function keys aren't available, because their media functions run before Tinycast sees the key
+press. Turning F1 into a Hyper key would still dim your screen.
 
-Shortcuts you already use with those modifiers work with Hyper right away.
+Shortcuts you already use with those modifiers work with the Hyper key right away.
 
 ### The ✦ symbol
 
-**Any shortcut that includes all the Hyper modifiers shows as a single ✦.** So
-<kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> shows as `✦G`, or `✦⇧G` when an extra modifier is
-left over.
+**Any shortcut that includes all the Hyper modifiers is shown as a single ✦.** For example,
+<kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> is shown as `✦G`, or `✦⇧G` if it uses an extra
+modifier.
 
-This is simply how it is written, not a setting. With no Hyper key set,
-<kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> shows as itself.
+This only changes how the shortcut is displayed. With no Hyper key set,
+<kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd> is shown as it is.
 
 ### Include Shift
 
-Switching this **updates every saved shortcut**, so nothing breaks. If an update would clash with
-another shortcut, that one is skipped and keeps its original keys.
+Changing this setting **updates every saved shortcut**, so none of them stop working. If an update
+would conflict with another shortcut, Tinycast skips it and that shortcut keeps its original keys.
 
-The option is greyed out while Hyper Key is set to None.
+The option is dimmed while Hyper Key is set to None.
 
 ### Quick Press
 
-**Settings → General → Quick Press** decides what pressing the Hyper key on its own does:
-**Does Nothing** (default), the key's original job, or **Trigger Escape**.
+**Settings → General → Quick Press** sets what happens when you press the Hyper key by itself:
+**Does Nothing** (default), the key's original function, or **Trigger Escape**.
 
-Escape is the favorite choice for Caps Lock users.
+Many people who use Caps Lock as their Hyper key choose Escape.
 
 ### Caps Lock details
 
-While Caps Lock is your Hyper key, it is remapped at the hardware level. The remap is removed when you
-pick another key, when Tinycast quits, and it never survives a restart.
+While Caps Lock is your Hyper key, it's remapped at the hardware level. The remapping is removed when
+you choose a different key or quit Tinycast, and it never persists after a restart.
 
-In the brief moment before the remap takes hold, the Caps Lock light can still switch. That is the
-hardware, not something Tinycast can stop.
+In the brief moment before the remapping takes effect, the Caps Lock light can still turn on. That's
+the hardware, and Tinycast can't prevent it.
 
-Hyper needs Accessibility and never asks for it on its own. Tinycast keeps checking, starts working as
-soon as access is granted, notices if access is removed, and clears a key that looks stuck. When you
-switch to another user, it pauses until you are back.
+The Hyper key needs Accessibility, and Tinycast never asks for it on its own. Tinycast keeps checking,
+starts working as soon as access is granted, notices if access is removed, and releases a key that
+seems stuck. When you switch to another user account, it pauses until you come back.
 
-## Hidden, switched off, and turned off
+## Hiding versus turning off
 
-**Hiding a row does not turn off its shortcut.** Unticking a row's checkbox, or
+**Hiding an item doesn't turn off its shortcut.** Clearing a row's checkbox, or pressing
 <kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd> in the launcher, only changes what search shows.
 
-**A section's switch does turn off its shortcuts.** **Enable Applications**, **Enable System
-Settings**, **Enable System Actions** and **Enable Commands** each stop every shortcut in their pane.
+**A section's switch turns off its shortcuts.** **Enable Applications**, **Enable System Settings**,
+**Enable System Actions** and **Enable Commands** each turn off every shortcut in their pane.
 
-**Turning a feature off turns off its shortcuts.** File Search, Notes, AI, Quick Actions, Navigation,
-Calendar, window commands, quicklinks, custom commands and extensions all check their switch before
-doing anything. Turn the feature back on and your shortcuts work again.
+**Turning off a feature turns off its shortcuts.** File Search, Notes, AI, Quick Actions,
+Navigation, Calendar, window commands, quicklinks, snippets, custom commands and extensions all check
+their switch before doing anything. Turn the feature back on and its shortcuts work again.
 
-A [system action's confirmation](/docs/launcher/system-actions#confirmation) comes up for its shortcut
-exactly as it does in the palette.
+A [system action's confirmation](/docs/launcher/system-actions#confirmation) appears when you use its
+shortcut, the same as in the palette.
 
 ## Keeping them
 
-Shortcuts are included in [backups](/docs/reference/backup), except for custom Quick Actions.
+Shortcuts are included in [backups](/docs/reference/backup), except for custom Quick Actions and
+snippets.
 
-Shortcuts for things you deleted while Tinycast was not running are cleaned up the next time it
-starts.
+Shortcuts for items you deleted while Tinycast wasn't running are removed the next time it starts.

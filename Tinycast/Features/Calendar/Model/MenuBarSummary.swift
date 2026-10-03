@@ -28,11 +28,13 @@ struct MenuBarSummary: Sendable {
         self.calendar = calendar
     }
 
-    /// The earliest event still inside its window, so one hiding hands the space to the next.
-    func event(from events: [MeetingEvent], now: Date) -> MeetingEvent? {
+    /// The earliest event inside its window and undismissed, so one hiding hands over the next.
+    func event(
+        from events: [MeetingEvent], now: Date, dismissed: Set<MeetingEvent.ID> = []
+    ) -> MeetingEvent? {
         UpcomingWindow.agenda(from: events, now: now).first {
-            (!linkedOnly || $0.link != nil) && isInsideLead(for: $0, now: now)
-                && now < hidesAt($0)
+            !dismissed.contains($0.id) && (!linkedOnly || $0.link != nil)
+                && isInsideLead(for: $0, now: now) && now < hidesAt($0)
         }
     }
 

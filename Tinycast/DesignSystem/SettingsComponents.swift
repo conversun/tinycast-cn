@@ -1,20 +1,68 @@
+import AppKit
 import SwiftUI
 
 // The few pieces more than one Settings pane or editor needs; everything else stays feature-owned.
+
+/// The Settings sidebar tile, shared with the matching feature switches.
+struct SettingsTabIcon: View {
+    let systemImage: String
+    let tint: Color
+    var size = Theme.Size.settingsSidebarGlyph + Theme.Spacing.xs * 2
+
+    var body: some View {
+        let scale = size / (Theme.Size.settingsSidebarGlyph + Theme.Spacing.xs * 2)
+        Image(systemName: systemImage)
+            .resizable()
+            .scaledToFit()
+            .frame(
+                width: Theme.Size.settingsSidebarGlyph * scale,
+                height: Theme.Size.settingsSidebarGlyph * scale
+            )
+            .foregroundStyle(tint)
+            .padding(Theme.Spacing.xs * scale)
+            .background(
+                tint.opacity(0.1),
+                in: RoundedRectangle(
+                    cornerRadius: Theme.Radius.thumbnail * scale, style: .continuous))
+    }
+}
+
+struct SettingsFeatureToggleLabel: View {
+    let anchor: SettingsAnchor
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.lg) {
+            SettingsTabIcon(
+                systemImage: anchor.tab.systemImage, tint: .accentColor,
+                size: Theme.Size.settingsRowIcon * 1.5)
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                SettingsRowTitle(anchor, title)
+                    .fontWeight(.semibold)
+                Text(subtitle.localizedUI)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
 
 /// Not `LabeledContent`: its selectable text field eats the taps a `ShortcutRecorder` needs.
 struct SettingsRow<Icon: View, Trailing: View>: View {
     let title: String
     var subtitle: String?
     var subtitleLineLimit = 1
+    var alignment: VerticalAlignment = .center
+    var labelOpacity = 1.0
     /// Set when a search result points at this row, so its title can carry the pulse.
     var anchor: SettingsAnchor?
     @ViewBuilder var icon: Icon
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.lg) {
-            icon
+        HStack(alignment: alignment, spacing: Theme.Spacing.lg) {
+            icon.opacity(labelOpacity)
             VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                 Group {
                     if let anchor {
@@ -34,26 +82,96 @@ struct SettingsRow<Icon: View, Trailing: View>: View {
                         .help(subtitle.localizedUI)
                 }
             }
+            .opacity(labelOpacity)
             Spacer(minLength: Theme.Spacing.lg)
             trailing
         }
     }
 }
 
+enum SettingsListMetrics {
+    static let iconSize = Theme.Size.settingsRowIcon + Theme.Spacing.xs
+}
+
 extension SettingsRow where Icon == EmptyView {
     init(
         title: String, subtitle: String? = nil, subtitleLineLimit: Int = 1,
-        anchor: SettingsAnchor? = nil,
+        alignment: VerticalAlignment = .center,
+        labelOpacity: Double = 1, anchor: SettingsAnchor? = nil,
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.init(
             title: title, subtitle: subtitle, subtitleLineLimit: subtitleLineLimit,
+            alignment: alignment, labelOpacity: labelOpacity,
             anchor: anchor, icon: { EmptyView() },
             trailing: trailing)
     }
 }
 
+struct SettingsScopeRow: View {
+    let scope: String
+    let path: String
+    let isMissing: Bool
+    let onRemove: () -> Void
+
+    private var isFolder: Bool { (path as NSString).pathExtension != "app" }
+
+    var body: some View {
+        LabeledContent {
+            HStack(spacing: Theme.Spacing.sm) {
+                if isMissing {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .help("This location no longer exists.")
+                }
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove \(scope)")
+            }
+        } label: {
+            HStack {
+                Image(nsImage: IconCache.icon(forFile: path))
+                    .resizable()
+                    .renderingMode(.original)
+                    .interpolation(.high)
+                    .id(IconCache.style.generation)
+                    .frame(
+                        width: SettingsListMetrics.iconSize
+                            - (isFolder ? Theme.Spacing.xxs + 1 : 0),
+                        height: SettingsListMetrics.iconSize - (isFolder ? 1 : 0)
+                    )
+                    .frame(
+                        width: SettingsListMetrics.iconSize,
+                        height: SettingsListMetrics.iconSize
+                    )
+                    .accessibilityHidden(true)
+                Text(scope)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(isMissing ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+            }
+        }
+    }
+}
+
 extension View {
+    func settingsOptionSegment(isSelected: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.barControl, style: .continuous)
+        return
+            self
+            .frame(
+                width: Theme.Size.settingsControlHeight,
+                height: Theme.Size.settingsControlHeight
+            )
+            .contentShape(shape)
+            .background {
+                shape.fill(isSelected ? Theme.Colors.controlSurface : Color.clear)
+            }
+    }
+
     /// Dims as well as disables; `.disabled` alone leaves the title at full strength.
     func settingsEnabled(_ isEnabled: Bool) -> some View {
         disabled(!isEnabled).opacity(isEnabled ? 1 : 0.45)
@@ -67,8 +185,9 @@ extension View {
         modifier(SettingsEditorTextArea(height: height))
     }
 
-    func settingsEditorPanelSurface() -> some View {
-        modifier(SettingsEditorPanelSurface())
+    /// `controlsOnGlass: false` draws the glass behind, so a control keeps its accent colour.
+    func settingsEditorPanelSurface(controlsOnGlass: Bool = true) -> some View {
+        modifier(SettingsEditorPanelSurface(controlsOnGlass: controlsOnGlass))
     }
 
     /// The one place that says hiding a row from the launcher never unbinds its shortcut.
@@ -148,11 +267,22 @@ private struct SettingsEditorTextArea: ViewModifier {
 }
 
 private struct SettingsEditorPanelSurface: ViewModifier {
+    let controlsOnGlass: Bool
+
+    @ViewBuilder
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous)
-        content
-            .background(Theme.Colors.panelScrim, in: shape)
-            .glassEffect(.regular, in: shape)
+        // In front of the glass: a glass fill is hit-testable and would hide a handle behind it.
+        let draggable = content.background(WindowDragBackground())
+        if controlsOnGlass {
+            draggable
+                .background(Theme.Colors.panelScrim, in: shape)
+                .glassEffect(.regular, in: shape)
+        } else {
+            draggable.background {
+                shape.fill(Theme.Colors.panelScrim).glassEffect(.regular, in: shape)
+            }
+        }
     }
 }
 
@@ -163,18 +293,33 @@ struct FeatureSwitchSection: View {
     var enableSubtitle: String?
     @Binding var isEnabled: Bool
     @Binding var showsInLauncher: Bool
+    var showsIcon = false
+    var showsHeader = true
 
     var body: some View {
+        if showsHeader {
+            section
+        } else {
+            section.settingsAnchor(anchor)
+        }
+    }
+
+    private var section: some View {
         Section {
             Toggle(isOn: $isEnabled) {
-                SettingsRowTitle(anchor, enableTitle)
-                if let enableSubtitle { Text(enableSubtitle.localizedUI) }
+                if showsIcon, let enableSubtitle {
+                    SettingsFeatureToggleLabel(
+                        anchor: anchor, title: enableTitle, subtitle: enableSubtitle)
+                } else {
+                    SettingsRowTitle(anchor, enableTitle)
+                    if let enableSubtitle { Text(enableSubtitle.localizedUI) }
+                }
             }
             Toggle("Show in launcher", isOn: $showsInLauncher)
                 // The switch above stays live so the feature can always be turned back on.
                 .settingsEnabled(isEnabled)
         } header: {
-            SettingsSectionHeader(anchor)
+            if showsHeader { SettingsSectionHeader(anchor) }
         }
     }
 }
@@ -212,32 +357,128 @@ struct SettingsFilterField: View {
     }
 }
 
-/// Dressed like `ShortcutRecorder`; a persistent `TextField` — swapping views broke repeat focus.
+private struct AliasTextField: NSViewRepresentable {
+    @Binding var text: String
+    @Binding var focused: Bool
+    let onCancel: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSTextView {
+        let editor = NSTextView()
+        editor.delegate = context.coordinator
+        editor.isRichText = false
+        editor.importsGraphics = false
+        editor.allowsUndo = true
+        editor.drawsBackground = false
+        editor.backgroundColor = .clear
+        editor.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        editor.textContainerInset = NSSize(width: 0, height: 5.5)
+        editor.textContainer?.lineFragmentPadding = 0
+        editor.textContainer?.maximumNumberOfLines = 1
+        editor.textContainer?.lineBreakMode = .byTruncatingTail
+        editor.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        editor.setAccessibilityRole(.textField)
+        return editor
+    }
+
+    func updateNSView(_ editor: NSTextView, context: Context) {
+        context.coordinator.field = self
+        if editor.string != text { editor.string = text }
+        editor.isEditable = isEnabled
+        editor.isSelectable = isEnabled
+        editor.textColor = isEnabled ? .labelColor : .disabledControlTextColor
+        if !focused, editor.window?.firstResponder === editor {
+            editor.window?.makeFirstResponder(nil)
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var field: AliasTextField
+
+        init(_ field: AliasTextField) {
+            self.field = field
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let editor = notification.object as? NSTextView else { return }
+            field.text = editor.string
+        }
+
+        func textView(
+            _ textView: NSTextView, shouldChangeTextIn range: NSRange,
+            replacementString: String?
+        ) -> Bool {
+            guard let replacementString, replacementString.contains(where: \.isNewline) else {
+                return true
+            }
+            textView.insertText(
+                String(replacementString.map { $0.isNewline ? " " : $0 }),
+                replacementRange: range)
+            return false
+        }
+
+        func textDidBeginEditing(_ notification: Notification) {
+            field.focused = true
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            field.focused = false
+        }
+
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            switch commandSelector {
+            case #selector(NSResponder.insertNewline(_:)):
+                textView.window?.makeFirstResponder(nil)
+                return true
+            case #selector(NSResponder.insertTab(_:)):
+                textView.window?.recalculateKeyViewLoop()
+                textView.window?.selectNextKeyView(textView)
+                return true
+            case #selector(NSResponder.insertBacktab(_:)):
+                textView.window?.recalculateKeyViewLoop()
+                textView.window?.selectPreviousKeyView(textView)
+                return true
+            case #selector(NSResponder.cancelOperation(_:)):
+                field.onCancel()
+                textView.window?.makeFirstResponder(nil)
+                return true
+            default:
+                return false
+            }
+        }
+    }
+}
+
+/// Dressed like `ShortcutRecorder`; the persistent AppKit field preserves focus across updates.
 struct AliasField: View {
     /// The owner's `preferenceKey`, taken raw so a row without an `AppEntry` can carry one too.
     let key: String
     let name: String
     @Environment(AliasStore.self) private var aliases
     @State private var draft = ""
-    @FocusState private var focused: Bool
+    @State private var focused = false
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.menu, style: .continuous)
-        let placeholder = Text("Add Alias").foregroundStyle(Theme.Colors.textSecondary)
         HStack(spacing: Theme.Spacing.xs) {
-            TextField("", text: $draft, prompt: placeholder)
-                .textFieldStyle(.plain)
-                .labelsHidden()
-                .font(Theme.Typography.keyCap)
-                .focused($focused)
-                // The system ring insets the field editor on focus, hopping the placeholder left.
-                .focusEffectDisabled()
-                .onSubmit(commit)
-                .onExitCommand(perform: revert)
-                // The pane's `releasesFocusOnOutsideClick` resigns; this catches it landing.
-                .onChange(of: focused) { _, now in
-                    if !now { commit() }
+            ZStack(alignment: .leading) {
+                if draft.isEmpty {
+                    Text("Add Alias")
+                        .font(Theme.Typography.keyCap)
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
+                AliasTextField(text: $draft, focused: $focused, onCancel: revert)
+                    .focusEffectDisabled()
+                    // The pane's `releasesFocusOnOutsideClick` resigns; this catches it landing.
+                    .onChange(of: focused) { _, now in
+                        if !now { commit() }
+                    }
+            }
             if !draft.isEmpty {
                 Button(action: clear) {
                     Image(systemName: "xmark.circle.fill")
@@ -261,13 +502,10 @@ struct AliasField: View {
             }
             draft = aliases.alias(for: new) ?? ""
         }
-        .padding(.horizontal, Theme.Spacing.sm)
+        .padding(.horizontal, Theme.Spacing.sm + 1)
         .frame(width: Theme.Size.shortcutRecorder, height: 24)
         .background(shape.fill(Theme.Colors.cardFill))
-        .overlay(
-            shape.strokeBorder(
-                focused ? Color.accentColor : Theme.Colors.cardStroke, lineWidth: 1)
-        )
+        .overlay(shape.strokeBorder(Theme.Colors.cardStroke, lineWidth: 1))
         .clipShape(shape)
         .accessibilityLabel("Alias for \(name)")
     }

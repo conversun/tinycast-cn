@@ -33,12 +33,25 @@ struct UpcomingWindow: Sendable {
         return "Now"
     }
 
-    /// A row's pill: only a meeting under way or starting within the hour earns one.
-    static func rowCountdown(for event: MeetingEvent, now: Date) -> String? {
-        if event.isInProgress(now: now) { return "Now" }
+    struct RowPill: Equatable, Sendable {
+        let text: String
+        let isImminent: Bool
+    }
+
+    /// A row's pill: a countdown until midnight, then the date, so tomorrow never passes for today.
+    static func rowPill(for event: MeetingEvent, now: Date, calendar: Calendar) -> RowPill? {
+        if event.isInProgress(now: now) { return RowPill(text: "Now", isImminent: true) }
         let delta = event.start.timeIntervalSince(now)
-        guard delta > 0, delta <= 60 * 60 else { return nil }
-        return countdown(to: event.start, now: now)
+        guard delta > 0 else { return nil }
+        let isImminent = delta <= 60 * 60
+        guard isImminent || calendar.isDate(event.start, inSameDayAs: now) else {
+            return RowPill(text: dayLabel(event.start, calendar: calendar), isImminent: false)
+        }
+        return RowPill(text: countdown(to: event.start, now: now), isImminent: isImminent)
+    }
+
+    static func dayLabel(_ date: Date, calendar: Calendar) -> String {
+        date.formatted(calendar.formatStyle.weekday(.abbreviated).month(.abbreviated).day())
     }
 
     /// The menu bar names the time left once a meeting has been underway for five minutes.

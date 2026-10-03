@@ -25,8 +25,9 @@ export function Support() {
         Enjoying Tinycast?
       </h2>
       <p className="mx-auto mt-4 max-w-lg text-pretty text-body-lg text-fg-muted">
-        Tinycast is free and open source, and it stays that way. If you would
-        like to support its development, you can chip in. Entirely optional.
+        Tinycast is free and open source, and it will stay that way. If
+        you&apos;d like to support its development, you can contribute.
+        It&apos;s optional.
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Button href={site.support} size="lg">

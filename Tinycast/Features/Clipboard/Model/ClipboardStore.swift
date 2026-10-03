@@ -24,6 +24,18 @@ struct ClipboardItem: Identifiable, Hashable, Sendable {
     /// The referenced path, so no call site re-derives a file entry's meaning from `text`.
     var filePath: String? { kind == .file ? text : nil }
 
+    /// What Paste as Plain Text writes: the text, or a file's path in place of the file.
+    var plainText: String? { kind == .image ? nil : text }
+
+    /// Whether Copy Text (⇧⌘T) applies: a captured image, or an image file copied in Finder.
+    var offersTextExtraction: Bool {
+        switch kind {
+        case .image: return imagePath != nil
+        case .file: return filePath.map { ClipboardFileKind.of(path: $0) == .image } ?? false
+        case .text: return false
+        }
+    }
+
     init(text: String, sourceBundleID: String?) {
         self.init(
             id: UUID(), kind: .text, text: text, imagePath: nil, createdAt: Date(),
@@ -99,10 +111,11 @@ enum ClipboardRetention: Int, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// What ↵ does on a clipboard entry; ⌘↵ always does the other one.
+/// What ↵ does on a clipboard entry; Paste takes the chord the chosen action leaves free.
 enum ClipboardDefaultAction: String, CaseIterable, Identifiable, Sendable {
     case paste
     case copy
+    case pastePlainText
 
     var id: String { rawValue }
 
@@ -110,6 +123,46 @@ enum ClipboardDefaultAction: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .paste: return "Paste"
         case .copy: return "Copy to Clipboard"
+        case .pastePlainText: return "Paste as Plain Text"
+        }
+    }
+
+    /// What `chord` runs on `item` with this as the default; nil when it has no text to paste.
+    func action(for chord: ClipboardChord, on item: ClipboardItem) -> Self? {
+        let hasPlainText = item.plainText != nil
+        // An image has no text, so a plain-text default pastes it as it is.
+        let resolved: Self = self == .pastePlainText && !hasPlainText ? .paste : self
+        let action: Self =
+            switch chord {
+            case .return: resolved
+            case resolved.ownChord: .paste
+            case .command: .copy
+            case .controlCommand: .pastePlainText
+            }
+        return action == .pastePlainText && !hasPlainText ? nil : action
+    }
+
+    /// The chord an action answers while Paste is the default.
+    private var ownChord: ClipboardChord {
+        switch self {
+        case .paste: .return
+        case .copy: .command
+        case .pastePlainText: .controlCommand
+        }
+    }
+}
+
+/// The ↵ chords a default reorders; ⌥↵ always pastes, so it is not one of them.
+enum ClipboardChord: CaseIterable, Sendable {
+    case `return`
+    case command
+    case controlCommand
+
+    var label: String {
+        switch self {
+        case .return: "↵"
+        case .command: "⌘↵"
+        case .controlCommand: "⌃⌘↵"
         }
     }
 }
@@ -364,13 +417,27 @@ final class ClipboardStore {
         deleteBlob(item)
     }
 
+    /// A pin is a deliberate keep, so it outlives the bulk clear; `remove` is the way to drop one.
     func clearAll() {
         invalidateSearch()
         extractionGeneration = UUID()
-        if db != nil { sqlite3_exec(db, "DELETE FROM items", nil, nil, nil) }
-        try? FileManager.default.removeItem(at: imagesDir)
-        try? FileManager.default.createDirectory(at: imagesDir, withIntermediateDirectories: true)
-        items = []
+        // RETURNING hands back the deleted blobs in the same pass, so no separate SELECT is needed.
+        if db != nil,
+            let stmt = prepare("DELETE FROM items WHERE pinned_at IS NULL RETURNING image_path")
+        {
+            var orphaned: [String] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if let path = Self.columnString(stmt, 0), owns(path) { orphaned.append(path) }
+            }
+            sqlite3_finalize(stmt)
+            if !orphaned.isEmpty {
+                Task.detached(priority: .utility) {
+                    for path in orphaned { try? FileManager.default.removeItem(atPath: path) }
+                }
+            }
+        }
+        // Every pinned row is resident however old, so the window stays whole without a reload.
+        items = items.filter(\.isPinned)
     }
 
     @discardableResult
@@ -462,12 +529,12 @@ final class ClipboardStore {
 
     func imageURL(for item: ClipboardItem) -> URL? {
         guard let path = item.imagePath else { return nil }
-        return URL(fileURLWithPath: path)
+        return URL(filePath: path, directoryHint: .inferFromPath)
     }
 
     func fileURL(for item: ClipboardItem) -> URL? {
         guard let path = item.filePath else { return nil }
-        return URL(fileURLWithPath: path)
+        return URL(filePath: path, directoryHint: .inferFromPath)
     }
 
     /// Display order for `query` under `filter`: pinned entries first, each block newest-first.
@@ -495,6 +562,12 @@ final class ClipboardStore {
     func pinnedItem(at index: Int, in query: String, filter: ClipboardFilter) -> ClipboardItem? {
         guard index >= 0 else { return nil }
         return search(query, filter: filter).prefix(while: \.isPinned).dropFirst(index).first
+    }
+
+    /// Where a reset lands: past the pins to the newest clip, or on the first match once typed.
+    func landingIndex(in query: String, filter: ClipboardFilter) -> Int {
+        guard query.trimmingCharacters(in: .whitespaces).isEmpty else { return 0 }
+        return search(query, filter: filter).firstIndex { !$0.isPinned } ?? 0
     }
 
     private func unfiltered(_ q: String, filter: ClipboardFilter) -> [ClipboardItem] {

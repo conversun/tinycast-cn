@@ -24,34 +24,34 @@ export const defaultSwitches: DefaultSwitch[] = [
   {
     icon: "aiChat",
     name: "AI",
-    note: "No chat command and no history file until you turn it on.",
+    note: "The chat command and its history file don't exist until you turn AI on.",
     isOn: false,
   },
   {
     icon: "extensions",
     name: "Extensions",
-    note: "No folder scanned, no JavaScript engine running.",
+    note: "While off, no extension folder is read and no JavaScript engine runs.",
     isOn: false,
   },
   {
     icon: "snippets",
     name: "Snippets",
-    note: "The only feature that watches typing. Matching stays on your Mac.",
+    note: "The only feature that reads what you type. Matching happens on your Mac.",
     isOn: false,
   },
   {
     icon: "calendar",
     name: "Calendar",
-    note: "Explains what it reads before macOS asks. Events never leave.",
+    note: "Tells you what it reads before macOS asks for access. Events stay on your Mac.",
     isOn: false,
   },
   {
     icon: "clipboard",
     name: "Clipboard history",
-    note: "Kept on your Mac for 3 months. Skips Keychain Access and Passwords.",
+    note: "Stored on your Mac for 3 months. Ignores copies from Keychain Access and Passwords.",
     isOn: true,
   },
 ];
 
 export const permissionNote =
-  "Permissions are asked for the moment a feature needs one, never at launch. A settings backup can never switch on extensions or snippets.";
+  "Tinycast asks for a permission only when a feature first needs it, never at launch. Restoring a settings backup can't turn on extensions or snippets.";

@@ -70,12 +70,14 @@ struct NoteEditorView: NSViewRepresentable {
 
         func install(_ input: NoteEditorInput, resetUndo: Bool) {
             guard let textView else { return }
+            let wasEmpty = textView.textStorage?.length == 0
             self.input = input
             let selectionLocation = min(
                 textView.selectedRange().location,
                 (input.source as NSString).length)
             isInstalling = true
             textView.string = input.source
+            if wasEmpty != input.source.isEmpty { textView.needsDisplay = true }
             textView.setSelectedRange(NSRange(location: selectionLocation, length: 0))
             renderer.reset()
             isInstalling = false
@@ -107,6 +109,7 @@ struct NoteEditorView: NSViewRepresentable {
             reportFormatting()
             let source = textView.string
             guard source != input.source else { return }
+            if input.source.isEmpty != source.isEmpty { textView.needsDisplay = true }
             input = NoteEditorInput(id: input.id, source: source, epoch: input.epoch)
             parent.onSourceChange(source)
             reportCharacterCount()
@@ -205,7 +208,7 @@ struct NoteEditorView: NSViewRepresentable {
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
         textView.smartInsertDeleteEnabled = false
-        textView.usesFindPanel = true
+        textView.usesFindBar = true
         textView.allowsUndo = true
         textView.linkTextAttributes = [.foregroundColor: NSColor.linkColor, .cursor: NSCursor.pointingHand]
         textView.typingAttributes = NoteMarkdownStyler.literal

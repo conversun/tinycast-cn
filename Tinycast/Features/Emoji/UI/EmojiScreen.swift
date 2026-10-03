@@ -32,7 +32,7 @@ struct EmojiScreen: PaletteScreen {
     private var sections: [EmojiGridSection] {
         EmojiGrid.sections(
             query: vm.query, index: index, frequent: frequent, pinned: pinned,
-            filter: vm.emojiCategoryFilter)
+            filter: vm.emojiCategoryFilter, columns: columns)
     }
 
     /// Flat grid order across sections — what the selection indexes.
@@ -90,6 +90,23 @@ struct EmojiScreen: PaletteScreen {
     func zoom(_ zoom: EmojiGridZoom) {
         guard let next = columns.applying(zoom, default: defaultColumns) else { return }
         vm.emojiGridColumnsOverride = next == defaultColumns ? nil : next
+    }
+
+    /// Blind to the filter and query, so only a use or a density change rewrites it.
+    var frequentlyUsed: [String] {
+        EmojiGrid.frequentlyUsed(frequent, in: index, columns: columns).map(\.glyph)
+    }
+
+    func frequentlyUsedChanged(from old: [String], to new: [String]) {
+        guard isBrowsing else { return }
+        let start: Int
+        switch vm.emojiCategoryFilter {
+        case .all: start = visiblePins.count
+        case .frequentlyUsed: start = 0
+        case .pinned, .category: return
+        }
+        vm.selection = EmojiGridGeometry.selection(
+            vm.selection, afterSectionAt: start, changesFrom: old, to: new)
     }
 
     /// One visual row vertically, spilling into the neighbour by column; one cell horizontally.

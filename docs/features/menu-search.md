@@ -6,14 +6,19 @@ ranking runs in memory over it, and activating a row re-resolves the live elemen
 
 ## Invariants
 
-- **The target is frozen at open, and activation never retargets.** `MenuSearchCoordinator.show()`
-  captures `paletteCoordinator.targetApp` once, into `frozenApp`; `activate` re-resolves against that
-  app, not against whatever is frontmost by the time the user hits ↵. There is no app picker, so the
-  app whose icon every row paints is the only app a row can ever reach.
+- **The target is frozen at open, and activation never retargets.** `MenuSearchCoordinator.load()`
+  captures `paletteCoordinator.targetApp` once per open, into `frozenApp`; `activate` re-resolves
+  against that app, not against whatever is frontmost by the time the user hits ↵. There is no app
+  picker, so the app whose icon every row paints is the only app a row can ever reach.
+- **Every open walks anew, a restored one included.** `PaletteCoordinator.showPalette` calls
+  `load()` through `onScreenOpening` before the panel orders front, whether the command ran or a
+  re-summon inside the Pop to Root window brought the screen back — hiding dropped the snapshot, so
+  a restore that only re-filtered would list nothing. It runs before the show because `targetApp`
+  reads the frontmost app only while the panel is still hidden.
 - **The Apple menu is dropped by position, not by name.** `menuSearchShowsAppleMenu` ships **off**,
   and `MenuSnapshotPolicy.excludingAppleMenu` drops the menu bar's *first* item — the one slot macOS
   reserves for it — rather than matching a title that may localise. The flag is read once, in
-  `show()`, and rides into `startWalk` beside the pid: a snapshot always answers the question the
+  `load()`, and rides into `startWalk` beside the pid: a snapshot always answers the question the
   summon asked, whatever Settings says by the time the walk lands.
 - **Sections are runs of the snapshot, never a regrouping.** While browsing, `MenuSearchList` cuts
   the rows into consecutive runs of one top-level menu; the walk emits a menu's leaves contiguously,
@@ -38,11 +43,12 @@ ranking runs in memory over it, and activating a row re-resolves the live elemen
   bumps `revision`, and a landing walk that does not match it is discarded.
 - **The walk runs off-main, and holds no actor state.** `AXMenuAccess` is a pure `enum` of static
   functions driven by `Task.detached` from `MenuSearchSession`. There is no second actor.
-- **Accessibility is gated twice.** `Permissions.ensureAccessibility()` runs on show *and* on
+- **Accessibility is gated twice.** `Permissions.ensureAccessibility()` runs on open *and* on
   activate — a grant revoked while the palette is open must not reach `AXUIElementPerformAction`.
+  The open gate sits in both `show()` and `load()`, because a restore reaches `load()` alone.
 - **An excluded app is refused, never filtered.** `MenuSearchTarget.classify` answers `.excluded`
   from `AppSettings.menuSearchDisabledApps`, before the menu-bar test so an excluded accessory app
-  does not read as menu-less, and `show()` starts no walk at all. Filtering a walked snapshot would
+  does not read as menu-less, and `load()` starts no walk at all. Filtering a walked snapshot would
   still have read the menu, which is the whole thing the list exists to prevent.
 
 ## How it is put together

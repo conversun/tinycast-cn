@@ -1,0 +1,92 @@
+import Foundation
+
+/// Every key settings.json holds, in the order the file lists them; the raw value is its path.
+enum SettingsFileKey: String, CaseIterable, Sendable {
+    // Spelled out, so renaming a case can never rename a key in someone's file.
+    case showInMenuBar = "general.showInMenuBar"
+    case popToRootTimeout = "general.popToRootSeconds"
+    case escapeKeyBehavior = "general.escapeKeyBehavior"
+    case autoSwitchInputSource = "general.autoSwitchInputSource"
+    case supportReminders = "general.supportReminders"
+    case appearance = "appearance.theme"
+    case interfaceSize = "appearance.interfaceSize"
+    case compactMode = "appearance.compactMode"
+    case showFavoritesInCompactMode = "appearance.showFavoritesInCompactMode"
+    case openOnCursorScreen = "appearance.followCursorAcrossDisplays"
+    case paletteDraggable = "appearance.dragToReposition"
+    case hyperKey = "hyperKey.key"
+    case hyperKeyIncludesShift = "hyperKey.includesShift"
+    case hyperKeyQuickPress = "hyperKey.quickPress"
+    case calcNumberStyle = "calculator.numberStyle"
+    case launcherShowsSuggestions = "search.showsSuggestions"
+    case rootSearchSensitivity = "search.sensitivity"
+    case searchScopes = "applications.searchScopes"
+    case customCommandsEnabled = "commands.enabled"
+    case customCommandsShowInLauncher = "commands.showInLauncher"
+    case quicklinksEnabled = "quicklinks.enabled"
+    case quicklinksShowInLauncher = "quicklinks.showInLauncher"
+    case quicklinkOpensNewWindow = "quicklinks.opensNewWindow"
+    case quicklinkSelectionFallback = "quicklinks.selectionFallback"
+    case quicklinkConfirmsBeforeDelete = "quicklinks.confirmsBeforeDelete"
+    case appleShortcutsEnabled = "appleShortcuts.enabled"
+    case aiEnabled = "ai.enabled"
+    case aiWebSearch = "ai.webSearch"
+    case aiSystemPrompt = "ai.systemPrompt"
+    case aiSystemPromptEnabled = "ai.systemPromptEnabled"
+    case aiRetention = "ai.retentionDays"
+    case aiOpensTo = "ai.opensTo"
+    case aiNewChatAfter = "ai.newChatAfterMinutes"
+    case aiToolRounds = "ai.toolRounds"
+    case quickActionLanguage = "quickActions.targetLanguage"
+    case fileSearchEnabled = "fileSearch.enabled"
+    case fileSearchScopes = "fileSearch.scopes"
+    case fileSearchIgnorePatterns = "fileSearch.ignorePatterns"
+    case notesEnabled = "notes.enabled"
+    case notesRendersMarkdown = "notes.rendersMarkdown"
+    case notesShowsFormattingBar = "notes.showsFormattingBar"
+    case notesFolder = "notes.folder"
+    case snippetsShowInLauncher = "snippets.showInLauncher"
+    case snippetsFolder = "snippets.folder"
+    case navigationEnabled = "navigation.enabled"
+    case menuSearchShowsAppleMenu = "navigation.menuSearchShowsAppleMenu"
+    case menuSearchDisabledApps = "navigation.menuSearchDisabledApps"
+    case windowManagementEnabled = "windowManagement.enabled"
+    case windowManagementShowInLauncher = "windowManagement.showInLauncher"
+    case windowGap = "windowManagement.gap"
+    case windowCycle = "windowManagement.cycle"
+    case windowLayoutsShowInLauncher = "windowManagement.layoutsShowInLauncher"
+    case windowRoomsShowInLauncher = "windowManagement.roomsShowInLauncher"
+    case windowShortcuts = "windowManagement.shortcuts"
+    case customWindowSizes = "windowManagement.customSizes"
+    case windowLayouts = "windowManagement.layouts"
+    case windowRooms = "windowManagement.rooms"
+    case clipboardEnabled = "clipboard.enabled"
+    case clipboardRetention = "clipboard.retentionDays"
+    case clipboardDefaultAction = "clipboard.defaultAction"
+    case clipboardDisabledApps = "clipboard.disabledApps"
+    case emojiSkinTone = "emoji.skinTone"
+    case emojiGridColumns = "emoji.gridColumns"
+    case calendarShowInLauncher = "calendar.showInLauncher"
+    case calendarLauncherLimit = "calendar.launcherLimit"
+    case calendarSpan = "calendar.span"
+    case joinWindowMinutes = "calendar.joinWindowMinutes"
+    case autoJoinConfirms = "calendar.autoJoinConfirms"
+    case meetingBrowser = "calendar.meetingBrowser"
+    case calendarMenuBarDisplay = "calendar.menuBar"
+    case menuBarEvents = "calendar.menuBarUpcomingEvents"
+    case menuBarLinkedEventsOnly = "calendar.menuBarLinkedEventsOnly"
+    case calendarMenuBarHidesWhenEmpty = "calendar.menuBarHidesWhenEmpty"
+    case hideCurrentEvent = "calendar.hideCurrentEventAfterMinutes"
+    case extensionsShowInLauncher = "extensions.showInLauncher"
+
+    /// The top-level object the key sits in.
+    var section: String { String(rawValue.prefix { $0 != "." }) }
+
+    /// The key's name inside its section.
+    var name: String { String(rawValue.drop { $0 != "." }.dropFirst()) }
+
+    /// Every section, in file order.
+    static let sections: [String] = allCases.reduce(into: []) { sections, key in
+        if sections.last != key.section { sections.append(key.section) }
+    }
+}

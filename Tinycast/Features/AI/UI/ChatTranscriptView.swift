@@ -1,12 +1,31 @@
 import AppKit
 import SwiftUI
 
+/// Find in chat's matches and the one to show; the transcript marks them and scrolls to it.
+struct ChatFindHighlight: Equatable {
+    let query: String
+    let matches: Set<UUID>
+    let current: ChatFindOccurrence?
+}
+
+/// Where a transcript is drawn: the palette's scroll grammar is measured against its own bars.
+enum ChatSurface {
+    case palette
+    case window
+}
+
 struct ChatTranscriptView: View {
 
     @Environment(\.metrics) private var metrics
     let messages: [ChatMessage]
     let status: String?
     let usage: AIUsage?
+    let surface: ChatSurface
+    /// Offered on the last reply once it has finished; nil where a surface has no room for it.
+    var onRegenerate: (() -> Void)?
+    /// Answers with one of the last reply's choices; nil leaves them unshown.
+    var onChoose: ((String) -> Void)?
+    var find: ChatFindHighlight?
     /// Cleared when the reader scrolls up, so a streaming reply stops dragging them back down.
     @State private var followsTail = true
 
@@ -25,10 +44,17 @@ struct ChatTranscriptView: View {
                 // Not lazy: every anchored jump and the end test measure an estimated height
                 VStack(spacing: metrics.spacing.xl) {
                     ForEach(messages) { message in
+                        let isLast = message.id == messages.last?.id
                         ChatMessageView(
                             message: message,
-                            status: message.id == messages.last?.id ? status : nil
+                            status: isLast ? status : nil,
+                            onRegenerate: isLast && message.role == .assistant
+                                ? onRegenerate : nil,
+                            // Only the latest reply's choices still answer anything.
+                            onChoose: isLast && message.state == .complete ? onChoose : nil
                         )
+                        .equatable()
+                        .environment(\.chatTextHighlight, highlight(for: message.id))
                         .id(message.id)
                     }
                     if let total = usage?.totalTokens {
@@ -43,10 +69,16 @@ struct ChatTranscriptView: View {
                 }
                 .padding(.horizontal, metrics.spacing.xxl)
                 .padding(.top, metrics.spacing.xl)
-                .padding(.bottom, metrics.spacing.chatTranscriptBottom)
+                .padding(
+                    .bottom,
+                    surface == .palette ? metrics.spacing.chatTranscriptBottom : metrics.spacing.xl
+                )
+                .lineSpacing(metrics.spacing.chatLine)
+                // A window can be any width; a line of prose past this stops being readable.
+                .frame(maxWidth: surface == .window ? Theme.Size.aiChatReadingWidth : nil)
+                .frame(maxWidth: .infinity)
             }
-            .edgeDissolve()
-            .thinScrollbar()
+            .modifier(TranscriptScrollChrome(surface: surface))
             // Reopened chats start at the latest message; other anchor roles fight the reader.
             .defaultScrollAnchor(.bottom, for: .initialOffset)
             .onScrollGeometryChange(for: ScrollMark.self) { geometry in
@@ -65,6 +97,16 @@ struct ChatTranscriptView: View {
                 }
             }
             .onChange(of: messages.count) { follow(proxy, always: true) }
+            .onChange(of: find?.current) { _, current in
+                guard current != nil else { return }
+                followsTail = false
+                // Next turn: the text holding the match takes its anchor in this same update.
+                Task { @MainActor in
+                    withAnimation(.easeOut(duration: Theme.Duration.chatFooter)) {
+                        proxy.scrollTo(ChatTextHighlight.currentAnchor, anchor: .center)
+                    }
+                }
+            }
             .onChange(of: messages) { follow(proxy, always: false) }
             .onChange(of: usage) { follow(proxy, always: false) }
             .overlay(alignment: .bottom) {
@@ -80,10 +122,28 @@ struct ChatTranscriptView: View {
         }
     }
 
+    private func highlight(for id: UUID) -> ChatTextHighlight? {
+        guard let find, find.matches.contains(id) else { return nil }
+        return ChatTextHighlight(
+            query: find.query, current: find.current?.messageID == id ? find.current : nil)
+    }
+
     /// A sent message always comes into view; a growing reply only while the reader is at the end.
     private func follow(_ proxy: ScrollViewProxy, always: Bool) {
         guard always || followsTail else { return }
         proxy.scrollTo("ai-transcript-tail", anchor: .bottom)
+    }
+}
+
+/// The dissolve and thin bar are tuned to the palette's floating bars; a window scrolls natively.
+private struct TranscriptScrollChrome: ViewModifier {
+    let surface: ChatSurface
+
+    func body(content: Content) -> some View {
+        switch surface {
+        case .palette: content.edgeDissolve().thinScrollbar()
+        case .window: content
+        }
     }
 }
 
@@ -106,13 +166,28 @@ private struct ResumeFollowingButton: View {
     }
 }
 
-private struct ChatMessageView: View {
+/// Equatable, so a flush redraws only the changed reply; closures compare by presence alone.
+private struct ChatMessageView: View, @MainActor Equatable {
 
     @Environment(\.metrics) private var metrics
     let message: ChatMessage
     let status: String?
+    let onRegenerate: (() -> Void)?
+    let onChoose: ((String) -> Void)?
+    @Environment(\.chatTextHighlight) private var highlight
 
     @State private var hovered = false
+
+    /// The fence is the choices' carrier, never prose: it is left out of the text and the copy.
+    private var parts: (text: String, choices: [String]) {
+        message.role == .assistant ? ChatChoices.split(message.text) : (message.text, [])
+    }
+
+    /// Read only once the reply is done: a link half-streamed is not a source yet.
+    private var references: [ChatReference] {
+        guard message.role == .assistant, message.state != .streaming else { return [] }
+        return ChatReferences.extract(from: parts.text)
+    }
 
     var body: some View {
         HStack {
@@ -139,7 +214,8 @@ private struct ChatMessageView: View {
     private var footer: some View {
         HStack(spacing: metrics.spacing.sm) {
             if message.role == .user { timestamp }
-            ChatCopyButton(text: message.text)
+            ChatCopyButton(text: parts.text)
+            if let onRegenerate { RegenerateButton(action: onRegenerate) }
             if message.role == .assistant { timestamp }
         }
         .opacity(hovered ? 1 : 0)
@@ -155,7 +231,7 @@ private struct ChatMessageView: View {
 
     @ViewBuilder private var content: some View {
         if message.text.isEmpty, message.searches.isEmpty, message.toolUses.isEmpty,
-            message.state == .streaming
+            message.reasoning.isEmpty, message.state == .streaming
         {
             HStack(spacing: metrics.spacing.sm) {
                 ProgressView().controlSize(.small)
@@ -194,7 +270,9 @@ private struct ChatMessageView: View {
                     }
                 }
             }
-            if !message.text.isEmpty || !message.searches.isEmpty || !message.toolUses.isEmpty {
+            if !message.text.isEmpty || !message.searches.isEmpty || !message.toolUses.isEmpty
+                || !message.reasoning.isEmpty
+            {
                 rendered
             }
         }
@@ -203,20 +281,185 @@ private struct ChatMessageView: View {
     /// Only a reply is markdown — what the user typed is shown back exactly as they typed it.
     @ViewBuilder private var rendered: some View {
         if message.role == .assistant {
+            let references = references
+            let segments = message.segments
             VStack(alignment: .leading, spacing: metrics.spacing.lg) {
-                ForEach(Array(message.segments.enumerated()), id: \.offset) { _, segment in
-                    switch segment {
-                    case .text(let text):
-                        MarkdownView(blocks: MarkdownBlock.parse(text))
-                    case .search(let search):
-                        ChatSearchRow(search: search)
-                    case .tool(let use):
-                        ChatToolRow(use: use)
+                ForEach(Array(segments.enumerated()), id: \.offset) { offset, segment in
+                    Group {
+                        switch segment {
+                        case .text(let text):
+                            ChatMarkdownText(
+                                blocks: MarkdownBlock.parse(
+                                    ChatChoices.split(text).text,
+                                    midStream: message.isArriving(segmentAt: offset, of: segments.count)),
+                                failed: message.state == .failed)
+                        case .search(let search):
+                            ChatSearchRow(search: search)
+                        case .tools(let uses):
+                            ChatToolRun(uses: uses)
+                        case .reasoning(let block):
+                            ChatReasoningBlock(
+                                block: block,
+                                isThinking: message.state == .streaming && block.duration == nil)
+                        }
                     }
+                    .environment(\.chatFindPath, [offset])
+                }
+                if let onChoose, !parts.choices.isEmpty {
+                    ChatSuggestionChips(choices: parts.choices, onChoose: onChoose)
+                }
+                if !references.isEmpty { ChatSourcesView(references: references) }
+            }
+            .environment(\.chatCitations, ChatReferences.numbers(for: references))
+        } else {
+            Text(highlight?.attributed(message.text, leaf: [0]) ?? AttributedString(message.text))
+                .findAnchor(highlight, leaf: [0])
+        }
+    }
+}
+
+extension ChatMessageView {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.message == rhs.message && lhs.status == rhs.status
+            && (lhs.onRegenerate == nil) == (rhs.onRegenerate == nil)
+            && (lhs.onChoose == nil) == (rhs.onChoose == nil)
+    }
+}
+
+/// The pages a reply linked to, gathered under it the way a cited answer lists its sources.
+private struct ChatSourcesView: View {
+    @Environment(\.metrics) private var metrics
+    let references: [ChatReference]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: metrics.spacing.sm) {
+            Text("Sources")
+                .font(metrics.typography.rowTrailing.weight(.semibold))
+                .foregroundStyle(Theme.Colors.textTertiary)
+            ChatFlowLayout(spacing: metrics.spacing.sm) {
+                ForEach(Array(references.enumerated()), id: \.element) { index, reference in
+                    ChatSourceChip(index: index + 1, reference: reference)
                 }
             }
-        } else {
-            Text(message.text)
+        }
+        .padding(.top, metrics.spacing.xs)
+    }
+}
+
+private struct ChatSourceChip: View {
+    @Environment(\.metrics) private var metrics
+    let index: Int
+    let reference: ChatReference
+
+    var body: some View {
+        Button {
+            NSWorkspace.shared.open(reference.url)
+        } label: {
+            HStack(spacing: metrics.spacing.xs) {
+                Text("\(index)")
+                    .font(metrics.typography.keyCap)
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.Colors.textTertiary)
+                Text(reference.title)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: Theme.Size.chatSourceTitle, alignment: .leading)
+                    .fixedSize(horizontal: true, vertical: false)
+                if reference.title != reference.host {
+                    Text(reference.host)
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
+                }
+            }
+            .font(metrics.typography.rowTrailing)
+            .padding(.horizontal, metrics.spacing.xs)
+        }
+        .buttonStyle(.glass)
+        .help(reference.url.absoluteString)
+        .accessibilityLabel("Source \(index): \(reference.title), \(reference.host)")
+    }
+}
+
+private struct RegenerateButton: View {
+    @Environment(\.metrics) private var metrics
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.clockwise")
+                .font(metrics.typography.keyCap)
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .frame(width: metrics.size.chatMessageAction, height: metrics.size.chatMessageAction)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Regenerate Response")
+        .accessibilityLabel("Regenerate Response")
+    }
+}
+
+/// One stretch of thinking: folded by default, one click from being read, and opened by find.
+private struct ChatReasoningBlock: View {
+    @Environment(\.metrics) private var metrics
+    @Environment(\.chatTextHighlight) private var highlight
+    @Environment(\.chatFindPath) private var path
+    let block: ChatReasoning
+    let isThinking: Bool
+    @State private var expanded = false
+
+    private var title: String {
+        if isThinking { return "Thinking…" }
+        guard let duration = block.duration else { return "Thoughts" }
+        return "Thought for \(max(1, Int(duration.rounded())))s"
+    }
+
+    /// A match inside a folded block would be found and then invisible, so find unfolds it.
+    private var isOpen: Bool {
+        expanded
+            || highlight.map {
+                block.text.range(of: $0.query, options: [.caseInsensitive, .diacriticInsensitive])
+                    != nil
+            } == true
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: metrics.spacing.sm) {
+            Button {
+                withAnimation(.easeOut(duration: Theme.Duration.chatFooter)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: metrics.spacing.xs) {
+                    if isThinking {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: "brain")
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                    Text(title.localizedUI)
+                    Image(systemName: "chevron.right")
+                        .font(metrics.typography.keyCap)
+                        .rotationEffect(.degrees(isOpen ? 90 : 0))
+                }
+                .font(metrics.typography.rowTrailing)
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isOpen ? "Hide reasoning" : "Show reasoning")
+            if isOpen {
+                Text(highlight?.attributed(block.text, leaf: path) ?? AttributedString(block.text))
+                    .findAnchor(highlight, leaf: path)
+                    .font(metrics.typography.rowTrailing)
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, metrics.spacing.md)
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(Theme.Colors.border)
+                            .frame(width: metrics.size.markdownQuoteBar)
+                    }
+                    .transition(.opacity)
+            }
         }
     }
 }
@@ -265,6 +508,68 @@ struct ChatImageThumbnail: View {
         .frame(width: edge, height: edge)
         .clipShape(RoundedRectangle(cornerRadius: metrics.radius.row, style: .continuous))
         .task(id: image) { decoded = NSImage(data: image.data) }
+    }
+}
+
+/// Calls with nothing between them: the one running while live, then a count that opens to each.
+private struct ChatToolRun: View {
+    @Environment(\.metrics) private var metrics
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let uses: [ChatToolUse]
+    @State private var isExpanded = false
+
+    var body: some View {
+        if uses.count == 1, let use = uses.first {
+            ChatToolRow(use: use)
+        } else {
+            VStack(alignment: .leading, spacing: metrics.spacing.sm) {
+                if let running = uses.runningCall {
+                    ChatToolRow(use: running)
+                } else {
+                    Button {
+                        isExpanded.toggle()
+                    } label: {
+                        HStack(spacing: metrics.spacing.sm) {
+                            Image(
+                                systemName: uses.failedCount > 0
+                                    ? "exclamationmark.triangle" : "wrench.and.screwdriver"
+                            )
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(
+                                uses.failedCount > 0
+                                    ? Theme.Colors.destructive : Theme.Colors.textSecondary)
+                            Text(uses.completedLabel)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.down")
+                                .font(metrics.typography.disclosure)
+                                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                                .animation(
+                                    reduceMotion ? nil : Theme.MenuMotion.chevronAnimation,
+                                    value: isExpanded)
+                        }
+                        .font(metrics.typography.rowTrailing)
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(uses.completedLabel)
+                    .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+                    if isExpanded {
+                        VStack(alignment: .leading, spacing: metrics.spacing.sm) {
+                            ForEach(uses, id: \.callID) { use in
+                                ChatToolRow(use: use)
+                            }
+                        }
+                        .padding(.leading, metrics.spacing.xxl)
+                    }
+                }
+            }
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: Theme.Duration.chatFooter), value: uses
+            )
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: Theme.Duration.chatFooter), value: isExpanded)
+        }
     }
 }
 

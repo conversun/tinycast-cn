@@ -6,7 +6,7 @@ export const supportHero = {
   eyebrow: "Support",
   title: "Enjoying Tinycast?",
   intro:
-    "Tinycast is free and open source, and it stays that way. If it saves you time and you would like to support its development, you can chip in here. Entirely optional, and thank you either way.",
+    "Tinycast is free and open source, and it will stay that way. If it saves you time and you'd like to support its development, you can contribute here. It's optional, and thank you either way.",
 } as const;
 
 export const plans: { id: Plan; label: string }[] = [
@@ -22,20 +22,20 @@ export const reasonsLabel = "What you're supporting";
 export const supportReasons = [
   {
     title: "Independent",
-    body: "No investors, no ads, no upsell. Just an app made for the people who use it.",
+    body: "Tinycast has no investors, ads or paid tiers. It's made for the people who use it.",
   },
   {
     title: "Native",
-    body: "Built with Apple's own frameworks, for the current macOS. Fast, small and at home on your Mac.",
+    body: "Built with Apple's frameworks for the current version of macOS, so it's fast, small and feels like part of your Mac.",
   },
 ] as const;
 
 export const runningCosts =
-  "It also covers the running costs: the yearly Apple Developer Program membership, so releases can be properly signed and notarised, the tinycast.dev domain, and the tools and services behind it.";
+  "Your support also pays the running costs: the yearly Apple Developer Program membership needed to sign and notarize releases, the tinycast.dev domain, and the services the project uses.";
 
 export const thanks = {
   title: "Thank you.",
-  body: "That genuinely means a lot. It goes straight into making Tinycast better.",
+  body: "Your support goes straight into making Tinycast better.",
   next: {
     monthly: [
       "Polar has emailed your receipt.",
@@ -43,7 +43,7 @@ export const thanks = {
     ],
     "one-time": [
       "Polar has emailed your receipt.",
-      "That's it: one payment, nothing recurring.",
+      "This was a one-time payment, so nothing will renew.",
     ],
   },
   perks: {
@@ -53,7 +53,7 @@ export const thanks = {
     // Polar's customer portal for the tinycast organization; perks are claimed there.
     href: "https://polar.sh/tinycast/portal",
   },
-  share: "Want to help a little more? Tell a friend who lives in Spotlight.",
+  share: "Know someone who lives in Spotlight? Tell them about Tinycast.",
 } as const satisfies {
   title: string;
   body: string;

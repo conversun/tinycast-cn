@@ -1,0 +1,2059 @@
+😀|grinsendes gesicht,froh,fröhlich,gesicht,grinsen,haha,lachen,lol,lustig,smiley
+😃|grinsendes gesicht mit großen augen,augen,fröhlich,gesicht,glücklich,grinsen,große,lächeln,lachen,lol,lustig,mund,offen,smiley
+😄|grinsendes gesicht mit lachenden augen,augen,fröhlich,geschlossen,gesicht,glücklich,grinsen,lächeln,lachen,lustig,mund,offen,smiley,witzig
+😁|strahlendes gesicht mit lachenden augen,augen,fröhlich,gesicht,grinsen,lächeln,lachen,lustig,smiley,strahlen,zähne
+😆|grinsegesicht mit zugekniffenen augen,augen,geschlossen,gesicht,grinsegesicht,grinsen,hehe,hihi,lachen,lustig,mund,offen,smiley,witzig,zugekniffen,zusammengekniffen
+😅|grinsendes gesicht mit schweißtropfen,gesicht,grinsen,lächeln,lachen,lustig,mund,nervös,offen,schweiß,schweißtropfen,schwitzen,smiley
+🤣|sich vor lachen auf dem boden wälzen,boden,gesicht,lachen,lustig,muahaha,smiley,tränen,wälzen,witzig
+😂|gesicht mit freudentränen,freude,freudentränen,fröhlich,gesicht,hihi,lachen,lustig,muahaha,smiley,tränen,witzig
+🙂|leicht lächelndes gesicht,gesicht,lächeln,leicht,smiley
+🙃|umgekehrtes gesicht,auf dem kopf,gesicht,lächeln,smiley,stehen,umgekehrt
+🫠|schmelzendes gesicht,auflösen,beschämt,flüssig,gesicht,hitze,sarkasmus,sarkastisch,schmelzen,schwitzen,smiley,verschwinden
+😉|zwinkerndes gesicht,auge,flirten,gesicht,smiley,zudrücken,zugedrückt,zukneifen,zuzwinkern,zwinkern
+😊|lächelndes gesicht mit lachenden augen,augen,erröten,freude,freundlich,gesicht,glücklich,lächeln,lachen,rot,wangen
+😇|lächelndes gesicht mit heiligenschein,brav,engel,gesicht,glücklich,heiligenschein,lächeln,lieb,seelig,smiley
+🥰|lächelndes gesicht mit herzen,anhimmeln,bewundern,gesicht,hdgdl,hdl,herzchen,herzen,lächeln,lieb,liebe,smiley,verknallt,verliebt,verzückt
+😍|lächelndes gesicht mit herzförmigen augen,augen,gesicht,glücklich,herzen,herzförmig,lächeln,liebe,smiley,verliebt
+🤩|überwältigt,aufgeregt,augen,gesicht,grinsen,smiley,stern
+😘|kuss zuwerfendes gesicht,flirten,gesicht,kuss,küsschen,küssen,lieb,smiley,zuwerfen
+😗|küssendes gesicht,flirten,gesicht,hdl,knutsch,kuss,küssen,smiley
+☺️|lächelndes gesicht,fröhlich,gesicht,lächeln,rot,smiley,wangen
+😚|küssendes gesicht mit geschlossenen augen,geschlossen,gesicht,knutsch,kuss,küsschen,küssen,rot,smiley,ugen,wangen
+😙|küssendes gesicht mit lächelnden augen,augen,flirten,gesicht,knutsch,kuss,küssen,lächeln,smiley
+🥲|lachendes gesicht mit träne,berührt,dankbar,erleichtert,freudenträne,gerührt,gesicht,lächeln,stolz,träne
+😋|sich die lippen leckendes gesicht,gesicht,lächeln,lecker,leckeres essen,sich die lippen leckender smiley,smiley,zunge
+😛|gesicht mit herausgestreckter zunge,ätsch,bäh,gesicht,herausgestreckt,lachen,lustig,smiley,zunge
+😜|zwinkerndes gesicht mit herausgestreckter zunge,auge,gesicht,herausgestreckt,herausstrecken,smiley,zudrücken,zugedrückt,zunge,zwinkern
+🤪|irres gesicht,auge,augen,gesicht,groß,irre,klein,smiley,verrückt
+😝|gesicht mit herausgestreckter zunge und zusammengekniffenen augen,auge,augen,bäh,ekel,gesicht,herausgestreckt,herausstrecken,igitt,schmeck,schrecklich,smiley,zunge,zusammengekniffen,zusammenkneifen
+🤑|gesicht mit dollarzeichen,dollar,dollarzeichen,geld,gesicht,mund,smiley,zunge
+🤗|gesicht mit umarmenden händen,drücken,gesicht,hände,smiley,umarmen,umarmung
+🤭|verlegen kicherndes gesicht,gesicht,haha,hihi,huch,kichern,lachen,mund,rot,smiley,verlegen,wangen
+🫢|gesicht mit offenen augen und hand über dem mund,augen,erschrecken,erstaunen,furcht,geschockt,gesicht,mund,offen,schock,smiley,überraschung,unglauben,verlegenheit
+🫣|gesicht mit durch die finger linsendem auge,auge,finger,gebannt,gesicht,hervorlugen,linsen,schüchtern,smiley,spähen,starren,verlegen
+🤫|ermahnendes gesicht,ermahnen,finger,gesicht,leise,psst,pst,ruhe,ruhig,sch,smiley
+🤔|nachdenkendes gesicht,fragen,gesicht,grübeln,hm,komisch,nachdenken,nachdenklich,smiley,wundern
+🫡|salutierendes gesicht,aye,gesicht,jawohl,jawoll,militär,respekt,salutieren,smiley,zu befehl
+🤐|gesicht mit reißverschlussmund,geheimnis,gesicht,halten,mund,reißverschluss,schweigen,smiley,wahren
+🤨|gesicht mit hochgezogenen augenbrauen,argwöhnisch,augenbrauen,gesicht,hochgezogen,misstrauen,skeptisch,smiley,stutzig,zweifel
+😐|neutrales gesicht,ausdruckslos,gesicht,kommentarlos,smiley,todernst,unbeeindruckt
+😑|ausdrucksloses gesicht,ausdruckslos,gesicht,kommentarlos,selbstgefällig,smiley,unbeeindruckt,unglaublich
+😶|gesicht ohne mund,gesicht,kein,mund,ohne,smiley,sprachlos
+🫥|gestricheltes gesicht,depressiv,deprimiert,egal,gesicht,gestrichelt,introvertiert,smiley,traurig,unsichtbar,verschwinden,verstecken
+😶‍🌫️|gesicht in wolken,geistesabwesend,gesicht im nebel,kopf in wolken
+😏|süffisant lächelndes gesicht,feixen,flirten,gesicht,lächeln,mundwinkel,schief,smiley,süffisant
+😒|verstimmtes gesicht,gesicht,langweilig,smiley,traurig,unglücklich,unzufrieden,verstimmt
+🙄|augen verdrehendes gesicht,augen,genervt,gesicht,meinetwegen,nerv,ohje,rollen,smiley,verdrehen,verrollen
+😬|grimassen schneidendes gesicht,gesicht,grimasse,peinlich,schneiden,smiley,verziehen,zähne
+😮‍💨|gesicht das ausatmet,ausatmen,erleichtert,erschöpft,gesicht,husten,puh,pusten,schnaufen,seufz,seufzen
+🤥|lügendes gesicht,gesicht,lüge,nase,schwindel
+🫨|zitterndes doppelgesicht,doppelgesicht,erdbeben,gesicht,panik,schock,smiley,überrascht,verrückt,vibrieren,zittern
+🙂‍↔️|kopfschütteln,nein,schütteln
+🙂‍↕️|kopfnicken,ja,nicken
+😌|erleichtertes gesicht,augen,entspannt,erleichtert,geschlossen,gesicht,smiley,zufrieden
+😔|nachdenkliches gesicht,enttäuscht,gesicht,nachdenklich,schrecklich,smiley,traurig,verlieren,verloren
+😪|schläfriges gesicht,gesicht,gute,müde,nacht,schläfrig,smiley,traurig
+🤤|sabberndes gesicht,gesicht,sabbern,smiley
+😴|schlafendes gesicht,dösen,einschlafen,gähnen,gesicht,gute nacht,langweilig,mittagsschlaf,müde,nickerchen,schlaf,schlafen,smiley
+🫩|gesicht mit augenringen,augenringe,erschöpft,gesicht,müde,schläfrig,smiley,übermüdet
+😷|gesicht mit atemschutzmaske,arzt,atemschutzmaske,bazillen,erkältet,gesicht,krank,krankheit,mund,mundschutz,schutzmaske,smiley,viren,virus
+🤒|gesicht mit fieberthermometer,fieber,gesicht,krank,messen,smiley
+🤕|gesicht mit kopfverband,aua,autsch,gesicht,kopf,schmerzen,smiley,verband,verletzung
+🤢|würgendes gesicht,ekel,eklig,erbrechen,gesicht,grün,igitt,smiley,übelkeit,übergeben,widerlich,würgen
+🤮|kotzendes gesicht,brechen,erbrechen,gesicht,kotzen,krank,schlecht,smiley,speien,spucken,übel,übergeben
+🤧|niesendes gesicht,erkältet,erkältung,gesicht,grippe,hatschi,krank,nase,niesen,putzen,smiley,taschentuch
+🥵|schwitzendes gesicht,erhitzt,fieber,fiebrig,gesicht,heiß,herausstrecken,hitze,hitzschlag,rot,schnaufen,schwitzen,smiley,zunge
+🥶|frierendes gesicht,bibbern,blau,eisig,erfrieren,frieren,frösteln,frostig,gesicht,kalt,smiley,unter null,zähne,zähneklappern,zittern
+🥴|schwindeliges gesicht,angeheitert,angeschwipst,angetrunken,benebelt,berauscht,beschwipst,betrunken,gewellt,mund,schwindelig,schwindlig,smiley
+😵|benommenes gesicht,augen,benommen,gesicht,ko,krank,kreuze,schwindelig,schwindlig,smiley
+😵‍💫|gesicht mit spiralen als augen,augen,gesicht,höhenangst,hypnose,hypnotisiert,schwindelig,schwindlig,spiralen,verwirrt,wirr
+🤯|explodierender kopf,entsetzt,explodieren,geschockt,gesicht,kopf,schock,schockiert,smiley,überwältigt,unglaublich
+🤠|gesicht mit cowboyhut,cowboyhut,gesicht,hut,smiley
+🥳|partygesicht,aufgeregt,feier,fest,fröhlich,geburtstag,gesicht,glückwunsch,hurra,hut,smiley,überraschung
+🥸|verkleidet,brille,gesicht,inkognito,maske,nase,nasenbrille,smiley,spionieren,verdeckt,verkleidung
+😎|lächelndes gesicht mit sonnenbrille,gesicht,lächeln,smiley,sonnenbrille
+🤓|strebergesicht,brille,gesicht,klug,schlau,schlaumeier,smiley,streber
+🧐|gesicht mit monokel,elegant,gesicht,monokel,reich,smiley
+😕|verwundertes gesicht,gesicht,keine ahnung,smiley,traurig,verwirrt,verwundert,weiß nicht
+🫤|gesicht mit schrägem mund,enttäuscht,genervt,gesicht,hmpf,keine ahnung,langweilig,skeptisch,smiley,unsicher,zweifelnd
+😟|besorgtes gesicht,besorgt,gesicht,smiley,sorgen,traurig
+🙁|betrübtes gesicht,betrübt,gesicht,schade,smiley,traurig
+☹️|düsteres gesicht,deprimiert,düster,gesicht,smiley,stirnrunzelnd,traurig
+😮|gesicht mit offenem mund,erstaunt,gesicht,mund,offen,schockiert,unglaublich,vergessen
+😯|verdutztes gesicht,erstaunt,gesicht,smiley,sprachlos,verdutzt
+😲|erstauntes gesicht,erstaunt,gesicht,nee,schockiert,smiley,verwundert
+😳|errötetes gesicht mit großen augen,augen,erröten,gesicht,groß,peinlich,rot,scham,schämen,smiley,überrascht,verlegen,wangen
+🫪|verzerrtes gesicht,angst,ängstlich,aufgedunsen,besorgt,panik,panisch,schockiert,überrascht
+🥺|bettelndes gesicht,anflehen,augen,betteln,bettelnd,bitte,bitten,flehend,gesicht,groß,kulleraugen,smiley,traurig,welpenaugen
+🥹|gesicht das tränen zurückhält,aufgebracht,dankbar,freude,freudentränen,gerührt,gesicht,rührung,smiley,stolz,tränen,weinen,zurückhalten
+😦|entsetztes gesicht,entsetzt,gesicht,mund,offen,schockiert,smiley,verwundert
+😧|qualvolles gesicht,arm,gesicht,leidend,qualvoll,smiley,vergessen
+😨|ängstliches gesicht,angst,ängstlich,besorgt,gesicht
+😰|besorgtes gesicht mit schweißtropfen,angst,ängstlich,angstschweiß,besorgt,gesicht,mund,nervös,offen,schweiß
+😥|trauriges aber erleichtertes gesicht,ängstlich,enttäuscht,erleichtert,gesicht,knapp,schweiß,traurig
+😢|weinendes gesicht,gesicht,smiley,träne,traurig,weinen
+😭|heulendes gesicht,flennen,gesicht,heulen,schluchzen,smiley,tränen,tränenfluss,traurig,weinen
+😱|vor angst schreiendes gesicht,angst,ängstlich,gesicht,omg,panik,schrei,schreien,schreiend
+😖|verwirrtes gesicht,bestürzt,frustriert,gesicht,konfus,smiley,verwirrt,verzweifelt
+😣|entschlossenes gesicht,ausdauernd,durchhalten,fokus,gesicht,konzentration,konzentrieren,kopfschmerzen
+😞|enttäuschtes gesicht,enttäuscht,gesicht,leider,schade,smiley,traurig,verloren
+😓|bedrücktes gesicht mit schweiß,angstschweiß,augen,bedrückt,geschlossen,gesicht,kopfschmerzen,schweiß,smiley
+😩|erschöpftes gesicht,erschöpft,fehlschlag,gesicht,hungrig,müde,nein,smiley,unglücklich
+😫|müdes gesicht,gesicht,müde,niesen,smiley,traurig
+🥱|gähnendes gesicht,gähnen,gähnend,gelangweilt,gesicht,langweilig,müde,öde,schnarch,smiley
+😤|schnaubendes gesicht,erleichtert,gesicht,gewonnen
+😡|schmollendes gesicht,gesicht,rot,rot angelaufener smiley,wütend
+😠|verärgertes gesicht,ärgern,böse,gesicht,smiley,verärgert,wut,wütend,zornig
+🤬|gesicht mit symbolen über dem mund,ärger,ärgern,fluchen,gesicht,mund,schimpfen,schimpfwort,smiley,symbole,verdammt,wut,wütend,zensur
+😈|grinsendes gesicht mit hörnern,böse,dämon,dämonin,fantasie,grinsen,hörner,lila,märchen,satan,smiley,teufel,violett
+👿|wütendes gesicht mit hörnern,böse,dämon,dämonin,fantasie,gesicht,hörner,kobold,lila,märchen,satan,teufel,teufelchen,violett,wütend
+💀|totenkopf,gesicht,knochen,märchen,schädel,tod,tot
+☠️|totenkopf mit gekreuzten knochen,gekreuzt,gesicht,knochen,piratenflagge,schädel,tod,tot,totenkopf
+💩|kothaufen,kot,mist
+🤡|clown-gesicht,gesicht
+👹|ungeheuer,gesicht,gruselig,japan,japanisch,märchen,maske,oger
+👺|kobold,gemein,gesicht,japan,japanisch,märchen,maske,tengu,ungeheuer,wütend
+👻|gespenst,buh,geist,gesicht,gruselig,märchen,spuk,zunge
+👽|außerirdischer,all,außerirdisch,außerirdische,gesicht,märchen,weltraum,wesen
+👾|computerspiel-monster,gesicht
+🤖|roboter,gesicht,robotergesicht,roboterkopf
+😺|grinsende katze,gesicht,grinsen,katze,katzengesicht,lachen,lol,lustig,mund,offen,smiley,tier
+😸|grinsende katze mit lachenden augen,augen,gesicht,grinsen,katze,katzengesicht,lachen,smiley,tier
+😹|katze mit freudentränen,freude,freudentränen,gesicht,katze,katzengesicht,lachen,smiley,tier,tränen
+😻|lachende katze mit herzen als augen,augen,gesicht,herzaugen,herzen,katze,katzengesicht,lächeln,lachen,liebe,smiley,tier,verliebt
+😼|verwegen lächelnde katze,gesicht,grinsen,ironisch,katze,katzengesicht,lächeln,lachen,smiley,tier,verwegen
+😽|küssende katze,augen,geschlossen,gesicht,katze,katzengesicht,kuss,küsschen,küsse,küssen,rot,smiley,tier,wangen
+🙀|erschöpfte katze,angst,erschöpft,gesicht,katze,katzengesicht,panik,schock,schockiert,schrei,schreien,smiley,tier,überrascht
+😿|weinende katze,gesicht,katze,katzengesicht,smiley,tier,träne,traurig,weinen
+😾|schmollende katze,gesicht,katze,katzengesicht,schmollen,schmollmund,smiley,tier,verärgert
+🙈|sich die augen zuhaltendes affengesicht,affe,affengesicht,augen,böse,geheimnis,gemein,geste,nein,sehen,tier,verboten,vergessen,verstecken,zuhalten
+🙉|sich die ohren zuhaltendes affengesicht,affe,affengesicht,böse,geheimnis,gemein,geste,hören,nein,ohren,tier,verboten,zuhalten,zuhören
+🙊|sich den mund zuhaltendes affengesicht,affe,affengesicht,böse,geheimnis,gemein,geste,hand,heimlich,leise,mund,nein,sagen,sprechen,still,tier,ups,verboten,zuhalten
+💌|liebesbrief,brief,herz,liebe,post,siegel
+💘|herz mit pfeil,herz,liebe,pfeil
+💝|herz mit schleife,herz,hochzeitstag,jahrestag,küsschen,küsse,liebe,schleife,valentinstag
+💖|funkelndes herz,aufregung,funkeln,gefühl,glitzern,herz,liebe,morgen,nacht,rosa
+💗|wachsendes herz,aufregung,gefühl,herz,herzschlag,küsschen,küsse,liebe,nervös,nervosität,puls,wachsen
+💓|schlagendes herz,gefühl,herz,herzschlag,liebe,puls,pulsieren,schlagen
+💞|kreisende herzen,gefühl,herz,herzen,hochzeitstag,jahrestag,kreisen,liebe,süß
+💕|zwei herzen,gefühl,herz,herzen,hochzeitstag,jahrestag,küsschen,küsse,liebe,rendezvous,zwei
+💟|herzdekoration,deko,gefühl,herz,liebe,lila,violett,weiß
+❣️|herz als ausrufezeichen,ausrufezeichen,herz,satzzeichen
+💔|gebrochenes herz,allein,gebrochen,gefühl,herz,herzschmerz,liebeskummer,schmerz,traurig,trennung,zerbrochen
+❤️‍🔥|herz in flammen,brennendes herz,leidenschaft,liebe
+❤️‍🩹|herz mit verband,besserung,genesen
+❤️|rotes herz,herz
+🩷|pinkes herz,gefallen,gefällt,gefühl,herz,liebe,mag,mögen,niedlich,rosa,süß,verliebt
+🧡|oranges herz,herz,liebe
+💛|gelbes herz,gefühl,gelb,herz,herzlich,liebe
+💚|grünes herz,gefühl,grün,herz,liebe,romantisch
+💙|blaues herz,blau,gefühl,herz,liebe,romantisch
+🩵|hellblaues herz,aquamarin,gefallen,gefällt,gefühl,hdl,hellblau,herz,liebe,mag,mögen,niedlich,süß,türkis,zyan
+💜|lila herz,beste,gefühl,hdl,herz,liebe,lila,lilafarben,violett
+🤎|braunes herz,braun,herz
+🖤|schwarzes herz,böse,herz,schwarz
+🩶|graues herz,grau,hdl,herz,liebe,schieferfarben,silber,silberfarben
+🤍|weißes herz,herz,weiß
+💋|kussabdruck,gefühl,knutsch,kuss,küssen,liebe,lippen,lippenstift,romantisch
+💯|100 punkte,punktestand,volle punktzahl
+💢|ärger,wut
+🫯|kampfwolke,handgemenge,kampf,krawall,prügelei,rauferei,schlägerei,streit,wortgefecht
+💥|zusammenstoß,bombe,explodieren,explosion,kollidieren,kollision,zusammenstoßen
+💫|schwindlig,benommen,benommenheit,komet,stern,sterne,sternschnuppe
+💦|schweißtropfen,feucht,nass,schweiß,schwitzen,trainieren,training,tropfen,wasser
+💨|staubwolke,rennen,weglaufen
+🕳️|loch,schwarz
+💬|sprechblase mit drei punkten,gespräch,sprechblase,unterhaltung
+👁️‍🗨️|auge in sprechblase,auge,dialog,reden,sprechblase,sprechen,zeuge
+🗨️|sprechblase links,reden,sprechen,unterhaltung
+🗯️|sprechblase für wütende aussage rechts,sprechblase,wütend
+💭|gedankenblase,nachdenken
+💤|schlafen,buchstaben,gähn,langweilig,müde,nickerchen,öde,schlaf,schnarchen
+👋|winkende hand,auf wiedersehen,bis später,ciao,guten tag,hallo,tschüs,tschüss,winken
+🤚|erhobene hand von hinten,erhoben,erhobener handrücken
+🖐️|hand mit gespreizten fingern,5,fünf,gespreizt
+✋|erhobene hand,erhoben,halt,handfläche,high five,schlag ein,stopp,warte
+🖖|vulkanischer gruß,gruß,grüßen,hände,spreizen
+🫱|nach rechts weisende hand,ausgestreckt,ausstrecken,hände,händeschütteln,rechts,reichen,schütteln,weisen
+🫲|nach links weisende hand,ausgestreckt,ausstrecken,hände,händeschütteln,links,reichen,schütteln,weisen
+🫳|hand mit handfläche nach unten,abweisen,fallen lassen,fallenlassen,handfläche,handgeste,hau ab,unten,verscheuchen,wegscheuchen,wegschicken
+🫴|hand mit handfläche nach oben,anbieten,angebot,darbieten,einladen,entgegenstrecken,handfläche,handgeste,kommen,locken,oben,reichen
+🫷|nach links schiebende hand,drücken,high 5,high five,links,moment,nein,schieben,schluss,stopp,warte mal,warten
+🫸|nach rechts schiebende hand,drücken,high 5,high five,moment,nein,rechts,schieben,schluss,stopp,warte mal,warten
+👌|ok-zeichen,exzellent,finger,genial,in ordnung,natürlich,perfekt,super
+🤌|zusammengedrückte finger,bündelhand,finger,fingerspitzen,gehts noch,geste,handgeste,italienisch,was,zusammengedrückt,zusammengelegt
+🤏|wenig-geste,betrag,finger,gering,geste,klein,menge,unbedeutend,wenig,winzig
+✌️|victory-geste,sieg
+🤞|hand mit gekreuzten fingern,gekreuzt
+🫰|hand mit gekreuztem zeigefinger und daumen,daumen,fingerherz,gekreuzt,geld,handgeste,kosten,teuer,zeigefinger
+🤟|ich-liebe-dich-geste,drei,finger,geste,hdl,liebe
+🤘|teufelsgruß,corna,heavy,hörner,mano cornuta,metal,metalhand,pommesgabel,rock,teufel,yeah
+🤙|ruf-mich-an-handzeichen,anruf,anrufen,ruf
+👈|nach links weisender zeigefinger,handrückseite,links,weisen,zeigefinger,zeigen
+👉|nach rechts weisender zeigefinger,handrückseite,rechts,weisen,zeigefinger,zeigen
+👆|nach oben weisender zeigefinger von hinten,aufwärts,handrücken,handrückseite,hier,hinauf,melden,oben,rauf,weisen,zeigefinger,zeigen
+🖕|mittelfinger
+👇|nach unten weisender zeigefinger,abwärts,handrücken,handrückseite,hinab,hinunter,runter,unten,weisen,zeigefinger,zeigen
+☝️|nach oben weisender zeigefinger von vorne,handvorderseite,hier,melden,oben,weisen,zeigefinger,zeigen
+🫵|auf betrachter zeigender zeigefinger,deuten,du,fingerzeig,handgeste,sie,stupsen,zeigefinger,zeigen
+👍|daumen hoch,daumen,einverstanden,finger,gut,in ordnung,jawohl,klar,klasse,nach oben,ok,super,top
+👎|daumen runter,daumen,nach unten,schlecht
+✊|erhobene faust,erhoben,faust,kampf,solidarität
+👊|geballte faust,absolut,faust,geballt,korrekt,zustimmen
+🤛|faust nach links,faust,hand,nach links
+🤜|faust nach rechts,faust,hand,nach rechts
+👏|klatschende hände,applaudieren,applaus,beifall,gratulation,großartig,gut,hände,klatschen,klatschend,toll
+🙌|zwei erhobene handflächen,erhoben,feiern,geste,hände,handflächen,hurra,zwei
+🫶|hände die herz bilden,finger,geste,hände,händeherz,handgeste,handherz,hdl,herz,liebe
+👐|offene hände,hände,offen,umarmen,umarmung
+🤲|handflächen nach oben,beten,gebet,hand,hände,nach oben,zusammen
+🤝|handschlag,hände,händeschütteln,vereinbarung
+🙏|zusammengelegte handflächen,beten,betend,bitten,danke,danken,gebet,gefaltet,grüßen,handflächen,zusammengelegt
+✍️|schreibende hand,schreiben,schreibend,stift
+💅|nagellack,kosmetik,maniküre,nagel,nagelpflege
+🤳|smartphone
+💪|angespannter bizeps,bizeps,fitnessstudio,gewichtheben,muckies,muskeln,stark,training
+🦾|armprothese,barrierefreiheit,prothese
+🦿|beinprothese,barrierefreiheit,bein,prothese
+🦵|bein,extremität,fuß,gebeugtes knie,gliedmaße,knie,körperglied,körperteil,treten,tritt
+🦶|fuß,füße,knöchel,körperteil,stampfen,treten,tritt
+👂|ohr,hören,körperteil
+🦻|ohr mit hörgerät,barrierefreiheit,gehörlos,hilfsgerät,hörgerät,hörhilfe,ohr,schwerhörig,taub
+👃|nase,körperteil,riechen
+🧠|gehirn,hirn,intelligenz,klug,schlau
+🫀|herz (organ),anatomie,herz,herzschlag,körper,körperteil,mensch,puls,schlagen
+🫁|lunge,atem,atmen,ausatmen,einatmen,körper,körperteil,lungenflügel,mensch
+🦷|zahn,perlweiß,weiß,zahnarzt,zahnärztin,zähne
+🦴|knochen,hund,hundeknochen,kauknochen,skelett
+👀|augen,auge,gesicht,gucken,schauen,sehen
+👁️|auge,blick,körper,körperteil,schauen,sehen
+👅|zunge,ätsch,hmm,körperteil,lecken,lecker,mmh
+👄|mund,körperteil,kuss,lippen,lippenstift
+🫦|auf lippe beißen,angst,ängstlich,beißen,besorgt,flirten,flirtend,kuss,lippenstift,mund,nervös,unbehaglich,zähne
+👶|gesicht,jung,kind,kleinkind,locke
+🧒|kind,enkelkind,jung,jünger,munter,strahlend
+👦|junge,enkelsohn,gesicht,jung,jünger,kind,munter,sohn,strahlend
+👧|mädchen,enkeltochter,gesicht,jung,jünger,kind,munter,strahlend,tochter
+🧑|erwachsen,erwachsene person,mensch
+👱|person: blondes haar,blondhaarig,gesicht,mensch
+👨|mann,erwachsen,gesicht
+🧔|person: bart,bart,bärtig,schnurrbart
+🧔‍♂️|mann: bart,bart,mann,mann mit bart
+🧔‍♀️|frau: bart,bart,frau,frau mit bart
+👨‍🦰|mann: rotes haar,erwachsen,gesicht,mann,rotes haar
+👨‍🦱|mann: lockiges haar,erwachsen,gesicht,lockiges haar,mann
+👨‍🦳|mann: weißes haar,erwachsen,gesicht,mann,weißes haar
+👨‍🦲|mann: glatze,erwachsen,gesicht,glatze,mann
+👩|frau,erwachsen,gesicht
+👩‍🦰|frau: rotes haar,erwachsen,frau,gesicht,rotes haar
+🧑‍🦰|person: rotes haar,erwachsen,erwachsene person,mensch,rotes haar
+👩‍🦱|frau: lockiges haar,erwachsen,frau,gesicht,lockiges haar
+🧑‍🦱|person: lockiges haar,erwachsen,erwachsene person,lockiges haar,mensch
+👩‍🦳|frau: weißes haar,erwachsen,frau,gesicht,weißes haar
+🧑‍🦳|person: weißes haar,erwachsen,erwachsene person,mensch,weißes haar
+👩‍🦲|frau: glatze,erwachsen,frau,gesicht,glatze
+🧑‍🦲|person: glatze,erwachsen,erwachsene person,glatze,mensch
+👱‍♀️|frau: blond,blonde frau,frau,gesicht,haar
+👱‍♂️|mann: blond,blonder mann,gesicht,haar,mann
+🧓|ältere person,alt,älter,erwachsen,großeltern,mensch,weise
+👴|älterer mann,alt,älter,erwachsen,großeltern,großvater,mann,mensch,opa,senior,weise
+👵|ältere frau,alt,älter,erwachsen,frau,großeltern,großmutter,mensch,oma,seniorin,weise
+🙍|missmutige person,frustriert,gesicht,missmutig,runzeln,stirnrunzelnd,unzufrieden,verärgert
+🙍‍♂️|missmutiger mann,frustriert,gesicht,mann,missmutig,runzeln,stirnrunzelnd,unzufrieden,verärgert
+🙍‍♀️|missmutige frau,frau,frustriert,gesicht,missmutig,runzeln,stirnrunzelnd,unzufrieden,verärgert
+🙎|schmollende person,eingeschnappt,enttäuscht,jammerd,jammern,schmollen,schmollend,verärgert
+🙎‍♂️|schmollender mann,eingeschnappt,enttäuscht,jammerd,jammern,mann,schmollen,schmollend,verärgert
+🙎‍♀️|schmollende frau,eingeschnappt,enttäuscht,frau,jammerd,jammern,schmollen,schmollend,verärgert
+🙅|person mit überkreuzten armen,arme,gesicht,nein,nicht,überkreuzt,verbieten,verboten
+🙅‍♂️|mann mit überkreuzten armen,arme,gesicht,mann,nein,nicht,überkreuzt,verbieten,verboten
+🙅‍♀️|frau mit überkreuzten armen,arme,frau,gesicht
+🙆|person mit händen auf dem kopf,geste,hände,oje,über kopf,übung
+🙆‍♂️|mann mit händen auf dem kopf,geste,hände,mann,oje,über kopf,übung
+🙆‍♀️|frau mit händen auf dem kopf,frau,geste,hände,oje,über kopf,übung
+💁|infoschalter-mitarbeiter(in),abgekippt,beleidigen,gerüchte,geste,klatsch,klatschen,sarkasmus,sarkastisch,tratsch,tratschen
+💁‍♂️|infoschalter-mitarbeiter,abgekippt,beleidigen,gerüchte,geste,klatsch,klatschen,mann,sarkasmus,sarkastisch,tratsch,tratschen
+💁‍♀️|infoschalter-mitarbeiterin,auskunft,frau,informationen
+🙋|person mit erhobenem arm,aufzeigen,drankommen,drannehmen,frage,geste,heben,hier,ich,sich melden,wissen
+🙋‍♂️|mann mit erhobenem arm,aufzeigen,drankommen,drannehmen,frage,geste,heben,hier,ich,mann,sich melden,wissen
+🙋‍♀️|frau mit erhobenem arm,aufzeigen,drankommen,drannehmen,frage,frau,geste,heben,hier,ich,sich melden,wissen
+🧏|gehörlose person,barrierefreiheit,gehörlos,hören,ohr,schwerhörig,taub
+🧏‍♂️|gehörloser mann,gehörlos,mann,taub
+🧏‍♀️|gehörlose frau,frau,gehörlos,taub
+🙇|sich verbeugende person,bedauern,bitten,demut,entschuldigung,geste,kniefall,meditieren,unterwerfen,verbeugen,verzeihung
+🙇‍♂️|sich verbeugender mann,demut,mann,verbeugen
+🙇‍♀️|sich verbeugende frau,bedauern,bitten,demut,entschuldigung,frau,geste,kniefall,meditieren,unterwerfen,verbeugen,verzeihung
+🤦|sich an den kopf fassende person,fassen,frustriert,genervt,gesicht,kopf,oh nein,unfassbar,unglaublich,verzweifelt
+🤦‍♂️|sich an den kopf fassender mann,fassen,frustriert,genervt,gesicht,kopf,mann,oh nein,unfassbar,unglaublich,verzweifelt
+🤦‍♀️|sich an den kopf fassende frau,fassen,frau,frustriert,genervt,gesicht,kopf,oh nein,unfassbar,unglaublich,verzweifelt
+🤷|schulterzuckende person,egal,gleichgültig,keine ahnung,schultern zucken,schulterzuckend,weiß nicht,zweifel
+🤷‍♂️|schulterzuckender mann,egal,gleichgültig,keine ahnung,mann,schultern zucken,schulterzuckend,weiß nicht,zweifel
+🤷‍♀️|schulterzuckende frau,egal,frau,gleichgültig,keine ahnung,schultern zucken,schulterzuckend,weiß nicht,zweifel
+🧑‍⚕️|arzt/ärztin,arztkittel,doktor(in)
+👨‍⚕️|arzt,arztkittel,doktor,krankenpfleger,pfleger
+👩‍⚕️|ärztin,arztkittel,doktor,krankenschwester,pflegerin
+🧑‍🎓|student(in),absolvent(in),doktorhut,uni
+👨‍🎓|absolvent,diplom,doktorhut,uni
+👩‍🎓|studentin,abschluss,absolventin,diplom,doktorhut,uni
+🧑‍🏫|lehrer(in),dozent(in),professor(in)
+👨‍🏫|lehrer,dozent,mann,tafel
+👩‍🏫|lehrerin,dozentin,frau,professorin
+🧑‍⚖️|richter(in),waage
+👨‍⚖️|richter,gerechtigkeit,mann,recht
+👩‍⚖️|richterin,frau,gerechtigkeit,recht
+🧑‍🌾|bauer/bäuerin,farmer(in),gärtner(in),landwirt(in)
+👨‍🌾|bauer,ähre,gärtner,landwirt
+👩‍🌾|bäuerin,ähre,farmerin,gärtnerin,landwirtin
+🧑‍🍳|koch/köchin,kochen
+👨‍🍳|koch,kochen,restaurant
+👩‍🍳|köchin,kochen
+🧑‍🔧|mechaniker(in),elektriker(in),klempner(in)
+👨‍🔧|mechaniker,elektriker,handwerker,klempner,mann
+👩‍🔧|mechanikerin,elektrikerin,frau,handwerkerin,klempnerin
+🧑‍🏭|fabrikarbeiter(in),arbeiter(in),fabrik,industriell,montage
+👨‍🏭|fabrikarbeiter,fabrik,helm
+👩‍🏭|fabrikarbeiterin,fabrik,frau,helm
+🧑‍💼|büroangestellte(r),architekt(in),manager(in),schlips und kragen
+👨‍💼|büroangestellter,angestellter,büro,mann
+👩‍💼|büroangestellte,angestellte,büro,frau,managerin,mangerin
+🧑‍🔬|wissenschaftler(in),forscher(in),labor
+👨‍🔬|wissenschaftler,chemie,forscher,labor
+👩‍🔬|wissenschaftlerin,forscherin,frau,labor
+🧑‍💻|it-experte/it-expertin,bildschirm,entwickler(in)
+👨‍💻|it-experte,arbeit,bildschirm,büro,entwickler,mann,office
+👩‍💻|it-expertin,arbeit,bildschirm,büro,entwickler,entwicklerin,frau,laptop,office
+🧑‍🎤|sänger(in),entertainer(in)
+👨‍🎤|sänger,mann,mikrofon,popstar,schauspieler
+👩‍🎤|sängerin,frau,mikrofon,popstar,schauspielerin
+🧑‍🎨|künstler(in),farbpalette,maler(in)
+👨‍🎨|künstler,farbpalette,maler,mann
+👩‍🎨|künstlerin,farbpalette,frau,malerin
+🧑‍✈️|pilot(in),flugzeug
+👨‍✈️|flugzeug,mann
+👩‍✈️|pilotin,flieger,flugzeug,frau
+🧑‍🚀|astronaut(in),raumfahrt,weltraum
+👨‍🚀|mann,raumfahrt,weltraum
+👩‍🚀|astronautin,frau,raumfahrt,weltraum
+🧑‍🚒|feuerwehrmann/-frau,feuerwehrhelm
+👨‍🚒|feuerwehrmann,feuerwehr,feuerwehrhelm,mann
+👩‍🚒|feuerwehrfrau,feuerwehrhelm,frau
+👮|polizist(in),beruf,festnehmen,gesetzeshüter,gesicht,person,polizei,polizist,polizistin,uniform,verhaften
+👮‍♂️|polizist,mann,polizei
+👮‍♀️|polizistin,beruf,festnehmen,frau,gesetzeshüterin,person,polizei,uniform,verhaften
+🕵️|detektiv(in),detektiv,lupe,sherlock,spion
+🕵️‍♂️|detektiv,mann,spion
+🕵️‍♀️|detektivin,frau,spionage,spionin
+💂|wache,bärenfellmütze,buckingham palace,gesicht,wachfrau,wachmann,wachsoldat,wachsoldatin,wächter
+💂‍♂️|wachsoldat,buckingham palace,wache
+💂‍♀️|wachsoldatin,buckingham palace,helm,palast,wache,wächter
+🥷|ausdauer,geheimmission,kämpfer,killer,krieger,kunoichi,mörder,shinobi,soldat,vermummt
+👷|bauarbeiter(in),arbeit,bau,bauarbeiter,bauarbeiterin,beruf,gesicht,helm,schutzhelm,umbauen
+👷‍♂️|bauarbeiter,baustelle,helm
+👷‍♀️|bauarbeiterin,bauarbeiter,baustelle,frau,helm,mann
+🫅|person mit krone,adelig,könig,königin,königlich,königliche hoheit,krönung,monarchin,prinz,prinzessin
+🤴|prinz,krone
+👸|prinzessin,gesicht,krone,märchen
+👳|person mit turban,bart,dreitagebart
+👳‍♂️|mann mit turban,gesicht,mann
+👳‍♀️|frau mit turban,frau,gesicht
+👲|mann mit chinesischem hut,china,chinesisch,gesicht,hut,kappe,mütze
+🧕|frau mit kopftuch,frau,hidschab,kopftuch,person,tuch
+🤵|person im smoking,anzug,bräutigam,formell,mann,smoking,vornehm
+🤵‍♂️|mann im smoking,mann,smoking
+🤵‍♀️|frau im smoking,frau,smoking
+👰|person mit schleier,braut,braut mit schleier,gesicht,hochzeit,schleier
+👰‍♂️|mann mit schleier,mann,schleier
+👰‍♀️|frau mit schleier,frau,schleier
+🤰|schwangere frau,frau,schwanger
+🫃|schwangerer mann,aufgebläht,bauch,dick,person,schwanger,überfressen,zu viel gegessen
+🫄|schwangere person,aufgebläht,bauch,dick,dicker bauch,schwanger,schwangerschaft,überfressen,zu viel gegessen
+🤱|stillen,brust,frau,person
+👩‍🍼|frau die baby die flasche gibt,eltern,flasche geben,flasche gebende frau,frau,füttern,mama,milch,mutter,neugeborenes,person,säugling
+👨‍🍼|mann der baby die flasche gibt,flasche geben,flasche gebender mann,füttern,mann
+🧑‍🍼|person die baby die flasche gibt,flasche geben,flasche gebende person
+👼|putte,engel,gesicht,kind,märchen
+🎅|weihnachtsmann,weihnachten
+🤶|weihnachtsfrau,weihnachten
+🧑‍🎄|weihnachtsperson,gesicht,gesicht mit hut,person,santa claus,weihnachten,weihnachtsfrau,weihnachtshut,weihnachtsmann,weihnachtsmütze
+🦸|superheld(in),held,person,superheld,superheldin,superkraft,superkräfte,superman,übermensch,umhang
+🦸‍♂️|superheld,held
+🦸‍♀️|heldin,superheldin
+🦹|bösewicht,böse,bösewichtin,krimineller,person,schurke,schurkin,superkräfte,superschurke,superschurkin,verbrecher
+🦹‍♂️|männlicher bösewicht,böse,bösewicht
+🦹‍♀️|weiblicher bösewicht,böse,bösewicht
+🧙|magier(in),hexe,hexenmeister,magier,magiker,person,zauberer,zauberin,zaubern,zauberspruch,zauberstab
+🧙‍♂️|magier,hexenmeister,zauberer
+🧙‍♀️|magierin,hexe,zauberin
+🧚|märchenfee,elf,elfe,fee,flügel,geflügelt,märchen,mystisch,wesen
+🧚‍♂️|männliche fee,zauberer
+🧚‍♀️|fee
+🧛|vampir,blutsauger,person,reißzähne,untot,untoter,zähne
+🧛‍♂️|männlicher vampir,dracula,untoter
+🧛‍♀️|weiblicher vampir,untoter
+🧜|wassermensch,märchen,meerjungfrau,meermann,nixe,person,sirene,wasserfrau,wassermann
+🧜‍♂️|wassermann
+🧜‍♀️|meerjungfrau,nixe,wasserfrau
+🧝|elf(e),elbe,elben,elbin,elfe,herr der ringe,magie,magisch,person
+🧝‍♂️|alb,elbe,magisch
+🧝‍♀️|elfe,elbin,magisch
+🧞|flaschengeist,aladdin,aladin,dschinn,lampe,person,wunderlampe,wünsche
+🧞‍♂️|männlicher flaschengeist,dschinn
+🧞‍♀️|weiblicher flaschengeist,dschinn
+🧟|apokalypse,person,untot,untoter,walking dead,wandelnder toter
+🧟‍♂️|männlicher zombie,untoter,wandelnder toter
+🧟‍♀️|weiblicher zombie,untote,wandelnde tote
+🧌|gruslig,kobold,märchen,ork,ungeheuer
+🫈|haariges wesen,fabelwesen,gigant,haarig,kryptid,riese,wald,wilder mann
+💆|person die eine kopfmassage bekommt,behandlung,die eine kopfmassage bekommt,entspannen,kopfmassage,kopfschmerzen,migräne,therapie
+💆‍♂️|mann der eine kopfmassage bekommt,der eine kopfmassage bekommt,entspannen,kopfmassage,kopfschmerzen,mann
+💆‍♀️|frau die eine kopfmassage bekommt,behandlung,entspannen,entspannend,frau,gesicht,kopf,kopfmassage,kopfschmerzen,kopfweh,lindern,relaxen,therapie,verspannung
+💇|person beim haareschneiden,friseur,friseurin,friseuse,frisör,frisörin,frisur,haare,haarschnitt,schere
+💇‍♂️|mann beim haareschneiden,friseur,frisur,haarschnitt,mann,salon,schere
+💇‍♀️|frau beim haareschneiden,frau,friseur,haarschnitt,schere
+🚶|fußgänger(in),fußgänger,fußgängerin,gehen,gehend,schlendern,schlurfen,wandern
+🚶‍♂️|fußgänger,gehen,mann,spaziergang
+🚶‍♀️|fußgängerin,frau,gehen,schlendern,spazieren,spaziergang
+🚶‍➡️|fußgänger(in): nach rechts,fußgänger,fußgänger(in),fußgängerin,gehen,gehend,nach,rechts,schlendern,schlurfen,wandern
+🚶‍♀️‍➡️|fußgängerin: nach rechts,frau,fußgängerin,gehen,nach,rechts,schlendern,spazieren,spaziergang
+🚶‍♂️‍➡️|fußgänger: nach rechts,fußgänger,gehen,mann,nach,rechts,spaziergang
+🧍|stehende person,mensch,stehen
+🧍‍♂️|stehender mann,mann,stehen
+🧍‍♀️|stehende frau,frau,stehen
+🧎|kniende person,fersensitz,knien,kniend,meditation,meditieren,mensch,seiza,zazen
+🧎‍♂️|kniender mann,kniend,mann
+🧎‍♀️|kniende frau,frau,kniend
+🧎‍➡️|kniende person: nach rechts,fersensitz,knien,kniend,kniende person,meditation,meditieren,mensch,nach,rechts,seiza,zazen
+🧎‍♀️‍➡️|kniende frau: nach rechts,frau,kniend,kniende frau,nach,rechts
+🧎‍♂️‍➡️|kniender mann: nach rechts,kniend,kniender mann,mann,nach,rechts
+🧑‍🦯|person mit langstock,barrierefreiheit,person mit blindenstock
+🧑‍🦯‍➡️|person mit langstock: nach rechts,barrierefreiheit,nach,person mit blindenstock,person mit langstock,rechts
+👨‍🦯|mann mit langstock,barrierefreiheit,behinderung,mann,mann mit blindenstock,mann mit gehstock,mensch,person,sehbehindert
+👨‍🦯‍➡️|mann mit langstock: nach rechts,barrierefreiheit,behinderung,mann,mann mit blindenstock,mann mit gehstock,mann mit langstock,mensch,nach,person,rechts,sehbehindert
+👩‍🦯|frau mit langstock,barrierefreiheit,behinderung,frau,frau mit blindenstock,frau mit gehstock,mensch,person
+👩‍🦯‍➡️|frau mit langstock: nach rechts,barrierefreiheit,behinderung,frau,frau mit blindenstock,frau mit gehstock,frau mit langstock,mensch,nach,person,rechts
+🧑‍🦼|person in elektrischem rollstuhl,barrierefreiheit,rollstuhl
+🧑‍🦼‍➡️|person in elektrischem rollstuhl: nach rechts,barrierefreiheit,nach,person in elektrischem rollstuhl,rechts,rollstuhl
+👨‍🦼|mann in elektrischem rollstuhl,barrierefreiheit,behinderung,mann,mann in rollstuhl,mensch,person,rollstuhl
+👨‍🦼‍➡️|mann in elektrischem rollstuhl: nach rechts,barrierefreiheit,behinderung,mann,mann in elektrischem rollstuhl,mann in rollstuhl,mensch,nach,person,rechts,rollstuhl
+👩‍🦼|frau in elektrischem rollstuhl,barrierefreiheit,behinderung,frau,frau in rollstuhl,mensch,person,rollstuhl
+👩‍🦼‍➡️|frau in elektrischem rollstuhl: nach rechts,barrierefreiheit,behinderung,frau,frau in elektrischem rollstuhl,frau in rollstuhl,mensch,nach,person,rechts,rollstuhl
+🧑‍🦽|person in manuellem rollstuhl,barrierefreiheit,rollstuhl
+🧑‍🦽‍➡️|person in manuellem rollstuhl: nach rechts,barrierefreiheit,nach,person in manuellem rollstuhl,rechts,rollstuhl
+👨‍🦽|mann in manuellem rollstuhl,barrierefreiheit,behinderung,mann,mann in rollstuhl,mensch,person,rollstuhl
+👨‍🦽‍➡️|mann in manuellem rollstuhl: nach rechts,barrierefreiheit,behinderung,mann,mann in manuellem rollstuhl,mann in rollstuhl,mensch,nach,person,rechts,rollstuhl
+👩‍🦽|frau in manuellem rollstuhl,barrierefreiheit,behinderung,frau,frau in rollstuhl,mensch,person,rollstuhl
+👩‍🦽‍➡️|frau in manuellem rollstuhl: nach rechts,barrierefreiheit,behinderung,frau,frau in manuellem rollstuhl,frau in rollstuhl,mensch,nach,person,rechts,rollstuhl
+🏃|laufende person,eilig,joggen,laufen,läufer,läuferin,rennen,schnell,sport
+🏃‍♂️|laufender mann,joggen,jogger,laufen
+🏃‍♀️|laufende frau,athlet,athletin,frau,joggen,joggerin,laufen,läufer,läuferin,rennen,renner,rennerin,rennt,schell
+🏃‍➡️|laufende person: nach rechts,eilig,joggen,laufen,laufende person,läufer,läuferin,nach,rechts,rennen,schnell,sport
+🏃‍♀️‍➡️|laufende frau: nach rechts,athlet,athletin,frau,joggen,joggerin,laufen,laufende frau,läufer,läuferin,nach,rechts,rennen,renner,rennerin,rennt,schell
+🏃‍♂️‍➡️|laufender mann: nach rechts,joggen,jogger,laufen,laufender mann,nach,rechts
+🧑‍🩰|balletttänzerin,ballett,tänzerin
+💃|tanzende frau,festlich,frau,schwung,tanz,tanzen,tänzerin
+🕺|tanzender mann,festlich,mann,schwung,tanz,tanzen,tänzer
+🕴️|schwebender mann im anzug,anzug,geschäftlich,mann
+👯|personen mit hasenohren,bunnys,doppelt,hasenohren,leute,person,seelenverwandt,tanzen,tänzerinnen,zwillinge
+👯‍♂️|männer mit hasenohren,bunnys,hasenohren,männer,tanzen,zwillinge
+👯‍♀️|frauen mit hasenohren,bunnys,frauen,hasenohren
+🧖|person in dampfsauna,abschalten,dampfbad,dampfsauna,entspannen,frau,luxuriös,relaxen
+🧖‍♂️|mann in dampfsauna,dampfsauna
+🧖‍♀️|frau in dampfsauna,dampfsauna
+🧗|bergsteiger(in),bergsteiger,fels,kletterer,klettern,sport
+🧗‍♂️|bergsteiger
+🧗‍♀️|bergsteigerin,bergsteiger
+🤺|fechter(in),fechten,fechter,schwert,sport
+🏇|pferderennen,jockey auf pferd,schnell,um die wette,wetten
+⛷️|skifahrer(in),schnee,skifahrer,skifahrerin,sport
+🏂|snowboarder(in),snowboarden,snowboarderin
+🏌️|golfer(in),abschlagplatz,golfer,golferin,golfspieler,golfspielerin,sport,sportler,sportlerin
+🏌️‍♂️|golfer,golfen,golfspieler,mann
+🏌️‍♀️|golferin,frau,golfen,golfspielerin
+🏄|surfer(in),surfboard,surfbrett,surfen,surferin,wassersport,wellenreiten,wellenreiter,wellenreiterin
+🏄‍♂️|mann,wellenreiten
+🏄‍♀️|surferin,frau,strand,surfbrett,wellen,wellenreiten
+🚣|person im ruderboot,angeln,boot,kanu,paddel,ruderboot,rudern,sport
+🚣‍♂️|mann im ruderboot,boot,mann,rudern
+🚣‍♀️|frau im ruderboot,boot,bootfahrerin,frau,ruder,ruderin,rudern,see
+🏊|schwimmer(in),kraulen,pool,schwimmbecken,schwimmen,schwimmer,schwimmerin,wasser
+🏊‍♂️|schwimmer,kraulen,pool,schwimmbad,schwimmen
+🏊‍♀️|schwimmerin,frau,kraulen,pool,schwimmbad,schwimmen
+⛹️|person mit ball,basketballer,basketballspieler,basketballspielerin,dribbeln,sport,sportler,sportlerin
+⛹️‍♂️|mann mit ball,ballsport,handball,mann
+⛹️‍♀️|frau mit ball,ballsport,basketballspieler,frau,handball,sport
+🏋️|gewichtheber(in),gewicht,gewichtheber,gewichtheberin,hantel,muskeln,schwer,sport,stark,training
+🏋️‍♂️|gewichtheber,gewicht heben,mann
+🏋️‍♀️|gewichtheberin,frau,gewicht heben,gewichte heben,gewichteheberin
+🚴|radfahrer(in),fahrrad,rad,radeln,radfahren,radfahrer,radfahrerin,tour de france
+🚴‍♂️|radfahrer,fahrrad,mann,rad
+🚴‍♀️|radfahrerin,fahrrad,fahrradfahrerin,frau,frauen,rad,radeln,radlerin
+🚵|mountainbiker(in),fahrrad,mountainbiker,mountainbikerin,mountainbiking,rad,radfahren,radfahrer,radfahrerin,tour de france
+🚵‍♂️|mountainbiker,fahrrad,mann,mountainbike,rad
+🚵‍♀️|mountainbikerin,fahrrad,fahrradfahrerin,frau,mountain bike,mountain bikerin,mountainbike,rad,radeln,radfahrerin
+🤸|rad schlagende person,akrobatik,bodenturnen,gymnastik,rad,rad schlagen,radschlag,sport,turner,turnerin
+🤸‍♂️|rad schlagender mann,akrobatik,bodenturnen,gymnastik,mann,person,rad,rad schlagen,radschlag,sport,turner
+🤸‍♀️|rad schlagende frau,akrobatik,bodenturnen,frau,gymnastik,person,rad,rad schlagen,radschlag,sport,turnerin
+🤼|ringer(in),catchen,catcher,person,ringen,ringer,ringkampf,sport,sportler,wrestler
+🤼‍♂️|ringende männer,catchen,catcher,männer,ringen,ringer,ringkampf,sport,wrestler
+🤼‍♀️|ringende frauen,catchen,catcherin,person,ringen,ringer,ringerin,ringkampf,sport,wrestlerin
+🤽|wasserballspieler(in),schwimmsport,sportler,sportlerin,wasser,wasserball,wasserballspieler,wasserballspielerin,wassersport
+🤽‍♂️|wasserballspieler,mann,person,schwimmsport,sportler,wasser,wasserball,wassersport
+🤽‍♀️|wasserballspielerin,ballspiele,frau,person,schwimmsport,sportlerin,wasser,wasserball,wassersport
+🤾|handballspieler(in),handballer,handballerin,handballspieler,handballspielerin,schleudern,sportler,werfen
+🤾‍♂️|handballspieler,mann
+🤾‍♀️|handballspielerin,frau,handballerin,person,schleudern,sportlerin,werfen
+🤹|jongleur(in),artist,artistin,geschickt,jongleur,jongleurin,jongleuse,jonglieren,multitasking,zirkus
+🤹‍♂️|jongleur,artist,entertainer,geschickt,jonglieren,mann,multitasking,person,unterhalter,zirkus
+🤹‍♀️|jongleurin,frau,geschickt,jonglieren,multitasking
+🧘|person im lotossitz,burmesischer sitz,frau,lotussitz,person in lotussitz,schneidersitz
+🧘‍♂️|mann im lotossitz
+🧘‍♀️|frau im lotossitz
+🛀|badende person,bad,baden,badewanne,badezimmer,dusche,entspannen
+🛌|im bett liegende person,bett,gute nacht,heia,müde,nachtruhe,schlaf schön,schlafen
+🧑‍🤝‍🧑|sich an den händen haltende personen,händchen halten,hände,hände halten,menschen,paar,pärchen,personen
+👭|händchen haltende frauen,frauen,händchen halten,paar,pärchen aus frau und frau
+👫|mann und frau halten hände,frau,händchen halten,mann,paar,pärchen aus frau und mann
+👬|händchen haltende männer,händchen halten,männer,paar,pärchen aus mann und mann,zwillinge
+💏|sich küssendes paar,frau,herz,kuss,küssen,küssendes paar,mann
+👩‍❤️‍💋‍👨|sich küssendes paar: frau mann,frau,herz,kuss,küssen,küssendes paar,mann,sich küssendes paar
+👨‍❤️‍💋‍👨|sich küssendes paar: mann mann,frau,herz,kuss,küssen,küssendes paar,mann,sich küssendes paar
+👩‍❤️‍💋‍👩|sich küssendes paar: frau frau,frau,herz,kuss,küssen,küssendes paar,mann,sich küssendes paar
+💑|liebespaar,frau,herz,liebe,mann,paar
+👩‍❤️‍👨|liebespaar: frau mann,frau,herz,liebe,liebespaar,mann,paar
+👨‍❤️‍👨|liebespaar: mann mann,frau,herz,liebe,liebespaar,mann,paar
+👩‍❤️‍👩|liebespaar: frau frau,frau,herz,liebe,liebespaar,mann,paar
+👨‍👩‍👦|familie: mann frau und junge,familie,frau,junge,kind,mann,mutter,vater
+👨‍👩‍👧|familie: mann frau und mädchen,familie,frau,junge,kind,mädchen,mann,mutter,vater
+👨‍👩‍👧‍👦|familie: mann frau mädchen und junge,familie,frau,junge,kind,mädchen,mann,mutter,vater
+👨‍👩‍👦‍👦|familie: mann frau junge und junge,familie,frau,junge,kind,mann,mutter,vater
+👨‍👩‍👧‍👧|familie: mann frau mädchen und mädchen,familie,frau,junge,kind,mädchen,mann,mutter,vater
+👨‍👨‍👦|familie: mann mann und junge,familie,junge,kind,mann,mutter,vater
+👨‍👨‍👧|familie: mann mann und mädchen,familie,junge,kind,mädchen,mann,mutter,vater
+👨‍👨‍👧‍👦|familie: mann mann mädchen und junge,familie,junge,kind,mädchen,mann,mutter,vater
+👨‍👨‍👦‍👦|familie: mann mann junge und junge,familie,junge,kind,mann,mutter,vater
+👨‍👨‍👧‍👧|familie: mann mann mädchen und mädchen,familie,junge,kind,mädchen,mann,mutter,vater
+👩‍👩‍👦|familie: frau frau und junge,familie,frau,junge,kind,mutter,vater
+👩‍👩‍👧|familie: frau frau und mädchen,familie,frau,junge,kind,mädchen,mutter,vater
+👩‍👩‍👧‍👦|familie: frau frau mädchen und junge,familie,frau,junge,kind,mädchen,mutter,vater
+👩‍👩‍👦‍👦|familie: frau frau junge und junge,familie,frau,junge,kind,mutter,vater
+👩‍👩‍👧‍👧|familie: frau frau mädchen und mädchen,familie,frau,junge,kind,mädchen,mutter,vater
+👨‍👦|familie: mann junge,familie,junge,kind,mann,mutter,vater
+👨‍👦‍👦|familie: mann junge und junge,familie,junge,kind,mann,mutter,vater
+👨‍👧|familie: mann mädchen,familie,junge,kind,mädchen,mann,mutter,vater
+👨‍👧‍👦|familie: mann mädchen und junge,familie,junge,kind,mädchen,mann,mutter,vater
+👨‍👧‍👧|familie: mann mädchen und mädchen,familie,junge,kind,mädchen,mann,mutter,vater
+👩‍👦|familie: frau junge,familie,frau,junge,kind,mutter,vater
+👩‍👦‍👦|familie: frau junge und junge,familie,frau,junge,kind,mutter,vater
+👩‍👧|familie: frau mädchen,familie,frau,junge,kind,mädchen,mutter,vater
+👩‍👧‍👦|familie: frau mädchen und junge,familie,frau,junge,kind,mädchen,mutter,vater
+👩‍👧‍👧|familie: frau mädchen und mädchen,familie,frau,junge,kind,mädchen,mutter,vater
+🗣️|sprechender kopf,gesicht,kopf,sprechen,sprechend,sprechende person
+👤|silhouette einer büste,büste,person
+👥|silhouette mehrerer büsten,büsten,personen
+🫂|sich umarmende personen,abschied,danke,drücken,drücker,freundschaft,hallo,liebe,tschüss,umarmung
+👪|familie,junge,kind,mutter,vater
+🧑‍🧑‍🧒|familie: 2 erwachsene 1 kind,erwachsene,erwachsener,familie,kind
+🧑‍🧑‍🧒‍🧒|familie: 2 erwachsene 2 kinder,erwachsene,erwachsener,familie,kind
+🧑‍🧒|familie: 1 erwachsene(r) 1 kind,erwachsene,erwachsener,familie,kind
+🧑‍🧒‍🧒|familie: 1 erwachsene(r) 2 kinder,erwachsene,erwachsener,familie,kind
+👣|fußabdrücke,abdruck,auf dem weg,fuß,fußabdruck
+🫆|fingerabdruck,forensik,identität,sicherheit
+🐵|affengesicht,affe,banane,dschungel,gesicht,tier,zoo
+🐒|affe,tier
+🦍|affe,gesicht,tier
+🦧|orang-utan,affe,tier
+🐶|hundegesicht,gesicht,hund,tier,treu,wau,wuff
+🐕|hund,haustier,tier,wau,wuff
+🦮|blindenhund,barrierefreiheit,behinderung,hund,sehbehindert,tier
+🐕‍🦺|assistenzhund,assistenz,barrierefreiheit,behinderung,hund,tier
+🐩|pudel,hund,tier
+🐺|gesicht,tier,wolfsgesicht
+🦊|fuchs,fuchsgesicht,gesicht,tier
+🦝|waschbär,klug,neugierig,schlau,tier
+🐱|katzengesicht,gesicht,katze,miau,miez,miezekatze,tier
+🐈|katze,haustier,miau,tier
+🐈‍⬛|schwarze katze,kater,katze,miau,pech,schwarz,schwarzer kater,tier,unglück
+🦁|löwe,gesicht,löwengesicht,sternzeichen,tier,tierkreis
+🐯|tigergesicht,gesicht,raubkatze,tier
+🐅|tier
+🐆|gepunktet,punkte,raubkatze,raubtier,tier
+🐴|pferdegesicht,gesicht,pferd,pferdekopf,tier
+🫎|elch,geweih,säugetier,tier
+🫏|esel,austreten,dickschädel,dummkopf,maultier,säugetier,störrisch,stur,tier
+🐎|pferd,rennen,rennpferd,tier
+🦄|einhorn,einhorngesicht,gesicht
+🦓|streifen,tier
+🦌|hirsch,gesicht,tier
+🦬|büffel,herde,ochse,tier
+🐮|kuhgesicht,gesicht,kuh,tier
+🐂|ochse,kuh,sternzeichen,stier,tier,tierkreis
+🐃|wasserbüffel,büffel,tier,wasser
+🐄|kuh,bauernhof,muh,tier
+🐷|schweinegesicht,gesicht,schwein,tier
+🐖|schwein,bauernhof,sau,tier
+🐗|wildschwein,eber,schwein,tier
+🐽|schweinerüssel,nase,schwein,tier
+🐏|widder,schaf,sternzeichen,tierkreis
+🐑|schaf,bock,mäh,tier,widder,wolle
+🐐|ziege,steinbock,sternzeichen,tier,tierkreis
+🐪|dromedar,einhöckrig,kamel,tier,wüste
+🐫|kamel,tier,wüste,zweihöckrig
+🦙|lama,alpaka,anden,kamel,tier,wolle
+🦒|flecken,tier
+🐘|elefant,tier
+🦣|mammut,aussterben,groß,natur,stoßzahn,tier,wollig
+🦏|nashorn,rhinozeros,tier
+🦛|nilpferd,flusspferd,tier
+🐭|mäusegesicht,gesicht,maus,mausgesicht,nagetier,tier
+🐁|maus,nage,tier
+🐀|ratte,nagetier,tier
+🐹|gesicht,hamstergesicht,tier
+🐰|hasengesicht,gesicht,hase,kaninchen,karnickel,langohr,mümmelmann,nager,nagetier,tier
+🐇|hase,kaninchen,karnickel,mümmelmann,nagetier,tier
+🐿️|streifenhörnchen,tier
+🦫|biber,biberschwanz,biberzahn,damm,natur,otter,tier
+🦔|igel,stachelig,stacheln,tier
+🦇|fledermaus,tier,vampir
+🐻|bär,bärengesicht,gesicht,tier
+🐻‍❄️|eisbär,arktis,nordpol,weiß
+🐨|koalabär,koalagesicht,tier
+🐼|gesicht,pandabär,pandagesicht,tier
+🦥|faultier,faul,langsam,tier,träge
+🦦|fischen,tier,verspielt
+🦨|stinktier,stinken,tier
+🦘|känguru,australien,beuteltier,down under,hüpfen,quokka,skippy,springen,tier,wallaby
+🦡|dachs,dachse,frechdachs,honigdachs,ratel,tier
+🐾|tatzenabdrücke,abdruck,tatzen,tier
+🦃|truthahn,geflügel,pute
+🐔|huhn,geflügel,henne,tier,tierkopf
+🐓|hahn,tier
+🐣|schlüpfendes küken,ei,küken,küken in eierschale,piep,schlüpfen,tier,vogel
+🐤|küken,kükenkopf,tier
+🐥|küken von vorne,geflügel,küken,küken in frontansicht,tier
+🐦|vogel,papagei,taube,tier,vogelkopf
+🐧|pinguin,pinguinkopf,tier,vogel
+🕊️|taube,fliegen,friede,frieden,friedenstaube,vogel
+🦅|adler,tier,vogel
+🦆|ente,tier,vogel
+🦢|schwan,hässliches entlein,tier,vogel
+🦉|eule,raubvogel,tier,uhu,vogel,weise
+🦤|aussterben,dronte,groß,mauritius,natur,tier,vogel
+🪶|feder,federleicht,federn,fliegen,gefieder,leicht,vogelfeder
+🦩|bunt,farbenfroh,rosa,tier,tropen,tropisch,vogel
+🦚|pfau,bunt,stolz,stolzieren,tier,vogel
+🦜|papagei,ausplaudern,pirat,plappern,sprechen,tier,vogel,wiederholen
+🪽|flügel,engel,engelsflügel,federn,fliegen,flug,himmlisch,mythologie,vogel
+🐦‍⬛|schwarzer vogel,amsel,krächzen,krähe,rabe,schnabel,schwarz,tier,vogel
+🪿|gans,blöd,dumm,dumme gans,gänserich,ganter,geflügel,schnattern,tier,vogel
+🐦‍🔥|phönix,asche,fabelwesen,feuer,feuervogel,reinkarnation,tier,vogel,wiedergeburt
+🐸|frosch,froschgesicht,gesicht,grün,quak,tier
+🐊|krokodil,reptil,schnappi,tier
+🐢|schildkröte,tier
+🦎|eidechse,reptil
+🐍|schlange,schlangenträger,sternzeichen,tier,tierkreis
+🐲|drachengesicht,drache,gesicht,märchen,tier
+🐉|drache,chinesisch neujahr,märchen,tier
+🦕|sauropode,dino,dinosaurier,saurier
+🦖|dino,dinosaurier,saurier,tree,tyrannosaurus rex
+🐳|blasender wal,meer,ozean,tier,wal
+🐋|wal,ozean,tier
+🐬|delfin,meer,ozean,strand,tier
+🫍|meer,meeressäuger,meerestier,orka,ozean,wal
+🦭|seehund,meer,ozean,robbe,seelöwe,tier
+🐟|fisch,aquarium,fische,meehr,sternzeichen,tier,tierkreis
+🐠|tropenfisch,fisch,tier
+🐡|kugelfisch,fisch,kugelrund,meer,tier
+🦈|hai,fisch,haifisch,meer,tier
+🐙|oktopus,krake,meer,tier,tintenfisch
+🐚|schneckenhaus,muschel,strand,tier
+🪸|koralle,great barrier reef,klimawandel,korallenriff,meer,ozean,riff,tier
+🪼|qualle,autsch,brennen,gallert,glibber,meer,meeresbewohner,meerestier,nesseltier,ozean,tentakeln
+🦀|krebs,krabbe,meer,sternzeichen,strand,tierkreis
+🦞|hummer,meeresfrucht,meeresfrüchte,meerestier,scheren,tier
+🦐|garnele,gourmet,krustentier,meeresfrucht
+🦑|tintenfisch,kalmar,tier
+🦪|auster,meer,muschel,perle,tauchen,tier
+🐌|schnecke,langsam,tier
+🦋|schmetterling,insekt,schön
+🐛|raupe,gefräßig,insekt,tier
+🐜|ameise,insekt,tier
+🐝|biene,honig,honigbiene,hummel,insekt,maja,natur,summ,tier
+🪲|käfer,insekt,krabbeltier,minzkäfer,tier,wanze
+🐞|marienkäfer,glückskäfer,insekt,käfer,krabbel,punkte,tier
+🦗|grille,grashüpfer,heuschrecke,insekt,tier,zikade
+🪳|kakerlake,insekt,käfer,krabbeln,krabbeltier,küchenschabe,la cucaracha,schabe,tier
+🕷️|spinne,insekt,tier
+🕸️|spinnennetz,netz,spinne
+🦂|skorpion,horoskop,sternzeichen,tierkreis
+🦟|mücke,biss,fieber,insekt,insektenbiss,insektenstich,krankheit,moskito,schnake,stechmücke,stich,tier
+🪰|fliege,fliegen,insekt,krankheit,made,mücke,plage,schmeißfliege,tier,verwesen
+🪱|wurm,insekt,natur,parasit,regenwurm,ringelwurm,tier
+🦠|mikrobe,amöbe,amöben,bakterie,bakterien,einzeller,medizin,wissenschaft
+💐|blumenstrauß,blumen
+🌸|kirschblüte,blume,blüte,kirsche,pflanze
+💮|blumenstempel,blume
+🪷|lotusblüte,blume,buddhismus,erleuchtung,gleichmut,hinduismus,liebe,lotosblume,pflanze,reinheit,ruhe,schönheit
+🏵️|pflanze
+🌹|blume,blüte,pflanze
+🥀|welke blume,am sterben,blume,sterbend,verwelkt,welk,welkende blume
+🌺|hibiskus,blume,blüte,pflanze,rosa
+🌻|sonnenblume,blume,blüte,pflanze,sonne
+🌼|gelbe blüte,blume,blüte,pflanze
+🌷|tulpe,blume,blüte,pflanze
+🪻|hyazinthe,blaue wiesenlupine,blühen,blume,blüte,frühling,lavendel,lila,löwenmaul,pflanze,violett
+🌱|spross,junge pflanze
+🪴|topfpflanze,dekor,grünpflanze,haus,pflanze,pflegen,wachsen,zimmerpflanze
+🌲|nadelbaum,baum,pflanze,tannenbaum
+🌳|laubbaum,baum,blätter,grün,laub,pflanze,wald
+🌴|palme,baum,kokusnuss,oase,pflanze,strand,tropen
+🌵|kaktus,dürre,natur,pflanze,trockenzeit,wüste
+🌾|reisähre,ähre,pflanze,reis,reispflanze
+🌿|kräuter,blätter,pflanze
+☘️|kleeblatt,grün,pflanze
+🍀|glücksklee,blatt,glück,klee,kleeblatt,pflanze,silverster,vier,vierblättrig,vierblättriges kleeblatt
+🍁|ahornblatt,ahorn,blatt,herbst,laub,pflanze
+🍂|laub,blatt,blätter,fallendes laub,herbst,pflanze
+🍃|blätter im wind,blatt,blätter,laub,pflanze
+🪹|leeres nest,heim,nestbau,nisten,vogelnest,zuhause
+🪺|nest mit eiern,heim,nest mit blauen eiern,nestbau,nisten,vogelnest,zuhause
+🍄|fliegenpilz,giftig,pilz
+🪾|kahler baum,dürr,kahl,karg,trocken
+🍇|trauben,frucht,obst,traube,wein
+🍈|honigmelone,frucht,melone,obst
+🍉|wassermelone,frucht,melone,obst,wasser
+🍊|mandarine,apfelsine,frucht,obst
+🍋|zitrone,frucht,obst,sauer,zitrusfrucht
+🍋‍🟩|limette,essen,frucht,obst,saft,sauer,tropisch,zitrusfrucht
+🍌|banane,frucht,obst,schale
+🍍|ananas,frucht,obst
+🥭|essen,frucht,früchte,obst,shaker,tropisch
+🍎|roter apfel,apfel,frucht,obst,rot
+🍏|grüner apfel,apfel,frucht,gesund,grün,obst
+🍐|birne,frucht,obst
+🍑|pfirsich,frucht,obst
+🍒|kirschen,frucht,kirsche,obst
+🍓|erdbeere,beere,essen,frucht,obst
+🫐|blaubeeren,beere,blau,blaubeere,essen,frucht,heidelbeere,heidelbeeren,lebensmittel,nahrung,obst
+🥝|frucht,obst
+🍅|tomate,essen,gemüse,obst
+🫒|essen,grün,lebensmittel,nahrung,olivenöl,olivenzweig,zweig
+🥥|kokosnuss,essen,frucht,palme
+🥑|essen,frucht
+🍆|gemüse
+🥔|kartoffel,essen,gemüse
+🥕|karotte,gemüse,möhre,mohrrübe
+🌽|maiskolben,gemüse,mais
+🌶️|peperoni,chili,paprika,pfeffer,pflanze,scharf
+🫑|paprika,essen,gemüse,gemüsepaprika,grün,lebensmittel,nahrung,peperoni
+🥒|gurke,essen,gemüse,scheiben
+🥬|blattgemüse,blattgrün,essen,gemüse,grünkohl,grünzeug,kohl,kraut,mangold,pak choi,pok choi,salat,salatblatt,spinat
+🥦|brokkoli,essen,gemüse,gemüsekohl,kohl
+🧄|knoblauch,essen,geschmack,lebensmittel,nahrung,würze,zutat
+🧅|zwiebel,essen,geschmack,gewürz,lebensmittel,nahrung,würze
+🥜|erdnuss,essen
+🫘|bohnen,bohne,essen,gemüse,hülsenfrucht,kidney-bohne,kidneybohne,lebensmittel
+🌰|kastanie,marone
+🫚|ingwer,gesund,gewürz,ginger ale,ingwerbier,scharf,wurzel,würzig
+🫛|erbsenschote,bohne,erbse,erbsen,essen,gemüse,hülsenfrucht,hülsenfrüchte,schote
+🍄‍🟫|brauner pilz,braun,essen,gemüse,lebensmittel,natur,pflanze,pilz,wald
+🫜|wurzelgemüse,bete,garten,gemüse,rote bete,rübe,wurzel
+🍞|brot,brotlaib,essen,kohlenhydrate,laib brot,weißbrot,weizen
+🥐|corissant,französisch,frühstück,frühstückshörnchen
+🥖|brot,französisch,frühstück
+🫓|fladenbrot,brot,essen,lavasch,lebensmittel,nahrung
+🥨|brezel,brezen,brezn,essen,gedreht,oktoberfest
+🥯|bäckerei,backwaren,brötchen,essen,frühstück,pausenbrot
+🥞|pfannkuchen,crepe,eierpfannkuchen,essen
+🧇|waffel,essen,lebensmittel,nahrung,waffel mit butter
+🧀|käsestück,käse
+🍖|fleischhachse,fleisch,knochen,restaurant
+🍗|hähnchenschenkel,fleisch,geflügel,hühnerbein,restaurant
+🥩|fleischstück,essen,fleisch,kotelett,lammkotelett,rot,schnitzel,schweinekotelett
+🥓|essen,frühstücksspeck,speck,speckstreifen
+🍔|fast food,restaurant
+🍟|pommes frites,fritten,pommes
+🍕|pizzastück,pizzeria
+🌭|essen,wurst,würstchen
+🥪|brot,essen
+🌮|essen,mexikanisch
+🌯|essen,mexikanisch
+🫔|burrito,eingewickelt,essen,lebensmittel,mexikanisch,streetfood,wrap
+🥙|döner,döner kebab,wrap
+🧆|bällchen,essen,fleischbällchen,kichererbsen,lebensmittel,nahrung
+🥚|ei,frühstück,frühstücksei
+🍳|spiegelei in bratpfanne,braten,bratpfanne,kochen,pfanne,spiegelei
+🥘|pfannengericht,essen,reispfanne
+🍲|topf mit essen,eintopf,gericht,schüssel,suppe
+🫕|essen,geschmolzen,käse,schokolade,schweizerisch,topf
+🥣|schüssel mit löffel,brei,cerealien,essen,frühstück,haferbrei,reisbrei,schüssel,suppe
+🥗|salat,blattgemüse,essen,gesund,grün
+🍿|kino,snack
+🧈|essen,lebensmittel,milchprodukt,nahrung
+🧂|salz,gesalzen,geschmack,gewürz,salzig,salzstreuer,würze,zutat
+🥫|konserve,büchse,dose,essen
+🍱|bento-box,japanisches essen,sushi
+🍘|reiscracker
+🍙|reisbällchen,essen,japanisch,reis
+🍚|reis in schüssel,essen,reis
+🍛|reis mit curry,reis
+🍜|schüssel und essstäbchen,chinesisches essen,dampfend,eiernudeln,nudeln,schüssel,stäbchen,suppe
+🍝|essse,nudeln mit tomatensoße
+🍠|geröstete süßkartoffel,essen,gemüse,geröstet,süßkartoffel
+🍢|japanisches gericht
+🍣|japanisches gericht,restaurant
+🍤|frittierte garnele,garnele,restaurant
+🍥|fischfrikadelle,fisch,spirale
+🥮|mondkuchen,essen,fest,herbst,kuchen,mondfest,pinyin,yuebing
+🍡|japanisches gericht,mochi-kugeln auf einem spieß,restaurant
+🥟|teigtasche,chinesische teigtasche,essen,kloß
+🥠|glückskeks,essen,prophezeiung
+🥡|takeaway-schachtel,chinesisches essen,essen,stäbchen,takeaway-box
+🍦|softeis,eis
+🍧|wassereis,eis,sorbet,zerstoßen
+🍨|eiscreme,eis,eisbecher,eisdiele
+🍩|essen,kuchen,süß
+🍪|keks,plätchen
+🎂|geburtstagskuchen,essen,feier,geburtstag,geburtstagstorte,happy birthday,kerzen,kuchen,lebensmittel,torte
+🍰|torte,kuchen,kuchenstück,stück torte,tortenstück
+🧁|bäckerei,essen,gebäck,kalorienbombe,konditorei,muffin,nachspeise,streusel,süß,zucker
+🥧|kuchen,essen,füllung,gebäck,pastete,torte
+🍫|schokoladentafel,essen,schokolade,süßigkeit
+🍬|bonbon,süß,süßigkeit
+🍭|lutscher,lolli,süßigkeit
+🍮|flan,nachspeise,nachtisch,schokolade,soße
+🍯|honigtopf,honig,süß
+🍼|babyflasche,fläschchen,flasche,kind,milch,trinken
+🥛|glas milch,getränk,glas,milch,trinken
+☕|heißgetränk,dampfend,getränk,heiß,kaffee,tasse,tee,trinken
+🫖|teekanne,getränk,kanne,lebensmittel,tee,tee brühen,teekrug,trinken
+🍵|teetasse ohne henkel,getränk,grüner tee,schale,tee,teetasse
+🍶|sake-flasche mit tasse,flasche,getränk,sake-flasche und -tasse,tasse,trinken
+🍾|flasche mit knallendem korken,champagner,flasche,getränk,knallen,korken,sekt,trinken
+🍷|weinglas,alkohol,glas,wein
+🍸|cocktailglas
+🍹|exotisches getränk
+🍺|bierkrug,bier,krug,prost,weizenbier
+🍻|bierkrüge,anstoßen,bier,oktoberfest,prosit,prost,weizen
+🥂|sektgläser,anstoßen,feier,feiern,getränk,gläser,prost,sekt
+🥃|trinkglas,bar,schnaps
+🫗|flüssigkeit ausgießen,ausgießen,ausleeren,getränk,gießen,glas,leer,missgeschick,tropfende flüssigkeit,verschütten
+🥤|becher mit strohhalm,becher,brause,erfrischung,saft,selters,strohhalm,trinken,trinkhalm,wasser
+🧋|blase,essen,getränk,lebensmittel,milch,perle,taiwan,tee
+🧃|trinkpäckchen,fruchtsaft,getränk,obstsaft,saft,saftpackung
+🧉|mate-tee,getränk,tee
+🧊|eiswürfel,eisberg,gefroren,kalt,kühlen,würfel
+🥢|essstäbchen,chinesisches essen,essen,japanisches essen,stäbchen
+🍽️|teller mit messer und gabel,gabel,geschirr,kochen,messer,teller
+🍴|messer und gabel,abendessen,besteck,essen,frühstück,gabel,gabel und messer,geschirr,hunger,lecker,messer,mittagessen
+🥄|löffel,besteck
+🔪|küchenmesser,messer,schneiden
+🫙|einmachglas,einweckglas,essen,gewürzglas,leer,leerer behälter,leeres einweckglas,leeres glas,marmeladeglas,schraubglas
+🏺|amphore,gefäß,kochen,krug,sternzeichen,tierkreis,trinken,vase,wassermann
+🌍|globus mit europa und afrika,afrika,erde,europa,weltkugel
+🌎|globus mit amerika,erde,globus,nordamerika,südamerika,weltkugel
+🌏|globus mit asien und australien,asien,australien,erde,globus,weltkugel
+🌐|globus mit meridianen,breitengrad,längengrad
+🗺️|weltkarte,karte,landkarte,reisen,welt
+🗾|umriss von japan,karte
+🧭|kompass,himmelsrichtung,magnetisch,orientierung,richtung,windrose
+🏔️|schneebedeckter berg,berg,gebirge,kalt,schnee
+⛰️|berg,gebirge
+🛘|erdrutsch,berg,erdbeben,felsen,gefahr,katastrophe,lawine,murenabgang,murgang,schlammlawine
+🌋|vulkan,ausbruch,berg,lava,vulkanausbruch,wetter
+🗻|berg,vulkan
+🏕️|campen,zelt,zelten
+🏖️|strand mit sonnenschirm,meer,sonnenschirm,strand
+🏜️|wüste,heiß
+🏝️|einsame insel,einsam,insel,meer,palme,strand,verlassen
+🏞️|nationalpark,berg,fluss,natur,schutzgebiet
+🏟️|stadion,arena
+🏛️|antikes gebäude,antik,gebäude,klassizistisch
+🏗️|kran,bau,bauen
+🧱|ziegelstein,bauen,grenze,klinker,mauer,mauerwerk,mörtel,wand,ziegel,ziegelsteine,zugemauert
+🪨|felsen,felsig,hart,natur,schwer,stein,steinig
+🪵|holz,baumstamm,feuerholz,holzig,holzscheite,lagerfeuer
+🛖|hütte,behausung,gebäude,haus,jurte,objekt,rundhaus,schutz
+🏘️|wohnhäuser,dorf,gebäude,haus,häuser,wohnhaus,wohnsiedlung
+🏚️|verfallenes haus,gebäude,haus,heruntergekommen,verfallen,verlassen,verlassenes haus
+🏠|haus,gebäude,zuhause
+🏡|haus mit garten,baum,haus,haus mit baum
+🏢|bürogebäude,hochhaus
+🏣|japanisches postgebäude,japan
+🏤|postgebäude,europa,europäisches postgebäude
+🏥|krankenhaus,ambulanz,arzt,gebäude,krank,medizin,notaufnahme
+🏦|gebäude,geld
+🏨|gebäude,übernachten,unterkunft
+🏩|stundenhotel,gebäude,liebe,unterkunft
+🏪|minimarkt,einkaufen,gebäude,geschäft,lebensmittel
+🏫|schule,gebäude,schulgebäude
+🏬|kaufhaus,einkaufen,gebäude,geschäft,shoppen
+🏭|fabrik,fabrikgebäude,gebäude
+🏯|japanisches schloss,bauwerk,gebäude,japan,japanisch,schloss
+🏰|schloss,bauwerk,burg,europa,europäisch,gebäude,märchen,märchenschloss
+💒|hochzeit,herz,kirche
+🗼|fernsehturm,tokio
+🗽|freiheitsstatue,amerika,freiheit
+⛪|kirche,christ,christentum,christlich,gebäude,kreuz
+🕌|moschee,moslem
+🛕|hindutempel,gebäude,tempel
+🕍|synagoge,jude,jüdisch,tempel
+⛩️|shinto-schrein,schrein
+🕋|moslem
+⛲|springbrunnen,brunnen,garten,park
+⛺|zelt,campingurlaub,zeltplatz
+🌁|neblig,nebel,wetter
+🌃|sternenhimmel,city,hochhäuser,nacht,skyline,stadt,sterne
+🏙️|skyline,gebäude,großstadt,häuser,hochhäuser,stadt,wolkenkratzer
+🌄|sonnenaufgang über bergen,berge,sonnenaufgang
+🌅|sonnenaufgang über dem meer,meer,sonnenaufgang
+🌆|abendstimmung in der stadt,hochhäuser,new york,skyline,sonnenaufgang,sonnenuntergang,wolkenkratzer
+🌇|sonnenuntergang in der stadt,großstadt,hochhäuser,morgenrot,sonnenaufgang,sonnenuntergang,wolkenkratzer
+🌉|brücke vor nachthimmel,brücke,golden gate,nacht,nachts
+♨️|heiße quellen,dampf,dampfend,heiß,heiße quelle,quelle,quellen
+🎠|karussellpferd,karussell,pferd,reiten
+🛝|spielplatzrutsche,rutschbahn,rutsche,spielen,spielplatz,vergnügungspark
+🎡|riesenrad,freizeitpark,rad,volksfest
+🎢|achterbahn,freizeitpark,volksfest
+💈|barbershop-säule,friseur,herrenfriseur,säule
+🎪|zirkuszelt,unterhaltung,zelt,zirkus
+🚂|dampflokomotive,bahn,dampf,dampflok,fahrzeug,lokomotive,schiene,zug
+🚃|eisenbahnwagen,fahrzeug,straßenbahn,straßenbahnwagen,wagen,waggon,wagon,zug
+🚄|hochgeschwindigkeitszug mit spitzer nase,ice,tgv,zug
+🚅|hochgeschwindigkeitszug,bahn,japan,zug
+🚆|zug,bahn,eisenbahn,ice
+🚇|u-bahn
+🚈|s-bahn,bahn,ice,zug
+🚉|bahnhof,bahn,zug
+🚊|straßenbahn,verkehrsmittel
+🚝|einschienenbahn,bahn,magnetschwebebahn
+🚞|bergbahn,bahn,bimmelbahn,zug
+🚋|straßenbahnwagen,straßenbahn,tramwagen,transport,verkehrsmittel,waggon
+🚌|fahrzeug,schulbus
+🚍|bus von vorne,verkehrsmittel,vorderansicht bus
+🚎|oberleitungsbus,straßenbahn
+🚐|kleinbus,fahrzeug
+🚑|krankenwagen,ambulanz,notfall
+🚒|feuerwehrauto,brand,löschfahrzeug
+🚓|polizeiwagen,polizei,streifenwagen
+🚔|polizeiwagen von vorne,polizei,streifenwagen,vorderansicht polizeiwagen
+🚕|auto,fahrzeug
+🚖|taxi von vorne,auto,fahren,gelb,vorderansicht taxi
+🚗|auto,fahren,fahrzeug,rot,verkehr
+🚘|auto von vorne,auto,automobil,fahrzeug,rot,vorderansicht auto
+🚙|wohnmobil,auto,blau,fahren,verreisen
+🛻|auto,fahren,fahrzeug,laster,lastwagen,lieferwagen,lkw,transport
+🚚|lieferwagen,lastwagen,lkw
+🚛|sattelzug,lastwagen,lkw,umziehen,ziehen um
+🚜|traktor,bauernhof,landwirtschaft,trecker
+🏎️|rennauto,autorennen
+🏍️|motorrad,moped,motorrennen
+🛵|motorroller,motoroller,roller,vespa
+🦽|manueller rollstuhl,barrierefreiheit,behinderung,rollstuhl
+🦼|elektrischer rollstuhl,barrierefreiheit,behinderung,rollstuhl
+🛺|autorikscha,fahrzeug,tuk-tuk
+🚲|fahrrad,bmx,rad,radeln,radler
+🛴|tretroller,roller
+🛹|brett,räder,skateboard fahren,skaten
+🛼|rollschuh,rollen,rollerskate,rollschuh laufen,schuh
+🚏|bushaltestelle,haltestelle
+🛣️|autobahn,schnellstraße
+🛤️|bahngleis,bahn,gleise,schienen
+🛢️|ölfass,fass,öl
+⛽|tanksäule,benzin,tanke,tanken,tankstelle
+🛞|autorad,autoreifen,drehen,rad,reifen,reifen mit felgen,rotieren
+🚨|polizeilicht,polizei,sirene
+🚥|horizontale verkehrsampel,ampel,verkehrsampel,vertikal
+🚦|vertikale verkehrsampel,ampel,horizontal,verkehrsampel
+🛑|stoppschild,achteckig,schild,stopp
+🚧|baustellenabsperrung,baustelle,baustellenschild,schild
+⚓|anker,hafen,meer
+🛟|rettungsring,leben retten,lebensretter,retten,rettung,schwimmring,sicherheit
+⛵|segelboot,boot
+🛶|kanu,boot,wassersport
+🚤|schnellboot,boot,luxus,see,sommer,wasser,yacht
+🛳️|passagierschiff,aida,rundreise,schiff,seereise,traumschiff
+⛴️|fähre,schiff
+🛥️|motorboot,boot,schiff
+🚢|schiff,dampfer,kreuzfahrtschiff,traumschiff
+✈️|flugzeug,flieger
+🛩️|kleines flugzeug,flugzeug,klein,privatjet
+🛫|abflug,fliegen,flughafen,flugzeug,start,start eines flugzeugs
+🛬|landung eines flugzeugs,ankunft,flieger,flughafen,flugzeug,landen,landung
+🪂|fallschirm,fallschirmspringen,paragliding,skydiving,sport
+💺|sitzplatz,bus,flugzeug,sitz,zug
+🚁|hubschrauber,fliegen,helikopter,reisen
+🚟|schwebebahn,hängebahn
+🚠|bergschwebebahn,schwebebahn
+🚡|bergseilbahn,gondel,seilbahn
+🛰️|satellit,sputnik,weltraum
+🚀|rakete,all,weltraum
+🛸|fliegende untertasse,alien,außerirdisch
+🛎️|rezeptionsklingel,klingel
+🧳|gepäck,ballast,hartschalenkoffer,koffer,reise,trolley-tasche
+⌛|sanduhr,prozess,vorgang läuft,zeit
+⏳|laufende sanduhr,prozess,sanduhr,vorgang läuft
+⌚|armbanduhr,uhr,zeit
+⏰|wecker,uhr,uhrzeit,zeit
+⏱️|stoppuhr,uhr,zeit
+⏲️|zeitschaltuhr,uhr
+🕰️|kaminuhr,tick tack,uhr
+🕛|ziffernblatt 12:00 uhr,0 uhr,12:00 uhr,mittag,mitternacht,uhr,ziffernblatt 12.00 uhr,zwölf uhr
+🕧|12:30 uhr,00:30,halb eins,uhr,zeit,ziffernblatt 12:30 uhr,ziffernblatt 12.30 uhr
+🕐|1:00 uhr,01:00,13:00,punkt eins,uhr,zeit,ziffernblatt 1:00 uhr,ziffernblatt 1.00 uhr
+🕜|1:30 uhr,1 uhr 30,halb zwei,uhr,ziffernblatt 1:30 uhr,ziffernblatt 1.30 uhr
+🕑|2:00 uhr,uhr,zeit,ziffernblatt 2:00 uhr,ziffernblatt 2.00 uhr
+🕝|2:30 uhr,halb drei,uhr,zeit,ziffernblatt 2:30 uhr,ziffernblatt 2.30 uhr
+🕒|3:00 uhr,uhr,zeit,ziffernblatt 3:00 uhr,ziffernblatt 3.00 uhr
+🕞|3:30 uhr,halb vier,uhr,ziffernblatt 3:30 uhr,ziffernblatt 3.30 uhr
+🕓|4:00 uhr,uhr,zeit,ziffernblatt 4:00 uhr,ziffernblatt 4.00 uhr
+🕟|4:30 uhr,04:30,16:30,halb fünf,uhr,zeit,ziffernblatt 4:30 uhr,ziffernblatt 4.30 uhr
+🕔|5:00 uhr,05:00,17:00,punkt fünf,uhr,zeit,ziffernblatt 5:00 uhr,ziffernblatt 5.00 uhr
+🕠|5:30 uhr,05:30,17:30,halb sechs,uhr,ziffernblatt 5:30 uhr,ziffernblatt 5.30 uhr
+🕕|6:00 uhr,uhr,zeit,ziffernblatt 6:00 uhr,ziffernblatt 6.00 uhr
+🕡|6:30 uhr,halb sieben,uhr,ziffernblatt 6.30 uhr
+🕖|7:00 uhr,uhr,ziffernblatt 7:00 uhr,ziffernblatt 7.00 uhr
+🕢|7:30 uhr,halb acht,uhr,zeit,ziffernblatt 7:30 uhr,ziffernblatt 7.30 uhr
+🕗|8:00 uhr,uhr,um 8,zeit,ziffernblatt 8:00 uhr,ziffernblatt 8.00 uhr
+🕣|8:30 uhr,halb neun,uhr,ziffernblatt 8:30 uhr,ziffernblatt 8.30 uhr
+🕘|9:00 uhr,uhr,zeit,ziffernblatt 9:00 uhr,ziffernblatt 9.00 uhr
+🕤|9:30 uhr,halb zehn,uhr,zeit,ziffernblatt 9:30 uhr,ziffernblatt 9.30 uhr
+🕙|10:00 uhr,uhr,zeit,ziffernblatt 10:00 uhr,ziffernblatt 10.00 uhr
+🕥|10:30 uhr,halb elf,uhr,ziffernblatt 10:30 uhr,ziffernblatt 10.30 uhr
+🕚|11:00 uhr,uhr,zeit,ziffernblatt 11:00 uhr,ziffernblatt 11.00 uhr
+🕦|11:30 uhr,halb zwölf,uhr,zeit,ziffernblatt 11:30 uhr,ziffernblatt 11.30 uhr
+🌑|neumond,mond
+🌒|erstes mondviertel,mond,zunehmend
+🌓|zunehmender halbmond,halbmond,mond,zunehmend
+🌔|zweites mondviertel,mond,zunehmend
+🌕|vollmond,mond
+🌖|drittes mondviertel,abnehmend,mond
+🌗|abnehmender halbmond,abnehmend,halbmond
+🌘|letztes mondviertel,abnehmend,mond,nacht
+🌙|mondsichel,mond,nacht
+🌚|neumond mit gesicht,gesicht,mond,mondgesicht,neumond
+🌛|mondsichel mit gesicht links,gesicht,mond,mondsichel,weltall
+🌜|mondsichel mit gesicht rechts,gesicht,mondsichel,nacht
+🌡️|temperatur,wetter
+☀️|sonne,sonnenstrahlen,sonnig,strahlen,wetter
+🌝|vollmond mit gesicht,gesicht,vollmond
+🌞|sonne mit gesicht,gesicht,sonne,sonnengesicht,sonnenschein
+🪐|ringplanet,gasplanet,himmelskörper
+⭐|weißer mittelgroßer stern,astronomie,gelber stern,himmel,stern
+🌟|funkelnder stern,funkeln,glitzern,stern
+🌠|sternschnuppe,himmel
+🌌|milchstraße,galaxie,universum
+☁️|wolke,wetter,wolkig
+⛅|sonne hinter wolke,sonne,wolke,wolkig
+⛈️|wolke mit blitz und regen,blitz,gewitter,regen,wetter,wolke,wolkig
+🌤️|sonne hinter kleiner wolke,bewölkt,kleine wolke,sonne,wetter,wolke
+🌥️|sonne hinter großer wolke,bewölkt,große wolke,sonne,wetter,wolke
+🌦️|sonne hinter regenwolke,regenwolke,sonne,wetter
+🌧️|wolke mit regen,regen,regenwolke,wetter,wolke
+🌨️|wolke mit schnee,kalt,schnee,wetter,wolke
+🌩️|wolke mit blitz,blitz,gewitter,wetter,wolke
+🌪️|wirbelsturm,wetter
+🌫️|nebel,neblig,wetter
+🌬️|wetter,windig
+🌀|wirbel,spirale,wirbelsturm
+🌈|regenbogen,wetter
+🌂|geschlossener regenschirm,regen,regenschirm
+☂️|regenschirm,bekleidung,regen,wetter
+☔|regenschirm im regen,regen,regenschirm
+⛱️|aufgestellter sonnenschirm,aufgestellt,sonnenschirm,strand
+⚡|hochspannung,blitz,elektrizität,gefahr,gewitter,hochspannungszeichen,strom
+❄️|schneeflocke,flocke,kalt,schnee,schneien,wetter,winter
+☃️|schneemann im schnee,schnee,schneemann
+⛄|schneemann ohne schneeflocken,kalt,schnee,schneemann,winter
+☄️|komet,weltall
+🔥|feuer,brennen,flamme,heiß
+💧|tropfen,schweiß,träne,wasser,wassertropfen
+🌊|welle,meer
+🎃|halloweenkürbis,herbst,kürbis,kürbislaterne
+🎄|weihnachtsbaum,baum,tanne,weihnachten
+🎆|feuerwerk,silvester
+🎇|wunderkerze,feiern,feuerwerk,party
+🧨|feuerwerkskörper,dynamit,explosion,explosiv,feuer,feuerwerk,funken,knall,knallen,knaller,kracher,silvester,sprengen,sprengstoff,zündstoff
+✨|funkelnde sterne,funkel,funkeln,sterne
+🎈|luftballon,ballon,feier,geburtstag
+🎉|konfettibombe,böller,feier,juhu,knaller,konfetti,super,yay
+🎊|konfettiball,feier,konfetti
+🎋|tanabata-baum,baum,fest,japan,sternenfest,zettel
+🎍|piniendekoration,japan,neujahrsfest
+🎎|japanische puppen,puppenfest japan
+🎏|traditionelle japanische windsäcke,feier,karpfen,windsäcke
+🎐|japanisches windspiel,bimmel,feier,glocke
+🎑|traditionelles mondfest,japan,mond,mondfest
+🧧|roter umschlag,geld,geschenk,glück,hong bao,hongbao
+🎀|pinke schleife,feier,geschenk,pink,rosa,schleife
+🎁|geschenk,feier,geburtstag,schachtel,schleife,überraschung,verpackt,weihnachten
+🎗️|gedenkschleife,schleife
+🎟️|eintrittskarten,billet,eintrittskarte
+🎫|konzert,unterhaltung
+🎖️|militärorden,orden
+🏆|pokal,bundesliga,gewinnen,preis,sieger,trophäe
+🏅|sportmedaille,gewinn,goldmedaille,medaille
+🥇|goldmedaille,erster,gewinn,medaille 1. platz
+🥈|silbermedaille,medaille 2. platz,zweiter
+🥉|bronzemedaille,dritter,medaille 3. platz
+⚽|fußball,bundesliga,messi
+🥎|baseball,handschuh,sport,unterarm,werfen
+🏀|korb
+🏐|sport
+🏈|amerika,super bowl
+🏉|rugbyball
+🎾|tennisball
+🥏|frisbee,disk,fliegende untertasse,scheibe
+🎳|bowlingkugel,kugel,spiel
+🏏|kricket,schläger
+🏑|feldhockey,schläger
+🏒|eishockey,eishockey-schläger und puck,schläger
+🥍|schläger,sport,stock,tor
+🏓|tischtennis,schläger,spiel,sport
+🏸|federball,schläger
+🥊|boxhandschuh,boxen,handschuh,sport
+🥋|kampfsportanzug,kampfkunst,kampfsport
+🥅|tor,fußball,netz,sport
+⛳|golffahne,golfplatz
+⛸️|schlittschuh,eislauf
+🎣|angel mit fisch,angeln,entspannung
+🤿|tauchmaske,schnorcheln,schwimmen,sport,sporttauchen,tauchen
+🎽|laufshirt,laufen,laufshirt mit schärpe,schärpe,sport
+🎿|ski und stöcke
+🛷|schlitten,rodel,rodeln,schnee
+🥌|curlingstein,spiel,sport,stein
+🎯|darts,pfeil,spiel,volltreffer,zielscheibe
+🪀|jo-jo,spielzeug
+🪁|drachen,fliegen,hochfliegen,steigen,wind
+🔫|wasserpistole,pistole,waffe
+🎱|billardkugel,8-ball,billard,kugel,schwarz,spiel
+🔮|kristallkugel,wahrsager,zukunft
+🪄|zauberstab,abrakadabra,hexe,hexer,magie,magisch,wunder,zauberei,zauberer,zauberin,zaubern
+🎮|gamepad,gaming,unterhaltung,videospiel
+🕹️|gaming,videospiel
+🎰|spielautomat,glücksspiel,spiel
+🎲|spielwürfel,casino,spiel,unterhaltung,würfel,würfeln,zufall
+🧩|puzzleteil,bestandteile,hinweise,hobby,passen,puzzeln,puzzlestück,puzzleteile,spiel,teile,zusammenpassen,zusammensetzen
+🧸|teddybär,bär,kuscheltier,plüschteddy,plüschtier,spielwaren,spielzeug,stoffbär,stofftier
+🪅|feier,hau drauf,mexikanisch,mexiko,objekt,süß,süßigkeiten
+🪩|discokugel,lichtreflexe,spiegel,spiegelkugel,tanz,tanzen
+🪆|matroschka,babuschka,matrioschka,matrjoschka,puppe,russland,spielzeug
+♠️|pik,karten,kartenspiel
+♥️|herz,kartenspiel
+♦️|karo,kartenspiel
+♣️|kreuz,kartenspiel
+♟️|bauer schach,schach
+🃏|jokerkarte,spielkarte
+🀄|mahjong-stein,roter drache,spiel
+🎴|japanische blumenkarte,blume,blumenkarte,hanafuda,japan,karte
+🎭|masken,kunst,unterhaltung
+🖼️|gerahmtes bild,bild,gemälde,kunst,malen,rahmen,zeichnen,zeichnung
+🎨|mischpalette,farben,kunst,künstler
+🧵|faden,nadel,nähen,nähfaden,nähgarn,rolle,spule,zwirn
+🪡|nähnadel,einfädeln,faden,nadel,nadel und faden,nähen,nähte,schneidern,stiche,sticken
+🧶|wollknäuel,garn,häkeln,spinnen,stricken,wolle,zwirn
+🪢|knoten,achterknoten,binden,schnur,schnürsenkel,seemansknoten,segelboot,segeln,seil,verknoten,zusammendrehen
+👓|brille,accessoire
+🕶️|sonnenbrille,augen,brille,dunkel
+🥽|schutzbrille,augenschutz,brille,schweißen,schweißerbrille,schwimmen,tauchen,taucherbrille
+🥼|laborkittel,arzt,arztkittel,doc,doktor,kleidung,kleidungsstück,labormantel,weiße jacke,weißer mantel,wissenschaftler
+🦺|sicherheitsweste,kleidung,notfall,sicherheit,weste
+👔|hemd mit krawatte,hemd,kleidung,kragen,schlips
+👕|kleidung
+👖|hose,kleidung
+🧣|schal,hals,kalt,kleidung,warm anziehen
+🧤|handschuhe,handschuh
+🧥|mantel,jacke,kalt,kleidung,warm anziehen
+🧦|socken,strumpf,strümpfe
+👗|kleid,kleidung
+👘|japanisch,kleid,kleidung
+🥻|kleid,kleidung
+🩱|einteiliger badeanzug,badeanzug,kleidung
+🩲|slip,badeanzug,einteiler,kleidung,unterwäsche
+🩳|badebekleidung,badehose,boxershorts,kleidung,schwimmshorts
+👙|badeanzug,kleidung
+👚|bluse,damenmode,kleidung,oberbekleidung
+🪭|faltfächer,abkühlung,fächer,flirten,heiß,kühlen,luft zufächeln,schüchtern,spanisch,tanz,warm
+👛|geldbörse,accessoire,brieftasche,münzen,portemonnaie
+👜|handtasche,accessoire,einkaufen,tasche
+👝|accessoire,beutel,handtasche,kulturbeutel,tasche,waschtasche
+🛍️|einkaufstüten,einkaufen,shoppen,tasche,tüte
+🎒|schulranzen,ranzen,schule,tornister
+🩴|zehensandale,badelatschen,flipflops,latschen,sandalen,schuh,strandschuh,zehensandalen
+👞|herrenschuh,gehen,herren,schuh
+👟|sportschuh,laufen,rennen,schuh,sportlich,turnschuh
+🥾|wanderstiefel,brauner schuh,campen,kleidungsstück,outdoor,rucksacktour,schuh,stiefel,wandern,wanderung
+🥿|flacher schuh,ballerina,ballet-pumps,bequem,frauenschuh,kleidungsstück,schuh
+👠|stöckelschuh,absatz,absatzschuh,damen,elegant,high heel,highheels,pumps,rot,schuh,vornehm
+👡|damensandale,damen,sandale,schuh
+🩰|ballettschuhe,ballett,kleidung,schuhe,tanz
+👢|damenstiefel,damen,schuh,stiefel
+🪮|haarkamm,afro pick,haare,kamm,kämmen
+👑|krone,könig,königin,kopfbedeckung,majestät
+👒|damenhut,damenhut mit schleife,hut,kleidung,kopfbedeckung,schleife
+🎩|zylinder,hut,kopfbedeckung,unterhaltung,zauberer,zylinderhut
+🎓|doktorhut,abschlussfeier,diplom
+🧢|baseballmütze,baseball-kappe,baseball-mütze,baseballkappe,mütze,schirmkappe
+🪖|militärhelm,armee,heer,helm,kämpfer,kämpferin,krieg,militär,schutzhelm,soldat,soldatin
+⛑️|rettungshelm,bergen,erste hilfe,helm,helm mit weißem kreuz,hilfe,kreuz,retten,roter helm,sanitäter
+📿|gebetskette,beten,gebet,kette,rosenkranz
+💄|lippenstift,kosmetik,make-up,rot,schminke
+💍|diamantring,edelstein,schmuck,verlobung
+💎|edelstein,diamant
+🔇|durchgestrichener lautsprecher,leise,psst,stumm,stummgeschaltet
+🔈|lautsprecher mit geringer lautstärke,eingeschaltet,ton an
+🔉|lautsprecher mit mittlerer lautstärke,lautsprecher mit einer schallwelle,leise,mittellaut,ton
+🔊|lautsprecher mit hoher lautstärke,dezibel,laut,lautsprecher mit drei schallwellen,musik,schallwellen
+📢|lautsprecher,megafon,schallendes megafon
+📣|megafon,jubel,lautsprecher
+📯|posthorn,brief,e-mail
+🔔|glocke,ding dong,klingeling,ton eingeschaltet
+🔕|durchgestrichene glocke,glocke,kein ton,leise,ton ausgeschaltet
+🎼|notenschlüssel,musik,noten,partitur,violinschlüssel
+🎵|musiknote,lied,melodie,musik
+🎶|musiknoten,musik,noten
+🎙️|studiomikrofon,mikrofon
+🎚️|schieberegler,musik
+🎛️|drehregler,bedienknöpfe,knöpfe,stellknöpfe
+🎤|mikrofon,singen,unterhaltung
+🎧|kopfhörer,musik,unterhaltung
+📻|musik
+🎷|saxofon,musik,musikinstrument
+🎺|trompete,musik,musikinstrument
+🪊|posaune,blasinstrument,blechbläser,blechblasinstrument,musik,schieben,traurig,ziehen
+🪗|akkordeon,akkordeons,harmonika,musik,musikinstrument,quetschkommode,quetschkommoden,schifferklavier,spielen,ziehharmonika,ziehharmonikas
+🎸|gitarre,musik,musikinstrument
+🎹|klaviatur,klavier,musik,musikinstrument,tastatur,tasten
+🎻|geige,musik,musikinstrument,violine
+🪕|instrument,musik,saiteninstrument,zupfinstrument
+🥁|trommel,instrument,musik,schlägel,sticks,trommelstöcke
+🪘|afrikanische trommel,handtrommel,musikinstrument,rhythmus,trommel,trommeln
+🪇|cha-cha-cha,musik,musikinstrument,musizieren,rassel,rasseln,tanz,tanzen
+🪈|flöte,blaskapelle,holzblasinstrument,musik,musikinstrument,musizieren,orchester,spielmannszug
+🪉|harfe,amor,cupido,liebe,musik,orchester
+📱|mobiltelefon,handy,iphone,smartphone,telefonieren
+📲|mobiltelefon mit pfeil,anruf,anrufen,handy,iphone,kommunikation,mobiltelefon,pfeil,whatsapp
+☎️|telefon,anruf,anrufen,festnetz
+📞|telefonhörer,anrufen,hörer,kommunikation,telefon
+📟|kommunikation,piepser
+📠|faxgerät,kommunikation
+🔋|batterie,akku
+🪫|schwache batterie,akku,akku fast leer,akku leer,aufladen,batterie,batterie fast leer,batterie leer,elektronik,ladestand,niedriger akkustand,schwacher akku
+🔌|netzstecker,stecker,stromstecker
+💻|bildschirm,computermonitor,monitor,notebook
+🖥️|desktopcomputer,bildschirm,imac
+🖨️|drucker
+⌨️|tastatur
+🖱️|computermaus,maus
+💽|minidisc,md
+💾|diskette,datenträger
+🧮|abakus,abaki,abakusse,berechnung,kalkulation,mathe,mathematik,rechenhilfe,rechenrahmen,rechenschieber,rechnen,zählen,zählrahmen
+🎥|filmkamera,kino,unterhaltung
+🎞️|filmstreifen,filmband,kino
+📽️|filmprojektor,kino,unterhaltung
+🎬|filmklappe,film,klappe,unterhaltung
+📺|fernseher,fernsehen,film
+📷|fotoapparat,fotos,kamera
+📸|fotoapparat mit blitz,blitz,fotoapparat
+📹|videokamera,filmen,videos
+📼|videokassette
+🔍|lupe nach links,suche,vergrößerungsglas
+🔎|lupe nach rechts,lupe,suche,vergrößerungsglas
+🕯️|kerze,licht
+💡|glühbirne,hell,idee,lampe,licht
+🔦|taschenlampe,lampe,licht
+🏮|rote papierlaterne,izakaya,japanische laterne,japanisches lokal
+🪔|öllampe,lampe,öl
+📔|notizbuch mit dekorativem einband,einband,notizbuch
+📕|geschlossenes buch,buch,geschlossen
+📖|offenes buch,bibliothek,blättern,buch,geöffnet,lernen,lesen,offen,seite
+📗|grünes buch,buch,grün,lesen
+📘|blaues buch,blau,buch
+📙|orangefarbenes buch,buch,orangefarben
+📚|bücherstapel,bücher,fantasie,lesen,roman
+📓|notizbuch,notizen
+📒|spiralblock,notizblock
+📃|teilweise eingerolltes blatt,dokument,papier,seite
+📜|schriftrolle,papier
+📄|vorderseite eines blattes,dokument,papier,seite
+📰|zeitung,medien,nachrichten,presse
+🗞️|zusammengerollte zeitung,zeitung,zusammengerollt
+📑|pagemarker,notizen
+🔖|lesezeichen,etikett,lesen
+🏷️|etikett,marke
+🪙|münze,bezahlen,geld,goldesel,metall,reich,schatz,silber,sparen
+💰|geldsack,geld,moneten,reich,sack
+🪎|schatztruhe,beute,edelstein,geld,juwelen,preis,reichtum,silber,wertgegenstände
+💴|yen-banknote,geld,geldschein
+💵|dollar-banknote,geld,geldschein,währung
+💶|euro-banknote,euroschein,geld,geldschein
+💷|pfund-banknote,geld,geldschein,pfund
+💸|geldschein mit flügeln,euro,geld,knete,moneten
+💳|kreditkarte,bankkarte,ec-karte,geldkarte,guthaben,karte
+🧾|beleg,abrechnung,aufstellung,blatt,buchhalter,buchhaltung,quittung,rechnung,rechnungswesen,schriftstück
+💹|steigende kurve mit yen-zeichen,diagramm,markt,steigender trend mit yen-zeichen
+✉️|briefumschlag,brief
+📧|brief,e-mail-symbol,post
+📨|eingehender briefumschlag,empfangen,umschlag
+📩|umschlag mit pfeil,gesendet
+📤|postausgang,ablage,e-mail
+📥|posteingang,ablage,e-mail
+📦|paket,päckchen
+📫|geschlossener briefkasten mit post,briefkasten,e-mail,geschlossen,post
+📪|geschlossener briefkasten ohne post,briefkasten,geschlossen,keine e-mail,keine post,post
+📬|offener briefkasten mit post,briefkasten,e-mail,offen,post
+📭|offener briefkasten ohne post,briefkasten,keine e-mail,keine post,offen,post
+📮|briefkasten,brief,post
+🗳️|urne mit wahlzettel,urne,wahlen,wahlzettel
+✏️|bleistift,stift
+✒️|schwarzer federhalter,federhalter,füller,schwarz,stift
+🖋️|füllhalter,füller,füllfedehalter,füllfederhalter,schreiben,stift
+🖊️|kugelschreiber,stift
+🖌️|pinsel,kunst,malen
+🖍️|wachsmalstift,buntstift,filzstift
+📝|papier und bleistift,bleistift,kurzmitteilung,nachricht,notiz,papier,schreibblock,schreiben
+💼|aktentasche,tasche
+📁|ordner,akten,büro,dokument,geschlossen
+📂|geöffneter ordner,dokument,offen,ordner
+🗂️|karteireiter,akten,büro,büroausstattung,büromaterial,karteibahnen,karteikarten
+📅|kalender,datum,kalenderblatt
+📆|abreißkalender,datum,kalender,termin
+🗒️|notizblock,block,notiz,papier
+🗓️|spiralkalender,kalender
+📇|rotationskartei,visitenkarten
+📈|aufwärtstrend,diagramm,kurve,steigend
+📉|abwärtstrend,diagramm,fallend,kurve
+📊|balkendiagramm,balken,diagramm
+📋|klemmbrett,clpboard,zwischenablage
+📌|reißzwecke,anpinnen
+📍|stecknadel,anpinnen,reißzwecke,rund,runde reißzwecke
+📎|büroklammer
+🖇️|verhakte büroklammern,büroklammer,büroklammern,verhakt
+📏|lineal
+📐|dreieckiges lineal,geodreieck,lineal
+✂️|schere,schneiden,schnipp
+🗃️|karteikasten,büroausstattung,büromaterial
+🗄️|aktenschrank,ablage,archiv,schublade
+🗑️|papierkorb,abfalleimer
+🔒|geschlossenes schloss,datenschutz,geschlossen,schloss,sicherheit
+🔓|offenes schloss,nicht gesichert,offen,schloss
+🔏|schloss mit füller,datenschutz,privat,sicherheit
+🔐|schloss mit schlüssel,datenschutz,privat,sicherheit
+🔑|schlüssel,passwort,schließen
+🗝️|alter schlüssel,alt,schloss,schlüssel
+🔨|werkzeug
+🪓|axt,beil,hacken,holz,spalten,werkzeug
+⛏️|pickel,werkzeug
+⚒️|hammer und pickel,arbeiter,pickel,werkzeug
+🛠️|hammer und schraubenschlüssel,schraubenschlüssel,werkzeug
+🗡️|dolch,schwert,waffe
+⚔️|gekreuzte schwerter,gekreuzt,schwerter,waffe
+💣|bombe,dynamit,explodieren
+🪃|bumerang,aborigines,australien,schleuder,waffe,werfen
+🏹|pfeil und bogen,bogen,pfeil
+🛡️|schutzschild,schild
+🪚|handsäge,holz,säge,sägen,tischler,trimmen,werkzeug
+🔧|schraubenschlüssel,werkzeug
+🪛|schraubenzieher,schraube,schrauben,schraubendreher,werkzeug
+🔩|mutter und schraube,schraube
+⚙️|zahnrad,werkzeug
+🗜️|schraubzwinge,werkzeug
+⚖️|waage,gerechtigkeit,gewicht,werkzeug,wiegen
+🦯|blindenstock,barrierefreiheit,behinderung,gehstock
+🔗|linksymbol,kettenglieder,verknüpfen,verknüpfung,verknüpfungssymbol,zwei ringe
+⛓️‍💥|gebrochene kette,brechen,freiheit,gebrochen,handschellen,kette,zerbrechen
+⛓️|ketten,eisen,kette
+🪝|haken,angelhaken,aufhaken,aufhängen,einhaken,hängen,metallhaken
+🧰|werkzeugkasten,handkasten,kasten,kiste,mechaniker,rote kiste,werkzeug,werkzeugkiste,werkzeugkoffer
+🧲|anziehung,anziehungskraft,hufeisen,magnetisch,pole,positiv negativ,u-form
+🪜|leiter,hochsteigen,holzleiter,klettern,sprosse,stufe
+🪏|schaufel,graben,loch,schippe,spaten
+⚗️|destillierapparat,werkzeug
+🧪|reagenzglas,chemie,chemikalie,chemiker,labor,substanz,versuche,wissenschaft
+🧫|petrischale,bakterien,bakterienkultur,biologe,biologie,biologin,kultur,labor,pipette,probe
+🧬|biologe,biologie,biologin,dns,gen,genetik,genmanipulation,leben
+🔬|mikroskop,labor,untersuchen,wissenschaft
+🔭|teleskop,himmel
+📡|satellitenschüssel,antenne,sat-schüssel,satschüssel,schüssel
+💉|spritze,arzt,impfen,impfung,injektion,kanüle,nadel
+🩸|blutstropfen,blutspende,flüssigkeit,medizin
+💊|kapsel,arznei,arzt,medizin,pille,tabletten
+🩹|heftpflaster,pflaster,verletzt,wunde
+🩼|krücke,behinderung,beinverletzung,fußverletzung,gehhilfe,gehstütze,hilfe,schmerzen,stock,verletzt,verletzung
+🩺|stethoskop,abhören,arzt,doktor,herz,herzschlag,medizin,untersuchung
+🩻|röntgenbild,durchleuchten,knochen,medizin,radiologie,rippen,röntgen,röntgenstrahlen,skelett
+🚪|tür,eingang,geschlossen
+🛗|fahrstuhl,aufzug,haus,symbol,transport
+🪞|spiegel,holzspiegel,reflexion,spiegelbild,wandspiegel
+🪟|fenster,aussicht,durchsichtig,fensterrahmen,frische luft,glas,haus,lüften,öffnung,rahmen
+🛏️|bett,schlafen,übernachtung
+🛋️|sofa und lampe,lampe,sofa
+🪑|stuhl,holzstuhl,möbel,sitzen
+🚽|toilette,klo,wc
+🪠|saugglocke,abfluss,gummiglocke,klempner,klo,pömpel,pümpel,sanitär,saugglocken,toilette,verstopft,wc,werkzeug
+🚿|dusche,duschkopf
+🛁|badewanne,bad,badezimmer,dusche
+🪤|mausefalle,anlocken,falle,käse,maus,mäusefalle
+🪒|rasierer,klinge,rasieren,rasiermesser,scharf
+🧴|creme,feuchtigkeitscreme,feuchtigkeitsmilch,haarwaschmittel,körpercreme,nachtcreme,sonnencreme
+🧷|sicherheitsnadel,windel
+🧹|besen,fegen,hexe,hexenbesen,kehren,reinigen,sauber machen,säubern
+🧺|korb,bauernhof,landwirtschaft,picknick,tragekorb,wäsche,wäschekorb
+🧻|küchenrolle,hygiene,klopapier,papierrolle,papiertücher,toilette,toilettenpapier,wc,wc-papier
+🪣|eimer,behälter,bottich,kübel,wassereimer
+🧼|seife,baden,putzen,reinigen,riegel,sauber,sauber machen,säubern,schaum,schäumen,seifenschale,seifenstück
+🫧|blasen,perlen,reinigen,schaum,schweben,seife,seifenblasen,unter wasser,wasserblasen
+🪥|zahnbürste,badezimmer,bürste,körperpflege,mundhygiene,putzen,sauber,zähne,zahnhygiene
+🧽|schwamm,absorbieren,aufsaugen,löchrig,porös,putzen,putzmittel,reinigen,sauber machen,schaum,schäumen
+🧯|feuerlöscher,feuer,löschen
+🛒|einkaufswagen,einkaufen
+🚬|zigarette,kippe,rauchen,rauchersymbol
+⚰️|sarg,beerdigung,tod,tot,vampir
+🪦|grabstein,friedhof,grab,tot
+⚱️|urne,beerdigung,tod,tot
+🧿|nazar-amulett,amulett,blau,böser blick,glasperle,glücksbringer,kügelchen,perle
+🪬|amulett,auge in offener hand,glückssymbol,jüdisch,maria,muslimisch,schutz
+🗿|gesicht,maske,osterinsel
+🪧|protestschild,ankündigung,bekanntmachung,hinweis,mahnwache,plakat,schild
+🪪|ausweis,dokument,führerschein,karte,pass,personalausweis,plakette,reisepass
+🏧|symbol „geldautomat“,geldautomat
+🚮|symbol „papierkorb“,abfall,müll,mülleimer,sauberkeit,wegschmeißen,wegwerfen
+🚰|trinkwasser,wasser,wasserhahn
+♿|symbol „rollstuhl“,barrierefrei,behindertengerecht,rollstuhl
+🚹|herren,herrentoilette
+🚺|damen,damentoilette
+🚻|toiletten,toilette
+🚼|symbol „baby“,wickelraum
+🚾|toilette
+🛂|passkontrolle,pass
+🛃|zollkontrolle,zoll
+🛄|gepäckausgabe,gepäck
+🛅|gepäckaufbewahrung,gepäck,schließfach
+⚠️|warnung,achtung,dreieck,vorsicht,warnschild
+🚸|kinder überqueren die straße,kinder,kinder-queren-die-straße-schild,straßenschild,vorsicht
+⛔|zutritt verboten,einbahnstrasse,kein zutritt,keine durchfahrt,verboten,zutritt-verboten-schild
+🚫|verboten,kein zutritt,kein-zutritt-zeichen,verbotszeichen
+🚳|fahrräder verboten,fahhrad,fahrrad-verboten-schild,radfahren verboten,verboten
+🚭|rauchverbot,rauchen verboten,zigarette
+🚯|abfall verboten,abfall,müll,müll-verboten-zeichen,verboten
+🚱|kein trinkwasser,verboten,verschmutzt,wasser
+🚷|fußgänger verboten,fußgänger-verboten-schild,verboten
+📵|mobiltelefone verboten,handy,mobiltelefon,verbot
+🔞|minderjährige verboten,erwachsene,mindestalter,nicht jugendfrei,zeichen mit durchgestrichener 18
+☢️|radioaktiv
+☣️|biogefährdung,zeichen
+⬆️|pfeil nach oben,aufwärts,aufwärtspfeil,nach oben,norden,pfeil
+↗️|pfeil nach rechts oben,nach rechts oben,nordosten,pfeil
+➡️|pfeil nach rechts,nach rechts,osten,pfeil,rechts,rechtspfeil
+↘️|pfeil nach rechts unten,nach rechts unten,pfeil,südosten
+⬇️|pfeil nach unten,abwärts,abwärtspfeil,nach unten,pfeil,süden
+↙️|pfeil nach links unten,nach links unten,pfeil
+⬅️|pfeil nach links,linkspfeil,nach links,pfeil,westen
+↖️|pfeil nach links oben,nach links oben,nordwesten,pfeil
+↕️|pfeil nach oben und unten,entgegengesetzt,nach oben und unten,pfeil
+↔️|pfeil nach links und rechts,entgegengesetzt,nach links und rechts,pfeil
+↩️|geschwungener pfeil nach links,geschwungen,links,nach links,pfeil
+↪️|geschwungener pfeil nach rechts,geschwungen,nach rechts,pfeil,rechts,umdrehen
+⤴️|geschwungener pfeil nach oben,geschwungen,nach oben,oben,pfeil
+⤵️|geschwungener pfeil nach unten,geschwungen,nach unten,pfeil,unten
+🔃|kreisförmige pfeile im uhrzeigersinn,im uhrzeigersinn,pfeile
+🔄|pfeile gegen den uhrzeigersinn,gegen den uhrzeigersinn,kreisförmige pfeile gegen den uhrzeigersinn,pfeile
+🔙|back-pfeil,links,pfeil,zurück
+🔚|end-pfeil,ende-zeichen,links,pfeil
+🔛|on!-pfeil,anschalten,ein-zeichen,einschaltem,pfeil,rechts und links
+🔜|soon-pfeil,bald-zeichen,pfeil,rechts
+🔝|top-pfeil,pfeil nach oben,top-zeichen
+🛐|religiöse stätte,kultstätte
+⚛️|atomzeichen
+🕉️|hinduismus
+✡️|davidstern,jüdisch
+☸️|dharma-rad,buddhismus
+☯️|yin und yang,daoismus
+✝️|lateinisches kreuz,christentum,kreuz,lateinisch,römisch
+☦️|orthodoxes kreuz,christentum,kreuz
+☪️|hilal und stern,hilal,stern
+☮️|friedenszeichen,friedensbewegung,friedenssymbol
+🕎|menora,leuchter
+🔯|hexagramm mit punkt,wahrsager
+🪯|deg tegh fateh,glaube,khanda-emblem,schwert,sikhismus
+♈|widder (sternzeichen),sternzeichen,widder
+♉|stier (sternzeichen),horoskop,sternzeichen,stier
+♊|zwillinge (sternzeichen),horoskop,sternzeichen,zwilling,zwillinge
+♋|krebs (sternzeichen),krebs,sternzeichen
+♌|löwe (sternzeichen),horoskop,löwe,sternzeichen
+♍|jungfrau (sternzeichen),horoskop,jungfrau,sternzeichen
+♎|waage (sternzeichen),horoskop,sternzeichen,waage
+♏|skorpion (sternzeichen),horoskop,skorpion,sternzeichen
+♐|schütze (sternzeichen),schütze,sternzeichen
+♑|steinbock (sternzeichen),steinbock,sternzeichen
+♒|wassermann (sternzeichen),sternzeichen,wassermann
+♓|fische (sternzeichen),fische,horoskop,sternzeichen
+⛎|schlangenträger,schlagenträger,sternbild
+🔀|zufallsmodus,gekreuzt,pfeile,richtung,verschlungene pfeile nach rechts
+🔁|wiederholen,im uhrzeigersinn,keycap,pfeile,tastenkappe
+🔂|titel wiederholen,dasselbe wiederholen,einmal,im uhrzeigersinn,noch einmal,pfeile,wiederholen
+▶️|wiedergabe,abspielen,dreieck,pfeil,rechts
+⏩|doppelpfeile nach rechts,doppelpfeil,überspringen,vorwärts,weiter
+⏭️|nächster titel,doppelpfeil,dreieck,vorwärts,weiter
+⏯️|wiedergabe oder pause,dreieck,pfeil,rechts,wiedergabe
+◀️|pfeil zurück,dreieck,links,pfeil,zurück
+⏪|zurückspulen,doppelpfeil,doppelpfeile nach links,dreieck,pfeil,vorheriger titel,zurück
+⏮️|vorheriger titel,doppelpfeil,dreieck,pfeil,zurück
+🔼|aufwärts-schaltfläche,aufwärts,nach oben,pfeil,schaltfläche
+⏫|doppelpfeile nach oben,aufwärts,doppelpfeil,doppelt,nach oben,pfeil
+🔽|abwärts-schaltfläche,abwärts,nach unten,pfeil,schaltfläche
+⏬|doppelpfeile nach unten,doppelpfeil,doppelt abwärts,nach unten,pfeil
+⏸️|keycap,streifen,tastenkappe,vertikal
+⏹️|stopp,aufnahme stoppen,keycap,quadrat,tastenkappe
+⏺️|aufnehmen,aufnahme,keycap,kreis,tastenkappe
+⏏️|auswerfen,auswurf,auswurftaste,medien
+🎦|kinosymbol,filmkamera,filmkamera in blauem quadrat,kino,unterhaltung
+🔅|taste dimmen,dimmen,gedimmt,helligkeit,schwache helligkeit
+🔆|heller-taste,heller,helligkeit,starke helligkeit
+📶|balkenförmige signalstärkenanzeige,empfang,mobilfunksignal,mobiltelefon,signalstärke
+🛜|drahtlos,kabellos,netzwerk,verbindung
+📳|vibrationsmodus,handy,kommunikation,mobiltelefon,symbol für vibrationsalarm,vibrieren
+📴|mobiltelefon aus,ausschalten,handy aus,mobiltelefon
+♀️|frauensymbol,frau,weiblich,zeichen
+♂️|männersymbol,mann,symbol,zeichen
+⚧️|transgender-symbol,symbol für transgender
+✖️|mal,abbrechen,multiplikation,multiplikationszeichen,multiplizieren
+➕|addieren,mathe,pluszeichen
+➖|mathe,minuszeichen
+➗|geteilt durch,divisionszeichen,geteilt,geteiltzeichen,mathe
+🟰|gleichheitszeichen extrafett,gleich,gleichheit,gleichheitszeichen,ist gleich,mathematik,vergleichszeichen
+♾️|unendlichkeit,ewig,grenzenlos,unendlich
+‼️|doppeltes ausrufezeichen,ausrufezeichen,doppelt,muss,rot,satzzeichen
+⁉️|ausrufe- und fragezeichen,ausrufezeichen,fragezeichen,rot,satzzeichen
+❓|rotes fragezeichen,frage,fragezeichen,rot,satzzeichen,warum,wieso
+❔|weißes fragezeichen,frage,fragezeichen,satzzeichen,warum,weiß
+❕|weißes ausrufezeichen,ausrufezeichen,muss,satzzeichen,weiß
+❗|rotes ausrufezeichen,ausrufezeichen,rot,satzzeichen
+〰️|wellenlinie,gewellt,linie
+💱|geldwechsel,geld,währung,wechsel
+💲|dollarzeichen extrafett,bezahlen,dollar-zeichen,geld,knete,moneten,teuer,usd,währung
+⚕️|äskulapstab,apotheke,arznei,asklepiosstab,medizin
+♻️|recycling-symbol,grüne punkt,grüner punkt
+⚜️|lilie
+🔱|dreizack,anker,triton
+📛|namensschild,schild
+🔰|japanisches anfänger-zeichen,anfänger,japanisches symbol
+⭕|hohler roter kreis,großer kreis,kreis,rot
+✅|weißes häkchen,abgehakt,erledigt
+☑️|abgehaktes kästchen,abstimmungsfeld,abstimmungsfeld mit häkchen,ankreuz,feld,häkchen,kästchen,kästchen mit häkchen,wahlurne
+✔️|kräftiges häkchen,abhaken,erledigt,fertig,häkchen,haken
+❌|kreuzzeichen,abbrechen,durchgestrichen,mal,multiplikation,multiplizieren,rotes kreuz
+❎|angekreuztes kästchen,angekreuztes feld,feld,kreuz,kreuzsymbol im quadrat,quadrat
+➰|schleife
+➿|doppelschleife,blau,rechteck,schleife
+〽️|teilalternationszeichen,japanisch,zeichensetzung
+✳️|achtzackiger stern,achtzackig,grün,quadrat,stern
+✴️|achtstrahliger stern,stern
+❇️|funkeln,grün,quadrat
+®️|registered-trademark,markenzeichen
+™️|markenzeichen
+🫟|spritzer,farbe,fleck,klecks,tinte
+#️⃣|taste: #,taste
+*️⃣|taste: *,taste
+0️⃣|taste: 0,null,taste
+1️⃣|taste: 1,eins,taste
+2️⃣|taste: 2,taste,zwei
+3️⃣|taste: 3,drei,taste
+4️⃣|taste: 4,taste,vier
+5️⃣|taste: 5,fünf,taste
+6️⃣|taste: 6,sechs,taste
+7️⃣|taste: 7,sieben,taste
+8️⃣|taste: 8,acht,taste
+9️⃣|taste: 9,neun,taste
+🔟|taste: 10,taste
+🔠|eingabesymbol lateinische großbuchstaben,buchstaben,eingabe,eingabesymbol,großbuchstaben,großschreiben,lateinisch
+🔡|eingabesymbol lateinische kleinbuchstaben,kleinbuchstaben,lateinische kleinbuchstaben
+🔢|eingabesymbol zahlen,eingabe,eingabesymbol,symbol,zahlen,ziffern
+🔣|eingabesymbol sonderzeichen,eingabe,eingabesymbol,keycap,sonderzeichen,symbol,tastenkappe
+🔤|eingabesymbol lateinische buchstaben,buchstaben,eingabe,eingabesymbol,lateinisch,symbol
+🅰️|großbuchstabe a in rotem quadrat,blut,blutgruppe,großbuchstabe,negativ,positiv
+🆎|großbuchstaben ab in rotem quadrat,blut,blutgruppe,negativ,positiv
+🅱️|großbuchstabe b in rotem quadrat,blut,blutgruppe,großbuchstabe,negativ,positiv
+🆑|großbuchstaben cl in rotem quadrat
+🆒|wort „cool“ in blauem quadrat
+🆓|wort „free“ in blauem quadrat
+ℹ️|buchstabe „i“ in blauem quadrat
+🆔|großbuchstaben id in lila quadrat
+Ⓜ️|buchstabe „m“ in kreis,buchstabe,eingekreist,großbuchstabe,kreis
+🆕|wort „new“ in blauem quadrat,neu
+🆖|großbuchstaben ng in blauem quadrat
+🅾️|großbuchstabe o in rotem quadrat,0,blut,blutgruppe,großbuchstabe,negativ,positiv
+🆗|großbuchstaben ok in blauem quadrat,großbuchstaben,keycap,taste,tastenkappe
+🅿️|großbuchstabe p in blauem quadrat,großbuchstabe,parken,parkplatz,taste
+🆘|sos-zeichen,hilfe
+🆙|schriftzug „up!“ im blauen quadrat,keycap,taste,tastenkappe
+🆚|schriftzug vs in orangem quadrat,gegen,taste
+🈁|schriftzeichen „koko“,„koko“,japanisches schriftzeichen
+🈂️|schriftzeichen „sa“,„sa“,japanisches schriftzeichen
+🈷️|schriftzeichen für „monatsbetrag“,japanisch,monatlich,monatsbetrag,mond,schriftzeichen,taste
+🈶|schriftzeichen für „nicht gratis“,berechnen,existieren,japanisch,nicht gratis,schriftzeichen,taste
+🈯|schriftzeichen für „reserviert“,finger,japanisches schriftzeichen,reserviert,schriftzeichen für „finger“
+🉐|schriftzeichen für „schnäppchen“,japanisches schriftzeichen,schnäppchen,schriftzeichen für „vorteil“,vorteil
+🈹|schriftzeichen für „rabatt“,japanisches schriftzeichen,rabatt,schriftzeichen für „teilen“,teilen
+🈚|schriftzeichen für „gratis“,gratis,japanisches schriftzeichen,schriftzeichen für „verhandlung“,verhandlung
+🈲|schriftzeichen für „verbieten“,japanisches schriftzeichen,kanji,verbieten
+🉑|schriftzeichen für „akzeptieren“,akzeptieren,japanisch,schriftzeichen
+🈸|schriftzeichen für „anwenden“,anwenden,chinesisches schriftzeichen,japanisches schriftzeichen
+🈴|schriftzeichen für „note zum bestehen“,bestanden,bestehen,chinesisches schriftzeichen,japanisches schriftzeichen,schriftzeichen für „zusammen“,zusammen
+🈳|schriftzeichen für „zimmer frei“,chinesisches schriftzeichen,japanisches schriftzeichen,leer,schriftzeichen für „leer“,zimmer frei
+㊗️|schriftzeichen für „gratulation“,chinesisches schriftzeichen,gratulation,japanisches schriftzeichen
+㊙️|schriftzeichen für „geheimnis“,chinesisches schriftzeichen,geheimnis,japanisches schriftzeichen
+🈺|schriftzeichen für „geöffnet“,betrieb,chinesisches schriftzeichen,geöffnet,japanisches schriftzeichen,schriftzeichen für „betrieb“
+🈵|schriftzeichen für „kein zimmer frei“,belegt,besetzt,chinesisches schriftzeichen,fülle,japanisches schriftzeichen,kanji,kein zimmer frei,schriftzeichen für „fülle“
+🔴|roter punkt,ball,punkt,rot
+🟠|oranger punkt,form,kreis,orange scheibe,oranger kreis,punkt
+🟡|gelber punkt,form,gelb,gelbe scheibe,gelber kreis,kreis,punkt,scheibe
+🟢|grüner punkt,form,grün,grüne scheibe,grüner kreis,kreis,punkt
+🔵|blauer punkt,ball,blau,großer blauer kreis,kreis,punkt
+🟣|lila punkt,form,kreis,lila,punkt,scheibe,violett
+🟤|brauner punkt,braun,braune scheibe,brauner kreis,form,kreis,punkt
+⚫|schwarzer punkt,ball,großer schwarzer kreis,kreis,punkt,rund,schwarz
+⚪|weißer punkt,ball,großer weißer kreis,kreis,punkt,weiß
+🟥|rotes quadrat,form,quadrat,rot,rotes viereck,viereck
+🟧|oranges quadrat,form,oranges viereck,quadrat,viereck
+🟨|gelbes quadrat,form,gelb,gelbes viereck,quadrat,viereck
+🟩|grünes quadrat,form,grün,grünes viereck,quadrat,viereck
+🟦|blaues quadrat,blau,blaues viereck,form,quadrat,viereck
+🟪|lila quadrat,form,lila,quadrat,viereck,violett
+🟫|braunes quadrat,braun,braunes viereck,form,quadrat,viereck
+⬛|großes schwarzes quadrat,quadrat,schwarz
+⬜|großes weißes quadrat,quadrat,weiß
+◼️|mittelgroßes schwarzes quadrat,quadrat,schwarz
+◻️|mittelgroßes weißes quadrat,quadrat,weiß
+◾|mittelkleines schwarzes quadrat,quadrat,schwarz
+◽|mittelkleines weißes quadrat,geometrisch,quadrat,weiß
+▪️|kleines schwarzes quadrat,punkt,quadrat,schwarz
+▫️|kleines weißes quadrat,quadrat,weiß
+🔶|große orangefarbene raute,orangefarben,raute
+🔷|große blaue raute,blau,raute
+🔸|kleine orangefarbene raute,orangefarben,raute
+🔹|kleine blaue raute,blau,raute
+🔺|rotes dreieck mit der spitze nach oben,aufwärts,dreieck,rot,rotes dreieck mit spitze oben
+🔻|rotes dreieck mit der spitze nach unten,abwärts,dreieck,rot
+💠|rautenform mit punkt,diamant,mit punkt,rautenform
+🔘|optionsfeld,schaltfläche
+🔳|weiße quadratische schaltfläche,quadrat,quadratisch,schaltfläche,weiß
+🔲|schwarze quadratische schaltfläche,quadratisch,schaltfläche,schwarz
+🏁|zielflagge,flagge,formel 1,karierte flagge,nascar,rennen
+🚩|wimpel,dreiecksflagge,flagge,rot,standortflagge
+🎌|überkreuzte flaggen,japan,japanische flaggen
+🏴|schwarze flagge,fahne,schwarze fahne,wehen,wehende schwarze fahne
+🏳️|weiße flagge,fahne,wehen,wehende weiße fahne,weiße fahne
+🏳️‍🌈|regenbogenflagge,bisexuell,bunt,fahne,flagge,lesbisch,regenbogen,schwul
+🏳️‍⚧️|transgender-flagge,flagge
+🏴‍☠️|piratenflagge,jolly roger,pirat,piratenfahne,schatz
+🇦🇨|flagge: ascension,flagge
+🇦🇩|flagge: andorra,flagge
+🇦🇪|flagge: vereinigte arabische emirate,flagge
+🇦🇫|flagge: afghanistan,flagge
+🇦🇬|flagge: antigua und barbuda,flagge
+🇦🇮|flagge: anguilla,flagge
+🇦🇱|flagge: albanien,flagge
+🇦🇲|flagge: armenien,flagge
+🇦🇴|flagge: angola,flagge
+🇦🇶|flagge: antarktis,flagge
+🇦🇷|flagge: argentinien,flagge
+🇦🇸|flagge: amerikanisch-samoa,flagge
+🇦🇹|flagge: österreich,flagge
+🇦🇺|flagge: australien,flagge
+🇦🇼|flagge: aruba,flagge
+🇦🇽|flagge: ålandinseln,flagge
+🇦🇿|flagge: aserbaidschan,flagge
+🇧🇦|flagge: bosnien und herzegowina,flagge
+🇧🇧|flagge: barbados,flagge
+🇧🇩|flagge: bangladesch,flagge
+🇧🇪|flagge: belgien,flagge
+🇧🇫|flagge: burkina faso,flagge
+🇧🇬|flagge: bulgarien,flagge
+🇧🇭|flagge: bahrain,flagge
+🇧🇮|flagge: burundi,flagge
+🇧🇯|flagge: benin,flagge
+🇧🇱|flagge: st. barthélemy,flagge
+🇧🇲|flagge: bermuda,flagge
+🇧🇳|flagge: brunei darussalam,flagge
+🇧🇴|flagge: bolivien,flagge
+🇧🇶|flagge: karibische niederlande,flagge
+🇧🇷|flagge: brasilien,flagge
+🇧🇸|flagge: bahamas,flagge
+🇧🇹|flagge: bhutan,flagge
+🇧🇻|flagge: bouvetinsel,flagge
+🇧🇼|flagge: botsuana,flagge
+🇧🇾|flagge: belarus,flagge
+🇧🇿|flagge: belize,flagge
+🇨🇦|flagge: kanada,flagge
+🇨🇨|flagge: kokosinseln,flagge
+🇨🇩|flagge: kongo-kinshasa,flagge
+🇨🇫|flagge: zentralafrikanische republik,flagge
+🇨🇬|flagge: kongo-brazzaville,flagge
+🇨🇭|flagge: schweiz,flagge
+🇨🇮|flagge: côte d'ivoire,flagge
+🇨🇰|flagge: cookinseln,flagge
+🇨🇱|flagge: chile,flagge
+🇨🇲|flagge: kamerun,flagge
+🇨🇳|flagge: china,flagge
+🇨🇴|flagge: kolumbien,flagge
+🇨🇵|flagge: clipperton-insel,flagge
+🇨🇶|flagge: sark,flagge
+🇨🇷|flagge: costa rica,flagge
+🇨🇺|flagge: kuba,flagge
+🇨🇻|flagge: cabo verde,flagge
+🇨🇼|flagge: curaçao,flagge
+🇨🇽|flagge: weihnachtsinsel,flagge
+🇨🇾|flagge: zypern,flagge
+🇨🇿|flagge: tschechien,flagge
+🇩🇪|flagge: deutschland,flagge
+🇩🇬|flagge: diego garcia,flagge
+🇩🇯|flagge: dschibuti,flagge
+🇩🇰|flagge: dänemark,flagge
+🇩🇲|flagge: dominica,flagge
+🇩🇴|flagge: dominikanische republik,flagge
+🇩🇿|flagge: algerien,flagge
+🇪🇦|flagge: ceuta und melilla,flagge
+🇪🇨|flagge: ecuador,flagge
+🇪🇪|flagge: estland,flagge
+🇪🇬|flagge: ägypten,flagge
+🇪🇭|flagge: westsahara,flagge
+🇪🇷|flagge: eritrea,flagge
+🇪🇸|flagge: spanien,flagge
+🇪🇹|flagge: äthiopien,flagge
+🇪🇺|flagge: europäische union,flagge
+🇫🇮|flagge: finnland,flagge
+🇫🇯|flagge: fidschi,flagge
+🇫🇰|flagge: falklandinseln,flagge
+🇫🇲|flagge: mikronesien,flagge
+🇫🇴|flagge: färöer,flagge
+🇫🇷|flagge: frankreich,flagge
+🇬🇦|flagge: gabun,flagge
+🇬🇧|flagge: vereinigtes königreich,flagge
+🇬🇩|flagge: grenada,flagge
+🇬🇪|flagge: georgien,flagge
+🇬🇫|flagge: französisch-guayana,flagge
+🇬🇬|flagge: guernsey,flagge
+🇬🇭|flagge: ghana,flagge
+🇬🇮|flagge: gibraltar,flagge
+🇬🇱|flagge: grönland,flagge
+🇬🇲|flagge: gambia,flagge
+🇬🇳|flagge: guinea,flagge
+🇬🇵|flagge: guadeloupe,flagge
+🇬🇶|flagge: äquatorialguinea,flagge
+🇬🇷|flagge: griechenland,flagge
+🇬🇸|flagge: südgeorgien und die südlichen sandwichinseln,flagge
+🇬🇹|flagge: guatemala,flagge
+🇬🇺|flagge: guam,flagge
+🇬🇼|flagge: guinea-bissau,flagge
+🇬🇾|flagge: guyana,flagge
+🇭🇰|flagge: sonderverwaltungsregion hongkong,flagge
+🇭🇲|flagge: heard und mcdonaldinseln,flagge
+🇭🇳|flagge: honduras,flagge
+🇭🇷|flagge: kroatien,flagge
+🇭🇹|flagge: haiti,flagge
+🇭🇺|flagge: ungarn,flagge
+🇮🇨|flagge: kanarische inseln,flagge
+🇮🇩|flagge: indonesien,flagge
+🇮🇪|flagge: irland,flagge
+🇮🇱|flagge: israel,flagge
+🇮🇲|flagge: isle of man,flagge
+🇮🇳|flagge: indien,flagge
+🇮🇴|flagge: britisches territorium im indischen ozean,flagge
+🇮🇶|flagge: irak,flagge
+🇮🇷|flagge: iran,flagge
+🇮🇸|flagge: island,flagge
+🇮🇹|flagge: italien,flagge
+🇯🇪|flagge: jersey,flagge
+🇯🇲|flagge: jamaika,flagge
+🇯🇴|flagge: jordanien,flagge
+🇯🇵|flagge: japan,flagge
+🇰🇪|flagge: kenia,flagge
+🇰🇬|flagge: kirgisistan,flagge
+🇰🇭|flagge: kambodscha,flagge
+🇰🇮|flagge: kiribati,flagge
+🇰🇲|flagge: komoren,flagge
+🇰🇳|flagge: st. kitts und nevis,flagge
+🇰🇵|flagge: nordkorea,flagge
+🇰🇷|flagge: südkorea,flagge
+🇰🇼|flagge: kuwait,flagge
+🇰🇾|flagge: kaimaninseln,flagge
+🇰🇿|flagge: kasachstan,flagge
+🇱🇦|flagge: laos,flagge
+🇱🇧|flagge: libanon,flagge
+🇱🇨|flagge: st. lucia,flagge
+🇱🇮|flagge: liechtenstein,flagge
+🇱🇰|flagge: sri lanka,flagge
+🇱🇷|flagge: liberia,flagge
+🇱🇸|flagge: lesotho,flagge
+🇱🇹|flagge: litauen,flagge
+🇱🇺|flagge: luxemburg,flagge
+🇱🇻|flagge: lettland,flagge
+🇱🇾|flagge: libyen,flagge
+🇲🇦|flagge: marokko,flagge
+🇲🇨|flagge: monaco,flagge
+🇲🇩|flagge: republik moldau,flagge
+🇲🇪|flagge: montenegro,flagge
+🇲🇫|flagge: st. martin,flagge
+🇲🇬|flagge: madagaskar,flagge
+🇲🇭|flagge: marshallinseln,flagge
+🇲🇰|flagge: nordmazedonien,flagge
+🇲🇱|flagge: mali,flagge
+🇲🇲|flagge: myanmar,flagge
+🇲🇳|flagge: mongolei,flagge
+🇲🇴|flagge: sonderverwaltungsregion macau,flagge
+🇲🇵|flagge: nördliche marianen,flagge
+🇲🇶|flagge: martinique,flagge
+🇲🇷|flagge: mauretanien,flagge
+🇲🇸|flagge: montserrat,flagge
+🇲🇹|flagge: malta,flagge
+🇲🇺|flagge: mauritius,flagge
+🇲🇻|flagge: malediven,flagge
+🇲🇼|flagge: malawi,flagge
+🇲🇽|flagge: mexiko,flagge
+🇲🇾|flagge: malaysia,flagge
+🇲🇿|flagge: mosambik,flagge
+🇳🇦|flagge: namibia,flagge
+🇳🇨|flagge: neukaledonien,flagge
+🇳🇪|flagge: niger,flagge
+🇳🇫|flagge: norfolkinsel,flagge
+🇳🇬|flagge: nigeria,flagge
+🇳🇮|flagge: nicaragua,flagge
+🇳🇱|flagge: niederlande,flagge
+🇳🇴|flagge: norwegen,flagge
+🇳🇵|flagge: nepal,flagge
+🇳🇷|flagge: nauru,flagge
+🇳🇺|flagge: niue,flagge
+🇳🇿|flagge: neuseeland,flagge
+🇴🇲|flagge: oman,flagge
+🇵🇦|flagge: panama,flagge
+🇵🇪|flagge: peru,flagge
+🇵🇫|flagge: französisch-polynesien,flagge
+🇵🇬|flagge: papua-neuguinea,flagge
+🇵🇭|flagge: philippinen,flagge
+🇵🇰|flagge: pakistan,flagge
+🇵🇱|flagge: polen,flagge
+🇵🇲|flagge: st. pierre und miquelon,flagge
+🇵🇳|flagge: pitcairninseln,flagge
+🇵🇷|flagge: puerto rico,flagge
+🇵🇸|flagge: palästinensische autonomiegebiete,flagge
+🇵🇹|flagge: portugal,flagge
+🇵🇼|flagge: palau,flagge
+🇵🇾|flagge: paraguay,flagge
+🇶🇦|flagge: katar,flagge
+🇷🇪|flagge: réunion,flagge
+🇷🇴|flagge: rumänien,flagge
+🇷🇸|flagge: serbien,flagge
+🇷🇺|flagge: russland,flagge
+🇷🇼|flagge: ruanda,flagge
+🇸🇦|flagge: saudi-arabien,flagge
+🇸🇧|flagge: salomonen,flagge
+🇸🇨|flagge: seychellen,flagge
+🇸🇩|flagge: sudan,flagge
+🇸🇪|flagge: schweden,flagge
+🇸🇬|flagge: singapur,flagge
+🇸🇭|flagge: st. helena,flagge
+🇸🇮|flagge: slowenien,flagge
+🇸🇯|flagge: spitzbergen und jan mayen,flagge
+🇸🇰|flagge: slowakei,flagge
+🇸🇱|flagge: sierra leone,flagge
+🇸🇲|flagge: san marino,flagge
+🇸🇳|flagge: senegal,flagge
+🇸🇴|flagge: somalia,flagge
+🇸🇷|flagge: suriname,flagge
+🇸🇸|flagge: südsudan,flagge
+🇸🇹|flagge: são tomé und príncipe,flagge
+🇸🇻|flagge: el salvador,flagge
+🇸🇽|flagge: sint maarten,flagge
+🇸🇾|flagge: syrien,flagge
+🇸🇿|flagge: eswatini,flagge
+🇹🇦|flagge: tristan da cunha,flagge
+🇹🇨|flagge: turks- und caicosinseln,flagge
+🇹🇩|flagge: tschad,flagge
+🇹🇫|flagge: französische süd- und antarktisgebiete,flagge
+🇹🇬|flagge: togo,flagge
+🇹🇭|flagge: thailand,flagge
+🇹🇯|flagge: tadschikistan,flagge
+🇹🇰|flagge: tokelau,flagge
+🇹🇱|flagge: timor-leste,flagge
+🇹🇲|flagge: turkmenistan,flagge
+🇹🇳|flagge: tunesien,flagge
+🇹🇴|flagge: tonga,flagge
+🇹🇷|flagge: türkei,flagge
+🇹🇹|flagge: trinidad und tobago,flagge
+🇹🇻|flagge: tuvalu,flagge
+🇹🇼|flagge: taiwan,flagge
+🇹🇿|flagge: tansania,flagge
+🇺🇦|flagge: ukraine,flagge
+🇺🇬|flagge: uganda,flagge
+🇺🇲|flagge: amerikanische überseeinseln,flagge
+🇺🇳|flagge: vereinte nationen,flagge
+🇺🇸|flagge: vereinigte staaten,flagge
+🇺🇾|flagge: uruguay,flagge
+🇺🇿|flagge: usbekistan,flagge
+🇻🇦|flagge: vatikanstadt,flagge
+🇻🇨|flagge: st. vincent und die grenadinen,flagge
+🇻🇪|flagge: venezuela,flagge
+🇻🇬|flagge: britische jungferninseln,flagge
+🇻🇮|flagge: amerikanische jungferninseln,flagge
+🇻🇳|flagge: vietnam,flagge
+🇻🇺|flagge: vanuatu,flagge
+🇼🇫|flagge: wallis und futuna,flagge
+🇼🇸|flagge: samoa,flagge
+🇽🇰|flagge: kosovo,flagge
+🇾🇪|flagge: jemen,flagge
+🇾🇹|flagge: mayotte,flagge
+🇿🇦|flagge: südafrika,flagge
+🇿🇲|flagge: sambia,flagge
+🇿🇼|flagge: simbabwe,flagge
+🏴󠁧󠁢󠁥󠁮󠁧󠁿|flagge: england,flagge
+🏴󠁧󠁢󠁳󠁣󠁴󠁿|flagge: schottland,flagge
+🏴󠁧󠁢󠁷󠁬󠁳󠁿|flagge: wales,flagge
+←|nach links weisender pfeil,links,nach links weisend,pfeil
+↑|nach oben weisender pfeil,aufwärts,nach oben weisend,pfeil
+→|nach rechts weisender pfeil,nach rechts weisend,pfeil,rechts
+↓|nach unten weisender pfeil,abwärts,nach unten weisend,pfeil
+↖|pfeil nach links oben,nach links oben,nordwesten,pfeil
+↗|pfeil nach rechts oben,nach rechts oben,nordosten,pfeil
+↘|pfeil nach rechts unten,nach rechts unten,pfeil,südosten
+↙|pfeil nach links unten,nach links unten,pfeil
+↔|pfeil nach links und rechts,entgegengesetzt,nach links und rechts,pfeil
+↕|pfeil nach oben und unten,entgegengesetzt,nach oben und unten,pfeil
+↩|geschwungener pfeil nach links,geschwungen,links,nach links,pfeil
+↪|geschwungener pfeil nach rechts,geschwungen,nach rechts,pfeil,rechts,umdrehen
+↰|pfeil nach oben mit spitze nach links
+↱|pfeil nach oben mit spitze nach rechts
+↲|pfeil nach unten mit spitze nach links
+↳|pfeil nach unten mit spitze nach rechts
+⇄|pfeil nach rechts über pfeil nach links
+⇅|nach oben und nach unten weisende pfeile,abwärts,aufwärts,nach oben weisend,nach unten weisend,pfeil
+⇐|pfeil mit doppelstrich nach links
+⇑|pfeil mit doppelstrich nach oben
+⇒|pfeil mit doppelstrich nach rechts
+⇓|pfeil mit doppelstrich nach unten
+⇔|pfeil mit doppelstrich nach links und rechts
+⇧|weißer pfeil nach oben
+⇪|weißer pfeil nach oben von strich weglaufend
+$|geld,peso
+£|pfund sterling,britisches pfund,egp,pfund,währung
+€|währung
+¥|cny,renminbi,währung
+₹|indische rupie,rupie,währung
+₩|kpw
+₽|rubel,währung
+₺|türkische lira
+₫|vietnamesischer dong
+₴|ukrainische hrywnja
+₦|nigerianischer naira
+₪|israelischer neuer schekel
+฿|thailändischer baht
+₿|bitcoin-zeichen
+₡|costa-rica-colón
+₨|rupie
+₸|kasachischer tenge
+¤|unbekannte währung
++|pluszeichen,addieren
+−|minuszeichen,subtrahieren
+×|multiplikation,mal,malnehmen,malzeichen,multiplikationszeichen,multiplizieren
+÷|dividieren,divisionszeichen,geteiltzeichen,teilen,teilen durch
+=|gleichheitszeichen,gleich
+≠|ungleich,ungleichheit
+≈|ungefähr gleich,näherung,ungefähr-zeichen
+<|kleiner als,kleiner-als-zeichen
+>|größer als,größer-als-zeichen
+≤|kleiner als oder gleich,gleich,ist gleich,kleiner als,vergleichszeichen
+≥|größer als oder gleich,gleich,größer als,ist gleich,vergleichszeichen
+±|plusminuszeichen,plus-minus-zeichen,plusminus
+¬|negationszeichen,nicht
+√|quadratwurzel,basiszahl,grundzahl,irrationale zahl,quadratzahl,radikal,wurzel
+∞|unendlichkeitszeichen,unendlich,unendlichkeit
+∑|summenzeichen
+∏|produktzeichen
+∂|partielle ableitung
+∆|inkrement,dreieck,erhöhung,schrittweite,wertzuwachs,zuwachs
+∇|dreieck
+∈|element von,enthält,menge,zugehörigkeit
+∉|kein element von
+∩|schnittmenge,menge,schnitt
+∪|vereinigungsmenge,menge,vereinigung
+⊂|teilmenge,menge,teilmenge von,untermenge,untermenge von
+⊃|obermenge von
+∅|leere menge
+∧|logisches und
+⊕|eingekreistes pluszeichen
+∝|proportional zu
+∴|folglich
+∵|weil
+°|grad alkohol,grad,proof,stunde,volumenprozent
+‰|promille,promillezeichen,tausendstel
+µ|mikro-zeichen,maßeinheit,my
+■|schwarzes quadrat
+□|weißes quadrat
+▪|kleines schwarzes quadrat,punkt,quadrat,schwarz
+▫|kleines weißes quadrat,quadrat,weiß
+▲|schwarzes nach oben weisendes dreieck,aufwärts,dreieck,pfeil,schwarz
+△|weißes nach oben weisendes dreieck
+▶|wiedergabe,abspielen,dreieck,pfeil,rechts
+▷|weißes nach rechts weisendes dreieck
+▼|schwarzes nach unten weisendes dreieck,abwärts,dreieck,pfeil,schwarz
+▽|weißes nach unten weisendes dreieck
+◀|pfeil zurück,dreieck,links,pfeil,zurück
+◁|weißes nach links weisendes dreieck
+●|gefüllter kreis,kreis
+○|hohler kreis,kreis,ring
+◆|schwarzes karo
+◇|weißes karo
+♠|pik,karten,kartenspiel
+♣|kreuz,kartenspiel
+♥|herz,kartenspiel
+♦|karo,kartenspiel
+•|aufzählungspunkt,aufzählungszeichen,blickfangpunkt,punkt
+◦|weißes aufzählungszeichen
+·|mittelpunkt,halbhochpunkt,punkt
+—|geviertstrich,strich
+–|halbgeviertstrich,langstrich,n-dash,strich
+…|ellipse,auslassungszeichen,drei punkte
+«|nach links weisendes guillemet,anführungszeichen,caret,chevron,klammer,links,spitzzeichen
+»|nach rechts weisendes guillemet,anführungszeichen,caret,chevron,klammer,rechts,spitzzeichen
+‘|apostroph links,anführungszeichen oben,apostroph,einfaches anführungszeichen oben,hochkomma
+’|apostroph rechts,anführungszeichen oben,apostroph,einfaches anführungszeichen oben,hochkomma
+“|öffnendes doppeltes anführungszeichen oben,anführung,doppeltes anführungszeichen
+”|schließendes doppeltes anführungszeichen oben,anführung,doppeltes anführungszeichen
+„|öffnendes doppeltes anführungszeichen unten,anführung,anführungszeichen,doppeltes anführungszeichen,doppeltes anführungszeichen unten,öffnendes anführungszeichen unten
+†|langkreuz,dolch,kreuz,obeliscus,obelisk
+‡|zweibalkenkreuz,doppelkreuz,doppeltes kreuz,kreuz,obeliscus,obelisk
+§|paragraf,absatz,abschnitt
+¶|absatzzeichen,absatz,absatzmarke,alinea
+©|c
+®|registered-trademark,markenzeichen,r
+™|markenzeichen,tm
+¡|umgekehrtes ausrufezeichen,ausruf,ausrufezeichen,spanisch,umgekehrt
+¿|umgekehrtes fragezeichen,frage,fragezeichen,spanisch,umgekehrt
+◉|weißer kreis mit kleinem schwarzem kreis
+◎|konzentrische kreise
+#|doppelkreuz,nummernzeichen,raute
+*|sternchen,stern
+@|at-zeichen,ad-zeichen,adresszeichen,affenschaukel,affenschwanz,klammeraffe
+&|et-zeichen,kaufmännisches und-zeichen,und,und-zeichen
+%|prozent,hundertstel,prozentzeichen,vom hundert
+⁉|ausrufe- und fragezeichen,ausrufezeichen,fragezeichen,rot,satzzeichen
+‼|doppeltes ausrufezeichen,ausrufezeichen,doppelt,muss,rot,satzzeichen
+℗|copyrightzeichen für audioaufnahme,audio,audioaufnahme,aufnahme,aufzeichnung,copyrightzeichen
+※|glyphe,japanisch,reismarke
+・|katakana-mittelpunkt,mediopunkt,mittelpunkt,punkt auf mitte
+―|waagerechter strich,gedankenstrich,halbgeviertstrich,strich
+〈|öffnende spitze klammer,öffnende winkelklammer,pfeilspitze links,spitze klammer,winkelklammer
+〉|schließende spitze klammer,pfeilspitze rechts,schließende winkelklammer,spitze klammer,spitze klammer rechts,winkelklammer
+《|öffnende doppelte spitze klammer,doppelte spitze klammer,klammer
+》|schließende doppelte spitze klammer,doppelte spitze klammer,klammer
+「|öffnende eckklammer,eckklammer,klammer
+」|schließende eckklammer,eckklammer,klammer
+『|öffnende hohle eckklammer,hohle eckklammer,klammer
+』|schließende hohle eckklammer,hohle eckklammer,klammer
+【|öffnende schwarze konkave klammer,klammer,konkave klammer,schwarze konkave klammer
+】|schließende schwarze konkave klammer,klammer,konkave klammer,schwarze konkave klammer
+⇥|pfeil nach rechts auf strich zulaufend
+⇤|pfeil nach links auf strich zulaufend
+⇞|pfeil nach oben mit doppeltem querstrich
+⇟|pfeil nach unten mit doppeltem querstrich
+⏏|auswerfen,auswurf,auswurftaste,medien
+⌨|tastatur,computer
+⚙|zahnrad,werkzeug

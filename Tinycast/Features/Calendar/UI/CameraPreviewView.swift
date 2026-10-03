@@ -18,7 +18,7 @@ struct CameraPreviewView: View {
         }
         .frame(width: Theme.Size.cameraPreview.width)
         .background(Theme.Colors.panelScrim)
-        .background(VisualEffectView())
+        .background(GlassEffectView())
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.dialog, style: .continuous))
         .panelEntrance()
     }

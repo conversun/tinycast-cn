@@ -1,4 +1,4 @@
-// Meeting links, the join and menu-bar windows, auto-join, drafts, buckets and span.
+// Meeting links, the join and menu-bar windows, auto-join, drafts, day groups and span.
 import Foundation
 
 @main
@@ -25,16 +25,19 @@ struct CalendarTests {
         cardWindow()
         chordFallsBackWiderThanTheCard()
         countdownStrings()
-        rowCountdowns()
+        rowPills()
         dayBuckets()
+        dayGroups()
         readSpan()
         menuBarWindow()
+        menuBarDismissal()
         menuBarFiltering()
         menuBarToday()
         menuBarTitles()
         autoJoinFiresOnce()
         autoJoinRespectsArming()
         eventDrafts()
+        meetingDetails()
 
         print("\(passes)/\(passes + failures) passed")
         if failures > 0 { exit(1) }
@@ -271,17 +274,36 @@ struct CalendarTests {
             "a meeting that is over is not offered")
     }
 
-    static func rowCountdowns() {
-        let meeting = event(id: "review", start: 120, minutes: 30)
-        func pill(_ offset: TimeInterval) -> String? {
-            UpcomingWindow.rowCountdown(for: meeting, now: at(120).addingTimeInterval(offset))
+    static func rowPills() {
+        var calendar = Self.calendar
+        calendar.locale = Locale(identifier: "en_US")
+        let start = date(year: 2026, month: 9, day: 23, hour: 17)
+        let meeting = event(id: "review", starting: start, minutes: 30)
+        func pill(_ offset: TimeInterval) -> UpcomingWindow.RowPill? {
+            UpcomingWindow.rowPill(
+                for: meeting, now: start.addingTimeInterval(offset), calendar: calendar)
         }
-        expect(pill(-60 * 60) == "in 60 min", "exactly an hour out still earns a pill")
-        expect(pill(-60 * 60 - 1) == nil, "past the hour a row shows only its time")
-        expect(pill(-25 * 60) == "in 25 min", "inside the hour a row counts down")
-        expect(pill(0) == "Now", "the start reads as Now")
-        expect(pill(29 * 60) == "Now", "a meeting under way stays Now")
+        expect(
+            pill(-60 * 60) == .init(text: "in 60 min", isImminent: true),
+            "exactly an hour out is imminent")
+        expect(
+            pill(-3 * 60 * 60) == .init(text: "in 3 hr", isImminent: false),
+            "later today counts down in hours")
+        expect(
+            pill(-18 * 60 * 60) == .init(text: "Wed, Sep 23", isImminent: false),
+            "a meeting tomorrow names its date")
+        expect(
+            pill(-40 * 60)?.text == "in 40 min", "inside the hour a countdown beats the date")
+        expect(pill(0)?.text == "Now", "the start reads as Now")
+        expect(pill(29 * 60) == .init(text: "Now", isImminent: true), "a meeting under way stays Now")
         expect(pill(30 * 60) == nil, "a finished meeting earns no pill")
+
+        let lateNight = date(year: 2026, month: 9, day: 23, hour: 23, minute: 30)
+        let pastMidnight = event(id: "late", starting: lateNight.addingTimeInterval(40 * 60))
+        expect(
+            UpcomingWindow.rowPill(for: pastMidnight, now: lateNight, calendar: calendar)?.text
+                == "in 40 min",
+            "a meeting just past midnight still counts down")
     }
 
     static func countdownStrings() {
@@ -359,6 +381,32 @@ struct CalendarTests {
         expect(
             automatic.event(from: [meeting, next], now: start)?.id == "next",
             "when the current one hides, the next inside its lead time takes the space")
+    }
+
+    static func menuBarDismissal() {
+        let meeting = event(id: "standup", start: 60, minutes: 30)
+        let next = event(id: "next", start: 62)
+        let now = at(60).addingTimeInterval(-60)
+        expect(
+            automatic.event(from: [meeting, next], now: now, dismissed: [])?.id == "standup",
+            "nothing dismissed leaves the earliest event in the menu bar")
+        expect(
+            automatic.event(from: [meeting, next], now: now, dismissed: ["standup"])?.id == "next",
+            "dismissing the displayed event hands the space to the next one inside its lead")
+        expect(
+            automatic.event(from: [meeting], now: now, dismissed: ["standup"]) == nil,
+            "with nothing behind it the menu bar clears instead")
+        expect(
+            automatic.event(from: [meeting, next], now: now, dismissed: ["next"])?.id == "standup",
+            "dismissing an event that is not displayed leaves the displayed one alone")
+        expect(
+            automatic.event(from: [meeting, next], now: now, dismissed: ["standup", "next"]) == nil,
+            "dismissing both clears the menu bar")
+
+        let later = at(62).addingTimeInterval(-60)
+        expect(
+            automatic.event(from: [meeting, next], now: later, dismissed: ["standup"])?.id == "next",
+            "a dismissal is per occurrence, so the next event still arrives on its own lead")
     }
 
     static func menuBarFiltering() {
@@ -497,23 +545,75 @@ struct CalendarTests {
         expect(EventDraft.label(duration: 60) == "1 hr", "an hour reads as an hour")
     }
 
+    // MARK: - Meeting details
+
+    static func meetingDetails() {
+        let notes = MeetingDetails.plainText(fromNotes:)
+        expect(notes("  Agenda\n\nBring numbers  ") == "Agenda\n\nBring numbers", "plain text is trimmed")
+        expect(notes(" \n ") == nil, "blank notes are none at all")
+        expect(
+            notes("Join <https://teams.microsoft.com/l/meetup-join/1> now")
+                == "Join <https://teams.microsoft.com/l/meetup-join/1> now",
+            "an angle-bracketed link in plain text survives")
+        expect(notes("a < b and c > d") == "a < b and c > d", "bare angle brackets are not markup")
+        expect(
+            notes("<b>Agenda</b><br>Q&amp;A<br/><br><br>Wrap&nbsp;up") == "Agenda\nQ&A\n\nWrap up",
+            "HTML notes lose their tags, keep their breaks and decode entities")
+        expect(
+            notes("<ul><li>One</li><li>Two</li></ul>") == "• One\n• Two", "list items become bullets")
+        expect(
+            notes("<p>See <a href=\"https://example.com\">https://example.com</a></p>")
+                == "See https://example.com",
+            "a link keeps its text")
+        expect(notes("&amp;lt;b&amp;gt; <br>") == "&lt;b&gt;", "entities decode exactly once")
+
+        let organizer = MeetingDetails.Attendee(name: "Ana", response: .accepted, isOrganizer: true)
+        let guest = MeetingDetails.Attendee(name: "Ben", response: .pending, isOrganizer: false)
+        let other = MeetingDetails.Attendee(name: "Cy", response: .declined, isOrganizer: false)
+        let details = MeetingDetails(
+            meetingID: "m", location: "  \n", notes: nil, attendees: [guest, organizer, other])
+        expect(details.attendees == [organizer, guest, other], "the organizer leads, the rest keep order")
+        expect(details.location == nil, "a blank location is none at all")
+    }
+
     // MARK: - Day buckets
 
     static func dayBuckets() {
+        var calendar = Self.calendar
+        calendar.locale = Locale(identifier: "en_US")
         let now = date(year: 2026, month: 8, day: 23, hour: 22)
+        func day(_ hours: Double) -> MeetingDay {
+            MeetingDay(for: now.addingTimeInterval(hours * 3600), now: now, calendar: calendar)
+        }
+        expect(day(1).offset == 0, "an hour before midnight is still today")
+        expect(day(2).offset == 1, "an hour past midnight is tomorrow")
         expect(
-            MeetingDay(for: now.addingTimeInterval(3600), now: now, calendar: calendar) == .today,
-            "an hour before midnight is still today")
+            day(48).offset == 2 && day(48).start == date(year: 2026, month: 8, day: 25, hour: 0),
+            "the day after tomorrow is its own day, keyed by its midnight")
+        expect(day(-24) == day(1), "a meeting still running from yesterday is happening today")
         expect(
-            MeetingDay(for: now.addingTimeInterval(2 * 3600), now: now, calendar: calendar)
-                == .tomorrow,
-            "an hour past midnight is tomorrow")
+            day(1).title(calendar: calendar) == "Today, Aug 23"
+                && day(2).title(calendar: calendar) == "Tomorrow, Aug 24"
+                && day(48).title(calendar: calendar) == "Tuesday, Aug 25",
+            "a day is named relative to today while it can be, then by weekday, always dated")
+    }
+
+    static func dayGroups() {
+        let now = at(9 * 60)
+        let agenda = [
+            event(id: "standup", start: 10 * 60), event(id: "review", start: 14 * 60),
+            event(id: "kickoff", start: 33 * 60), event(id: "offsite", start: 81 * 60)
+        ]
+        let groups = MeetingDayGroup.grouping(agenda, now: now, calendar: calendar)
         expect(
-            MeetingDay(for: now.addingTimeInterval(48 * 3600), now: now, calendar: calendar) == nil,
-            "the day after tomorrow has no bucket")
+            groups.map(\.day.offset) == [0, 1, 3],
+            "one group per day, in start order")
         expect(
-            MeetingDay(for: now.addingTimeInterval(-24 * 3600), now: now, calendar: calendar) == nil,
-            "yesterday has no bucket")
+            groups.map { $0.meetings.map(\.id) } == [["standup", "review"], ["kickoff"], ["offsite"]],
+            "a day's meetings stay together and in order")
+        expect(
+            MeetingDayGroup.grouping([], now: now, calendar: calendar).isEmpty,
+            "an empty agenda has no days")
     }
 
     // MARK: - The read span
@@ -521,10 +621,6 @@ struct CalendarTests {
     static func readSpan() {
         let now = date(year: 2026, month: 8, day: 23, hour: 22)
         let midnight = date(year: 2026, month: 8, day: 23, hour: 0)
-        expect(
-            MeetingSpan(includesTomorrow: false) == .today
-                && MeetingSpan(includesTomorrow: true) == .todayAndTomorrow,
-            "the setting names the span")
         expect(
             MeetingSpan.today.interval(from: now, calendar: calendar)
                 == DateInterval(start: midnight, end: date(year: 2026, month: 8, day: 24, hour: 0)),
@@ -534,8 +630,14 @@ struct CalendarTests {
                 == DateInterval(start: midnight, end: date(year: 2026, month: 8, day: 25, hour: 0)),
             "tomorrow adds a second day to the same start")
         expect(
+            MeetingSpan.nextSevenDays.interval(from: now, calendar: calendar)
+                == DateInterval(start: midnight, end: date(year: 2026, month: 8, day: 30, hour: 0)),
+            "the week runs seven days from the same start, today included")
+        expect(
             MeetingSpan.today.possessivePhrase == "today's"
-                && MeetingSpan.todayAndTomorrow.orPhrase == "today or tomorrow",
+                && MeetingSpan.todayAndTomorrow.orPhrase == "today or tomorrow"
+                && MeetingSpan.nextSevenDays.possessivePhrase == "the next 7 days'"
+                && MeetingSpan.nextSevenDays.orPhrase == "in the next 7 days",
             "the wording follows the span")
     }
 

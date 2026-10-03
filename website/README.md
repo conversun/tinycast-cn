@@ -31,6 +31,7 @@ generated and not committed.
 | Path               | Holds                                                                  |
 | ------------------ | ---------------------------------------------------------------------- |
 | `src/app/`         | Routes. `page.tsx` is the marketing page; `docs/` is the documentation |
+| `src/lib/`         | Build-time GitHub reads: the version, stars and the stable changelog   |
 | `worker/`          | The Worker behind `/support`'s API                                     |
 | `src/components/`  | Page sections, with shared primitives in `ui/`                         |
 | `src/data/`        | All copy and content, so components stay free of prose                 |
@@ -75,7 +76,9 @@ type added to `Scripts/upload-website-media.sh`.
 
 ## Deploy
 
-Pushing to `main` deploys the site. To check the exported build locally:
+Pushing to `main` deploys the site, and so does every stable release, so `/changelog` and the
+footer's version never lag a release. The build reads GitHub's API with CI's `GITHUB_TOKEN`; a local
+build without one makes anonymous requests. To check the exported build locally:
 
 ```sh
 npm run build

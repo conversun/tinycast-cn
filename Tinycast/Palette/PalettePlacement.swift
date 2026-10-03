@@ -2,6 +2,8 @@ import CoreGraphics
 
 /// Pure, with every screen fact injected, so this stays testable off a display.
 enum PalettePlacement {
+    static let maxSnapEntrySpeedPointsPerSecond: CGFloat = 600
+
     /// The untouched placement: centred, top edge a fraction of the way down, growing downward.
     static func defaultAnchor(
         in visibleFrame: CGRect, width: CGFloat, topMarginFraction: CGFloat
@@ -22,6 +24,10 @@ enum PalettePlacement {
         CGPoint(x: visibleFrame.minX + offset.x, y: visibleFrame.maxY - offset.y)
     }
 
+    static func expandedCenterY(in visibleFrame: CGRect, expandedHeight: CGFloat) -> CGFloat {
+        visibleFrame.midY + expandedHeight / 2
+    }
+
     /// Nil once the display shows too little of the compact bar to grab it back.
     static func restored(
         _ stored: CGPoint, graspable: CGSize, visibleFrame: CGRect, minimumVisible: CGFloat
@@ -34,9 +40,48 @@ enum PalettePlacement {
             ? stored : nil
     }
 
-    /// Near enough to the default placement that releasing the drag should drop it home.
-    static func isSnapping(_ anchor: CGPoint, to home: CGPoint, within distance: CGFloat) -> Bool {
-        abs(anchor.x - home.x) <= distance && abs(anchor.y - home.y) <= distance
+    enum HeightSnap: Equatable {
+        case home
+        case expandedCenter
+    }
+
+    struct Snap {
+        let anchor: CGPoint
+        let centeredX: Bool
+        let height: HeightSnap?
+    }
+
+    /// Height detents exist only on the invisible vertical centre line.
+    static func snapped(
+        _ anchor: CGPoint, home: CGPoint, visibleFrame: CGRect,
+        expandedHeight: CGFloat, within distance: CGFloat, previous: Snap?, speed: CGFloat
+    ) -> Snap {
+        let wasCentered = previous?.centeredX ?? false
+        let allowsEntry = speed <= maxSnapEntrySpeedPointsPerSecond
+        guard abs(anchor.x - home.x) <= distance * (wasCentered ? 2 : 1),
+            wasCentered || allowsEntry
+        else {
+            return Snap(anchor: anchor, centeredX: false, height: nil)
+        }
+        let expandedY = expandedCenterY(in: visibleFrame, expandedHeight: expandedHeight)
+        let candidateHeight: HeightSnap?
+        if abs(anchor.y - home.y) <= distance
+            && abs(anchor.y - home.y) <= abs(anchor.y - expandedY)
+        {
+            candidateHeight = .home
+        } else if abs(anchor.y - expandedY) <= distance {
+            candidateHeight = .expandedCenter
+        } else {
+            candidateHeight = nil
+        }
+        let height = allowsEntry || candidateHeight == previous?.height ? candidateHeight : nil
+        let y: CGFloat =
+            switch height {
+            case .home: home.y
+            case .expandedCenter: expandedY
+            case nil: anchor.y
+            }
+        return Snap(anchor: CGPoint(x: home.x, y: y), centeredX: true, height: height)
     }
 }
 

@@ -8,12 +8,12 @@ struct FileSearchSettingsView: View {
         return Form {
             Section {
                 Toggle(isOn: $settings.fileSearchEnabled) {
-                    SettingsRowTitle(.fileSearchFileSearch, "Enable File Search")
-                    Text("Uses the Spotlight index, only when you search.")
+                    SettingsFeatureToggleLabel(
+                        anchor: .fileSearchFileSearch, title: "Enable File Search",
+                        subtitle: "Uses the Spotlight index, only when you search.")
                 }
-            } header: {
-                SettingsSectionHeader(.fileSearchFileSearch)
             }
+            .settingsAnchor(.fileSearchFileSearch)
 
             FeatureCommandsSection(owner: .fileSearch, anchor: .fileSearchCommands)
                 .settingsEnabled(settings.fileSearchEnabled)
@@ -39,7 +39,11 @@ private struct FileSearchScopesSection: View {
     var body: some View {
         Section {
             ForEach(settings.fileSearchScopes, id: \.self) { scope in
-                ScopeRow(scope: scope, isMissing: missing.contains(scope)) {
+                SettingsScopeRow(
+                    scope: scope,
+                    path: FileSearchScope.expand(scope, homeDirectory: home).path,
+                    isMissing: missing.contains(scope)
+                ) {
                     settings.fileSearchScopes.removeAll { $0 == scope }
                 }
             }
@@ -84,39 +88,6 @@ private struct FileSearchScopesSection: View {
         guard panel.runModal() == .OK else { return }
         settings.fileSearchScopes = FileSearchScope.normalize(
             settings.fileSearchScopes + panel.urls.map(\.path), homeDirectory: home)
-    }
-}
-
-private struct ScopeRow: View {
-    let scope: String
-    let isMissing: Bool
-    let onRemove: () -> Void
-
-    var body: some View {
-        LabeledContent {
-            HStack(spacing: Theme.Spacing.sm) {
-                if isMissing {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                        .help("This location no longer exists.")
-                }
-                Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(scope)")
-            }
-        } label: {
-            Label {
-                Text(scope)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .foregroundStyle(isMissing ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
-            } icon: {
-                Image(systemName: "folder")
-            }
-        }
     }
 }
 

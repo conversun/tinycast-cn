@@ -1,56 +1,56 @@
 ---
 title: Favorites
-description: Pin the things you open all the time, and launch them by number.
+description: Pin the things you open most, and open them by number.
 ---
 
-A favorite sits above everything else when the launcher opens with nothing typed.
+Favorites appear above everything else when you open the launcher with nothing typed.
 
 ## Adding one
 
 Select an entry and press <kbd>⇧</kbd><kbd>⌘</kbd><kbd>F</kbd>, or choose
-<kbd>⌘</kbd><kbd>K</kbd> → **Add to Favorites**. The same key and menu remove it.
+<kbd>⌘</kbd><kbd>K</kbd> → **Add to Favorites**. The same shortcut and menu item remove it.
 
-After adding, the highlight moves to your first favorite. After removing, it lands on the favorite
-above the one you took out, so the section stays under your fingers.
+After you add a favorite, the selection moves to your first favorite. After you remove one, the
+selection moves to the favorite above it, so you stay in the Favorites section.
 
 ## Reordering
 
-Favorites stay in the order you put them. With nothing typed, select one and press
-<kbd>⌥</kbd><kbd>⌘</kbd><kbd>↑</kbd> or <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↓</kbd>, or use
+Favorites keep the order you give them. With nothing typed, select one and press
+<kbd>⌥</kbd><kbd>⌘</kbd><kbd>↑</kbd> or <kbd>⌥</kbd><kbd>⌘</kbd><kbd>↓</kbd>, or choose
 <kbd>⌘</kbd><kbd>K</kbd> → **Move Favorite Up** or **Move Favorite Down**.
 
-The selection follows the favorite as it moves, so holding the keys walks it to where you want it.
+The selection moves with the favorite, so you can keep pressing the keys until it's where you want
+it.
 
 ## Launching by number
 
-<kbd>⌘</kbd><kbd>1</kbd> opens your first favorite, <kbd>⌘</kbd><kbd>2</kbd> the second, and so on up
-to <kbd>⌘</kbd><kbd>9</kbd>. <kbd>⌘</kbd><kbd>0</kbd> opens the tenth. Favorites past the tenth have
-no number; move one up if you want it on a key.
+<kbd>⌘</kbd><kbd>1</kbd> opens your first favorite, <kbd>⌘</kbd><kbd>2</kbd> the second, and so on
+up to <kbd>⌘</kbd><kbd>9</kbd>. <kbd>⌘</kbd><kbd>0</kbd> opens the tenth. Favorites after the tenth
+don't get a number, so move one up if you want a key for it.
 
 The numbers follow key positions, so they work the same on any keyboard layout.
 
-**Hold <kbd>⌘</kbd> for a moment** and each numbered favorite shows its number on the right of its
-row, so you never have to count.
+Hold <kbd>⌘</kbd> for a moment and each numbered favorite shows its number on the right side of its
+row.
 
-The numbers work while the Favorites section is on screen, which means with nothing typed. Once you
-type, the list is ranked results, where a position would mean nothing.
+The numbers only work while the Favorites section is visible, which means with nothing typed. Once
+you start typing, the list shows ranked results, so a position number wouldn't be meaningful.
 
 In the clipboard screen, the same number keys paste your pinned entries instead.
 
 ## In compact mode
 
-With [compact mode](/docs/palette#appearance) on and **Show favorites in compact mode** enabled,
-your favorites show as icons on the right of the slim search bar.
+With [compact mode](/docs/palette#appearance) and **Show favorites in compact mode** both on, your
+favorites appear as icons on the right side of the slim search bar.
 
-The bar has room for five icons, and the same numbers open them. With more than five, a **…** button
-follows. Click it, or press <kbd>↓</kbd>, to open the full list. <kbd>⌘</kbd><kbd>6</kbd> and up
-still open favorites the bar has no room to show.
+The bar fits five icons, and the same numbers open them. If you have more than five, a **…** button
+appears after them. Click it, or press <kbd>↓</kbd>, to open the full list. <kbd>⌘</kbd><kbd>6</kbd>
+and higher still open the favorites that don't fit in the bar.
 
-## Favorites do not teach ranking
+## Favorites don't affect ranking
 
-Opening a favorite with nothing typed, or by its number, does not feed
-[learned ranking](/docs/launcher#learned-ranking). You did not search for it, so there is nothing to
-learn.
+Opening a favorite with nothing typed, or by its number, doesn't count toward
+[learned ranking](/docs/launcher#learned-ranking), since you didn't search for it.
 
-Favorites are included in [backups](/docs/reference/backup), and they are one of the things the
-[Raycast importer](/docs/reference/import-from-raycast) brings across.
+Favorites are included in [backups](/docs/reference/backup), and the
+[Raycast importer](/docs/reference/import-from-raycast) can bring them over.

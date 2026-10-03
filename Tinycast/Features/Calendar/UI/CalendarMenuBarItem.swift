@@ -46,67 +46,98 @@ struct CalendarMenuBarLabel: View {
 /// Calendar actions only: the launcher item carries the app's menu, and neither repeats the other.
 struct CalendarMenuBarMenu: View {
     var body: some View {
-        if let meeting = AppCore.shared.calendarCoordinator.menuBarEvent {
-            if meeting.link != nil {
-                Button {
-                    AppCore.shared.calendarCoordinator.join(meeting)
-                } label: {
-                    MeetingMenuLabel(title: String(localized: "Join \(meeting.title)"), color: meeting.calendarColor)
+        // A macOS menu drops a label's icon unless the style asks for it.
+        Group {
+            let coordinator = AppCore.shared.calendarCoordinator
+            if let meeting = coordinator.menuBarEvent {
+                Section {
+                    if let link = meeting.link {
+                        Button(String(localized: "Join \(meeting.title)"), systemImage: link.provider.sfSymbol) {
+                            coordinator.join(meeting)
+                        }
+                    }
+                    Button("Open in Calendar", systemImage: "calendar") {
+                        coordinator.openInCalendar(meeting)
+                    }
+                    Button("Dismiss Event", systemImage: "xmark.circle") {
+                        coordinator.dismissMenuBarEvent(meeting)
+                    }
                 }
             }
-            Button {
-                AppCore.shared.calendarCoordinator.openInCalendar(meeting)
-            } label: {
-                // Only the first item names the meeting, so only it carries the calendar bar.
-                MeetingMenuLabel(
-                    title: "Open in Calendar...".localizedUI,
-                    color: meeting.link == nil ? meeting.calendarColor : nil)
+            MenuBarAgenda()
+            Section {
+                Button("My Schedule", systemImage: "calendar.day.timeline.left") {
+                    coordinator.showSchedule()
+                }
+                .keyboardShortcut("o")
+                Button("Calendar Settings…", systemImage: "gearshape") {
+                    AppCore.shared.settingsCoordinator.showSettings(tab: .calendar)
+                }
+                .keyboardShortcut(",")
             }
-            Divider()
         }
-        Button("My Schedule") { AppCore.shared.calendarCoordinator.showSchedule() }
-        Button("Calendar Settings...") {
-            AppCore.shared.settingsCoordinator.showSettings(tab: .calendar)
+        .labelStyle(.titleAndIcon)
+    }
+}
+
+/// The span's remaining meetings by day; a click joins, or opens a linkless one in Calendar.
+private struct MenuBarAgenda: View {
+    var body: some View {
+        let now = AppCore.shared.meetingClock.now
+        ForEach(AppCore.shared.calendarCoordinator.menuBarAgenda) { group in
+            Section(group.day.title(calendar: .current)) {
+                ForEach(group.meetings) { meeting in
+                    Button {
+                        AppCore.shared.calendarCoordinator.join(meeting)
+                    } label: {
+                        Label {
+                            Text("\(MeetingTimeFormat.range(of: meeting)) \(meeting.title)")
+                        } icon: {
+                            CalendarSymbol(
+                                name: meeting.isInProgress(now: now) ? "circle.fill" : "circle",
+                                color: meeting.calendarColor)
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-private struct MeetingMenuLabel: View {
-    let title: String
+/// A symbol in the event's calendar colour, where a menu would otherwise ink it like its text.
+private struct CalendarSymbol: View {
+    let name: String
     let color: MeetingEvent.CalendarColor?
 
     var body: some View {
-        if let color {
-            Label {
-                Text(title)
-            } icon: {
-                Image(nsImage: color.menuBarBar)
-            }
+        if let image = color?.menuSymbol(name) {
+            Image(nsImage: image)
         } else {
-            Text(title)
+            Image(systemName: name)
         }
     }
 }
 
+/// Neither image is a template, so the status bar and its menu keep the colour rather than ink it.
 extension MeetingEvent.CalendarColor {
     fileprivate var menuBarDot: NSImage {
-        swatch(NSSize(width: Theme.Size.colorDot, height: Theme.Size.colorDot))
-    }
-
-    fileprivate var menuBarBar: NSImage {
-        swatch(
-            NSSize(width: Theme.Size.calendarBarWidth, height: Theme.Size.menuBarCalendarBarHeight))
-    }
-
-    /// Not a template, so the status bar and its menu keep the colour instead of inking it.
-    private func swatch(_ size: NSSize) -> NSImage {
+        let size = NSSize(width: Theme.Size.colorDot, height: Theme.Size.colorDot)
         let image = NSImage(size: size, flipped: false) { rect in
             nsColor.setFill()
-            let radius = min(rect.width, rect.height) / 2
-            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            NSBezierPath(ovalIn: rect).fill()
             return true
         }
         image.isTemplate = false
+        return image
+    }
+
+    fileprivate func menuSymbol(_ name: String) -> NSImage? {
+        let configuration = NSImage.SymbolConfiguration(
+            pointSize: NSFont.menuFont(ofSize: 0).pointSize, weight: .regular
+        ).applying(NSImage.SymbolConfiguration(paletteColors: [nsColor]))
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration)
+        image?.isTemplate = false
         return image
     }
 }

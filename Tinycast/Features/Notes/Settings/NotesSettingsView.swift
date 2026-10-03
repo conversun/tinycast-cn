@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NotesSettingsView: View {
+    @Environment(AppCore.self) private var core
     @Environment(AppSettings.self) private var settings
 
     var body: some View {
@@ -8,20 +9,34 @@ struct NotesSettingsView: View {
         return Form {
             Section {
                 Toggle(isOn: $settings.notesEnabled) {
-                    SettingsRowTitle(.notesNotes, "Enable Notes")
-                    Text("Plain Markdown in a floating editor.")
+                    SettingsFeatureToggleLabel(
+                        anchor: .notesNotes, title: "Enable Notes",
+                        subtitle: "Plain Markdown in a floating editor.")
                 }
+            }
+            .settingsAnchor(.notesNotes)
+
+            Section {
                 Toggle(isOn: $settings.notesRendersMarkdown) {
-                    SettingsRowTitle(.notesNotes, "Render Markdown")
+                    SettingsRowTitle(.notesOptions, "Render Markdown")
                     Text("Formats as you type.")
                 }
                 .settingsEnabled(settings.notesEnabled)
                 Toggle(isOn: $settings.notesShowsFormattingBar) {
-                    SettingsRowTitle(.notesNotes, "Show Formatting Bar")
+                    SettingsRowTitle(.notesOptions, "Show Formatting Bar")
                 }
                 .settingsEnabled(settings.notesEnabled && settings.notesRendersMarkdown)
+                LabeledContent {
+                    if settings.notesFolder != nil {
+                        Button("Use Default", action: core.notesCoordinator.resetNotesFolder)
+                    }
+                    Button("Choose…", action: core.notesCoordinator.chooseNotesFolder)
+                } label: {
+                    SettingsRowTitle(.notesOptions, "Notes Folder")
+                    Text((core.notesStore.notesDirectory.path as NSString).abbreviatingWithTildeInPath)
+                }
             } header: {
-                SettingsSectionHeader(.notesNotes)
+                SettingsSectionHeader(.notesOptions)
             }
 
             FeatureCommandsSection(owner: .notes, anchor: .notesCommands)

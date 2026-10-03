@@ -39,11 +39,19 @@ struct SystemActionTests {
             Set(actions.filter { $0.confirmation != .none }.map(\.id)) == confirmed,
             "only the agreed disruptive actions require confirmation")
         for action in actions {
-            guard case .required(let title, let message) = action.confirmation else { continue }
-            expect(
-                !title.isEmpty && !message.isEmpty,
-                "\(action.id.rawValue) carries confirmation copy")
+            switch action.confirmation {
+            case .required(let title, let message), .followsFinder(let title, let message):
+                expect(
+                    !title.isEmpty && !message.isEmpty,
+                    "\(action.id.rawValue) carries confirmation copy")
+            case .none, .computed:
+                continue
+            }
         }
+        expect(
+            actions.filter { if case .followsFinder = $0.confirmation { true } else { false } }
+                .map(\.id) == [.emptyTrash],
+            "only Empty Trash defers its confirmation to Finder's own preference")
         expect(
             SystemActionCatalog.action(id: .quitAllApps).confirmation == .computed,
             "Quit All builds its own copy from the target count")

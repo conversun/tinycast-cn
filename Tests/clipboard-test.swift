@@ -14,6 +14,7 @@ struct ClipboardTests {
         pinsSurvivePruningAndTheWindow()
         pinsLeadFilteredSearches()
         pinnedSlotResolutionUsesVisiblePins()
+        landingSkipsThePins()
         textFormClassification()
         colorParsing()
         colorFormatting()
@@ -30,6 +31,9 @@ struct ClipboardTests {
         fileEntriesAreFoundByNameAndFolder()
         fileKindClassification()
         importedFilesArriveOncePerPath()
+        defaultActionChords()
+        plainTextSkipsTheFile()
+        offersTextExtraction()
 
         print("\(passes)/\(passes + failures) passed")
         if failures > 0 { exit(1) }
@@ -191,6 +195,42 @@ struct ClipboardTests {
             expect(
                 store.pinnedItem(at: 0, in: "", filter: .link) == nil,
                 "filter applies before pinned slot mapping")
+        }
+    }
+
+    /// A reset passes the pins for the newest clip; a typed query lands on its first match.
+    static func landingSkipsThePins() {
+        withStore { store, _ in
+            store.addText("alpha one", sourceBundleID: nil)
+            store.addText("beta two", sourceBundleID: nil)
+            store.addText("https://example.com", sourceBundleID: nil)
+            store.addText("beta three", sourceBundleID: nil)
+            expect(
+                store.landingIndex(in: "", filter: .all) == 0, "no pins: the newest clip is row 0")
+
+            store.togglePinned(item(store, "alpha one"))
+            store.togglePinned(item(store, "beta two"))
+            let landing = store.landingIndex(in: "", filter: .all)
+            expect(landing == 2, "nothing typed: the landing passes both pins")
+            expect(
+                store.search("", filter: .all)[landing].text == "beta three",
+                "and lands on the most recent copy")
+            expect(store.landingIndex(in: "  ", filter: .all) == 2, "a blank query is no query")
+            expect(
+                store.landingIndex(in: "beta", filter: .all) == 0,
+                "a typed query lands on its first match, even a pinned one")
+            expect(
+                store.landingIndex(in: "", filter: .text) == 2,
+                "a filter still passes the pins it shows")
+            expect(
+                store.landingIndex(in: "", filter: .link) == 0,
+                "and lands on its first row when it shows none")
+
+            store.togglePinned(item(store, "https://example.com"))
+            store.togglePinned(item(store, "beta three"))
+            expect(
+                store.landingIndex(in: "", filter: .all) == 0,
+                "an all-pinned list has no clip to pass to, so it stays on row 0")
         }
     }
 
@@ -494,7 +534,11 @@ struct ClipboardTests {
             expect(texts(reopened) == ["first", "third", "second"], "unpin after a reload")
 
             reopened.clearAll()
-            expect(reopened.items.isEmpty, "Clear History takes pins too")
+            expect(texts(reopened) == ["first"], "Clear History spares the pin")
+
+            let afterClear = ClipboardStore(directory: dir)
+            afterClear.load()
+            expect(texts(afterClear) == ["first"], "and the unpinned rows are gone from disk")
         }
     }
 
@@ -626,6 +670,67 @@ struct ClipboardTests {
                 store.items.allSatisfy { $0.imagePath == nil },
                 "an imported file row is never adopted into imagesDir")
         }
+    }
+
+    /// The default takes ↵ and Paste its chord; the Paste and Copy defaults keep their old pair.
+    static func defaultActionChords() {
+        let text = ClipboardItem(text: "hello", sourceBundleID: nil)
+        let file = ClipboardItem(filePath: "/Users/me/report.pdf", sourceBundleID: nil)
+        let image = ClipboardItem(imagePath: "/tmp/shot.png", sourceBundleID: nil)
+        let expected: [ClipboardDefaultAction: [ClipboardDefaultAction]] = [
+            .paste: [.paste, .copy, .pastePlainText],
+            .copy: [.copy, .paste, .pastePlainText],
+            .pastePlainText: [.pastePlainText, .copy, .paste]
+        ]
+        for (defaultAction, actions) in expected {
+            for item in [text, file] {
+                expect(
+                    ClipboardChord.allCases.map { defaultAction.action(for: $0, on: item) } == actions,
+                    "\(defaultAction) orders ↵, ⌘↵, ⌃⌘↵ as \(actions) on a \(item.kind) entry")
+            }
+            let imageActions = ClipboardChord.allCases.map { defaultAction.action(for: $0, on: image) }
+            let paste: ClipboardDefaultAction = defaultAction == .copy ? .copy : .paste
+            expect(imageActions.first == paste, "\(defaultAction) on an image never pastes plain")
+            expect(imageActions.last == .some(nil), "and ⌃⌘↵ has nothing to run on it")
+        }
+    }
+
+    static func plainTextSkipsTheFile() {
+        expect(ClipboardItem(text: "hi", sourceBundleID: nil).plainText == "hi", "text is itself")
+        expect(
+            ClipboardItem(filePath: "/a/b.pdf", sourceBundleID: nil).plainText == "/a/b.pdf",
+            "a file is its path")
+        expect(
+            ClipboardItem(imagePath: "/a/b.png", sourceBundleID: nil).plainText == nil,
+            "an image has no plain text")
+    }
+
+    /// Copy Text is an image answer: a captured blob, or an image file — never text or a PDF.
+    static func offersTextExtraction() {
+        expect(
+            ClipboardItem(imagePath: "/tmp/shot.png", sourceBundleID: nil).offersTextExtraction,
+            "a captured image offers Copy Text")
+        expect(
+            !ClipboardItem(
+                id: UUID(), kind: .image, text: nil, imagePath: nil, createdAt: Date(),
+                sourceBundleID: nil
+            ).offersTextExtraction,
+            "an image entry without its blob does not")
+        expect(
+            !ClipboardItem(text: "hello", sourceBundleID: nil).offersTextExtraction,
+            "a text entry does not")
+        expect(
+            ClipboardItem(filePath: "/Users/me/shot.png", sourceBundleID: nil)
+                .offersTextExtraction,
+            "an image file copied in Finder offers Copy Text")
+        expect(
+            !ClipboardItem(filePath: "/Users/me/notes.txt", sourceBundleID: nil)
+                .offersTextExtraction,
+            "a text file does not")
+        expect(
+            !ClipboardItem(filePath: "/Users/me/report.pdf", sourceBundleID: nil)
+                .offersTextExtraction,
+            "a PDF stays a background-indexing capability")
     }
 
     // MARK: - Harness

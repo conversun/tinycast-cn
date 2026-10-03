@@ -1,20 +1,7 @@
 import { site } from "../data/site";
+import { readRepoJson, repoApiUrl } from "./github";
 
-// Resolve the releases API URL from the repo link, so there's still a single
-// source of truth (site.repo) rather than a second hardcoded slug.
-const match = site.repo.match(/github\.com\/([^/]+)\/([^/]+)/);
-const repoUrl = match
-  ? `https://api.github.com/repos/${match[1]}/${match[2]}`
-  : null;
-const apiUrl = repoUrl ? `${repoUrl}/releases/latest` : null;
-
-async function readRepoJson(url: string): Promise<unknown> {
-  const res = await fetch(url, {
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (!res.ok) throw new Error(`GitHub API ${res.status}`);
-  return res.json();
-}
+const apiUrl = repoApiUrl ? `${repoApiUrl}/releases/latest` : null;
 
 /**
  * The latest published release tag, read once at build time and baked into the
@@ -43,9 +30,9 @@ export async function latestVersion(): Promise<string> {
  * unavailable, so the caller drops the badge rather than showing a made-up one.
  */
 export async function starCount(): Promise<string | null> {
-  if (!repoUrl) return null;
+  if (!repoApiUrl) return null;
   try {
-    const data = await readRepoJson(repoUrl);
+    const data = await readRepoJson(repoApiUrl);
     const stars =
       data && typeof data === "object" && "stargazers_count" in data
         ? Number((data as { stargazers_count: unknown }).stargazers_count)

@@ -96,17 +96,12 @@ private struct ChatHistoryRow: View {
     }
 
     var body: some View {
-        HStack(spacing: metrics.spacing.lg) {
-            RoundedRectangle(cornerRadius: metrics.radius.thumbnail, style: .continuous)
-                .fill(Theme.Colors.controlSurface)
-                .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
-                .overlay(
-                    Image(systemName: "bubble.left")
-                        .font(.system(size: 12))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary))
+        IconCache.observeStyle()
+        return HStack(spacing: metrics.spacing.lg) {
+            Image(nsImage: IconCache.symbolIcon(named: "bubble.left")).resizable()
+                .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
             VStack(alignment: .leading, spacing: metrics.spacing.xxs) {
-                Text(conversation.title)
+                Text(conversation.displayTitle)
                     .font(metrics.typography.rowTitle)
                     .lineLimit(1)
                 if !conversation.preview.isEmpty {
@@ -140,9 +135,12 @@ struct ChatHistoryPreview: View {
         Group {
             if conversationID == chat.session.id, !chat.session.messages.isEmpty {
                 ChatTranscriptView(
-                    messages: chat.session.messages, status: chat.liveStatus, usage: chat.usage)
+                    messages: chat.session.messages, status: chat.liveStatus, usage: chat.usage,
+                    surface: .palette)
             } else if let session {
-                ChatTranscriptView(messages: session.messages, status: nil, usage: nil)
+                ChatTranscriptView(
+                    messages: session.messages, status: nil, usage: nil,
+                    surface: .palette)
             } else if conversationID != nil {
                 ProgressView().controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

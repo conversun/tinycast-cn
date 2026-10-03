@@ -134,6 +134,9 @@ Swift 6 language mode: data-race violations are hard errors, and that is the des
   with extra steps.
 - Block observers go through the RAII `NotificationToken` (`Platform/NotificationToken.swift`), not a
   bare `addObserver` plus removal in `deinit`.
+- A child process is started with `runObservingExit()` (`Platform/ProcessExit.swift`) and awaited
+  through the `ProcessExit` it returns, never `waitUntilExit()`: that spins the calling thread's run
+  loop, which on a GCD thread can miss the exit and block forever.
 - Every escaping closure capturing `self` uses `[weak self]`, or `[unowned self]` where the closure
   cannot outlive the owner (as in `AppCore`'s coordinator wiring).
 - `DispatchQueue.main.async` is not a fix for an ordering problem. If order matters, make it explicit.

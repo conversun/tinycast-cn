@@ -1,12 +1,12 @@
 ---
 title: System actions
-description: 31 built-in actions for the Mac itself, like lock, sleep, volume, Bluetooth and the Trash.
+description: 31 built-in actions for your Mac, like lock, sleep, volume, Bluetooth and the Trash.
 ---
 
-System actions are things you do to your Mac rather than to a file. Each one is searchable, and each
-one can have a global shortcut.
+System actions control your Mac itself, like locking the screen or emptying the Trash. You can search
+for each one, and each one can have a global shortcut.
 
-They have their own **System Actions** section in the launcher, and their own pane in
+They have their own **System Actions** section in the launcher and their own pane in
 **Settings → System Actions**.
 
 ## The full list
@@ -29,53 +29,59 @@ Dismiss Notifications
 
 ## Confirmation
 
-Five actions ask first, because running them by accident is costly:
+Five actions ask for confirmation first, because running them by accident would be costly:
 
 Restart · Shut Down · Log Out · Empty Trash · Quit All Applications
 
-<kbd>return</kbd> runs and <kbd>esc</kbd> cancels. Each dialog shows that action's own icon, so you can see
-at a glance what you are about to do. **Quit All Applications** tells you how many apps it will quit.
+<kbd>return</kbd> runs the action and <kbd>esc</kbd> cancels. Each dialog shows the action's icon,
+so you can see what you're about to do. **Quit All Applications** also tells you how many apps it
+will quit.
 
-**The same question comes up when you use a shortcut.** There is no way around it, and holding a
-shortcut down cannot stack up dialogs.
+**Empty Trash follows your Finder setting.** It only asks while **Show warning before emptying the
+Trash** is on in Finder ▸ Settings ▸ Advanced. If you turn that off, Empty Trash runs without a
+dialog.
 
-## What you see afterwards
+**The same confirmation appears when you use a shortcut.** You can't skip it, and holding down a
+shortcut never opens more than one dialog.
 
-Actions with no visible effect tell you where they landed: `Trash Emptied`, `Hidden Files Shown`,
-`Dark Appearance`, `Bluetooth Off`, `3 Disks Ejected`.
+## What you see afterward
 
-A green check means something changed. A plain dot means there was nothing to do.
-`Trash Is Already Empty` is an answer, not a failure, and so is the same kind of message from Eject
-All Disks, Dismiss Notifications and Unhide All Hidden Apps.
+Actions without a visible effect show a short message with the result, like `Trash Emptied`,
+`Hidden Files Shown`, `Dark Appearance`, `Bluetooth Off` or `3 Disks Ejected`.
+
+A green check means something changed. A plain dot means there was nothing to do. For example,
+`Trash Is Already Empty` isn't an error, and neither are similar messages from Eject All Disks,
+Dismiss Notifications and Unhide All Hidden Apps.
 
 ## A few details
 
-**Volume.** Up and Down move along a **5% grid**: from 37%, up goes to 40% and down to 35%. Tinycast
-shows its own volume display, because macOS only shows one for the real media keys. It shows the
-level as a number, says `Muted` instead of `0%`, and fades after 1.6 seconds.
+**Volume.** Turn Volume Up and Turn Volume Down move in **5% steps**: from 37%, up goes to 40% and
+down goes to 35%. Tinycast shows its own volume indicator, because macOS only shows one for the
+hardware media keys. It shows the level as a number, shows `Muted` instead of `0%`, and fades out
+after 1.6 seconds.
 
-**Eject All Disks** ejects external and removable drives, including a dock's hard drive, and never
-touches internal or network volumes.
+**Eject All Disks** ejects external and removable drives, including a hard drive connected through a
+dock. It never ejects internal or network volumes.
 
-**Hide All Apps Except Frontmost** and **Quit All Applications**, run from a shortcut with the
-palette closed, work on the app that is actually in front. Quit All leaves Finder and Tinycast
-running, and quits politely, so apps with unsaved work still ask you to save.
+When you run **Hide All Apps Except Frontmost** or **Quit All Applications** from a shortcut with the
+palette closed, they act on the app that's actually in front. Quit All Applications leaves Finder and
+Tinycast running and asks apps to quit normally, so apps with unsaved work still ask you to save.
 
-**Toggle System Appearance** changes **macOS itself**, not just Tinycast. Tinycast follows along only
-while its own [theme](/docs/palette#appearance) is set to System.
+**Toggle System Appearance** changes the appearance of **macOS itself**, not only Tinycast. Tinycast
+follows the change only while its own [theme](/docs/palette#appearance) is set to System.
 
 ## Permissions
 
-Some actions need Automation, Accessibility or Bluetooth access. Each is asked for the first time you
-run the action that needs it, never up front. If you say no, you get a message with a link to the
-right System Settings pane instead of nothing happening.
+Some actions need Automation, Accessibility or Bluetooth access. Tinycast asks the first time you run
+an action that needs it, never in advance. If you decline, you see a message with a link to the right
+System Settings pane, so the action never fails silently.
 
 ## Settings
 
-**Settings → System Actions** has **Enable System Actions** at the top, and a row per action with a
-launcher checkbox, a shortcut recorder and an alias field. A filter field at the top helps with 31
-rows.
+**Settings → System Actions** has **Enable System Actions** at the top and a row for each action,
+with a launcher checkbox, a shortcut recorder and an alias field. Use the filter field at the top to
+find an action among the 31 rows.
 
-**Enable System Actions** off takes every action out of search and turns off their shortcuts. A single
-row's checkbox only hides it from search, and <kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd> in the launcher
-does the same.
+Turning off **Enable System Actions** removes every action from search and turns off their
+shortcuts. Clearing a single row's checkbox only hides that action from search, which is the same as
+pressing <kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd> on it in the launcher.

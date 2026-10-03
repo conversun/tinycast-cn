@@ -20,21 +20,23 @@ struct MeetingTiming: View {
     let now: Date
 
     var body: some View {
-        let countdown = UpcomingWindow.rowCountdown(for: meeting, now: now)
+        let pill = UpcomingWindow.rowPill(for: meeting, now: now, calendar: .current)
         HStack(spacing: metrics.spacing.md) {
             Text(MeetingTimeFormat.range(of: meeting))
                 .font(metrics.typography.rowTrailing)
                 .foregroundStyle(meeting.isInProgress(now: now) ? .primary : .secondary)
             ZStack {
                 Text(UpcomingWindow.countdown(to: now + 60 * 60, now: now)).hidden()
-                Text(countdown ?? "")
+                Text(UpcomingWindow.dayLabel(now + 24 * 60 * 60, calendar: .current)).hidden()
+                Text(pill?.text ?? "")
+                    .foregroundStyle(pill?.isImminent == true ? .primary : .secondary)
             }
             .font(metrics.typography.rowTrailing.weight(.medium))
             .padding(.horizontal, metrics.spacing.sm)
             .padding(.vertical, metrics.spacing.xxs)
             .background(
                 RoundedRectangle(cornerRadius: metrics.radius.keyCap, style: .continuous)
-                    .fill(countdown == nil ? .clear : Theme.Colors.controlSurface))
+                    .fill(pill == nil ? .clear : Theme.Colors.controlSurface))
         }
         .monospacedDigit()
         .lineLimit(1)

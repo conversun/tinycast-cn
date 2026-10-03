@@ -1,137 +1,143 @@
 ---
 title: Notes
-description: Plain Markdown files in one floating editor. No database, no frontmatter, no sidecar files.
+description: Plain Markdown files in one floating editor, with no database or extra files.
 ---
 
-Notes is a collection of plain Markdown files, as many as you like, edited in one floating window.
+Notes is a collection of plain Markdown files, as many as you want, edited in one floating window.
 
-**Settings → Notes** holds the switch. It ships **off**, and turning it on does not create the folder
-or write anything until you make a note.
+Turn it on in **Settings → Notes**. It's **off** by default, and turning it on doesn't create the
+folder or write anything until you make your first note.
 
 ## Commands
 
-Three commands, each with its own optional global shortcut in **Settings → Notes**:
+There are three commands, and each can have its own global shortcut in **Settings → Notes**:
 
 | Command          | Does                                                     |
 | ---------------- | -------------------------------------------------------- |
 | **Show Notes**   | Opens your last note. Press it again to hide the window. |
-| **Create Note**  | Makes a new Untitled note and opens it                   |
-| **Search Notes** | Opens the window with the note switcher ready to type in |
+| **Create Note**  | Creates a new Untitled note and opens it                 |
+| **Search Notes** | Opens the window with the note switcher ready for typing |
 
 ## In the window
 
-The title bar holds three buttons: **Create**, **Browse** and **Open Folder**.
+The title bar has three buttons: **Create**, **Browse** and **Open Folder**.
 
 | Key                           | Does                                        |
 | ----------------------------- | ------------------------------------------- |
 | <kbd>⌘</kbd><kbd>N</kbd>      | Create a note                               |
-| <kbd>⌘</kbd><kbd>P</kbd>      | Open the switcher, or jump back into it     |
+| <kbd>⌘</kbd><kbd>P</kbd>      | Open the switcher, or return to it          |
 | <kbd>⌘</kbd><kbd>O</kbd>      | Open the Notes folder in Finder             |
 | <kbd>⌘</kbd><kbd>W</kbd>      | Hide the window                             |
 | <kbd>esc</kbd>                | Close the switcher, then hide the window    |
 | <kbd>⌘</kbd><kbd>delete</kbd> | Move the selected switcher row to the Trash |
 
-<kbd>⌘</kbd><kbd>Q</kbd> does nothing here, so **no key press over Notes can quit Tinycast** by
-accident.
+<kbd>⌘</kbd><kbd>Q</kbd> does nothing in Notes, so you can't quit Tinycast by accident while
+writing.
 
 ## Files
 
-Notes live in Tinycast's Application Support folder:
+Notes are stored in Tinycast's Application Support folder:
 
 ```
 ~/Library/Application Support/com.tinycast.app/Notes/
 ```
 
-**One `.md` file is one note, and its file name is its title.** There is no frontmatter, no hidden
-ID, no database and no sidecar file. What you see is the file.
+**Each note is one `.md` file, and the file name is the note's title.** There's no frontmatter,
+hidden ID, database or extra file. The file is the note.
 
-Only files directly in that folder count. Subfolders, hidden files and links are ignored. Notes are
-sorted by when they changed, newest first.
+Only files directly in that folder are included. Subfolders, hidden files and links are ignored.
+Notes are sorted by when they were last changed, newest first.
 
-New notes are named `Untitled.md`, then `Untitled 2.md`, and so on. **Until you rename one, it shows
-its first line as the title**, so a list of Untitled notes is still easy to scan. Markdown marks like
-`#`, `- [ ]` and `**` are dropped from that title.
+New notes are named `Untitled.md`, then `Untitled 2.md`, and so on. **Until you rename a note, its
+first line is shown as the title**, so a list of untitled notes is still easy to scan. Markdown
+symbols like `#`, `- [ ]` and `**` are removed from that title.
 
-Names are compared without case or accents, so `plán` next to `Plan` becomes `plán 2.md`. A note
-never clashes with itself, so you can rename one just to change its case or accents.
+File names are compared without case or accents, so a new `plán` next to `Plan` becomes
+`plán 2.md`. A note never conflicts with itself, so you can rename a note just to change its case or
+accents.
 
 ## The editor
 
-**Markdown renders as you write.** Headings, bold, italic, strikethrough, inline code, links, lists,
-tasks, quotes, code blocks and rules all show formatted. The line you are on shows its Markdown so you
-can edit it, and every other line stays rendered. The file itself never changes: what is saved, searched
-and copied is the plain Markdown you typed.
+**Markdown is formatted as you write.** Headings, bold, italic, strikethrough, inline code, links,
+lists, tasks, quotes, code blocks and horizontal rules are all shown formatted. The line you're
+editing shows its Markdown symbols, and every other line stays formatted. The file itself doesn't
+change: what's saved, searched and copied is the plain Markdown you typed.
 
-Images and highlighting inside code blocks are not rendered; they stay as text. Tables stay as text
-too, shown in a fixed-width font with nothing styled inside them, so their columns stay readable.
+Images and syntax highlighting in code blocks aren't rendered; they appear as text. Tables also
+appear as text, in a fixed-width font without other formatting, so their columns stay aligned.
 
-- **Click a checkbox** to tick or untick a task. The caret stays where it was.
-- **Click a link** to open it in your browser. Click right at the edge of a link to edit it instead.
-- **Return** continues a list, and ends it on an empty item. **Tab** and **Shift-Tab** nest items.
+- **Click a checkbox** to check or uncheck a task. The text cursor stays where it was.
+- **Click a link** to open it in your browser. To edit the link instead, click right at its edge.
+- **Return** continues a list, and ends it on an empty item. **Tab** and **Shift-Tab** indent and
+  outdent items.
 - Type `[] ` at the start of a line to start a task.
-- Paste a web address over selected text to turn that text into a link.
+- Paste a web address over selected text to turn the text into a link.
 
-| Key                                                              | Does                 |
-| ---------------------------------------------------------------- | -------------------- |
-| <kbd>⌘</kbd><kbd>B</kbd>                                         | Bold                 |
-| <kbd>⌘</kbd><kbd>I</kbd>                                         | Italic               |
-| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>X</kbd>                             | Strikethrough        |
-| <kbd>⌘</kbd><kbd>E</kbd>                                         | Inline code          |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd>                             | Code block           |
-| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>B</kbd>                             | Quote                |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd>                             | Show the buttons     |
-| <kbd>⌘</kbd><kbd>K</kbd>                                         | Link                 |
-| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>7</kbd>                             | Numbered list        |
-| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>8</kbd>                             | Bullet list          |
-| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>9</kbd>                             | Task list            |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>1</kbd>, <kbd>2</kbd>, <kbd>3</kbd> | Heading 1, 2, 3      |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>0</kbd>                             | Back to a plain line |
+| Key                                                              | Does                        |
+| ---------------------------------------------------------------- | --------------------------- |
+| <kbd>⌘</kbd><kbd>B</kbd>                                         | Bold                        |
+| <kbd>⌘</kbd><kbd>I</kbd>                                         | Italic                      |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>X</kbd>                             | Strikethrough               |
+| <kbd>⌘</kbd><kbd>E</kbd>                                         | Inline code                 |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>C</kbd>                             | Code block                  |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>B</kbd>                             | Quote                       |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd>                             | Show the formatting buttons |
+| <kbd>⌘</kbd><kbd>K</kbd>                                         | Link                        |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>7</kbd>                             | Numbered list               |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>8</kbd>                             | Bullet list                 |
+| <kbd>⇧</kbd><kbd>⌘</kbd><kbd>9</kbd>                             | Task list                   |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>1</kbd>, <kbd>2</kbd>, <kbd>3</kbd> | Heading 1, 2, 3             |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>0</kbd>                             | Back to a plain line        |
 
-Prefer to see the raw text? Turn off **Render Markdown** in **Settings → Notes**. The editor then shows
-every mark as typed, and Return, Tab and these keys behave like any plain text field.
+If you'd rather see the raw text, turn off **Render Markdown** in **Settings → Notes**. The editor
+then shows every symbol as you typed it, and Return, Tab and the shortcuts above behave like they do
+in any plain text field.
 
 ### The formatting bar
 
-At the bottom right of the note is a round button. Click it, or press
-<kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd>, and a
-button for each of those keys slides out, plus a heading menu. Click one to format the selection or
-the word at the caret; click a lit button to remove that formatting again. Hover a button to see its
-shortcut. Tinycast remembers whether you left it open. When the window is narrow, the character count
-makes room for the buttons.
+There's a round button at the bottom right of each note. Click it, or press
+<kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd>, and a button for each of the shortcuts above appears, along
+with a heading menu. Click a button to format the selection or the word at the cursor, and click a
+highlighted button to remove that formatting. Hover over a button to see its shortcut. Tinycast
+remembers whether you left the bar open. When the window is narrow, the character count moves aside
+to make room for the buttons.
 
-Don't want it? Turn off **Show Formatting Bar** in **Settings → Notes**. The keys keep working. The bar
-also stays hidden while Render Markdown is off.
+To hide it, turn off **Show Formatting Bar** in **Settings → Notes**. The shortcuts still work. The
+bar is also hidden while Render Markdown is off.
 
-Typing, selection, copy and paste, Find, emoji, input methods and undo all behave like any Mac text
-field. An empty note shows **Start writing…**, and the character count sits under the note.
+Typing, selecting, copy and paste, Find, emoji, input methods and undo all work like they do in any
+Mac text field. An empty note shows **Start writing…**, and the character count appears below the
+note.
 
-[Snippets](/docs/features/snippets) expand right into the editor, and undo takes them back.
+[Snippets](/docs/features/snippets) expand directly in the editor, and you can undo them.
 
 ## The switcher
 
-The switcher drops down from the title bar. With nothing typed, it lists notes by recency. Type and
-it searches titles and note text, after a 120 ms pause, showing up to **200** results.
+The switcher opens below the title bar. With nothing typed, it lists notes by when you last changed
+them. When you type, it searches titles and note text after a 120 ms pause and shows up to **200**
+results.
 
-Each row offers VoiceOver actions to open, rename and move that note to the Trash.
+Each row has VoiceOver actions to open, rename and move that note to the Trash.
 
-## Saving, and the one real caveat
+## Saving, and one important caveat
 
-Changes save automatically 300 ms after you stop typing.
+Changes are saved automatically 300 ms after you stop typing.
 
-**A save overwrites whatever is on disk.** Tinycast does not watch the folder. If you edit the note
-that is _open in Tinycast_ in another app, that edit is lost at the next autosave.
+**Saving overwrites the file on disk.** Tinycast doesn't watch the folder for changes, so if you
+edit the note that's _open in Tinycast_ in another app, that edit is lost at the next autosave.
 
-<kbd>⌘</kbd><kbd>O</kbd> invites exactly this, and it is the trade for having no database.
+<kbd>⌘</kbd><kbd>O</kbd> makes this easy to do by accident. It's the tradeoff for storing notes as
+plain files instead of in a database.
 
-Every _other_ change from outside is picked up, because showing the window reads the folder again
-first. A note you add or edit elsewhere shows up as expected.
+All _other_ changes made outside Tinycast are picked up, because Tinycast reads the folder again each
+time it shows the window. Notes you add or edit elsewhere appear as expected.
 
-Quitting waits for the last save, but never blocks the quit.
+When you quit, Tinycast waits for the last save to finish, but it never stops the app from quitting.
 
 ## The window
 
-You choose the size, and macOS remembers it. You can delete every note; the window shows an empty
-state and Create Note still works.
+You choose the window's size, and macOS remembers it. You can delete every note; the window then
+shows an empty state, and Create Note still works.
 
-Hiding the window takes you back to the app you came from, but only if that app is still in front.
-If you already moved on, you stay where you are.
+Hiding the window returns you to the app you were using, but only if that app is still in front. If
+you've already switched to something else, you stay there.

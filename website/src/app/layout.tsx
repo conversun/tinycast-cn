@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
     default: pageTitle,
-    template: "%s — Tinycast",
+    template: "%s · Tinycast",
   },
   description: summary,
   applicationName: site.name,

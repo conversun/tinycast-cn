@@ -15,7 +15,8 @@ struct CompactFavoritesRow: View {
                 CompactFavoriteButton(help: help(for: app, at: index)) {
                     onLaunch(app)
                 } content: {
-                    AppIconView(app: app, pointSize: metrics.size.rowIcon)
+                    // The result rows' size, so collapsing and expanding share one cached bitmap.
+                    AppIconView(app: app, pointSize: metrics.size.resultRowIcon)
                         .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
                 }
             }

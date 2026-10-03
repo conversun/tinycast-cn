@@ -63,12 +63,14 @@ enum AppLauncher {
         }
     }
 
-    /// Asks every instance to quit, gracefully, so unsaved work still gets its sheet.
+    /// Quits every instance; only an unforced quit lets unsaved work put up its sheet.
     @MainActor
     @discardableResult
-    static func quit(bundleID: String) -> Bool {
+    static func quit(bundleID: String, force: Bool = false) -> Bool {
         let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
-        for app in running { app.terminate() }
+        for app in running {
+            if force { app.forceTerminate() } else { app.terminate() }
+        }
         return !running.isEmpty
     }
 

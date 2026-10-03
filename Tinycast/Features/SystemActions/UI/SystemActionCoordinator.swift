@@ -25,7 +25,9 @@ final class SystemActionCoordinator {
         case .computed:
             await quitAllApps()
             return
-        case .required(let title, let message):
+        case .followsFinder where !SystemActionRunner.finderWarnsBeforeEmptyingTrash:
+            break
+        case .required(let title, let message), .followsFinder(let title, let message):
             guard
                 await core.confirm(
                     title: title, message: message, symbol: action.sfSymbol,

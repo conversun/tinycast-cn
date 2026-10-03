@@ -77,7 +77,7 @@ final class AppleShortcutCoordinator {
     private func removeReferences(toShortcutsMissingFrom live: [AppleShortcut]) {
         let keys =
             Array(aliases.aliases.keys) + favorites.keys + visibility.hiddenItemKeys
-            + ranking.records.map(\.itemKey)
+            + ranking.visits.keys
         let bound = Set(hotKeys.boundAppleShortcutIDs)
         let stale = AppleShortcut.staleIDs(referencedBy: keys, bound: bound, live: live)
         guard !stale.isEmpty else { return }

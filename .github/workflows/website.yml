@@ -37,11 +37,16 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Install & build
+      - name: Install
         working-directory: website
-        run: |
-          npm install
-          npm run build
+        run: npm install
+      # The build reads the version, stars and changelog from the GitHub API; the token lifts
+      # those lookups off the runner IP's anonymous limit, and install scripts never see it.
+      - name: Build
+        working-directory: website
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run build
       - name: Deploy to Cloudflare
         working-directory: website
         env:

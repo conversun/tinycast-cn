@@ -13,7 +13,9 @@ struct CalendarSettingsView: View {
                 enableTitle: "Join meetings from Tinycast",
                 enableSubtitle: calendarSubtitle,
                 isEnabled: enabledBinding,
-                showsInLauncher: $settings.calendarShowInLauncher)
+                showsInLauncher: $settings.calendarShowInLauncher,
+                showsIcon: true,
+                showsHeader: false)
 
             Section {
                 Picker(selection: $settings.calendarLauncherLimit) {
@@ -21,7 +23,7 @@ struct CalendarSettingsView: View {
                         Text(limit.title.localizedUI).tag(limit)
                     }
                 } label: {
-                    SettingsRowTitle(.calendarSchedule, "Upcoming meetings in launcher")
+                    SettingsRowTitle(.calendarCalendar, "Upcoming meetings in launcher")
                 }
             }
             .settingsEnabled(settings.calendarEnabled && settings.calendarShowInLauncher)
@@ -47,15 +49,6 @@ struct CalendarSettingsView: View {
                     }
                 }
             }
-
-            Section {
-                Toggle(isOn: $settings.calendarIncludesTomorrow) {
-                    SettingsRowTitle(.calendarSchedule, "Include Tomorrow's Events")
-                }
-            } header: {
-                SettingsSectionHeader(.calendarSchedule)
-            }
-            .settingsEnabled(settings.calendarEnabled)
 
             Section {
                 Picker(selection: $settings.joinWindowMinutes) {
@@ -94,6 +87,14 @@ struct CalendarSettingsView: View {
                     SettingsRowTitle(.calendarMenuBar, "Calendar in Menu Bar")
                     Text("Separate from the Tinycast icon.")
                 }
+                Picker(selection: $settings.calendarSpan) {
+                    ForEach(MeetingSpan.allCases) { span in
+                        Text(span.title.localizedUI).tag(span)
+                    }
+                } label: {
+                    SettingsRowTitle(.calendarMenuBar, "Days to Show")
+                    Text("In the menu, My Schedule and launcher search.")
+                }
                 Picker(selection: $settings.menuBarEvents) {
                     ForEach(MenuBarEvents.allCases) { lead in
                         Text(lead.title.localizedUI).tag(lead)
@@ -105,6 +106,11 @@ struct CalendarSettingsView: View {
                 .settingsEnabled(settings.calendarMenuBarDisplay != .disabled)
                 Toggle(isOn: $settings.menuBarLinkedEventsOnly) {
                     SettingsRowTitle(.calendarMenuBar, "Only show events with meetings")
+                }
+                .toggleStyle(.checkbox)
+                .settingsEnabled(settings.calendarMenuBarDisplay != .disabled)
+                Toggle(isOn: $settings.calendarMenuBarHidesWhenEmpty) {
+                    SettingsRowTitle(.calendarMenuBar, "Hide when there are no upcoming events")
                 }
                 .toggleStyle(.checkbox)
                 .settingsEnabled(settings.calendarMenuBarDisplay != .disabled)
@@ -136,11 +142,13 @@ struct CalendarSettingsView: View {
     }
 
     private var calendarSubtitle: String {
-        switch core.calendarCoordinator.span {
+        switch settings.calendarSpan {
         case .today:
             String(localized: "Reads today's events for join links. Nothing leaves this Mac.")
         case .todayAndTomorrow:
             String(localized: "Reads today's and tomorrow's events for join links. Nothing leaves this Mac.")
+        case .nextSevenDays:
+            String(localized: "Reads the next 7 days' events for join links. Nothing leaves this Mac.")
         }
     }
 
@@ -202,23 +210,14 @@ private struct CalendarPickerSection: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
             } else {
-                // One row holding a lazy stack: a `Form` realizes every row it is handed.
-                LazyVStack(spacing: 0) {
-                    ForEach(calendars) { calendar in
-                        if calendar.id != calendars.first?.id { Divider() }
-                        CalendarRow(calendar: calendar)
-                            .padding(.vertical, Self.rowPadding)
-                    }
+                ForEach(calendars) { calendar in
+                    CalendarRow(calendar: calendar)
                 }
-                .padding(.vertical, -Self.rowPadding)
             }
         } header: {
             SettingsSectionHeader(.calendarCalendars)
         }
     }
-
-    /// A grouped `Form` row's own vertical padding.
-    private static let rowPadding: CGFloat = 15
 
     private var emptyMessage: String {
         if !query.isEmpty { return String(localized: "No matches for “\(query)”.") }

@@ -1,24 +1,49 @@
 # AI providers and chat
 
-Tinycast has one app-wide provider layer for features that need text generation. AI Chat chooses its
-model from the chat header; callers ask `AppCore.aiProvider()` for the current provider and stream an
-`AIRequest`.
-AI Chat is the first consumer and [Quick Actions](quick-actions.md) the second; the provider layer
+Tinycast has one app-wide provider layer for features that need text generation. Chat chooses its
+model from Quick AI's header or the AI Chat composer, and `AIChatCoordinator.provider(for:)`
+builds that chat's route through `AIProviderFactory` to stream an `AIRequest`.
+Chat is the first consumer and [Quick Actions](quick-actions.md) the second; the provider layer
 depends on neither, and Quick Actions carries its own route rather than borrowing this one.
+
+Chat has two surfaces over one history, as Raycast's does. **Quick AI** is the palette screen: Tab
+from the launcher asks what you typed, and the answer appears in place. **AI Chat** is a window —
+saved conversations in a sidebar on the left, the open one on the right, and a composer at the
+bottom with the model picker. ⌘J hands a Quick AI conversation to the window.
 
 ## Invariants
 
-- **AI Chat is off out of the box, and off means fully off.** `AppSettings.aiEnabled` is the flag:
-  no `AI Chat` command in the launcher, no history database opened or created, no Codex helper for
-  Chat, no stop for it on Tab's ring, and the palette leaves `.ai`. Installed providers may still
-  remain available for Quick Actions, which has its own switch and route. Turning AI Chat off cancels
-  a streaming reply and drops the transcript, but touches neither the saved conversations in
+- **AI is off out of the box, and off means fully off.** `AppSettings.aiEnabled` is the flag:
+  no `Quick AI` or `AI Chat` command in the launcher, no history database opened or created, no Codex
+  helper for chat, no stop for it on Tab's ring, the palette leaves `.ai` and the window closes.
+  Installed providers may still remain available for Quick Actions, which has its own switch and route. Turning AI off cancels
+  every streaming reply and drops both transcripts, but touches neither the saved conversations in
   `ai-chats.sqlite3` nor a Keychain key. `aiEnabled` is excluded from settings backups like every
   other AI key, so an import can never arm a feature it cannot configure.
 - **Installed model discovery is per-provider.** Settings → AI → Providers keeps Codex, Claude, Grok,
   OpenCode and Cursor visible with an individual toggle for each, all off by default. Turning one off cancels
   its check, clears its catalog and releases its process; Apple Intelligence is the default route when
   available, and saved API connections stay available.
+- **A route that is off is off everywhere.** The on-device model and every API connection have the
+  same switch an installed tool has (`aiDisabledRoutes`, by `AIModelSource.storageKey`). Off leaves
+  the route configured — a connection keeps its key — but `AIModelOption.availableGroups` drops it
+  from every picker, `AIProviderFactory` refuses it with a message, and a default that pointed at it
+  moves to a route still on. `AISettingsStore.isRouteEnabled` is the one place that answers.
+- **A picker lists what the reader ticked, and an untouched route lists everything.**
+  `aiShownModels` holds, per route, the models its pickers show. No entry means all of them,
+  including one the route starts offering later; ticking every box again drops the entry rather than
+  storing the full list. The default model is always listed, since a picker must be able to show what
+  it holds, and a removed connection takes its entry with it.
+- **A set command path wins or fails.** `InstalledAILaunch.command` answers `.automatic`,
+  `.executable` or `.missing`, and `.missing` fails the check and the turn. The lookup is never a
+  fallback for a path that was set: falling back would run another copy and hide the mistake the path
+  was set to fix.
+- **A reader's variable never replaces one Tinycast sets.** `InstalledAIKind.managedEnvironment` is
+  what keeps a tool inside the chat — OpenCode's deny-all configuration, Claude's account MCP switch —
+  and `InstalledAILaunch.inherited(for:)` drops a reader's variable of the same name, along with
+  `NO_COLOR` and the `TC_MCP_` names that carry MCP secrets to Codex. Names are stored in
+  `aiInstalledOverrides` and values in the login Keychain (`KeychainSecretStore.installedAIEnvironment`),
+  read only for a tool that has variables.
 - **Every request carries Tinycast's own preamble, and the user's text goes after it.**
   `AIInstructions.compose` builds `AIRequest.instructions`: a fixed preamble that tells the model
   where it is running and what the app can do, then whatever Settings → AI holds. The preamble
@@ -36,12 +61,73 @@ depends on neither, and Quick Actions carries its own route rather than borrowin
 - **Remote endpoints require HTTPS.** Plain HTTP is accepted only for `localhost`, `127.0.0.1` and
   `::1`, where a key is optional, and any other scheme is rejected outright — a loopback host does
   not excuse `ftp://`. `AIEndpointPolicy` is the one place that decides this.
+- **MCP OAuth is separate from the model provider's login.** The HTTP MCP client can sign into a
+  hosted server from Settings and keep its client credentials and tokens in that server's Keychain
+  item. API chat uses this session without receiving its credentials. A rejected refresh becomes
+  Sign-in required on the server, an unserved one does not end the session, and either way a
+  running tool loop receives an explainable failure result. The same session is lent to the Codex
+  and Claude routes as a bearer header, so a hosted server is signed into once for every route.
+  See [MCP](mcp.md).
 - **The chat model is the routing decision.** It names the on-device model, a model exposed by the
   installed Codex, Claude, Grok, OpenCode or Cursor command, or one saved API connection and model. Installed
   routes also carry their reasoning effort when the selected model supports one. A removed route
   falls forward to the on-device model when this Mac
   has one, then to another usable API model, then to no selection. Discovering an installed command
   never silently selects a networked model.
+- **Every chat keeps its own model.** `ChatSession.model` is stamped on the first send and changed by
+  either surface's picker; `conversation_details` stores it, so reopening a chat reopens its model and
+  effort. A pick also moves the app default, which is only what a *new* chat starts on. A chat whose
+  route was removed in Settings answers on the default rather than failing
+  (`AIChatCoordinator.model(for:)`), and keeps its stored pick in case the route comes back.
+- **Reasoning is shown, folded, and never resent.** `AIStreamEvent.reasoning` carries the text a route
+  shares — OpenAI-shaped `reasoning` / `reasoning_content` / `reasoning_details`, Anthropic and
+  Claude-CLI `thinking_delta`, Codex's reasoning summary — into `ChatMessage.reasoning`, a list of
+  `ChatReasoning` blocks. Thinking that resumes after answer text opens a new block pinned at that
+  text offset, so `segments` places it where it happened, like a search or a tool call; each block
+  is timed until the answer resumes. The transcript folds each under "Thought for Ns";
+  `message_thinking` keeps them; `requestMessages` never sends them back. A route that only says
+  it is thinking still just shows "Thinking…". How much there is to read is the route's call:
+  Claude streams full summaries, while Grok's CLI sends a line or two in the clear and the rest of
+  its reasoning encrypted, so a Grok fold is short by design, not by truncation. An OpenAI-shaped
+  route also counts a `<think>…</think>` block that opens its content, and only there, so a
+  literal `<think>` later in an answer stays text.
+- **A chat is named by its harness.** As soon as a chat's first question is sent — so the title
+  lands while the answer streams — again after an answer if that failed, and never over a rename,
+  `AIChatCoordinator.nameIfNeeded` asks for a title: Claude's CLI through its own
+  `generate_session_title` control request (`persist: false`, so nothing enters its history), every
+  other route with one side request to the chat's own model (`ChatTitle.instructions`). The Claude
+  request holds stdin open and reads with `availableData` until the answering line is whole: a
+  `read(upToCount:)` waits for a full chunk or EOF, which left every title waiting on the watchdog.
+  `ChatTitle.sanitize` strips labels, quotes and full stops; `conversation_details` keeps the
+  result, and `displayTitle` prefers a rename, then this, then the first question.
+- **A reply's links are its sources.** `ChatReferences.extract` gathers the web links of a finished
+  reply — Markdown links by their own names, bare URLs by host and path — in the order cited, one
+  per page, skipping code, and both surfaces list them under the reply as numbered glass chips that
+  open in the browser. The same numbers close the sentence that cited each source, as a raised,
+  linked `[n]`: `ChatCitations` finds each link's sentence end in the drawn text and inserts after
+  it, two sources in one sentence sharing it, so prose and chips always agree. The preamble asks the model to link a page it relies on inline, so a cited
+  answer carries its sources without a second request.
+- **Tools are chosen per chat.** The composer's tools menu switches MCP off for the chat or turns
+  single servers off (`ChatToolScope`, held on `AIChatState`, not stored); `@server` still narrows
+  one turn inside that. The scope binds both shapes alike: Tinycast's loop is offered only the
+  allowed servers' tools, and a Codex or Claude turn is handed only the allowed servers. A route that
+  cannot call tools shows the menu disabled and says why.
+- **A reply can end on choices, and a choice is only ever a message.** The preamble lets the model
+  close a reply with a fenced `choices` block, one option per line. `ChatChoices.split` lifts the
+  fence out of the prose (an unclosed one mid-stream too, so it never flashes as code). Apple's
+  on-device model tends to drop the fence and write a bare `choices` line over a list, so a
+  label on its own line with nothing but list items after it, to the reply's end, counts too; and
+  `ChatSuggestionChips` draws the options as glass capsules: in the window they rise out of the
+  composer, sitting on its top edge until the reader starts typing; in Quick AI they close the
+  transcript. A click sends the option as the reader's next message, through the same `send` a
+  typed one takes. Older replies lose their chips, since only the last question is still open. It is text in, text out, so it
+  works on every route — and not at all with the system prompt switched off, which drops the
+  preamble that describes it.
+- **Token usage belongs to the reply that reported it.** `AIUsage` carries input, output, cached
+  prompt and thinking tokens, and the model's window and cost where a route says them — Claude's CLI
+  reports all of it, the Anthropic API its cache, OpenAI-shaped routes their reasoning tokens and
+  OpenRouter its cost. `ChatMessage.usage` holds it and `message_details` keeps it, so a reopened chat
+  still knows its last turn.
 - **The on-device route is configured by having a Mac.** `.appleIntelligence` takes no key, opens no
   socket and names no endpoint, so the Keychain, HTTPS and ephemeral-session rules below have nothing
   to bind to — the Settings pane must never grow a credential field for it. It is text-only and
@@ -57,72 +143,125 @@ depends on neither, and Quick Actions carries its own route rather than borrowin
 - **Installed commands reuse their own login.** Tinycast launches the user's `codex`, `claude`, `grok` or
   `opencode` executable without asking for or storing another key. Codex inherits the user's normal
   home and credential-store setting; Claude, Grok, OpenCode and Cursor inherit their normal configuration. Tinycast
-  never reads those credential files, browser cookies or undocumented web endpoints.
-- **Codex tools are unavailable.** The app-server launches with tool capabilities disabled, approvals
-  set to never and a read-only, network-disabled sandbox. Any server approval request is declined.
-  [MCP](mcp.md) does not lift this: `AIModelCapabilities.tools` is false for the subscription route
-  and for the on-device one, so only the two HTTP shapes are ever handed a tool.
-- **Tool calling is a decorator, not a transport change.** `AIToolLoopProvider` wraps a route and
-  re-streams the turn until the model stops asking, so a route with no tools behaves exactly as it
-  did and `AIChatState` reduces one more pair of events. Only chat wraps: `quickActionProvider()`
+  never reads those credential files, browser cookies or undocumented web endpoints. A Codex route
+  with no account is ready only when `account/read` explicitly says `requiresOpenaiAuth: false`.
+- **Codex runs Tinycast's MCP servers and nothing else.** The app-server still launches with every
+  feature flag off and a read-only, network-disabled sandbox, and every server request but one is
+  declined. What changed is the list: the servers the reader configured for their own Codex are
+  disabled by name at launch — which they were not before, so they used to start inside Tinycast
+  threads — and the servers [MCP](mcp.md) supplies take their place when a chat has any, under
+  names of their own (`tinycast-<handle>`) so that no table of the reader's merges into one. A
+  launch that cannot read the reader's list, or cannot address a name on it, does not start. A turn
+  that arms none keeps `approvalPolicy: "never"`; a turn that arms some uses `"untrusted"`, where
+  a tool call becomes an elicitation Tinycast answers from the reader's own trust setting.
+- **Tool calling is a decorator, except where the CLI is the client.** `AIToolLoopProvider` wraps a
+  route and re-streams the turn until the model stops asking, so a route with no tools behaves
+  exactly as it did and `AIChatState` reduces one more pair of events. Codex and the Claude command
+  run that loop themselves, so `AIModelSelection.runsItsOwnTools` hands them an
+  `AIToolServerSession` instead of a wrapper — same servers, same trust, same rows, and the same
+  round cap counted in whatever unit the CLI counts in. Only chat wraps or arms: `quickActionProvider()`
   rewrites the reader's own selected text and has nothing to call. A turn's tool messages stay inside
   the loop — what the transcript keeps is a `ChatToolUse` record, pinned at a text offset like a
   search, so `boundedContext` can never separate a stored call from its result.
 - **Every HTTP request uses a private ephemeral `URLSession` with no URL cache.** Provider traffic must
   not create a second credential or response cache on disk.
 - **`Model/` stays Foundation-only.** `ai-provider-test` compiles the shipped provider models and pins
-  endpoints, request bodies, stream parsing, persistence repair and Codex protocol framing. Request
+  endpoints, request bodies, stream parsing, persistence repair, Codex protocol framing and both
+  CLI routes' MCP launch encodings. Request
   bodies are `AIRequestBody`'s, in `Model/`, precisely so a wrong shape fails a harness rather than a
   conversation. `installed-ai-test` runs the Claude, Grok, OpenCode and Cursor adapters against real
   subprocess stubs and pins their safety boundaries.
-- **Claude, Grok, OpenCode and Cursor are text transports, not agents.** Claude runs one turn with no tools,
-  browser integration, slash commands or persisted session — but never `--bare`, which reads neither
-  OAuth nor the keychain and so refuses the very sign-in this route reuses. Grok runs with `--deny *`,
+- **Grok, OpenCode and Cursor are text transports, not agents, and so is Claude with no server to
+  run.** Claude runs one turn with no tools, browser integration, slash commands or persisted
+  session — but never `--bare`, which reads neither
+  OAuth nor the keychain and so refuses the very sign-in this route reuses. Given servers by
+  [MCP](mcp.md) it becomes an agent for that turn and only over those: `--tools ""` still withholds
+  every built-in, the turn keeps its stream-json stdin open so consent has a pipe to answer on,
+  `--disallowedTools "*"` comes off because it removes the MCP tools too, `--max-turns` carries
+  the round cap instead of the constant 1, or is left out on Unlimited, and
+  `--permission-mode default` with an ask rule per server keeps the reader's own allow rules and
+  default mode from answering before Tinycast does.
+  Grok runs with `--deny *`,
   `dontAsk` permissions and a workspace sandbox, and never `--always-approve`, so a user's always-approve
   config cannot arm tools for this route. OpenCode runs `--pure` with deny-all permissions, disabled
   sharing and a private working directory. Cursor runs `agent -p --mode ask` with `--trust` against
   Tinycast's private workspace and never `--force` / `--yolo` / `--approve-mcps`; ask mode blocks edits.
   Each deletes the session or chat it created once the child exits, and Tinycast never reaches into the
   user's own config to do it. **Only Claude keeps the user's MCP servers out of the process**, through
-  `--strict-mcp-config` with an empty config — and even that yields to an installed managed MCP policy,
-  which makes the CLI reject both flags. Grok, OpenCode and Cursor load the global config either way,
+  `--strict-mcp-config` — whether the config it names is empty or Tinycast's own — and even that
+  yields to an installed managed MCP policy, which makes the CLI reject both flags and leaves MCP
+  on that route the organization's decision; the Providers row says so.
+  Grok, OpenCode and Cursor load the global config either way,
   because their configs merge with no opt-out; what refuses the call is `--deny *` for Grok,
   `permission: deny` for OpenCode and withheld MCP approval for Cursor. Cursor's is the only one resting
   on an approval prompt rather than an explicit deny, which is why its Providers row says so and the
-  others do not. None of these routes offer images or web search.
-- **Chat is a palette screen, not another window** — including its lifetime. The launcher command
-  enters `.ai`; its search field is the composer, and the shared footer's primary pill is Return's
-  job: Send (`↵`), or Stop (`↵`) while a response streams — followed by Actions (`⌘K`), which owns
-  New Chat. **A conversation outlives the window that showed it, and one place decides for how
-  long.** Pop to Root forgets the screen and the query; whether the next summon resumes the
-  transcript is Settings → AI's `Opens to`, applied in `AIChatCoordinator.applyOpenPolicy` on the
-  way into `.ai`. That used to be Pop to Root's job by accident — it fires on every hide, so a chat
-  never survived Escape — and deciding at open time from a timestamp leaves one clock instead of two
-  racing over the same state, and a verdict that still holds after a relaunch. A reply still
-  streaming is never reset out from under the reader — it was asked for — and the transcript is
-  saved regardless, so the old conversation is one ⌘K → Chat History away.
+  others do not. That is also why none of the three may be handed a server: there is no way to offer
+  one without offering the reader's own. None of these routes offer web search, and only Claude
+  takes images: every Claude turn is one `--input-format stream-json` user message, the newest
+  question's pictures as base64 `image` blocks beside the framed prompt. Claude also runs with
+  `--thinking-display summarized` — a hidden flag, and the only switch that works: a `-p` run forces
+  its display to `omitted` unless one is named explicitly, and the `showThinkingSummaries` setting
+  is read only by an interactive session. Without it Sonnet and Opus stream every thinking block
+  empty, so the fold would show one opening line.
+- **A conversation is live in one place at a time.** `AIChatSurfacesState` holds Quick AI's
+  `AIChatState`, the window's, and any window chat left mid-reply. Opening a chat anywhere takes the
+  live state from wherever it already is — ⌘J moves Quick AI's whole state object, reply, staged
+  files and all, into the window — and Quick AI will not take a chat the window has: its open policy
+  starts fresh instead, and Chat History opens that chat in the window. Two states editing one
+  transcript would each save over the other, and `ChatHistoryStore.save` rewrites the stored tail
+  from memory.
+- **Leaving a chat never cancels it.** Switching the window to another conversation, or starting a
+  new one, parks a streaming reply rather than stopping it; it saves itself when it ends, the sidebar
+  shows its spinner meanwhile, and reopening it resumes the same live state. Only Stop, deleting the
+  chat, turning AI off or quitting cut a reply short. A reply is the conversation's, which is
+  `AppCore`'s, so closing the window cancels nothing either.
+  Codex chats run side by side too: each request gets its own ephemeral app-server thread, and
+  `CodexTurnRunner` routes every notification and every tool-call question to its turn by
+  `threadId`, so a Stop ends only its own. The app-server's server list is fixed at launch, so a
+  turn armed with a different one relaunches it and ends the other chats' live threads with a
+  reason, rather than leaving them waiting on a process that is gone.
+- **Quick AI's lifetime is decided on the way in.** Pop to Root forgets the screen and the query;
+  whether the next summon resumes the transcript is Settings → AI's `Quick AI opens to`, applied in
+  `QuickAICoordinator.applyOpenPolicy` on the way into `.ai`. That used to be Pop to Root's job by
+  accident — it fires on every hide, so a chat never survived Escape — and deciding at open time from
+  a timestamp leaves one clock instead of two racing over the same state, and a verdict that still
+  holds after a relaunch. A reply still streaming is never reset out from under the reader — it was
+  asked for — and the transcript is saved regardless, so the old conversation is one ⌘K → Chat
+  History away, and in the window's sidebar. The window has no policy: it reopens on whatever it
+  last showed.
 - **Arriving with a question skips the open policy entirely.** `ask(_:)` — ⇥ from the launcher, and
-  the AI fallback row — always starts a new chat and submits the text, because a question asked
+  the Quick AI fallback row — always starts a new chat and submits the text, because a question asked
   outright is not a summon: resuming a transcript to append an unrelated line to it would be the one
-  reading of `Opens to` nobody wants. It is `showPalette(mode: .ai)` and `send`, never `showChat`.
+  reading of `Quick AI opens to` nobody wants. It is `showPalette(mode: .ai)` and `send`, never
+  `show`.
 - **Staged files survive a re-summon; only the typed draft does not.** `applyOpenPolicy` treats a
   pasted-but-unsent attachment as resident state: `Recent Conversation` will not open a saved chat
   over one, and `A New Conversation` resets only a chat that actually has messages, since an empty
   chat is already new and resetting it would drop the file for nothing. A file cost a read and a
   decode, which is not the same as a half-typed line — that is still dropped by `prepare`.
-  Switching conversations through history still disowns them, which is the rule they belong to.
+  ⌘J carries them into the window with the conversation; opening another chat there still disowns
+  a state's own, which is the rule they belong to.
 - **`AIConversationOpenPolicy` is the whole rule, and it is pure.** `Recent Conversation` resumes the
   resident transcript, or reopens the newest saved one when nothing is resident, unless it has been
   idle past `Start a new conversation after`; `A New Conversation` always starts fresh. There is no
   third setting for "immediately" because that *is* `A New Conversation` — two controls able to
   express one state would only ever disagree.
 - **History is local and lazy.** Conversation summaries stay in memory while transcripts load from the
-  system SQLite database only for the selected preview or opened chat. Empty chats are never saved.
+  system SQLite database only for the opened chat. Empty chats are never saved.
+- **A rename and a pin are the reader's, and nothing derived overwrites them.** Both live in
+  `conversation_details` beside `conversations`, whose `title` stays the first question: every save
+  rewrites that summary, so a rename stored there would be undone by the next turn. A blank rename
+  hands the title back. The same row holds the harness's title and the chat's model, each column
+  upserted on its own so no write clobbers another; `message_details` is its per-message twin, for a
+  question's `@server` scope and a reply's usage. Both tables are `CREATE TABLE IF NOT EXISTS` with
+  `ON DELETE CASCADE`, so they needed no migration and a deleted chat takes its facts with it.
+- **Pinned chats are the ones asked to be kept.** Retention skips them, and so does Delete All Chats
+  — which says so in its confirmation — the way a clipboard clear keeps its pins.
 - **Retention is enforced only while AI is on.** `Keep conversations` prunes on the enable transition
   and whenever the setting changes, through `AIChatCoordinator.applyRetention` — never on a schedule
   and never while `aiEnabled` is false, because age passes while the feature is off and "off means
   fully off" promises the file is untouched. A Mac left off for four months keeps its chats.
-  `ChatHistoryStore.prune(before:)` is one `DELETE` that cascades to messages, images and searches,
+  `ChatHistoryStore.prune(before:)` is one `DELETE`, sparing pinned chats, that cascades to messages, images and searches,
   and it `VACUUM`s only when something actually went: pictures live inline as BLOBs, so this is the
   one store where a delete alone frees pages without ever shrinking the file.
 - **Everything but the newest message is bounded.** `ChatSession.boundedContext` sends that message
@@ -170,8 +309,13 @@ cacheless and never persists the typed key. A
 custom gateway may not implement a model-list endpoint, so exact identifiers can always be entered
 manually. Tinycast does not ship or guess an API catalog that can become stale. Codex gets its models
 and reasoning efforts from `model/list`; OpenCode gets identifiers and model-specific variants from
-`opencode models --pure --verbose`. Claude exposes the CLI's stable `sonnet`, `opus` and `haiku`
-aliases, with the CLI's effort levels on the supported Opus and Sonnet families. Cursor lists models
+`opencode models --pure --verbose`. Claude answers an `initialize` control request — written to a
+stream-json `-p` run that then gets no prompt, so no model is called — with its own `/model` list;
+`InstalledAIModel.claudeCatalog` keeps one row per resolved model (dropping `default`, which restates
+another), names each by the version its alias points at today ("Claude Opus 5.5"), and takes each
+one's `supportedEffortLevels`. The version is in `description` before a " · " on an older CLI and in
+`displayName` on a newer one, which describes a model without it; the name is read from whichever
+has it. The same answer carries the account, which `claudeAccount` reads for the Overview page. A model the CLI starts offering appears without a Tinycast release. Cursor lists models
 from `agent --list-models` after `agent status --format json` confirms a login.
 
 Turning thinking off is a reasoning effort, not a second control: `reasoningOptions(for:)` answers with
@@ -189,8 +333,10 @@ was, and the choice rides in `AIModelSelection.effort` like every other route's.
 
 `AIProvider.stream(_:)` accepts provider-neutral messages, optional instructions, a maximum output
 token count and the tools the turn may call. It returns an `AsyncThrowingStream` of text, thinking
-state, tool activity, usage and completion. OpenAI-
-compatible reasoning fields are surfaced as `.thinking`, never mixed into answer text. Anthropic
+state, tool activity, usage and completion. OpenAI-compatible reasoning fields and a response's
+leading `<think>…</think>` content block are surfaced as `.thinking` and `.reasoning`, never mixed
+into answer text. `AIThinkTagDecoder` holds back a tag split across deltas, drops the whitespace
+between the closing tag and the answer, and flushes an unclosed block as reasoning. Anthropic
 system messages are lifted into its top-level `system` field; the other HTTP routes keep system
 messages in the OpenAI message array.
 
@@ -215,37 +361,140 @@ reader already wrote, which is what `permissiveContentTransformations` exists fo
 needs no second provider. `GenerationError` never reaches the transcript as-is; its `Context` carries
 a debug description written for a log, so each case maps to a plain sentence instead.
 
-## Chat surface
+## Chat surfaces
 
-The built-in `AI Chat` launcher command enters `AIScreen`, and carries a bindable global shortcut
-(`HotKeyAction.command(.aiChat)`) that does the same thing from any app; Tab from the launcher is the
-third way in. Settings → AI holds both the recorder and a checkbox for the command's place in launcher
-search; the shortcut keeps working while the command is hidden, and does nothing at all while the
-feature is off. The palette search field becomes the single-line composer. The footer pill and
-Return are one action, `activate`: Send, or Stop while a response streams — an empty composer sends
-nothing, so the pill never needs a disabled state. The header's trailing model switcher uses the
-same in-window menu control as Clipboard's type filter and changes the chat route for the next
-message. For installed routes and OpenRouter models whose catalog reports the capability, it also
-shows the supported reasoning efforts and changes the chat effort for the next message.
-Other API routes keep their provider default because their model catalogs expose no portable effort
-contract. Neither change interrupts a response already streaming; stopping one is the pill's job,
-so the header never has to fit a third control beside the switcher.
+### Quick AI
 
-The second footer control is the palette's normal Actions (`⌘K`) menu. It owns New Chat, Chat History
-and AI Settings, plus Stop Response and Copy Last Response when those actions apply. Chat adds no
-separate footer design and no independent window.
+The built-in `Quick AI` launcher command enters `AIScreen`, and carries a bindable global shortcut
+(`HotKeyAction.command(.quickAI)`) that does the same thing from any app; Tab from the launcher is the
+third way in. Settings → AI holds the recorder and a checkbox for the command's place in launcher
+search, beside `AI Chat`'s; either shortcut keeps working while its command is hidden, and does
+nothing at all while the feature is off. The palette search field becomes the single-line composer.
+The footer pill and Return are one action, `activate`: Send, or Stop while a response streams — an
+empty composer sends nothing, so the pill never needs a disabled state. The header's trailing model
+switcher opens by click or ⌘P, uses the same in-window menu control as Clipboard's type filter and
+changes the chat route for the next message. For installed routes and OpenRouter models whose catalog
+reports the capability, it also shows the supported reasoning efforts and changes the chat effort for
+the next message. Other API routes keep their provider default because their model catalogs expose no
+portable effort contract. Neither change interrupts a response already streaming; stopping one is
+the pill's job, so the header never has to fit a third control beside the switcher.
+
+The second footer control is the palette's normal Actions (`⌘K`) menu. It owns Continue in AI Chat
+(`⌘J`; Open AI Chat while the chat is empty), New Chat (`⌘N`), Chat History (`⌘Y`) and AI Settings
+(`⌥⌘,`), plus Stop Response (`⌘.`), Regenerate Response (`⌘R`), Copy Last Response (`⇧⌘C`) and
+Remove Attachments when those apply. The chords are Raycast's where it has one, and `AIScreen.perform`
+maps each `PaletteShortcut` to its action. AI Settings takes ⌥⌘, because ⌘, stays the app's own
+Settings on every screen. Continuing closes the palette and carries the half-typed line into the
+window's composer with the conversation. Chat History is the palette's own browser over the same
+saved chats the window's sidebar lists: ↵ opens one in Quick AI, or in the window when the window
+already holds it, and Continue in AI Chat (`⌘J`) takes it to the window either way.
+
+### AI Chat
+
+The `AI Chat` command (`command:ai-chat-window`, `HotKeyAction.command(.aiChat)`) opens a titled
+`AppWindowController` window owned by `AIChatCoordinator`, autosaved as `AIChatWindow`. It is built the
+way Settings is — an `AIChatSplitViewController` with a native sidebar item, here collapsible, and a
+unified toolbar whose title is the open chat's — so it takes the system's own sidebar, toolbar and
+menus rather than the palette's scrim. `AIChatWindowChrome` owns the toolbar — the sidebar toggle
+and New Chat as two round buttons at the sidebar's trailing edge, then Find in Chat and Actions
+alone at the window's — the title, and one key monitor for ⌘V, ⌘F, ⌘G / ⇧⌘G, ⌘K and the Actions
+menu's own chords, and dies with the window.
+
+- **Find in Chat** (⌘F): the system's `NSSearchToolbarItem`, as is. `ChatFindState` is one per
+  window and steps match by match, not message by message:
+  `ChatFindIndex` walks each message exactly as the transcript draws it — reasoning folds, every
+  paragraph, list item, code block and table cell, in order — and lists every occurrence as
+  (message, drawn text, index within it). A reply's hidden choices fence never matches. A drawn
+  text is named by its position path (segment, block, item or cell), not its content, so two
+  identical table cells are two matches. An equation draws as one character, so find never matches
+  inside its source. `ChatTextHighlight` rides the environment into every text
+  a message draws, which marks all its matches in the Mac's find yellow and the current one solid;
+  a clear marker over the current match takes the scroll anchor, so the transcript centres on the
+  word itself.
+- **A reply's text is one selectable text view.** SwiftUI's `Text` selects within itself only, so
+  a reply drawn paragraph by paragraph could be dragged across one paragraph at most.
+  `ChatMarkdownText` draws each text segment into one read-only `NSTextView`, and
+  `ChatMarkdownRenderer` builds its single attributed string: lists with hanging indents, quotes,
+  code as `NSTextBlock`s, tables as an `NSTextTable`, with find's marks and the citation numbers
+  in it. Its leaf paths are `ChatFindIndex.leaves`'s, which `chat-markdown-test` pins. A code
+  block's language and Copy sit in a strip its block leaves above the code. Thinking folds, search
+  and tool rows stay separate views, so a drag spans one segment's text. A fold holding a match
+  opens. A glass counter at the transcript's top edge says "3 of 17" with the same steps as
+  Return / ⇧↩ in the field and ⌘G / ⇧⌘G anywhere. The sidebar's own filter is still there, by click.
+- **Math is typeset natively, in that same text.** `\(…\)` and `$…$` are inline math, `\[…\]` and
+  `$$…$$` display math. `MarkdownMath` finds them before Foundation's Markdown parse, which would
+  eat their backslashes. A `$` pairs only by Pandoc's rule — hugging its content, no digit after the
+  closer — so "$5 and $10" stays prose, and code spans and `\$` are never math. `MathNode` parses a
+  bounded LaTeX subset: at a command it does not know, past 40 levels of nesting or past 4,000
+  characters, a formula shows as its source (a display one as a `latex` code block) rather than as a
+  guess. `MathLayoutEngine` sets it by TeX's rules in STIX Two Math, which macOS ships, reading sizes,
+  gaps and stretchy glyphs from the font's OpenType MATH table, so no dependency is involved. Each
+  formula is one `MathAttachmentCell` character carrying its source: selection, citations and find
+  keep their offsets, copying or dragging gives back the LaTeX as written
+  (`ChatSelectableTextView.writeSelection`), and a formula wider than its line scales down to fit.
+  While a reply streams, `MarkdownBlock.parse(_:midStream:)` holds back an equation still open at
+  the very end — a display one as a centred, muted `…`, an inline one withheld — so it neither
+  flashes as source nor jumps from the left to the centre. Only the last segment of a streaming reply
+  is mid-stream, an opener the stream has passed stays visible, and a lone `$` is never held back,
+  since it may be a price.
+- **Actions** (⌘K): Quick AI's ⌘K menu for a window, on the same chords — Stop Response (`⌘.`), New
+  Chat (`⌘N`), Regenerate (`⌘R`), Copy Last Response (`⇧⌘C`), Remove Attachments, Find in Chat
+  (`⌘F`) and AI Settings (`⌥⌘,`) — plus what only a saved chat has: Copy Chat, Pin and Delete.
+  `AIChatActionsMenu` builds it per open from the chat's state, as an `NSMenu` hung under the
+  toolbar button whether the click or ⌘K opened it.
+
+- **Sidebar** (`AIChatSidebarView`): a filter field over a `List` of every saved chat, Pinned
+  first and then bucketed by day like Clipboard. The open chat is the selected row. A new chat has
+  none until its first message saves it, so starting one or leaving an empty one never adds or
+  drops a row under the pointer. A row shows a spinner while its reply streams, else a pin when
+  pinned. Its content fills the whole cell, so hover — a fainter fill in the selection's own
+  shape — never blinks off crossing between rows.
+  The context menu pins, renames in place, copies or exports the chat as Markdown
+  (`ChatSession.markdownTranscript`), and deletes one or all through `DialogController`; ⌫ deletes
+  the selected chat the same way.
+- **Transcript**: `ChatTranscriptView` with `surface: .window`, which drops the palette's edge
+  dissolve and thin scrollbar (both are measured against the palette's bars) and centres the column
+  at `aiChatReadingWidth`. The last finished reply offers Regenerate beside Copy: `AIChatState`
+  drops only a trailing reply and asks again with the question and its attachments, of whichever
+  model is selected now.
+- **Composer** (`AIChatDetailView`): one pane of untinted Liquid Glass, stacked under the transcript
+  rather than floated over it, with glass capsules for its menus, the glass on a background layer.
+  The title bar keeps the system's own band, as a native document window's does.
+  Transcript text runs `spacing.chatLine` apart, both surfaces. `ChatComposerTextView` is an `NSTextView`, not a `TextEditor`: its delegate sees
+  `insertNewline:` only outside input-method composition, so Return sends and ⇧↩ or ⌥↩ breaks the
+  line without Return ever stealing an IME's confirm. It grows with its text to
+  `aiChatComposerMaxHeight`, then scrolls. Under it: the paperclip (an `NSOpenPanel`), the model
+  menu, the reasoning menu (always shown, disabled for a model with no efforts, so the row never
+  changes shape), a web-search toggle when the route offers search, a context gauge, and Send/Stop.
+  One paperclip takes every kind; its help names what this chat's model can read. The gauge is the
+  last reply's `contextTokens` against the model's window when the route reported one, and
+  `ChatSession.historyBytes` against Tinycast's history budget otherwise — orange from 80%, red at
+  100%. Hovering it raises Tinycast's own card (never a popover), drawn inside the transcript's
+  frame at its bottom edge — just above the composer and inside the window whatever its size — and
+  solid under its glass so the transcript cannot show through. `ChatContextReport`
+  lays it out: tokens in context of the window, input with its cached share, output with its
+  thinking share and cost; then what the next message sends — model, history of budget, messages
+  sent of total, staged files, and whether the system prompt, web search and tools ride along. The model and reasoning menus are this chat's, as Quick AI's header is Quick AI's. Files arrive by ⌘V, a drop anywhere on the pane, or the paperclip, and all three take
+  the refusals a paste does. The unsent text lives on `AIChatState.draft`, so it survives closing
+  the window.
 
 `AIChatState` turns provider-neutral stream events into one live assistant message. Thinking state is
 shown without entering the transcript, partial text is preserved on failure, cancellation invalidates
 the active generation, and only completed assistant messages become context for the next request.
-Assistant replies render Markdown; user messages remain literal. A reply keeps streaming while the
-palette is hidden or showing another screen — the state is `AppCore`'s, not the view's — and is
-saved when it finishes; only Stop, New Chat, deleting the chat or quitting cut it short.
+Assistant replies render Markdown and LaTeX math; user messages remain literal. A reply keeps streaming while the
+palette is hidden, the window is closed or showing another chat — the state is `AppCore`'s, not the
+view's — and is saved when it finishes.
 
 Tool activity persists in `message_tools` beside `message_searches`, and `ChatMessage.segments`
-interleaves the two by text offset so a reply renders what it did in the order it did it. A call
-loaded still marked running belonged to a process that is gone, so it reads back as failed — the same
-repair a message left streaming gets.
+interleaves the two by text offset so a reply renders what it did in the order it did it. Offsets tie
+whenever no text arrived between two of them, so each search and call also takes a `sequence` — its
+place among the reply's searches and calls — as it is created, and that breaks the tie. Both tables
+store it as their `position`, so no column was added; a chat saved earlier holds each table's own
+index there, so its ties go by that index and then to the search. Consecutive tool calls render as
+one run: the latest running call while live, then an expandable count with any failures once done.
+Text and searches separate runs; a single call keeps its own row. A call loaded still marked running
+belonged to a process that is gone, so it reads back as failed — the same repair a message left
+streaming gets.
 
 `ChatHistoryStore` writes `ai-chats.sqlite3` below the bundle-specific Application Support directory.
 It uses the system SQLite already linked by Tinycast, stores no provider credentials, and repairs a
@@ -253,15 +502,17 @@ reply left streaming by a prior process into an interrupted failure when loaded.
 
 ## Palette integration
 
-Two palette modes carry the feature, and neither changes the shell's rules:
+Two palette modes carry Quick AI, and neither changes the shell's rules:
 
 | Mode | Screen | Body |
 | --- | --- | --- |
-| `.ai` | `AIScreen` | `ChatTranscriptView` |
+| `.ai` | `AIScreen` | `ChatTranscriptView` (`surface: .palette`) |
 | `.aiHistory` | `ChatHistoryScreen` | `ChatHistoryList` + preview, bucketed by day like Clipboard |
 
-Chat History backs out to Chat; both are sub-screens, so the header shows the back chevron. The
-search field is the composer: Return submits, or stops a streaming response, and the footer pill
+Chat History backs out to Quick AI; both are sub-screens, so the header shows the back chevron.
+Quick AI keeps the `command:ai-chat` id it shipped with while it was the only chat, so a hotkey,
+alias or fallback order recorded then still reaches it with nothing migrated; the window's command
+is the new id. The search field is the composer: Return submits, or stops a streaming response, and the footer pill
 reads Send `↵` / Stop `↵` to match. The model switcher is a `HeaderMenuButton` — the
 active label, glyph and disclosure chevron layered over `BarButton` — which is also what Clipboard's
 type filter is now, so the two header menus hover and open identically. Its menu is the palette's
@@ -269,7 +520,9 @@ fourth `OpenMenu` case, `.topTrailing` like the type filter, and it opens on the
 row leads with the vendor's mark — `AIBrand` resolves it from a native connection's provider, or for
 OpenRouter and OpenAI-compatible endpoints from the model id (`anthropic/claude-…`, `deepseek-chat`,
 `o4-mini`). The marks are ~300 B–2 KB monochrome template SVGs in `Assets.xcassets` (`AIBrand*`),
-twelve from Simple Icons and Z.ai from `@lobehub/icons`, so they tint with the row like a symbol; an
+thirteen from Simple Icons, Grok and Z.ai from `@lobehub/icons` and OpenCode drawn after its own, so
+they tint with the row like a symbol. OpenCode's inner block is the one second tone among them, and
+is drawn with `opacity`: the asset compiler drops `fill-opacity` without a warning. An
 unrecognised model keeps the generic sparkle. Provenance, the MIT notice and the trademark position
 are recorded in [`NOTICE.md`](../../NOTICE.md) — the CC0 on the Simple Icons project does not extend
 to the brands it depicts. The header's model switcher shows the selected model's mark the same way.
@@ -282,15 +535,20 @@ them until an unrelated render or a window exit/re-enter recomputed hover. It di
 the menu, as a native menu's click-away does.
 
 Seven more `@MainActor @Observable` types join the shared state: `AISettingsStore`,
-`ChatGPTSubscriptionManager`, `InstalledAIManager`, `ChatHistoryStore`, `AIChatState`,
-`MCPSettingsStore` and `MCPServerManager`. `AIChatCoordinator` is the nineteenth feature coordinator
-and `MCPCoordinator` the twentieth.
+`ChatGPTSubscriptionManager`, `InstalledAIManager`, `ChatHistoryStore`, `AIChatSurfacesState` (which
+owns every live `AIChatState`), `MCPSettingsStore` and `MCPServerManager`. `AIChatCoordinator` — the
+window, and every chat action either surface sends — is the nineteenth feature coordinator,
+`MCPCoordinator` the twentieth and `QuickAICoordinator` the twenty-first.
 
 ### Manual sweep
 
 - The selected model appears at the right of the composer and truncates without crowding typed text.
-- Clicking it opens the same anchored menu shape as Clipboard's type filter; arrows, Return and Escape
-  operate the menu without changing the draft.
+- An `@server` chip — the tools glyph alone, since the handle is still in the text — or a staged
+  pill follows the typed text with a clear gap, and a long draft stops it right before the model
+  name, the same gap with a reasoning menu and without.
+- Clicking it or pressing ⌘P opens the same anchored menu shape as Clipboard's type filter;
+  arrows, Return and Escape operate the menu without changing the draft.
+- Pressing ⌘P again closes the model menu and returns focus to the composer.
 - Repeatedly clicking either the model switcher or the type filter opens and closes every time, even
   when the next click lands immediately after dismissal or a few points off the first one.
 - Selecting a model updates the button immediately and the next message reaches that route.
@@ -305,45 +563,97 @@ and `MCPCoordinator` the twentieth.
   and confirm Chat and each model-backed Quick Action use it without showing a credential field.
 - Sign out of an installed command, press Check Again, and confirm its models leave both pickers while
   the stored selection is repaired according to the normal routing rule.
-- With `Opens to: Recent Conversation` and a five-minute window, Escape out and summon again inside
+- On Codex and on the Claude command, with an MCP server enabled, a question answered with a tool
+  shows the same rows the API routes show and the reply continues after them; with MCP off, both
+  routes stream exactly as they did before.
+- With `Quick AI opens to: Recent Conversation` and a five-minute window, Escape out and summon again inside
   five minutes resumes the transcript; past it, the composer is empty. Quitting and relaunching still
   reopens the last conversation. `A New Conversation` is always empty.
-- Setting `Keep conversations` to 7 days drops older chats from ⌘K → Chat History and shrinks
-  `ai-chats.sqlite3`. Switching AI off, waiting past a boundary and switching back on prunes nothing
+- Setting `Keep conversations` to 7 days drops older unpinned chats from the window's sidebar and
+  shrinks `ai-chats.sqlite3`; a pinned one stays. Switching AI off, waiting past a boundary and switching back on prunes nothing
   that was saved before it went off.
-- Harnesses: `ai-provider-test` (endpoints, request bodies, stream decoding, persistence repair,
-  Codex framing, on-device routing), `ai-chat-test` (`ChatSession`, `MarkdownBlock`,
-  `ChatHistoryStore`, `AIToolLoopProvider`),
+- Ask in Quick AI, press ⌘J while it streams: the window opens on that chat, still streaming, with
+  the unsent line in its composer, and Quick AI is empty on the next summon.
+- In the window, send, then press ⌘N before the reply ends: the old chat keeps its sidebar spinner,
+  finishes, and reopens complete. Rename one, send another turn in it, and the name holds.
+- Ask for the quadratic formula in LaTeX: while the reply streams, its display equation is a centred
+  `…` that turns into the equation in place; selecting across it and copying pastes its `$$…$$`
+  source. A reply that mentions "$5 and $10" keeps both prices as prose, and in a narrow Quick AI a
+  long equation shrinks to fit rather than running off the edge.
+- Return sends, ⇧↩ breaks the line, and a Japanese IME's Return confirms its text without sending.
+- Drop a PDF on the pane with a text-only model selected: the HUD refuses it, as a paste would.
+- Collapse the sidebar with the toolbar button; ⌘N and ⌘Q (Close Window) still work, and ⌘Q with
+  Settings in front closes Settings instead.
+- Harnesses: `ai-provider-test` (endpoints, request bodies, stream decoding including leading
+  think tags across content and SSE splits, persistence repair,
+  Codex framing, on-device routing, the two MCP launch encodings and the two consent channels, the
+  shown-model and switched-off-route rules, and a tool's override from settings to launch),
+  `ai-chat-test` (`ChatSession`, `MarkdownBlock` with its math delimiters, LaTeX subset and
+  mid-stream hold-back, `ChatHistoryStore` with renames and pins,
+  `AIToolLoopProvider`, regenerate, and `AIChatSurfacesState`'s one-live-place rule),
   `codex-turn-test` (the Stop path, driven against a stub app-server stalled where Stop races the
-  turn ID, plus the no-config-mutation boundary), `installed-ai-test` (Claude/Grok/OpenCode/Cursor flags, prompt
-  framing, streaming and cleanup) and `apple-intelligence-test` (status copy, snapshot deltas,
+  turn ID, plus the MCP launch boundary, one launch for concurrent starts, the elicitation, the
+  rows, the call cap and a custom provider's access without an account),
+  `installed-ai-test` (Claude/Grok/OpenCode/Cursor flags, prompt
+  framing, streaming and cleanup, and Claude's private MCP configuration, control channel, round
+  cap and managed-policy branch, a reader's variables against Tinycast's own, and a set command
+  path that runs or fails) and `apple-intelligence-test` (status copy, snapshot deltas,
   transcript assembly, error mapping, plus one real generation when this Mac can run one), all in
   `run-tests.sh`.
 
 ## Installed commands
 
 `ExecutableLocator` finds `codex`, `claude`, `grok`, `opencode` and `agent` by asking the account's
-login shell, so a stale copy in another prefix never shadows the one Terminal runs. Only when the shell
-names no absolute executable does it fall back to the app's PATH, the normal Homebrew and local-bin
-locations and every nvm Node version, newest first — a fallback that can pick a different copy. The
+login shell, so a stale copy in another prefix never shadows the one Terminal runs. zsh, bash and fish
+are asked in their own syntax, any other shell through zsh, and the answer comes back behind a marker,
+so an rc or logout file that prints cannot hide it. Only when the shell names no absolute executable does
+it fall back to the app's PATH, the normal Homebrew and local-bin locations, mise's and asdf's shims and
+every nvm Node version, newest first — a fallback that can pick a different copy. What a
+found command runs under is `ExecutableLocator.environment`: its own folder, `/opt/homebrew/bin` and
+`/usr/local/bin` ahead of the inherited PATH, for every probe, turn, Codex `mcp list` read and local MCP
+server — a Finder-launched app's PATH is `/usr/bin:/bin:/usr/sbin:/sbin`, and an npm or Homebrew CLI is
+`#!/usr/bin/env node`, which would find no `node` on it.
+
+A reader can replace the lookup and add to that environment, per tool, on the tool's Advanced page.
+The path is used as written, a leading `~` expanded, and never searched for. The variables lie over
+the app's own before `ExecutableLocator.environment` builds the PATH, so a reader's `PATH` is the one
+the tool's folder is put ahead of. Both reach every spawn: the probes, a CLI turn and the session it
+deletes afterwards, Claude's title request, and Codex's app-server and its `mcp list` read.
+`InstalledAIManager` and `CodexAppServerClient` ask for them at each launch through `launchSettings`,
+so an edit takes the next one, and `AISettingsStore.launchRevisions` lets `AppCore` check again only
+the tool that was edited — Codex by stopping its server, which restarts on demand. The
 commands are never installed by Tinycast; Settings links to their own install docs and offers a sign-in
 command to copy. `InstalledAIManager` probes Claude, Grok, OpenCode and Cursor off-main, in parallel.
-Claude's auth status gates three model aliases; a successful Grok or OpenCode model list is both its auth
-check and catalog; Cursor's `status --format json` gates `--list-models`.
+Claude's auth status gates an `initialize` control request, and `InstalledAIModel.claudeCatalog` builds
+its model list from the answer. OpenCode's successful model list is both its auth check and catalog.
+Grok's `models` output is the catalog, but a signed-out CLI still exits 0 and prints that catalog under
+"You are not authenticated." — that banner is the auth check, not the exit status. Cursor's
+`status --format json` gates `--list-models`.
 
 `ChatGPTSubscriptionManager` retains its historical type name but now owns only the installed Codex
 app-server lifecycle and discovered account metadata. Production never sets `CODEX_HOME`, so the
 server uses the same login and credential store as the user's normal Codex command. Tinycast supplies
 only a private working directory. The server stops after ten idle minutes, when AI is switched off or
 when the app terminates, and restarts on demand. Account state, model availability and rate-limit
-windows come from the supported app-server protocol.
+windows come from the supported app-server protocol. A custom Codex provider can report no account
+and `requiresOpenaiAuth: false`; Tinycast then loads its models and runs turns without inventing an
+account or asking for `codex login`. A missing or true flag still requires sign-in. A running server
+rereads `config.toml` at every `account/read`, but Tinycast keeps what a check found, account or
+provider, beside the models and rate limits it read with it, until the next check; a turn that finds
+nothing to run on leaves Codex signed out and stops the server, as a check does.
+
+MCP is the one thing about that server that is fixed at `exec`: its overrides and its environment
+both are, so `CodexAppServerClient` remembers the list it was launched with and relaunches when the
+next turn wants a different one — a server added or removed, or an OAuth token refreshed. A check
+is not a turn and keeps whatever is already running. The account survives the relaunch because it
+was never the process's to begin with. See [MCP](mcp.md) for what goes on the launch line.
 
 `CodexTurnRunner` is the generation half behind `CodexInstalledProvider`.
 
 It creates an ephemeral thread for each request, injects prior user/assistant messages, and
 streams agent-message deltas, plus `item/started` for the reasoning and web-search items that feed the
 bubble's status line. System messages become developer instructions alongside Tinycast's fixed
-no-tools boundary. Cancellation interrupts the active turn, including one the server has started but
+boundary, which forbids every tool except the MCP tools an armed turn supplies. Cancellation interrupts the active turn, including one the server has started but
 not yet named: Stop arms that thread, and whichever of `turn/started` or the `turn/start` response
 names the turn first spends a single `turn/interrupt` on it.
 
@@ -355,9 +665,14 @@ out as `image` input parts with data URLs, and as `input_image` when prior turns
 `InstalledCLITurnRunner` handles Claude, Grok, OpenCode and Cursor behind the same provider protocol. It
 frames Tinycast's instructions and bounded conversation history as stdin (or a private `--prompt-file` for
 Grok, whose CLI requires a path), consumes newline-delimited JSON, and never puts prompt text on the
-process command line. Claude uses stream JSON, `--effort` and no session persistence.
+process command line. Claude uses stream JSON, `--effort` and no session persistence, and takes every
+turn as one framed `stream-json` user line. With servers armed it keeps stdin open for the consent
+channel and closes it on the CLI's own result frame; writes are chained rather than concurrent,
+because two racing the same pipe would interleave a line.
 Grok uses `streaming-messages-json` and `--effort`, with `--deny *` so tools cannot run even when the
 user's Grok config is always-approve; it captures the session id, then calls `grok sessions delete`.
+An error result omits `result` and carries the cause in `errors`; that text is the failure, not
+Claude's missing-`result` fallback.
 OpenCode runs pure with an inline deny-all configuration and passes the selected
 model variant through `--variant`; it captures the returned session identifier, then calls
 `opencode session delete` after the process exits. Cursor runs ask mode with `--trust`,
@@ -379,8 +694,8 @@ transport code at all.
 | Route | Web search | Images | PDFs | MCP tools |
 | --- | --- | --- | --- | --- |
 | Apple Intelligence | never — it reaches nothing | never — the model is text-only | never | never |
-| Codex | thread-scoped `web_search` config | `image` input part | never — the app-server takes no document part | never — its tools are disabled by design |
-| Claude command | never | never | never | none load — `--strict-mcp-config` with an empty config, unless a managed MCP policy forces both flags off |
+| Codex | thread-scoped `web_search` config | `image` input part | never — the app-server takes no document part | Tinycast's servers, added as launch overrides; the reader's own are disabled by name |
+| Claude command | never | base64 `image` block in its stream-json user message | never | Tinycast's servers, through `--strict-mcp-config` and a private config file — an empty one when there are none, and neither flag under a managed MCP policy |
 | Grok command | never | never | never | the global config still loads — `--deny *` refuses the call |
 | OpenCode command | never | never | never | the global config still loads — `permission: deny` refuses the call |
 | Cursor command | never | never | never | the global config still loads — ask mode and withheld approval refuse the call |
@@ -416,7 +731,8 @@ is why documents are *not* assumed the way images are. An attachment is never dr
 out: answering a question about a document the model never received is the one outcome this must
 not produce.
 
-Attachments arrive by ⌘V, in three kinds: an **image**, a **PDF** sent as a native document block,
+In Quick AI attachments arrive by ⌘V; the window also takes a drop and the paperclip. They come in
+three kinds: an **image**, a **PDF** sent as a native document block,
 and a **text-ish file** whose contents are inlined as fenced, named text.
 `PaletteWindowController`'s command-shortcut hook gives chat the chord first; a pasteboard holding
 file URLs or a bare image (a screenshot) stages them, while anything else carrying text falls
@@ -426,7 +742,7 @@ request. Every file is **sized before it is read**, so a huge CSV can never be s
 
 **A text file is inlined by `ChatSession.boundedContext`, never into `ChatMessage.text`.** That
 seam is load-bearing: `ChatSession.title` summarises the first user message, so folding a CSV into
-the stored text would make the dump the conversation's title in Chat History, its preview, and what
+the stored text would make the dump the conversation's title in the AI Chat sidebar, its preview, and what
 the user bubble renders back. Inlining after the transcript and before the transport also means
 only the newest turn carries it, so a chat's payload cannot grow turn on turn. The block names the
 file and fences it with a run longer than any inside it, so a Markdown file holding its own fence
@@ -445,26 +761,28 @@ Images are re-encoded to PNG and bounded to 1568px on the long edge, off-main on
 a display-sized screenshot does not decode on the keystroke; one past `AIAttachmentBudget` is refused
 with a HUD instead of being staged. Because that decode outlives the keystroke, it shares the staged
 images' lifetime exactly: whatever consumes or clears them — a send, a new chat, Remove Attachments,
-or leaving the conversation for another through history — disowns one still in flight and says so,
+or leaving the conversation for another in the window — disowns one still in flight and says so,
 rather than letting it surface on a later message. The counter that decides this sits on
-`AIChatState` beside the staged images, so a route that drops them cannot forget to move it. A
-staged attachment shows as a pill beside the typed text — an image carrying a small preview of
-itself, a PDF and a text file their own glyph, each followed by the file name, or "Image" for a
-screenshot. **Every kind is labelled**, images included: a bare thumbnail beside an ✕ reads as two
-stray marks rather than one pill, and the capsule needs something to wrap. The thumbnail is
-deliberately smaller than the pill's height for the same reason. Each pill carries its own ✕, so a
-mispaste is taken back without clearing the rest — ⌘K → Remove Attachments and bare backspace stay
-as the bulk and last-one routes. **Past two pills the rest collapse into a `+N` count**, because
-the strip's width is taken out of the search field: three named pills leave too little room to read
-what you are typing. The preview is a ~1 KB PNG downsampled on the same detached task that encodes the
-attachment and carried on the staged attachment itself, so a header re-rendered per keystroke
-decodes nothing and there is no cache whose lifetime could drift from the staging counter's.
-Each pill states its own width through `AttachmentChip.width(for:)`, which
-`RootPaletteView.searchFieldWidth(for:)` subtracts from the search field — so the two must move
-together or the caret drifts. Pills ride the same `headerAccessory` the launcher's argument fields use, so the field shrinks to
-its text and the chip follows it rather than the composer growing. Bare backspace on an empty composer removes the last
+`AIChatState` beside the staged images, so a route that drops them cannot forget to move it.
+**Staged attachments share one pill beside the typed text**: the newest one's kind as a glyph — a
+photo, a PDF, a text file — and `+N` for the rest, because the strip's width is taken out of the
+search field and a named pill per file left too little room to read what you are typing. The names
+are a hover away, one per line, and clicking the pill opens a header menu listing every file, an
+image by its own thumbnail, with its ✕, so a mispaste is taken back without clearing the rest — ⌘K → Remove Attachments
+and bare backspace stay as the bulk and last-one routes. A row runs by its index, so the open menu
+is re-laid whenever the staged list changes and closes once it empties; left stale, a file decoded
+under it would shift the rows, and clicking Remove All would take back only that file. The menu's
+thumbnail is the ~1 KB PNG downsampled on the same detached task that encodes the attachment and
+carried on the staged attachment itself, decoded once per row, so there is no cache whose lifetime
+could drift from the staging counter's. The strip states its own width — `AttachmentsPill.width(for:)`, the `@`
+chip's, and every gap it lays out, the one between the two chips included — which
+`RootPaletteView.searchFieldWidth(for:)` subtracts from the search field, so they must move together
+or the caret drifts. Pills ride the same `headerAccessory` the launcher's argument fields use, so the field shrinks to
+its text and the chip follows it rather than the composer growing. Nothing is reserved for the model
+menu: the row itself squeezes a long draft, so the strip stops right before that menu however wide
+its title is. Bare backspace on an empty composer removes the last
 chip before it backs out of chat; ⌘K → Remove Attachments clears them all. Sent images persist in `message_images` and sent PDFs in `message_documents` beside their message;
-the bubble renders images as thumbnails and documents as the same named chips the composer showed.
+the bubble renders images as thumbnails and documents as named chips.
 A text file is already in the message's text and needs no table. The schema is
 `CREATE TABLE IF NOT EXISTS` re-applied on every open, so the table needed no migration, and its
 `ON DELETE CASCADE` leaves `prune` unchanged.
@@ -473,12 +791,12 @@ The switcher's glyph comes from the selection. Codex uses OpenAI's mark; Claude 
 marks; OpenCode resolves a brand from the model id or falls back to a sparkle; Cursor uses an SF Symbol;
 an API model resolves through its connection. It never depends on `modelOptions`, which for
 Codex is empty until the app-server has answered `model/list`; opening the chat on a Codex model warms that list so the title is the
-display name from the first frame. Tab hands chat on to the clipboard, and Escape on an empty
-composer takes chat's own back step — to whatever opened it, or out of the palette when its hotkey
+display name from the first frame. Tab hands Quick AI on to the clipboard, and Escape on an empty
+composer takes its own back step — to whatever opened it, or out of the palette when its hotkey
 did; either way the unsent draft is dropped rather than carried into a field that would search it.
-History is pushed over chat and pops back to it, and Tab carries its query to the launcher because
-there the field really is a search. Neither exit touches the conversation: it lives on `AIChatState`,
-so Tab away and back resumes the same transcript.
+History is pushed over Quick AI and pops back to it, and Tab carries its query to the launcher
+because there the field really is a search. Neither exit touches the conversation: it lives on
+`AIChatState`, so Tab away and back resumes the same transcript.
 
 The model switcher is `fixedSize` with its title shortened in `AIChatCoordinator` (26 characters,
 middle ellipsis) rather than truncated by layout: a flexible label claimed the row up to its max
@@ -488,14 +806,35 @@ width and clipped the search field well short of the button.
 
 Settings → AI is a normal grouped `Form` inside Tinycast's existing Settings window. Its top AI
 section owns the feature switch and the **Providers → Manage…** action, and **Default model** below
-it picks the app-wide route and its reasoning effort. Provider management opens as a sheet, where
-**Installed AI** reports Codex, Claude, Grok, OpenCode and Cursor separately as checking, ready, sign-in required,
-missing or failed. It never contains a credential field: installation and sign-in happen in each
-command's own flow. **API Connections** remains the explicit Keychain-backed path in that sheet. The
-chat header changes the same default without a trip to Settings, while Quick Actions keeps its own
-model selection.
+it picks the app-wide route and its reasoning effort. A
+pick in Quick AI's header or the AI Chat composer sets that chat's model and moves this default with
+it, while Quick Actions keeps its own model selection.
 
-The signed-in Codex address is the one thing on the pane that names a person, and a Settings pane
+Provider management opens as an editor panel laid out like Mail's Accounts: every route in a list on
+the left — **On This Mac**, **Installed**, **API Connections** — each with its mark and a one-line
+state, and the selected one's detail on the right. `+` under the list is a menu of the five
+connection presets and `−` removes the selected connection; an installed tool cannot be removed,
+only switched off, from the switch in its detail header. The detail has pages behind a segmented
+control (`AIProviderTab`), and the chosen page is kept from one provider to the next:
+
+- **Overview** reports an installed tool as checking, ready, sign-in required, missing or failed,
+  with the account, Codex's usage windows and the command that ran. It never contains a credential
+  field: installation and sign-in happen in each command's own flow. For a connection it shows the
+  provider, base URL and whether a key is stored; **Edit…** in the header opens the connection
+  editor, which remains the explicit Keychain-backed path.
+- **Models** is the checklist behind the second invariant above, with Show All, Hide All and a
+  filter once a route offers more than eight. The rows are an `NSTableView` in one `Form` row
+  (`AIModelChecklist`): a `Form` realizes every row it holds, and OpenCode offers over four hundred.
+- **Advanced**, on an installed tool only, holds the command path and the variables, saved as each
+  field is left. It stays while the tool is off, so a wrong path can be fixed before it is switched
+  on. A name Tinycast sets itself says its value is not used.
+
+An API connection has the first two pages, and the on-device model, with one, shows no control. The
+panel draws its Liquid Glass behind its content rather than around it
+(`settingsEditorPanelSurface(controlsOnGlass: false)`), because the page control sits directly on the
+surface and a segmented control drawn on glass loses its accent colour.
+
+The signed-in Codex or Claude address is the one thing on the pane that names a person, and a Settings pane
 is what gets screenshotted into a bug report or left on screen in a recording, so `RedactedText`
 shows it scrambled and blurred until it is clicked. `RedactedPlaceholder` derives the stand-in from
 the address itself — stable across redraws, same length, `@ . - _` left in place — because a blurred
@@ -513,9 +852,10 @@ rides along on every turn, because it is billed on every turn and nothing else i
 box already withholds their own text, so a switch that spared the preamble would add nothing; the
 preamble is the part that is billed on every turn for every user and has no other way off. Off
 disables the editor rather than hiding it, so what is being withheld stays readable. One thing it
-deliberately cannot reach: the Codex route always prepends its own instruction never to invoke
-tools, run commands or touch files. That is a sandbox boundary on a local CLI, not Tinycast
-describing itself, and a user switch must not be able to lift it.
+deliberately cannot reach: every installed CLI route prepends its own instruction never to run
+commands or touch files, and never to invoke a tool beyond the MCP tools an armed Codex or Claude
+turn supplies. That is a sandbox boundary on a local CLI, not Tinycast describing itself, and a user
+switch must not be able to lift it.
 
 `mcpEnabled` and `mcpServers` are excluded for the reasons in [mcp.md](mcp.md).
 `aiConnections`, `aiDefaultModel`, `aiSystemPrompt` and `aiSystemPromptEnabled` are deliberately
@@ -524,4 +864,9 @@ second names an external destination and must not silently redirect AI traffic a
 last two are standing instructions and the switch that sends them, both of which change every
 answer and must not arrive on another Mac unread. `aiRetention`, `aiOpensTo` and `aiNewChatAfter`
 join them: all three are decisions about conversations that never leave the Mac that had them, and
-an import must not arrive carrying an instruction to delete them.
+an import must not arrive carrying an instruction to delete them. `aiToolRounds` stays behind too: it
+limits what a tool-driven reply may spend, and an import must not raise that unasked.
+`aiShownModels` and `aiDisabledRoutes` name this Mac's own tools, connections and their models, which
+another Mac may not have. `aiInstalledOverrides` names a command to run and the variables to run it
+with, and an import must never decide which program a Mac launches. None of the three has a
+`settings.json` key, for the same reasons: they are machine state, and the last grants a capability.

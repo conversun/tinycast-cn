@@ -14,6 +14,21 @@ final class EmojiIndex {
         let order: Int
     }
 
+    /// An entry's text folded once at load, so a keystroke folds only the query.
+    private struct FoldedEntry: Sendable {
+        let name: FuzzyMatch.Candidate
+        let localizedName: FuzzyMatch.Candidate
+        let keywords: FuzzyMatch.Candidate
+        let keywordList: [FuzzyMatch.Candidate]
+
+        init(_ entry: EmojiEntry) {
+            name = FuzzyMatch.Candidate(entry.name)
+            localizedName = FuzzyMatch.Candidate(entry.localizedName)
+            keywords = FuzzyMatch.Candidate(entry.keywords)
+            keywordList = entry.keywords.split(separator: ",").map { FuzzyMatch.Candidate(String($0)) }
+        }
+    }
+
     private struct SearchKey: Equatable {
         let query: String
         let revision: Int
@@ -23,15 +38,22 @@ final class EmojiIndex {
     }
 
     private var byGlyph: [String: EmojiEntry] = [:]
+    /// Parallel to `entries`.
+    private var foldedEntries: [FoldedEntry] = []
     @ObservationIgnored private var searchMemo = Memo<SearchKey, [EmojiEntry]>()
     /// Bumped on each load, so the key above names the catalog it scored.
     private var revision = 0
 
     var isLoaded: Bool { !entries.isEmpty }
 
-    func load(_ raw: String = EmojiData.raw) async {
-        let parsed = await Task.detached(priority: .utility) { EmojiCatalog.parse(raw) }.value
+    /// `languages` pick which of the bundle's keyword packs join the catalog's English keywords.
+    func load(_ raw: String = EmojiData.raw, languages: [String] = [], bundle: Bundle = .main) async {
+        let (parsed, folded) = await Task.detached(priority: .utility) {
+            let parsed = EmojiCatalog.parse(raw, localized: Self.keywordPacks(for: languages, in: bundle))
+            return (parsed, parsed.map(FoldedEntry.init))
+        }.value
         entries = parsed
+        foldedEntries = folded
         var grouped: [EmojiCategory: [EmojiEntry]] = [:]
         for entry in parsed { grouped[entry.category, default: []].append(entry) }
         categorySections = EmojiCategory.allCases.compactMap { category in
@@ -39,6 +61,16 @@ final class EmojiIndex {
         }
         byGlyph = Dictionary(parsed.map { ($0.glyph, $0) }, uniquingKeysWith: { first, _ in first })
         revision &+= 1
+    }
+
+    /// Plain files, never `.lproj`: one would switch AppKit's own text out of English.
+    private nonisolated static func keywordPacks(for languages: [String], in bundle: Bundle) -> [String] {
+        let urls = bundle.urls(forResourcesWithExtension: "txt", subdirectory: "EmojiKeywords") ?? []
+        let byLanguage = Dictionary(
+            urls.map { ($0.deletingPathExtension().lastPathComponent, $0) },
+            uniquingKeysWith: { first, _ in first })
+        return EmojiCatalog.keywordLanguages(available: byLanguage.keys.sorted(), preferred: languages)
+            .compactMap { byLanguage[$0].flatMap { try? String(contentsOf: $0, encoding: .utf8) } }
     }
 
     func entry(for glyph: String) -> EmojiEntry? { byGlyph[glyph] }
@@ -65,7 +97,8 @@ final class EmojiIndex {
                 }, uniquingKeysWith: max)
             var scored: [ScoredEntry] = []
             for (order, entry) in entries.enumerated() {
-                guard let textScore = Self.textScore(query, terms: terms, entry: entry) else { continue }
+                guard let textScore = Self.textScore(query, terms: terms, folded: foldedEntries[order])
+                else { continue }
                 let score = textScore + (frecency[entry.glyph] ?? 0)
                 scored.append(ScoredEntry(entry: entry, score: score, order: order))
             }
@@ -87,22 +120,19 @@ final class EmojiIndex {
     private static let mixedWordsScore = 50_000
 
     private static func textScore(
-        _ query: FuzzyMatch.Query, terms: [String], entry: EmojiEntry
+        _ query: FuzzyMatch.Query, terms: [String], folded: FoldedEntry
     ) -> Int? {
         var nameOnly = true
-        if !terms.isEmpty {
-            let name = FuzzyMatch.normalized(entry.name)
-            let localizedName = FuzzyMatch.normalized(entry.localizedName)
-            let keywords = FuzzyMatch.normalized(entry.keywords)
-            for term in terms
-            where !containsWordStart(term, in: name) && !containsWordStart(term, in: localizedName) {
-                guard !term.contains(","), containsWordStart(term, in: keywords) else { return nil }
-                nameOnly = false
-            }
+        for term in terms
+        where !containsWordStart(term, in: folded.name.text)
+            && !containsWordStart(term, in: folded.localizedName.text)
+        {
+            guard !term.contains(","), containsWordStart(term, in: folded.keywords.text) else { return nil }
+            nameOnly = false
         }
 
-        let matchedName = [entry.name, entry.localizedName]
-            .filter { !$0.isEmpty }
+        let matchedName = [folded.name, folded.localizedName]
+            .filter { !$0.text.isEmpty }
             .compactMap { name in
                 FuzzyMatch.match(query, candidate: name).map { (name: name, match: $0) }
             }
@@ -112,7 +142,7 @@ final class EmojiIndex {
         var best = nameMatch?.score
         if let nameMatch, nameMatch.tier == .prefix,
             let matchedName,
-            let next = FuzzyMatch.normalized(matchedName.name).dropFirst(nameMatch.queryLength).first,
+            let next = matchedName.name.text.dropFirst(nameMatch.queryLength).first,
             !next.isLetter && !next.isNumber
         {
             best = leadingWordScore - nameMatch.candidateLength
@@ -121,10 +151,10 @@ final class EmojiIndex {
             let ordered = nameMatch?.tier == .subsequence ? nameMatch?.score ?? 0 : 0
             best = max(best ?? Int.min, (nameOnly ? nameWordsScore : mixedWordsScore) + ordered)
         }
-        guard !entry.keywords.isEmpty, FuzzyMatch.score(query, candidate: entry.keywords) != nil
+        guard !folded.keywordList.isEmpty, FuzzyMatch.score(query, candidate: folded.keywords) != nil
         else { return best }
-        for keyword in entry.keywords.split(separator: ",") {
-            guard let match = FuzzyMatch.match(query, candidate: String(keyword)) else { continue }
+        for keyword in folded.keywordList {
+            guard let match = FuzzyMatch.match(query, candidate: keyword) else { continue }
             best = max(best ?? Int.min, min(match.score, leadingWordScore) - keywordPenalty)
             if match.tier == .exact { break }
         }

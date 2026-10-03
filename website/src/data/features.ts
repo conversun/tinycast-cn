@@ -31,7 +31,7 @@ export const coreFeatures: Feature[] = [
   {
     icon: "launch",
     title: "App launcher",
-    body: "Fuzzy-search every app and open it with a keystroke. Pin favorites, see what's running, restart or quit without the mouse.",
+    body: "Find any app by typing a few letters and open it from the keyboard. Pin favorites, see what's running, and quit or restart apps.",
     href: "/docs/launcher",
     preview: "launcher",
     isWide: true,
@@ -39,7 +39,7 @@ export const coreFeatures: Feature[] = [
   {
     icon: "calculator",
     title: "Inline calculator",
-    body: "Math, units, live currency, time zones and dates like “days till 9 Apr”.",
+    body: "Math, units, currencies, time zones, and dates like “days till 9 Apr”.",
     href: "/docs/features/calculator",
     preview: "calculator",
     isWide: false,
@@ -47,7 +47,7 @@ export const coreFeatures: Feature[] = [
   {
     icon: "clipboard",
     title: "Clipboard history",
-    body: "Text, images, files and colors, searchable and pasted straight back.",
+    body: "Search the text, images, files and colors you've copied, then paste them back.",
     href: "/docs/features/clipboard",
     preview: "clipboard",
     isWide: false,
@@ -55,7 +55,7 @@ export const coreFeatures: Feature[] = [
   {
     icon: "aiChat",
     title: "AI Chat",
-    body: "Apple Intelligence, Codex, Claude, Grok, OpenCode or any API you bring.",
+    body: "Use Apple Intelligence, Claude, Codex, Grok, OpenCode or your own API key.",
     href: "/docs/ai",
     preview: "aiChat",
     isWide: false,
@@ -71,7 +71,7 @@ export const coreFeatures: Feature[] = [
   {
     icon: "windows",
     title: "Window management",
-    body: "Halves, thirds, nudges, display moves and saved layouts, all from the keyboard. 34 commands.",
+    body: "35 keyboard commands for halves, thirds, nudges and moving between displays, plus layouts you save.",
     href: "/docs/features/window-management",
     preview: "windows",
     isWide: true,
@@ -79,7 +79,7 @@ export const coreFeatures: Feature[] = [
   {
     icon: "extensions",
     title: "Raycast extensions",
-    body: "Run in JavaScriptCore and drawn in SwiftUI. Install from the store with no toolchain.",
+    body: "Install them from the Raycast Store without Node or a build step. They run in JavaScriptCore and render in SwiftUI.",
     href: "/docs/extensions",
     preview: "extensions",
     isWide: true,
@@ -87,7 +87,7 @@ export const coreFeatures: Feature[] = [
   {
     icon: "snippets",
     title: "Snippets",
-    body: "Markdown templates with placeholders. Type a keyword in any app and it expands.",
+    body: "Type a keyword in any app and it expands into text. Snippets can use Markdown and placeholders.",
     href: "/docs/features/snippets",
     preview: "snippets",
     isWide: true,

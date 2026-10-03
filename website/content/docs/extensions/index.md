@@ -1,74 +1,86 @@
 ---
 title: Extensions
-description: Tinycast runs Raycast extensions natively, drawn with SwiftUI.
+description: Tinycast runs Raycast extensions natively, rendered with SwiftUI.
 ---
 
-Tinycast runs Raycast extensions: the same `package.json` and the same built command files, drawn
+Tinycast runs Raycast extensions: the same `package.json` and the same built command files, rendered
 natively in the palette.
 
-There is no Electron, no browser and no Node.js running inside Tinycast. Extensions run in
-JavaScriptCore, which already ships with macOS, so this adds **nothing to the app's size**.
+Tinycast doesn't run Electron, a browser or Node.js. Extensions run in JavaScriptCore, which is
+already part of macOS, so supporting them adds **nothing to the app's size**.
 
-**Settings → Extensions** holds the switch. It ships **off**, and turning it on asks first, because
-it means agreeing to run code someone else wrote.
+Turn extensions on in **Settings → Extensions**. They're **off** by default, and Tinycast asks for
+confirmation when you turn them on, because extensions are code written by other people.
 
 | Setting           | Default |
 | ----------------- | ------- |
 | Enable extensions | **Off** |
 | Show in launcher  | On      |
 
-The switch is never included in [backups](/docs/reference/backup), so importing a file cannot turn it
-on.
+The switch is never included in [backups](/docs/reference/backup), so importing a backup can't turn
+extensions on.
 
-While it is off, no folder is scanned, nothing shows in the launcher and no JavaScript engine exists.
+While extensions are off, Tinycast doesn't scan any folders, nothing appears in the launcher, and no
+JavaScript engine runs.
 
-## The one ongoing cost
+## Memory use
 
-**One command runs at a time, and a running command keeps a JavaScript engine in memory until you
-leave it.** That is the only ongoing cost Tinycast has.
+**Only one foreground command runs at a time, and it keeps a JavaScript engine in memory until you
+leave it.** Menu bar commands use their own short-lived engine, which is released when a refresh
+finishes or the menu closes.
 
-Starting a command stops the one before and throws its engine away, so nothing carries over between
-runs. A fresh start takes about 7 ms once warm.
+Starting a command stops the previous one and discards its engine, so nothing carries over between
+runs. Once warmed up, a command starts in about 7 ms.
 
-The one exception is [background refresh](/docs/extensions/customising#background-refresh), which
+The only exception is [background refresh](/docs/extensions/customising#background-refresh), which
 briefly runs a command on a schedule, and only if you turn it on.
+
+## Menu bar commands
+
+Run a menu bar command once to turn it on. Its icon and title then stay in the menu bar, and the
+interval in its manifest controls how often it refreshes in the background. Opening the menu reloads
+the command, and closing it releases the engine once any running action finishes. Saved items come
+back after a restart without running the extension.
+
+To stop a menu bar command, turn off **Show in menu bar** in the command's configuration. Installing
+an extension doesn't turn on its menu bar commands.
 
 ## Where to go next
 
-- [Installing extensions](/docs/extensions/installing): the three ways in, registries and package
-  managers
-- [What works](/docs/extensions/compatibility): what is supported, and the known gaps
+- [Installing extensions](/docs/extensions/installing): the three ways to install, registries and
+  package managers
+- [What works](/docs/extensions/compatibility): what's supported, and the known gaps
 - [Configuring one](/docs/extensions/customising): preferences, icons, aliases and background
   refresh
 
 ## In the launcher
 
-An extension's commands show in the **Extensions** section. The extension's own name also finds its
-commands, so `lucide` finds Lucide's **Search Icons**.
+An extension's commands appear in the **Extensions** section. Searching for the extension's name
+also finds its commands, so `lucide` finds Lucide's **Search Icons**.
 
-A global shortcut belongs to a **command**, not to a whole extension. See
+Global shortcuts are assigned to individual **commands**, not to whole extensions. See
 [Hotkeys](/docs/reference/hotkeys).
 
-A command that takes arguments shows small fields right after what you typed. <kbd>tab</kbd> moves from
-the search field through each field and back, and <kbd>return</kbd> from any of them runs the command. An
-empty required field stops the launch and puts the cursor there.
+When a command takes arguments, small fields appear after what you typed. <kbd>tab</kbd> moves from
+the search field through each field and back, and <kbd>return</kbd> in any of them runs the command.
+If a required field is empty, the command doesn't run and the cursor moves to that field.
 
 Every argument is sent, as an empty string if you left it blank. Raycast does the same, and
-extensions count on it.
+extensions rely on it.
 
 ## Moving around
 
-<kbd>esc</kbd> clears the search field first. On an empty field, <kbd>esc</kbd> and <kbd>delete</kbd> go
-back through the extension's **own** screens, and only leave the command once you are at its first
-screen.
+<kbd>esc</kbd> clears the search field first. When the field is empty, <kbd>esc</kbd> and
+<kbd>delete</kbd> go back through the extension's **own** screens, and only leave the command from
+its first screen.
 
-Screens you go back to keep their state, so you land where you left off.
+Screens keep their state when you go back to them, so you return to where you left off.
 
-An extension's actions become the palette's <kbd>⌘</kbd><kbd>K</kbd> menu. The first action is the
-one <kbd>return</kbd> runs, and each action's own shortcut works.
+An extension's actions appear in the palette's <kbd>⌘</kbd><kbd>K</kbd> menu. <kbd>return</kbd> runs
+the first action, and each action's own shortcut works.
 
 ## Appearance
 
-A running command keeps the [appearance](/docs/palette#appearance) it started with. A theme change
-reaches it the next time it opens. Icons and colors made for light and dark switch as the palette
-does.
+A running command keeps the [appearance](/docs/palette#appearance) it started with, and a theme
+change applies the next time it opens. Icons and colors made for light and dark mode switch along
+with the palette.

@@ -17,22 +17,22 @@ export const ethos = {
 export const ethosPillars: EthosPillar[] = [
   {
     icon: "native",
-    title: "Native, end to end",
-    body: "SwiftUI and AppKit, Swift 6, zero third-party dependencies. It launches before Electron has finished thinking about it.",
+    title: "Native",
+    body: "Written in Swift 6 with SwiftUI and AppKit, and no third-party dependencies. It opens fast and stays under 100 MB of memory.",
   },
   {
     icon: "local",
-    title: "Nothing leaves your Mac",
-    body: "No account, no telemetry, no update pings you didn't ask for. AI features are off until you turn them on.",
+    title: "Local",
+    body: "Your clipboard, notes and snippets are stored on your Mac. AI stays off until you turn it on and pick a provider.",
   },
   {
     icon: "source",
-    title: "Open source, AGPL-3.0",
-    body: "Read every line. Build it yourself. The feature set is deliberately closed so it stays small.",
+    title: "Open source",
+    body: "The full source is on GitHub under AGPL-3.0, and you can build it yourself. The scope stays narrow so the app stays small.",
   },
   {
     icon: "free",
-    title: "Free, and staying free",
-    body: "A one-off tip keeps it maintained. There's no Pro tier waiting behind a paywall.",
+    title: "Free",
+    body: "Every feature is free, and there is no Pro tier. Optional tips pay the running costs.",
   },
 ];

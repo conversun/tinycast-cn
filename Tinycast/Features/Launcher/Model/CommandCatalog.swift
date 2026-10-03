@@ -38,7 +38,8 @@ enum CommandCatalog {
     ) -> AppEntry {
         AppEntry(
             id: id.rawValue, name: id.name, url: url ?? placeholderURL(id), bundleID: nil,
-            kind: id.entryKind, settingsOwner: id.owner, subtitle: subtitle, alternateNames: [id.untranslatedName])
+            kind: id.entryKind, settingsOwner: id.owner, subtitle: subtitle,
+            alternateTitles: [id.untranslatedName])
     }
 
     nonisolated private static func placeholderURL(_ id: CommandID) -> URL {
@@ -52,14 +53,15 @@ extension SettingsTab {
         switch self {
         case .quicklinks:
             [.createQuicklink, .searchQuicklinks, .importQuicklinks, .exportQuicklinks]
-        case .ai: [.aiChat]
+        case .ai: [.quickAI, .aiChat]
         case .quickActions: [.fixGrammar, .rewrite, .translate, .summarize]
         case .fileSearch: [.searchFiles]
         case .notes: [.showNotes, .createNote, .searchNotes]
         case .snippets: [.searchSnippets, .createSnippet]
         case .navigation: [.switchWindows, .searchMenuItems]
-        case .windowManagement: [.createWindowLayout, .captureWindowLayout]
-        case .clipboard: [.clipboardHistory]
+        case .windowManagement:
+            [.createWindowLayout, .captureWindowLayout, .switchRoom, .createRoom]
+        case .clipboard: [.clipboardHistory, .pasteSequentially]
         case .emoji: [.searchEmoji]
         case .calendar:
             [.joinNextMeeting, .mySchedule, .createEvent, .copyMeetingLink, .openInCalendar]

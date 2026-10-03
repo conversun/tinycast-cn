@@ -3,14 +3,12 @@
 
 // The page title and meta description, shared by the layout and /llms.txt. Google truncates a
 // description near 160 characters, so `summary` is written to land under it rather than be cut.
-export const pageTitle =
-  "Tinycast — everything on your Mac, one keystroke away";
+export const pageTitle = "Tinycast: a free, native launcher for macOS";
 export const summary =
-  "Free and open source, fully native macOS launcher: app search, clipboard manager, snippets, custom commands, window management, BYOK AI and Raycast extensions.";
+  "A free, open source macOS launcher with app search, clipboard history, snippets, custom commands, window management, your own AI keys and Raycast extensions.";
 
 export const site = {
   name: "Tinycast",
-  tagline: "The essentials, without the bloat.",
   repo: "https://github.com/abue-ammar/tinycast",
   url: "https://tinycast.dev",
   // The R2 bucket behind cdn.tinycast.dev. Anything over Workers' 25 MiB
@@ -32,7 +30,7 @@ export const hero = {
   // One entry per line: the break falls between the two sentences at every
   // width. The last line ends bare, because the hero draws a caret after it.
   headlineLines: ["Everything on your Mac.", "One keystroke away"],
-  sub: "A tiny, native launcher. No Electron. No account. No telemetry. No bullshit.",
+  sub: "A small, native launcher for your apps, clipboard, snippets and windows. Free and open source, with no account and no telemetry.",
   // The mono line under the buttons. Each fact is stated in the docs.
   facts: ["Under 100 MB of memory", "Zero dependencies", "Free & open source"],
 } as const;
@@ -41,6 +39,7 @@ export const nav = [
   { label: "Features", href: "/#features" },
   { label: "Privacy", href: "/#privacy" },
   { label: "Docs", href: "/docs" },
+  { label: "Changelog", href: "/changelog" },
 ] as const;
 
 // The hero's two lines. Every other channel lives in docs/install.md, which is

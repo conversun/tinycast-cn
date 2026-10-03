@@ -1,29 +1,29 @@
 ---
 title: Keyboard shortcuts
-description: Every key the palette and its screens understand, in one place.
+description: Every built-in shortcut in the palette and its screens, in one place.
 ---
 
-These are built in and cannot be changed. For shortcuts you record yourself, see
+These shortcuts are built in and can't be changed. For shortcuts you record yourself, see
 [Hotkeys](/docs/reference/hotkeys).
 
 Shortcuts follow key positions, so they work the same on any keyboard layout or input source.
 
 ## Everywhere in the palette
 
-| Key                                                 | Does                                                    |
-| --------------------------------------------------- | ------------------------------------------------------- |
-| <kbd>return</kbd>                                   | Main action                                             |
-| <kbd>⌘</kbd><kbd>return</kbd>                       | Second action                                           |
-| <kbd>⌘</kbd><kbd>K</kbd>                            | Actions menu                                            |
-| <kbd>↑</kbd> <kbd>↓</kbd>                           | Move the selection                                      |
-| <kbd>⌃</kbd><kbd>N</kbd> / <kbd>⌃</kbd><kbd>P</kbd> | Same as <kbd>↓</kbd> / <kbd>↑</kbd>                     |
-| <kbd>⌃</kbd><kbd>F</kbd> / <kbd>⌃</kbd><kbd>B</kbd> | Same as <kbd>→</kbd> / <kbd>←</kbd>                     |
-| <kbd>tab</kbd>                                      | Launcher → AI Chat → clipboard, or walk argument fields |
-| <kbd>esc</kbd>                                      | Clear the search, go back a screen, then close          |
-| <kbd>⌘</kbd><kbd>esc</kbd>                          | Back to the root search from any screen                 |
-| <kbd>delete</kbd>                                   | In an empty search, go back a screen                    |
-| <kbd>⌘</kbd><kbd>,</kbd>                            | Settings                                                |
-| <kbd>⌘</kbd><kbd>W</kbd>                            | Close the window                                        |
+| Key                                                 | Does                                                   |
+| --------------------------------------------------- | ------------------------------------------------------ |
+| <kbd>return</kbd>                                   | Main action                                            |
+| <kbd>⌘</kbd><kbd>return</kbd>                       | Second action                                          |
+| <kbd>⌘</kbd><kbd>K</kbd>                            | Actions menu                                           |
+| <kbd>↑</kbd> <kbd>↓</kbd>                           | Move the selection                                     |
+| <kbd>⌃</kbd><kbd>N</kbd> / <kbd>⌃</kbd><kbd>P</kbd> | Same as <kbd>↓</kbd> / <kbd>↑</kbd>                    |
+| <kbd>⌃</kbd><kbd>F</kbd> / <kbd>⌃</kbd><kbd>B</kbd> | Same as <kbd>→</kbd> / <kbd>←</kbd>                    |
+| <kbd>tab</kbd>                                      | Launcher → AI Chat → clipboard, or move through fields |
+| <kbd>esc</kbd>                                      | Clear the search, go back a screen, then close         |
+| <kbd>⌘</kbd><kbd>esc</kbd>                          | Back to the root search from any screen                |
+| <kbd>delete</kbd>                                   | In an empty search, go back a screen                   |
+| <kbd>⌘</kbd><kbd>,</kbd>                            | Settings                                               |
+| <kbd>⌘</kbd><kbd>W</kbd>                            | Close the window                                       |
 
 ## Launcher
 
@@ -43,7 +43,7 @@ Shortcuts follow key positions, so they work the same on any keyboard layout or 
 
 | Key                      | Does                                                |
 | ------------------------ | --------------------------------------------------- |
-| <kbd>return</kbd>        | Send, or stop a reply that is streaming             |
+| <kbd>return</kbd>        | Send, or stop a reply that's streaming              |
 | <kbd>⌘</kbd><kbd>V</kbd> | Attach an image, PDF or text file                   |
 | <kbd>delete</kbd>        | In an empty message box, remove the last attachment |
 
@@ -76,7 +76,8 @@ Shortcuts follow key positions, so they work the same on any keyboard layout or 
 | <kbd>⌃</kbd><kbd>X</kbd>                            | Delete Entry               |
 | <kbd>⌃</kbd><kbd>⇧</kbd><kbd>X</kbd>                | Delete All Entries         |
 
-With **Default action** set to Copy to Clipboard, <kbd>return</kbd> and <kbd>⌘</kbd><kbd>return</kbd> swap.
+When **Default action** is set to Copy to Clipboard, <kbd>return</kbd> and
+<kbd>⌘</kbd><kbd>return</kbd> are swapped.
 
 ## Emoji
 
@@ -148,6 +149,19 @@ With **Default action** set to Copy to Clipboard, <kbd>return</kbd> and <kbd>⌘
 | <kbd>esc</kbd>                | Close the switcher, then hide   |
 | <kbd>⌘</kbd><kbd>delete</kbd> | Move the selected note to Trash |
 
+## Switch Room
+
+| Shortcut                                    | Action                                 |
+| ------------------------------------------- | -------------------------------------- |
+| <kbd>return</kbd>                           | Enter the room                         |
+| <kbd>tab</kbd> / <kbd>⇧</kbd><kbd>tab</kbd> | Next or previous layout that fits      |
+| <kbd>⌘</kbd><kbd>K</kbd>                    | Room actions                           |
+| <kbd>⌘</kbd><kbd>N</kbd>                    | Create a room                          |
+| <kbd>⌘</kbd><kbd>delete</kbd>               | Delete the room; its windows stay open |
+
+In the window picker, <kbd>return</kbd> adds or removes a window and <kbd>⌘</kbd><kbd>return</kbd>
+saves the room.
+
 ## Window layout editor
 
 | Key                           | Does |
@@ -156,5 +170,5 @@ With **Default action** set to Copy to Clipboard, <kbd>return</kbd> and <kbd>⌘
 
 ## Dialogs
 
-<kbd>return</kbd> runs the main button and <kbd>esc</kbd> cancels, on **every** dialog, including ones that
-delete things. Cancel always sits on the left.
+On **every** dialog, including ones that delete things, <kbd>return</kbd> clicks the main button and
+<kbd>esc</kbd> cancels. Cancel is always on the left.

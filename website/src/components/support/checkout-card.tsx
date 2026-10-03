@@ -172,7 +172,7 @@ export function CheckoutCard() {
       <p className="mt-1.5 text-center text-caption text-fg-subtle">
         {plan === "monthly"
           ? "Cancel anytime from the link in your receipt."
-          : "A single payment. Nothing recurring."}
+          : "A one-time payment that doesn't renew."}
       </p>
     </div>
   );

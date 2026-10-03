@@ -7,7 +7,7 @@ struct FrequentEmoji: Codable, Hashable, Sendable {
     var lastUsed: Date
 }
 
-/// Usage counts as a capped JSON file, feeding the grid's "Frequently Used".
+/// Capped emoji history and usage counts, persisted together for the grid and search.
 @MainActor
 @Observable
 final class FrequentEmojiStore {
@@ -17,7 +17,7 @@ final class FrequentEmojiStore {
 
     private(set) var records: [FrequentEmoji]
 
-    /// The empty-query grid re-reads `top()` every render, so this sorts once per tally.
+    /// Search re-reads `top()` across queries, so this sorts once per tally.
     @ObservationIgnored private var sortedMemo = Memo<Int, [String]>()
     private(set) var revision = 0
 
@@ -27,7 +27,7 @@ final class FrequentEmojiStore {
         if let data = try? Data(contentsOf: fileURL),
             let decoded = try? JSONDecoder().decode([FrequentEmoji].self, from: data)
         {
-            records = decoded
+            records = Self.history(decoded)
         } else {
             records = []
         }
@@ -36,14 +36,14 @@ final class FrequentEmojiStore {
     func record(_ glyph: String) {
         revision &+= 1
         if let index = records.firstIndex(where: { $0.glyph == glyph }) {
-            records[index].count += 1
-            records[index].lastUsed = Date()
+            var entry = records.remove(at: index)
+            entry.count += 1
+            entry.lastUsed = Date()
+            records.insert(entry, at: 0)
         } else {
-            records.append(FrequentEmoji(glyph: glyph, count: 1, lastUsed: Date()))
+            records.insert(FrequentEmoji(glyph: glyph, count: 1, lastUsed: Date()), at: 0)
         }
         if records.count > Self.cap {
-            // Evict the least-used, oldest tallies so the file stays bounded.
-            records.sort { $0.count != $1.count ? $0.count > $1.count : $0.lastUsed > $1.lastUsed }
             records.removeLast(records.count - Self.cap)
         }
         persist()
@@ -52,11 +52,7 @@ final class FrequentEmojiStore {
     /// Replaces the tallies wholesale from a backup, under the same cap `record` enforces.
     func replace(_ imported: [FrequentEmoji]) {
         revision &+= 1
-        records = Array(
-            imported
-                .filter { !$0.glyph.isEmpty && $0.count > 0 }
-                .sorted { $0.count != $1.count ? $0.count > $1.count : $0.lastUsed > $1.lastUsed }
-                .prefix(Self.cap))
+        records = Self.history(imported)
         persist()
     }
 
@@ -68,6 +64,17 @@ final class FrequentEmojiStore {
                 .map(\.glyph)
         }
         return Array(sorted.prefix(n))
+    }
+
+    /// A backup can repeat a glyph; only its newest tally is kept, so each takes one grid cell.
+    private static func history(_ tallies: [FrequentEmoji]) -> [FrequentEmoji] {
+        var seen = Set<String>()
+        return Array(
+            tallies
+                .filter { !$0.glyph.isEmpty && $0.count > 0 }
+                .sorted { $0.lastUsed > $1.lastUsed }
+                .filter { seen.insert($0.glyph).inserted }
+                .prefix(cap))
     }
 
     private func persist() {

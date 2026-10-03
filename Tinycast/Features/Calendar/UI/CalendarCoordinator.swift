@@ -2,6 +2,7 @@ import AppKit
 
 /// Owns joining a meeting: the consent gate, the card's and the chord's actions, feature presence.
 @MainActor
+@Observable
 final class CalendarCoordinator {
     private let store: CalendarStore
     private let clock: MeetingClock
@@ -12,13 +13,18 @@ final class CalendarCoordinator {
     private unowned let core: AppCore
 
     /// Its own surface, the way `NotesCoordinator` owns the notes window.
-    private lazy var cameraPreview = CameraPreviewController()
+    @ObservationIgnored private lazy var cameraPreview = CameraPreviewController()
 
-    private var paletteVisible = false
+    @ObservationIgnored private var paletteVisible = false
     /// When auto join was last armed; a meeting already under way then is never joined.
-    private var armedAt = Date.distantFuture
+    @ObservationIgnored private var armedAt = Date.distantFuture
     /// Auto joined this launch, so a meeting opens itself at most once.
-    private var autoJoined: Set<MeetingEvent.ID> = []
+    @ObservationIgnored private var autoJoined: Set<MeetingEvent.ID> = []
+
+    /// Stored and written only on a flip: the menu-bar scene reads it, and must not re-run per tick.
+    private(set) var hasMenuBarEvent = false
+    /// Dismissed from the menu bar this launch, the way `autoJoined` remembers what it opened.
+    private var dismissedFromMenuBar: Set<MeetingEvent.ID> = []
 
     init(
         store: CalendarStore,
@@ -38,9 +44,6 @@ final class CalendarCoordinator {
 
     /// The window every surface reads, so the card, the chord and the schedule cannot disagree.
     var window: UpcomingWindow { UpcomingWindow(leadMinutes: settings.joinWindowMinutes.rawValue) }
-
-    /// The days the store reads, and the wording every sentence that names them uses.
-    var span: MeetingSpan { MeetingSpan(includesTomorrow: settings.calendarIncludesTomorrow) }
 
     /// The meeting the join card shows; `now` comes from the ticking clock.
     var cardedMeeting: MeetingEvent? {
@@ -67,7 +70,21 @@ final class CalendarCoordinator {
             hideAfterMinutes: settings.hideCurrentEvent.minutes,
             linkedOnly: settings.menuBarLinkedEventsOnly,
             hideCurrentAtStart: settings.hideCurrentEvent.hidesAtStart)
-        return summary.event(from: store.events, now: clock.now)
+        return summary.event(
+            from: store.events, now: clock.now, dismissed: dismissedFromMenuBar)
+    }
+
+    /// The menu bar's day-by-day list; clock-driven, so a meeting that ends leaves on the minute.
+    var menuBarAgenda: [MeetingDayGroup] {
+        let now = clock.now
+        return MeetingDayGroup.grouping(
+            UpcomingWindow.agenda(from: store.events, now: now), now: now, calendar: .current)
+    }
+
+    /// Dismisses what the menu drew: a handover mid-click must not eat the arriving event.
+    func dismissMenuBarEvent(_ meeting: MeetingEvent) {
+        dismissedFromMenuBar.insert(meeting.id)
+        refreshMenuBarEvent()
     }
 
     // MARK: - Feature switch
@@ -89,8 +106,8 @@ final class CalendarCoordinator {
                 await core.confirm(
                     title: "Enable calendar?",
                     message:
-                        "Tinycast reads \(span.possessivePhrase) events to find join links. "
-                        + "Nothing leaves this Mac.",
+                        "Tinycast reads \(settings.calendarSpan.possessivePhrase) events "
+                        + "to find join links. Nothing leaves this Mac.",
                     symbol: "calendar", confirmTitle: "Continue", tone: .neutral,
                     confirmRole: .standard)
             else { return }
@@ -105,18 +122,19 @@ final class CalendarCoordinator {
     /// Publishes or withdraws everything the feature contributes to the launcher.
     func applyEnabled() {
         let enabled = settings.calendarEnabled
-        let commands: Set<CommandID> = [
-            .joinNextMeeting, .copyMeetingLink, .mySchedule, .openInCalendar, .createEvent
-        ]
-        appIndex.setCommandsVisible(commands, enabled)
-        appIndex.setCommandsListed(commands, settings.calendarShowInLauncher)
+        appIndex.setCommandsVisible(
+            [.joinNextMeeting, .copyMeetingLink, .mySchedule, .openInCalendar, .createEvent], enabled)
         guard enabled else {
             store.stop()
             clock.stop()
             publishEntries()
+            refreshMenuBarEvent()
             return
         }
-        store.onChange = { [weak self] in self?.publishEntries() }
+        store.onChange = { [weak self] in
+            self?.publishEntries()
+            self?.refreshMenuBarEvent()
+        }
         clock.onTick = { [weak self] in self?.minuteDidPass() }
         applySpan()
         store.start()
@@ -126,7 +144,7 @@ final class CalendarCoordinator {
 
     /// Changing which days are read re-queries EventKit, so it goes through the store.
     func applySpan() {
-        store.span = span
+        store.span = settings.calendarSpan
     }
 
     /// The clock runs while something is watching it. With all three off an idle Mac owns no timer.
@@ -140,6 +158,7 @@ final class CalendarCoordinator {
             return
         }
         clock.start()
+        refreshMenuBarEvent()
     }
 
     /// Stamped when auto join goes on, so switching it on mid-call cannot yank you into that call.
@@ -155,7 +174,23 @@ final class CalendarCoordinator {
     private func minuteDidPass() {
         store.reloadIfStale(now: clock.now)
         publishEntries()
+        refreshMenuBarEvent()
         autoJoinIfDue()
+    }
+
+    private func refreshMenuBarEvent() {
+        forgetStaleDismissals()
+        let hasEvent = menuBarEvent != nil
+        guard hasEvent != hasMenuBarEvent else { return }
+        hasMenuBarEvent = hasEvent
+    }
+
+    /// Assigned only on a change: a write every tick would re-run the label for nothing.
+    private func forgetStaleDismissals() {
+        guard !dismissedFromMenuBar.isEmpty else { return }
+        let live = dismissedFromMenuBar.intersection(store.events.map(\.id))
+        guard live != dismissedFromMenuBar else { return }
+        dismissedFromMenuBar = live
     }
 
     private func autoJoinIfDue() {
@@ -172,7 +207,8 @@ final class CalendarCoordinator {
         join(meeting, uninvited: true)
     }
 
-    private func publishEntries() {
+    /// "Show in launcher" gates only these rows, so My Schedule stays findable with meetings off.
+    func publishEntries() {
         guard settings.calendarEnabled, settings.calendarShowInLauncher else {
             appIndex.setMeetings([])
             return
@@ -190,8 +226,8 @@ final class CalendarCoordinator {
                     + (meeting.id.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
                         ?? ""))!,
             bundleID: nil, kind: .meeting,
-            matchAliases: [meeting.calendarName],
-            symbolName: meeting.link?.provider.sfSymbol ?? "calendar")
+            symbolName: meeting.link?.provider.sfSymbol ?? "calendar",
+            keywords: [meeting.calendarName])
     }
 
     // MARK: - Palette lifecycle
@@ -252,7 +288,7 @@ final class CalendarCoordinator {
 
     func openNextMeetingInCalendar() {
         guard let meeting = window.joinable(from: store.events, now: Date()) ?? agenda.first else {
-            report("Nothing scheduled \(span.orPhrase)")
+            report("Nothing scheduled \(settings.calendarSpan.orPhrase)")
             return
         }
         openInCalendar(meeting)
@@ -270,6 +306,10 @@ final class CalendarCoordinator {
     func activateMeeting(id: String) {
         guard let meeting = store.event(id: id) else { return }
         join(meeting)
+    }
+
+    func meeting(entryID: String) -> MeetingEvent? {
+        MeetingEvent.id(fromEntryID: entryID).flatMap(store.event(id:))
     }
 
     /// `uninvited` marks an auto join, the only case that may have to ask before it acts.
@@ -325,6 +365,12 @@ final class CalendarCoordinator {
 
     func showSchedule() {
         paletteCoordinator.togglePalette(mode: .schedule)
+    }
+
+    /// Loaded before the push, so the page's first frame is already filled.
+    func showDetails(of meeting: MeetingEvent) {
+        store.loadDetails(of: meeting)
+        paletteCoordinator.navigate(to: .meetingDetails)
     }
 
     /// A miss is transient, so it reports through the HUD rather than a dialog needing dismissal.

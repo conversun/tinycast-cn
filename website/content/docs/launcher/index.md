@@ -1,30 +1,31 @@
 ---
 title: App launcher
-description: One search across everything Tinycast knows about, and how it decides what comes first.
+description: One search across everything Tinycast knows about, and how it orders the results.
 ---
 
 The launcher is the root screen. One search covers your apps, System Settings panes, commands,
 quicklinks, snippets, system actions, window commands and layouts, custom commands, Quick Actions,
 extension commands and upcoming meetings.
 
-<kbd>return</kbd> opens what is selected. <kbd>⌘</kbd><kbd>K</kbd> shows everything else you can do with it.
+<kbd>return</kbd> opens the selection. <kbd>⌘</kbd><kbd>K</kbd> shows everything else you can do
+with it.
 
 ## With nothing typed
 
-[Favorites](/docs/launcher/favorites) come first, then each section in this order:
+[Favorites](/docs/launcher/favorites) come first, followed by each section in this order:
 
 Meetings → Applications → System Settings → Extensions → Quicklinks → Snippets → System Actions →
 Window Layouts → Window Management → Custom Commands → Quick Actions → Commands
 
-Each section is in alphabetical order, and stays that way. A list that reorders itself as you use it
-is hard to scan.
+Each section is sorted alphabetically and keeps that order, because a list that reorders itself as
+you use it is hard to scan.
 
-When a meeting is about to start, a [join card](/docs/features/calendar#the-join-card) sits above
-everything.
+When a meeting is about to start, a [join card](/docs/features/calendar#the-join-card) appears above
+everything else.
 
 ## When you type
 
-The sections fold into one **Results** list, ordered by how well each entry matches. A few things can
+The sections merge into one **Results** list, sorted by how well each entry matches. A few extras can
 appear around it:
 
 - **A calculator card** at the top when your text is a
@@ -36,15 +37,15 @@ appear around it:
 
 ### Listing a whole category
 
-Type a section's exact name, like `Snippets`, `Snippet` or `Window Management`, and you get that
-whole category under its own heading.
+Type a section's exact name, like `Snippets`, `Snippet` or `Window Management`, to list that whole
+category under its own heading.
 
-It has to be the exact name. An app whose name is exactly your text still shows too, which is why
-typing `System Settings` lists both the app and its panes.
+The name has to match exactly. An app with exactly that name still appears too, which is why typing
+`System Settings` lists both the app and its panes.
 
 ## How matching works
 
-Tinycast looks at several names for each entry, and trusts some more than others:
+Tinycast checks several names for each entry and gives some of them more weight than others:
 
 | Name                                  | Example                                 |
 | ------------------------------------- | --------------------------------------- |
@@ -54,66 +55,70 @@ Tinycast looks at several names for each entry, and trusts some more than others
 | The extension a command comes from    | `lucide` for Lucide's Search Icons      |
 | The bundle identifier or program name | `apple.Photos`                          |
 
-How the letters match matters too: an exact match beats one at the start, which beats one at the
-start of a word, which beats one in the middle, which beats scattered letters.
+How the letters match also counts. From strongest to weakest: an exact match, a match at the start
+of the name, a match at the start of a word, a match in the middle of a word, and scattered letters.
 
-**One rule never bends: typing a name or alias exactly always wins**, however often you picked
-something else. Everything below that can move with [learned ranking](#learned-ranking).
+Typing a name or alias exactly always puts that entry first, no matter how often you picked
+something else. Everything below that can change with [learned ranking](#learned-ranking).
 
-A few details keep results sensible:
+A few more rules keep results useful:
 
 - **Bundle identifiers only match as typed**, never by scattered letters. Otherwise almost any short
-  search would hit almost every app. They also match without the leading `com.`, so `apple.Photos`
-  works, while pasting the full `com.apple.Photos` still finds it.
-- **An extension's name ranks low.** An extension called `Safari` can never take that search from the
-  real Safari.
+  search would match almost every app. They also match without the leading `com.`, so `apple.Photos`
+  works, and pasting the full `com.apple.Photos` still finds the app.
+- **An extension's name ranks low.** An extension called `Safari` can't push the real Safari out of
+  first place.
 
 ### Names in your language
 
 Apps are shown the way Finder shows them, in your Mac's language. The English name still works, so
-on a Portuguese Mac both `Find My` and `Buscar` find the same app.
+on a Mac set to Portuguese, both `Find My` and `Buscar` find the same app.
 
 Apps also match the other names macOS knows them by: `Address Book` finds Contacts,
 `System Preferences` finds System Settings, and `browser`, `浏览器` or `사파리` all find Safari.
 
-Names in other scripts get a Latin spelling too: `微信` answers to `weixin` and `wx`, `メモ帳` to
-`memo`, and `Яндекс` to `yandeks`.
+Names in other scripts also get a Latin spelling: `微信` matches `weixin` and `wx`, `メモ帳` matches
+`memo`, and `Яндекс` matches `yandeks`.
 
 If you renamed an app in Finder, both the old and the new name find it.
 
 ## Learned ranking
 
-Tinycast learns which result you pick for a search, on your Mac, and moves it up next time.
+Tinycast remembers which result you pick for a search and moves it up the next time. This happens on
+your Mac.
 
-Pick WhatsApp after typing `wha`, and it also comes up sooner for `w` and `wh`. The more often and
-more recently you pick something, the stronger the boost.
+If you pick WhatsApp after typing `wha`, it also ranks higher for `w` and `wh`. The more often and
+the more recently you pick something, the bigger the boost.
 
-These do not teach it, because none of them is a search: opening something with its own shortcut,
-launching a favorite with <kbd>⌘</kbd> and a number, listing a category, and Open in Browser.
+Some ways of opening things don't count, because they aren't searches: opening something with its
+own shortcut, opening a favorite with <kbd>⌘</kbd> and a number, listing a category, and Open in
+Browser.
 
-**Resetting.** For one entry: <kbd>⌘</kbd><kbd>K</kbd> → **Reset Ranking**, shown only when that entry
-has learned something. For everything: **Settings → General → Learned ranking → Reset**.
+**Resetting.** For one entry, choose <kbd>⌘</kbd><kbd>K</kbd> → **Reset Ranking**. It only appears
+when Tinycast has learned something about that entry. To reset everything, go to
+**Settings → General → Learned ranking → Reset**.
 
-What it learns stays in `launcher-ranking.json` in Tinycast's own folder and goes nowhere else.
+This data is stored in `launcher-ranking.json` in Tinycast's own folder and is never sent anywhere.
 
 ## Search scopes
 
-**Settings → Applications → Search Scopes** decides which folders are searched for apps. A scope can
+**Settings → Applications → Search Scopes** sets which folders Tinycast searches for apps. A scope can
 be a folder or a single `.app`.
 
 The defaults cover `/Applications`, `/System/Applications`, both `Utilities` folders,
-`/System/Library/CoreServices/Applications`, the hidden system folder where Safari really lives,
-`~/Applications`, and Finder on its own.
+`/System/Library/CoreServices/Applications`, the hidden system folder where Safari is actually
+installed, `~/Applications`, and Finder itself.
 
-Tinycast looks **one folder deep**, so `/Applications/Blackmagic Design/DaVinci Resolve.app` is found
-without its own scope. Anything deeper needs a scope of its own. It never looks inside an app bundle.
+Tinycast searches **one folder deep**, so it finds `/Applications/Blackmagic Design/DaVinci Resolve.app`
+without a separate scope. Apps nested deeper need their own scope. Tinycast never looks inside an app
+bundle.
 
-Scopes are saved with `~` shortened, so a backup still makes sense on another Mac. Changing them
-searches again straight away.
+Scopes are saved with your home folder written as `~`, so a backup still works on another Mac.
+Tinycast searches again as soon as you change them.
 
 ## Actions on an app
 
-Open <kbd>⌘</kbd><kbd>K</kbd> with an app selected:
+Press <kbd>⌘</kbd><kbd>K</kbd> with an app selected:
 
 | Action                                            | Shortcut                                            |
 | ------------------------------------------------- | --------------------------------------------------- |
@@ -127,36 +132,37 @@ Open <kbd>⌘</kbd><kbd>K</kbd> with an app selected:
 | Quit Application                                  | <kbd>⌃</kbd><kbd>⇧</kbd><kbd>Q</kbd>                |
 | [Uninstall Application](/docs/launcher/uninstall) |                                                     |
 
-**Restart Application** and **Quit Application** only appear while the app is running. Both quit
-politely, so an app with unsaved work still asks you to save. Restart waits up to five seconds for
-the app to quit, then opens it again. If the app refuses to quit, nothing is reopened.
+**Restart Application** and **Quit Application** only appear while the app is running. Both ask the
+app to quit normally, so an app with unsaved work still asks you to save it. Restart waits up to five
+seconds for the app to quit, then opens it again. If the app doesn't quit, it isn't reopened.
 
-To quit everything at once, use the **Quit All Applications**
+To quit every app at once, use the **Quit All Applications**
 [system action](/docs/launcher/system-actions). It leaves Finder and Tinycast running.
 
 ## Hiding a result
 
-<kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd> (**Hide from Search**) takes the selected entry out of search
+<kbd>⇧</kbd><kbd>⌘</kbd><kbd>H</kbd> (**Hide from Search**) removes the selected entry from search
 results. The palette stays open on the same search.
 
 It works for apps, System Settings panes, commands, Quick Actions, system actions, window commands
-and window layouts. To bring one back, tick its checkbox again in that Settings pane.
+and window layouts. To show an entry again, select its checkbox in the matching Settings pane.
 
 Hiding only changes what search shows. The app stays installed, and its favorite, alias, learned
-ranking and shortcut all keep working.
+ranking and shortcut keep working.
 
 ## Per-app shortcuts
 
-Any app can have its own global shortcut, set in **Settings → Applications**. Press it to bring the
-app to the front; press it again while the app is in front to hide it.
+You can give any app its own global shortcut in **Settings → Applications**. Press it to bring the
+app to the front, and press it again while the app is in front to hide it.
 
-See [Hotkeys](/docs/reference/hotkeys) for recording shortcuts and the double-tap option.
+See [Hotkeys](/docs/reference/hotkeys) for recording shortcuts and using double-tap shortcuts.
 
 ## Switching a whole section off
 
-**Settings → Applications** has **Enable Applications**, plus a checkbox per app.
+**Settings → Applications** has an **Enable Applications** switch, plus a checkbox for each app.
 
-- **Enable Applications** off takes every app out of search **and** turns off every per-app shortcut.
-- A single app's checkbox only hides that one row. Its shortcut keeps working.
+- Turning off **Enable Applications** removes every app from search **and** turns off every per-app
+  shortcut.
+- Clearing one app's checkbox only hides that app from search. Its shortcut keeps working.
 
 System Settings, System Actions and Commands each have the same kind of switch in their own pane.

@@ -2,14 +2,17 @@
 // bar, section titles, placeholders), and every row names Tinycast's own
 // things or generic apps, so nothing here pretends to be someone's data.
 
-export type DemoRowIcon = "ghost" | "github" | "link" | "file" | "terminal";
+export type DemoRowIcon =
+  "ghost" | "hammer" | "shield" | "gem" | "orbit" | "audio";
 
 export type DemoRow = {
   title: string;
   kind: string;
   icon: DemoRowIcon;
-  /** CSS background for the icon tile. */
+  /** CSS background for the app icon. */
   tint: string;
+  /** The row's bound hotkey, drawn as keycaps beside its title. */
+  hotkey?: string[];
 };
 
 export type DemoSection = {
@@ -17,11 +20,8 @@ export type DemoSection = {
   rows: DemoRow[];
 };
 
-export const demoQuery = "gh";
+export const demoQuery = "o";
 export const demoAction = "Open Application";
-
-/** The scope the palette is searching, named beside the filter button. */
-export const demoScope = "Apps";
 
 export const demoSections: DemoSection[] = [
   {
@@ -32,12 +32,13 @@ export const demoSections: DemoSection[] = [
         kind: "Application",
         icon: "ghost",
         tint: "linear-gradient(160deg, #3d5afe, #0d1b6e)",
+        hotkey: ["⌥", "⌘", "T"],
       },
       {
-        title: "GitHub Desktop",
+        title: "Xcode",
         kind: "Application",
-        icon: "github",
-        tint: "linear-gradient(160deg, #a875ff, #5b12bd)",
+        icon: "hammer",
+        tint: "linear-gradient(160deg, #5ab8ff, #1466d8)",
       },
     ],
   },
@@ -45,22 +46,28 @@ export const demoSections: DemoSection[] = [
     title: "Applications",
     rows: [
       {
-        title: "Search GitHub",
-        kind: "Quicklink",
-        icon: "link",
-        tint: "linear-gradient(160deg, #47bfff, #1769aa)",
+        title: "Brave Browser",
+        kind: "Application",
+        icon: "shield",
+        tint: "linear-gradient(160deg, #ff7a3d, #e0381c)",
       },
       {
-        title: "gh pr checkout",
-        kind: "Command",
-        icon: "terminal",
-        tint: "linear-gradient(160deg, #6b6d72, #2a2b2e)",
+        title: "Obsidian",
+        kind: "Application",
+        icon: "gem",
+        tint: "linear-gradient(160deg, #a875ff, #5b12bd)",
       },
       {
-        title: "Ghostty config",
-        kind: "File",
-        icon: "file",
-        tint: "linear-gradient(160deg, #863bff, #7e14ff)",
+        title: "Spotify",
+        kind: "Application",
+        icon: "audio",
+        tint: "linear-gradient(160deg, #2fe06f, #14833c)",
+      },
+      {
+        title: "OrbStack",
+        kind: "Application",
+        icon: "orbit",
+        tint: "linear-gradient(160deg, #4c4f9e, #16173a)",
       },
     ],
   },

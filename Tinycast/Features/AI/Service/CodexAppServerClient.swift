@@ -27,30 +27,121 @@ final class CodexAppServerClient {
 
     var onNotification: ((String, [String: JSONValue]) -> Void)?
     var onExit: ((String) -> Void)?
+    /// Answers a tool call's ask; nil, or a false answer, declines it.
+    var onElicitation: ((CodexElicitation) async -> Bool)?
+    /// A launch is about to replace a running process, whose threads go with it.
+    var onRelaunch: (() -> Void)?
+    /// The reader's command path and variables, asked at each launch so an edit takes the next one.
+    var launchSettings: () -> InstalledAILaunch = { InstalledAILaunch() }
 
     private let codexHome: URL?
     let workspace: URL
+    /// The command the last launch ran, kept after it stops so Settings can still name it.
+    private(set) var executable: URL?
     private var process: Process?
+    private var processID: UUID?
     private var input: FileHandle?
     private var outputBuffer = Data()
     private var stderrBuffer = Data()
     private var nextID = 1
     private var pending: [Int: PendingRequest] = [:]
+    /// What the process was launched with; it is fixed at exec, so a different list relaunches.
+    private(set) var toolServers: [AIToolServer] = []
+    private var elicitations: [(threadID: String?, task: Task<Void, Never>)] = []
+    private var pendingLaunch: (id: UUID, servers: [AIToolServer], task: Task<Void, Error>)?
+    /// Bumped by `stop`, so a launch still reading the list does not start a process after it.
+    private var generation = 0
 
     init(codexHome: URL? = nil, workspace: URL) {
         self.codexHome = codexHome
         self.workspace = workspace
     }
 
+    /// Process-scoped, never written to the reader's config; `plugins=false` drops plugin servers.
+    nonisolated private static let configurationFlags = [
+        "-c", "check_for_update_on_startup=false",
+        "-c", "features.apps=false",
+        "-c", "features.plugins=false",
+        "-c", "features.remote_plugin=false",
+        "-c", "features.plugin_sharing=false",
+        "-c", "features.shell_tool=false",
+        "-c", "features.unified_exec=false",
+        "-c", "features.browser_use=false",
+        "-c", "features.in_app_browser=false",
+        "-c", "features.computer_use=false",
+        "-c", "features.image_generation=false",
+        "-c", "features.multi_agent=false",
+        "-c", "features.hooks=false",
+        "-c", "features.workspace_dependencies=false",
+        "-c", "memories.use_memories=false"
+    ]
+
+    /// The reader's own servers, read under the app-server's flags; `nil` when that fails.
+    nonisolated static func foreignServerNames(
+        executable: URL, workspace: URL, codexHome: URL?,
+        inherited: [String: String] = ProcessInfo.processInfo.environment
+    ) async -> [String]? {
+        var environment = ExecutableLocator.environment(running: executable, inherited: inherited)
+        if let codexHome { environment["CODEX_HOME"] = codexHome.path }
+        let result = await InstalledAIProbe.run(
+            executable: executable, arguments: configurationFlags + ["mcp", "list", "--json"],
+            workspace: workspace, environment: environment)
+        guard result.status == 0 else { return nil }
+        return CodexMCPLaunch.foreignNames(listing: result.output)
+    }
+
     var isRunning: Bool { process?.isRunning == true }
 
-    func start() async throws {
-        if isRunning { return }
-        guard let executable = await ExecutableLocator.locate("codex") else {
-            throw ClientError.executableMissing
+    /// One launch at a time, handshake included; every caller for the same list awaits it.
+    func start(toolServers: [AIToolServer] = []) async throws {
+        while let pending = pendingLaunch {
+            if pending.servers == toolServers { return try await pending.task.value }
+            _ = await pending.task.result
         }
-        // A second caller may have started it during the lookup.
+        if isRunning, self.toolServers == toolServers { return }
+        let id = UUID()
+        let task = Task {
+            defer { if pendingLaunch?.id == id { pendingLaunch = nil } }
+            try await launch(toolServers)
+        }
+        pendingLaunch = (id, toolServers, task)
+        try await task.value
+    }
+
+    /// A status check has no list of its own: it joins whatever launch is pending or running.
+    func startForCheck() async throws {
+        // A failed launch does not answer the check, which then starts plainly on its own.
+        while let pending = pendingLaunch { _ = await pending.task.result }
         if isRunning { return }
+        try await start()
+    }
+
+    private func launch(_ toolServers: [AIToolServer]) async throws {
+        let generation = self.generation
+        let settings = launchSettings()
+        let executable: URL
+        switch settings.command() {
+        case .executable(let url):
+            executable = url
+        case .missing(let path):
+            throw ClientError.launchFailed(InstalledAILaunch.missingCommandMessage(path))
+        case .automatic:
+            guard let found = await ExecutableLocator.locate("codex") else {
+                throw ClientError.executableMissing
+            }
+            executable = found
+        }
+        self.executable = executable
+        let inherited = settings.inherited(for: .codex)
+        try checkNotStopped(since: generation)
+        // The list is only readable at launch, so the old process cannot be talked into it.
+        if isRunning {
+            onRelaunch?()
+            stop(error: ClientError.processExited("Codex stopped."))
+        }
+        guard let secrets = CodexMCPLaunch.environment(servers: toolServers) else {
+            throw ClientError.launchFailed("Two MCP servers' secrets would share one variable.")
+        }
         do {
             try FileManager.default.createDirectory(
                 at: workspace, withIntermediateDirectories: true)
@@ -67,42 +158,41 @@ final class CodexAppServerClient {
                 String(localized: "Its private support folder could not be prepared."))
         }
 
+        // Unread, the reader's servers would start inside the chat; so Codex does not start either.
+        guard
+            let foreign = await Self.foreignServerNames(
+                executable: executable, workspace: workspace, codexHome: codexHome,
+                inherited: inherited)
+        else {
+            throw ClientError.launchFailed(
+                "Tinycast could not read which MCP servers your Codex configuration runs, so it "
+                    + "could not keep them out of the chat. Run \u{201C}codex mcp list\u{201D} "
+                    + "in Terminal to see why.")
+        }
+        try checkNotStopped(since: generation)
+        if let name = CodexMCPLaunch.unaddressableName(foreign) {
+            throw ClientError.launchFailed(
+                "Your Codex MCP server \u{201C}\(name)\u{201D} cannot be kept out of a Tinycast "
+                    + "chat, because a dot or an equals sign in its name cannot be addressed. "
+                    + "Rename it in your Codex configuration.")
+        }
+        if let taken = CodexMCPLaunch.takenName(servers: toolServers, foreignNames: foreign) {
+            throw ClientError.launchFailed(
+                "Your Codex configuration has its own MCP server named \u{201C}\(taken)\u{201D}. "
+                    + "Rename it to use this Tinycast server with Codex.")
+        }
         let process = Process()
         let stdin = Pipe()
         let stdout = Pipe()
         let stderr = Pipe()
         process.executableURL = executable
-        process.arguments = [
-            "-c", "check_for_update_on_startup=false",
-            "-c", "features.apps=false",
-            "-c", "features.plugins=false",
-            "-c", "features.remote_plugin=false",
-            "-c", "features.plugin_sharing=false",
-            "-c", "features.shell_tool=false",
-            "-c", "features.unified_exec=false",
-            "-c", "features.browser_use=false",
-            "-c", "features.in_app_browser=false",
-            "-c", "features.computer_use=false",
-            "-c", "features.image_generation=false",
-            "-c", "features.multi_agent=false",
-            "-c", "features.hooks=false",
-            "-c", "features.workspace_dependencies=false",
-            "-c", "memories.use_memories=false",
-            "app-server"
-        ]
+        process.arguments =
+            Self.configurationFlags
+            + CodexMCPLaunch.arguments(servers: toolServers, disabling: foreign)
+            + ["app-server"]
         process.currentDirectoryURL = workspace
-        let inheritedPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-        let commandPaths = [
-            executable.deletingLastPathComponent().path,
-            "/opt/homebrew/bin",
-            "/usr/local/bin"
-        ]
-        var environment = ProcessInfo.processInfo.environment.merging(
-            [
-                "NO_COLOR": "1",
-                "PATH": (commandPaths + [inheritedPath]).joined(separator: ":")
-            ]
-        ) { _, value in value }
+        var environment = ExecutableLocator.environment(
+            running: executable, adding: secrets, inherited: inherited)
         // Tests can isolate app-server state; production deliberately inherits the user's Codex home.
         if let codexHome { environment["CODEX_HOME"] = codexHome.path }
         process.environment = environment
@@ -119,9 +209,10 @@ final class CodexAppServerClient {
             guard !data.isEmpty else { return }
             Task { @MainActor in self?.consumeStderr(data) }
         }
+        let launchID = UUID()
         process.terminationHandler = { [weak self] process in
             let status = process.terminationStatus
-            Task { @MainActor in self?.didExit(status: status) }
+            Task { @MainActor in self?.didExit(launchID, status: status) }
         }
         do {
             try process.run()
@@ -131,7 +222,11 @@ final class CodexAppServerClient {
             throw ClientError.launchFailed(error.localizedDescription)
         }
         self.process = process
+        processID = launchID
+        // A server that dies mid-write must fail the write, not SIGPIPE Tinycast.
+        _ = fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
         input = stdin.fileHandleForWriting
+        self.toolServers = toolServers
 
         // A failed handshake would otherwise leave `isRunning` true on an uninitialized server.
         do {
@@ -180,8 +275,24 @@ final class CodexAppServerClient {
         }
     }
 
+    /// A question still waiting its turn belongs to a turn that is over, so it is never asked.
+    func cancelElicitations(threadID: String) {
+        for elicitation in elicitations where elicitation.threadID == threadID {
+            elicitation.task.cancel()
+        }
+        elicitations.removeAll { $0.threadID == threadID }
+    }
+
     func stop() {
+        generation += 1
         stop(error: ClientError.processExited(String(localized: "Codex stopped.")))
+    }
+
+    /// A `stop` that landed while a launch was reading the list outranks the launch.
+    private func checkNotStopped(since generation: Int) throws {
+        guard generation == self.generation else {
+            throw ClientError.processExited("Codex stopped.")
+        }
     }
 
     /// Closing stdin is the clean exit — the server leaves on EOF — and SIGTERM is the backstop.
@@ -229,8 +340,21 @@ final class CodexAppServerClient {
             finishRequest(id, with: .failure(ClientError.requestFailed(message)))
         case .notification(let method, let params):
             onNotification?(method, params)
-        case .request(let id, let method, _):
-            declineServerRequest(id: id, method: method)
+        case .request(let id, let method, let params):
+            guard method == "mcpServer/elicitation/request",
+                let elicitation = CodexElicitation(params: params), let onElicitation
+            else {
+                declineServerRequest(id: id, method: method)
+                return
+            }
+            let task = Task { [weak self] in
+                let action: CodexElicitation.Action =
+                    await onElicitation(elicitation) ? .accept : .decline
+                // `persist` is never answered: only Settings may change a standing decision.
+                try? self?.send(
+                    CodexAppServerProtocol.response(id: id, result: ["action": action.rawValue]))
+            }
+            elicitations.append((elicitation.threadID, task))
         case .invalid:
             break
         }
@@ -250,6 +374,9 @@ final class CodexAppServerClient {
             ]
         case "tool/requestUserInput":
             result = ["answers": [:]]
+        case "mcpServer/elicitation/request":
+            // A form, or a call on a turn that armed nothing: neither is a question Tinycast asks.
+            result = ["action": CodexElicitation.Action.decline.rawValue]
         default:
             try? send(
                 CodexAppServerProtocol.errorResponse(
@@ -274,7 +401,9 @@ final class CodexAppServerClient {
         request.continuation.resume(with: result)
     }
 
-    private func didExit(status: Int32) {
+    /// A process this client already replaced or stopped has nothing left to tear down.
+    private func didExit(_ exited: UUID, status: Int32) {
+        guard exited == processID else { return }
         let detail = String(decoding: stderrBuffer, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let message =
@@ -285,11 +414,15 @@ final class CodexAppServerClient {
     }
 
     private func cleanup(error: Error) {
+        for elicitation in elicitations { elicitation.task.cancel() }
+        elicitations = []
+        toolServers = []
         process?.terminationHandler = nil
         (process?.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
         (process?.standardError as? Pipe)?.fileHandleForReading.readabilityHandler = nil
         try? input?.close()
         process = nil
+        processID = nil
         input = nil
         outputBuffer.removeAll(keepingCapacity: false)
         stderrBuffer.removeAll(keepingCapacity: false)

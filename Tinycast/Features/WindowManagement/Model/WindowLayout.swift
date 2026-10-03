@@ -101,12 +101,11 @@ struct WindowLayout: Codable, Hashable, Identifiable, Sendable {
     var entries: [WindowLayoutEntry]
     /// The one entry whose window ends a run frontmost; an ID rather than a flag, so it is one.
     var frontmostEntryID: UUID?
-    var createdAt: Date
 
     init(
         id: UUID = UUID(), name: String, iconSymbol: String? = nil,
         usesPreferredGap: Bool = true, entries: [WindowLayoutEntry] = [],
-        frontmostEntryID: UUID? = nil, createdAt: Date = Date()
+        frontmostEntryID: UUID? = nil
     ) {
         self.id = id
         self.name = name
@@ -114,7 +113,6 @@ struct WindowLayout: Codable, Hashable, Identifiable, Sendable {
         self.usesPreferredGap = usesPreferredGap
         self.entries = entries
         self.frontmostEntryID = frontmostEntryID
-        self.createdAt = createdAt
     }
 
     /// The glyph every surface draws for this layout.
@@ -149,7 +147,7 @@ struct WindowLayout: Codable, Hashable, Identifiable, Sendable {
 
     // Hand-written, so an added field keeps stored layouts and older backups readable.
     private enum CodingKeys: String, CodingKey {
-        case id, name, iconSymbol, usesPreferredGap, entries, frontmostEntryID, createdAt
+        case id, name, iconSymbol, usesPreferredGap, entries, frontmostEntryID
     }
 
     init(from decoder: Decoder) throws {
@@ -161,7 +159,6 @@ struct WindowLayout: Codable, Hashable, Identifiable, Sendable {
             try container.decodeIfPresent(Bool.self, forKey: .usesPreferredGap) ?? true
         entries = try container.decodeIfPresent([WindowLayoutEntry].self, forKey: .entries) ?? []
         frontmostEntryID = try container.decodeIfPresent(UUID.self, forKey: .frontmostEntryID)
-        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     }
 }
 

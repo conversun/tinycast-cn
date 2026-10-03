@@ -62,7 +62,7 @@ private struct WindowSwitchRow: View {
                     EntryIconView(source: .symbol("macwindow"))
                 }
             }
-            .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
+            .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
             .opacity(entry.isMinimized ? 0.5 : 1)
             Text(entry.displayTitle)
                 .font(metrics.typography.rowTitle)

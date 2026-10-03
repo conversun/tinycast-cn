@@ -27,6 +27,7 @@ struct FileSearchTests {
         policyResolution()
         resultModel()
         ranking()
+        previewKind()
 
         print(failures == 0 ? "File search tests passed" : "\(failures) file search tests failed")
         exit(failures == 0 ? 0 : 1)
@@ -300,5 +301,34 @@ struct FileSearchTests {
                 ignoring: FileSearchIgnoreList(patterns: ["Archive"])
             ).isEmpty,
             "ranking drops what the user's own patterns exclude")
+    }
+
+    static func previewKind() {
+        expect(FileSearchPreviewKind(pathExtension: "swift") == .quickLook, "declared text")
+        expect(FileSearchPreviewKind(pathExtension: "pdf") == .pdf, "a PDF draws in process")
+        expect(FileSearchPreviewKind(pathExtension: "mov") == .media, "a movie plays")
+        expect(FileSearchPreviewKind(pathExtension: "jsx") == nil, "undeclared waits on bytes")
+        expect(FileSearchPreviewKind(pathExtension: "ts") == nil, ".ts: TypeScript or MPEG-TS")
+
+        let source = Data("export const x = () => <div>é</div>\n".utf8)
+        expect(
+            FileSearchPreviewKind(pathExtension: "ts", head: source, isWholeFile: true) == .text,
+            "TypeScript source is text")
+        expect(
+            FileSearchPreviewKind(
+                pathExtension: "ts", head: Data([0x47, 0x40, 0x00, 0x10]), isWholeFile: false)
+                == .media,
+            "an MPEG-TS stream still plays")
+        expect(
+            FileSearchPreviewKind(pathExtension: "jsx", head: Data([0xFF, 0x00]), isWholeFile: true)
+                == .quickLook,
+            "undeclared binary falls back to QuickLook")
+
+        let cut = Data("café".utf8).dropLast()
+        expect(FileSearchPreviewKind.isText(cut, isWholeFile: false), "a read may cut a character")
+        expect(!FileSearchPreviewKind.isText(cut, isWholeFile: true), "a whole file must be UTF-8")
+        expect(
+            !FileSearchPreviewKind.isText(Data("abc".utf8) + [0xFF], isWholeFile: false),
+            "a read forgives a cut character, not a malformed byte")
     }
 }

@@ -40,9 +40,13 @@ struct ScheduleScreen: PaletteScreen {
 
     /// ⌘↵ — copy the link, for the "what's the link?" message rather than the call itself.
     func secondary(at selection: Int) -> Bool {
-        guard let meeting = meeting(at: selection), meeting.link != nil else { return false }
-        core.calendarCoordinator.copyLink(meeting)
-        return true
+        guard let meeting = meeting(at: selection) else { return false }
+        return MeetingActionsMenu.secondary(meeting: meeting, core: core)
+    }
+
+    func perform(_ shortcut: PaletteShortcut, at selection: Int) -> Bool {
+        guard let meeting = meeting(at: selection) else { return false }
+        return MeetingActionsMenu.perform(shortcut, meeting: meeting, core: core)
     }
 
     func body(selection: Int, scroll: ScrollIntent) -> AnyView {

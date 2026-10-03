@@ -83,10 +83,10 @@ private struct UninstallRow: View {
 
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
-            // Smaller glyph, same `rowIcon` slot, so titles line up at one x across modes.
+            // Smaller glyph, same result-row slot, so titles line up at one x across modes.
             SymbolImage(name: glyph, size: metrics.size.checkbox)
                 .foregroundStyle(candidate.isLocked ? Theme.Colors.textTertiary : .primary)
-                .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
+                .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
                 .contentShape(Rectangle())
                 // Only the checkbox toggles; the rest of the row selects.
                 .onTapGesture(perform: onToggle)
@@ -111,7 +111,7 @@ private struct UninstallRow: View {
                 .font(metrics.typography.rowTrailing)
                 .foregroundStyle(.secondary)
             FileIconView(path: candidate.path)
-                .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
+                .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
         }
         .opacity(candidate.isLocked ? 0.55 : 1)
         .padding(.horizontal, metrics.spacing.md)

@@ -49,6 +49,20 @@ final class SnippetCoordinator {
         NSWorkspace.shared.open(store.snippetsDirectory)
     }
 
+    /// Points the library at a folder as it is; nothing is moved out of the old one.
+    func chooseSnippetsFolder() {
+        guard
+            let url = FolderPicker.choose(
+                message: "Choose the folder your snippets are kept in.",
+                startingAt: store.snippetsDirectory)
+        else { return }
+        settings.snippetsFolder = AppPaths.contentFolderSetting(for: url, named: "Snippets")
+    }
+
+    func resetSnippetsFolder() {
+        settings.snippetsFolder = nil
+    }
+
     /// The switch funnels here so enabling, which is also consent, confirms first.
     func setSnippetsEnabled(_ enabled: Bool) {
         guard enabled != settings.snippetsEnabled else { return }
@@ -162,6 +176,18 @@ final class SnippetCoordinator {
         // One of our own editors is only reachable again once the palette hands key back to it.
         paletteCoordinator.hidePalette(restoreFocus: target?.ownEditor != nil)
         expandSnippet(id: id, target: target)
+    }
+
+    /// A shortcut lands where the caret is; over the palette, that's what the palette covered.
+    func expandSnippetFromHotKey(id: StoredSnippet.ID) {
+        guard settings.snippetsEnabled, store.record(id: id)?.snippet.isEnabled == true else {
+            return
+        }
+        if windowController.isVisible {
+            expandSnippetFromPalette(id: id)
+        } else {
+            expandSnippet(id: id, target: InjectionTarget.current())
+        }
     }
 
     func expandSnippet(

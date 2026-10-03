@@ -1,69 +1,84 @@
-import { FileCode2, Ghost, Link2, Search, Terminal } from "lucide-react";
+import {
+  AudioLines,
+  Gem,
+  Ghost,
+  Hammer,
+  Orbit,
+  Search,
+  Shield,
+} from "lucide-react";
 import type { ComponentType } from "react";
 import {
   demoAction,
   demoQuery,
-  demoScope,
   demoSections,
   type DemoRow,
   type DemoRowIcon,
 } from "../data/demo";
 import { cn } from "../lib/cn";
-import { GitHubLogo } from "./ui/icon";
 
 const rowIcons: Record<DemoRowIcon, ComponentType<{ size?: number }>> = {
   ghost: Ghost,
-  github: GitHubLogo,
-  link: Link2,
-  file: FileCode2,
-  terminal: Terminal,
+  hammer: Hammer,
+  shield: Shield,
+  gem: Gem,
+  orbit: Orbit,
+  audio: AudioLines,
 };
 
-function FilterGlyph() {
+function MenuGlyph() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className="size-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M3 9h18" />
-      <path d="M3 15h10" />
-    </svg>
+    <span className="flex flex-col items-start gap-[3px]">
+      <span className="h-[1.5px] w-3.5 rounded-full bg-current" />
+      <span className="h-[1.5px] w-2 rounded-full bg-current" />
+    </span>
   );
 }
 
 function Keycap({ children }: { children: string }) {
   return (
-    <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[5px] bg-(--glass-chip) px-1 text-caption text-(--glass-fg-muted)">
+    <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[6px] border border-(--glass-border) px-1 text-demo-key text-(--glass-fg-muted)">
       {children}
     </span>
   );
 }
 
-function ResultRow({ row, isSelected }: { row: DemoRow; isSelected: boolean }) {
+// The icon fills 22 of its 26px slot, the margin macOS app icons carry
+// inside their canvas.
+function RowIcon({ row }: { row: DemoRow }) {
   const Icon = rowIcons[row.icon];
+  return (
+    <span className="flex size-[26px] shrink-0 items-center justify-center">
+      <span
+        className="glass-app-icon flex size-[22px] items-center justify-center rounded-[5px] text-white"
+        style={{ background: row.tint }}
+      >
+        <Icon size={13} />
+      </span>
+    </span>
+  );
+}
+
+function ResultRow({ row, isSelected }: { row: DemoRow; isSelected: boolean }) {
   return (
     <li
       className={cn(
-        "flex items-center gap-3 rounded-[10px] px-2.5 py-2",
-        isSelected && "bg-(--glass-chip)",
+        "flex items-center gap-2.5 rounded-[10px] px-2 py-1.5",
+        isSelected && "bg-(--glass-selection)",
       )}
     >
-      <span
-        className="flex size-7 shrink-0 items-center justify-center rounded-[7px] text-white"
-        style={{ background: row.tint }}
-      >
-        <Icon size={15} />
-      </span>
-      <span className="min-w-0 flex-1 truncate text-demo-row text-(--glass-fg)">
+      <RowIcon row={row} />
+      <span className="min-w-0 truncate text-demo-row text-(--glass-fg)">
         {row.title}
       </span>
-      <span className="shrink-0 text-demo-row text-(--glass-fg-subtle)">
+      {row.hotkey && (
+        <span className="flex shrink-0 gap-0.5">
+          {row.hotkey.map((key) => (
+            <Keycap key={key}>{key}</Keycap>
+          ))}
+        </span>
+      )}
+      <span className="ml-auto shrink-0 text-demo-callout text-(--glass-fg-muted)">
         {row.kind}
       </span>
     </li>
@@ -77,32 +92,42 @@ export function HeroPalette() {
   return (
     <div
       aria-hidden="true"
-      className="glass-palette w-full rounded-2xl p-2 text-left"
+      className="glass-palette w-full rounded-[26px] text-left"
     >
       <span aria-hidden="true" className="glass-grain" />
 
-      <div className="flex items-center gap-3 px-3 py-2">
-        <Search size={19} className="shrink-0 text-(--glass-fg-subtle)" />
+      {/* The glyph's left edge lines up with the row icons below it. */}
+      <div className="mt-1.5 flex h-10 items-center gap-2 px-4">
+        <Search
+          size={22}
+          strokeWidth={1.75}
+          className="shrink-0 text-(--glass-fg-muted)"
+        />
         <span className="flex min-w-0 flex-1 items-center text-demo-query text-(--glass-fg)">
           <span className="truncate">{demoQuery}</span>
           <span className="demo-caret ml-px h-[1.1em] w-0.5 shrink-0 rounded-full bg-violet-bright" />
         </span>
       </div>
 
-      <div className="pb-1">
-        {demoSections.map((section) => (
+      {/* The last row sits on the footer's line, dissolving under its
+          floating controls the way an overflowing list does in the app. */}
+      <div className="glass-dissolve px-2 pb-2">
+        {demoSections.map((section, sectionIndex) => (
           <div key={section.title}>
-            <p className="px-2.5 pb-1.5 pt-2 text-caption text-(--glass-fg-subtle)">
+            <p
+              className={cn(
+                "px-2 pb-1 text-demo-section font-medium text-(--glass-fg-muted)",
+                sectionIndex === 0 ? "pt-1" : "pt-3",
+              )}
+            >
               {section.title}
             </p>
-            <ul className="flex flex-col gap-0.5">
+            <ul>
               {section.rows.map((row, rowIndex) => (
                 <ResultRow
                   key={row.title}
                   row={row}
-                  isSelected={
-                    section.title === demoSections[0].title && rowIndex === 0
-                  }
+                  isSelected={sectionIndex === 0 && rowIndex === 0}
                 />
               ))}
             </ul>
@@ -110,24 +135,18 @@ export function HeroPalette() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between gap-2 pl-1 pr-0.5 pt-4">
-        <span className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-full bg-(--glass-chip-soft) text-(--glass-fg-muted)">
-            <FilterGlyph />
-          </span>
-          <span className="text-caption text-(--glass-fg-subtle)">
-            {demoScope}
-          </span>
+      <div className="absolute inset-x-0 bottom-0 flex h-[52px] items-center justify-between px-2">
+        <span className="glass-control flex size-9 items-center justify-center rounded-full text-(--glass-fg-muted)">
+          <MenuGlyph />
         </span>
-        <span className="flex items-center gap-1 rounded-[10px] bg-(--glass-chip-soft) p-1 text-caption">
-          <span className="flex items-center gap-1.5 pl-1.5 font-medium text-(--glass-fg)">
+        <span className="glass-control flex items-center gap-0.5 rounded-full p-1 text-demo-callout font-medium">
+          <span className="flex h-7 items-center gap-1.5 px-2 text-(--glass-fg)">
             {demoAction}
             <Keycap>↵</Keycap>
           </span>
-          <span className="mx-0.5 h-3.5 w-px bg-(--glass-key-border)" />
-          <span className="flex items-center gap-1.5 pl-1.5 font-medium text-(--glass-fg-muted)">
+          <span className="flex h-7 items-center gap-1.5 px-2 text-(--glass-fg-muted)">
             Actions
-            <span className="flex gap-1">
+            <span className="flex gap-0.5">
               <Keycap>⌘</Keycap>
               <Keycap>K</Keycap>
             </span>

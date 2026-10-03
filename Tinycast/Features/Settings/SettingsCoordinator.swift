@@ -20,33 +20,25 @@ final class SettingsCoordinator {
 
     /// A fresh window mounts on `tab`; an open one navigates to it, recording the jump in history.
     /// A nil `tab` only reveals the window, so re-opening a minimised one keeps the pane it was on.
-    func showSettings(tab: SettingsTab? = nil) {
+    func showSettings(tab: SettingsTab? = nil, revealing target: SettingsTarget? = nil) {
         if window.focus() {
-            if let tab { navigation?.select(tab) }
+            if let tab { navigation?.select(tab, revealing: target) }
             return
         }
         let navigation = SettingsNavigationState(tab: tab ?? .general)
+        navigation.select(navigation.tab, revealing: target)
         let editorPresenter = SettingsEditorPresenter(core: core, navigation: navigation)
         self.navigation = navigation
         self.editorPresenter = editorPresenter
-        var split: SettingsSplitViewController?
-        window.show(chrome: SettingsToolbarController(navigation: navigation)) {
-            let controller = SettingsSplitViewController(
-                sidebar: inject(SettingsSidebarView(), navigation, editorPresenter),
-                detail: inject(SettingsDetailView(), navigation, editorPresenter))
-            split = controller
-            return controller
-        }
-        editorPresenter.attach(to: split?.view.window)
-    }
-
-    /// Both columns are hosted separately, so each needs the whole environment.
-    private func inject(
-        _ view: some View, _ navigation: SettingsNavigationState,
-        _ editorPresenter: SettingsEditorPresenter
-    ) -> some View {
-        view.settingsEnvironment(
-            core: core, navigation: navigation, editorPresenter: editorPresenter)
+        let hosting = NSHostingController(
+            rootView: SettingsRootView().settingsEnvironment(
+                core: core, navigation: navigation, editorPresenter: editorPresenter))
+        // Keep the window's size authoritative: an unconstrained fill would drive the frame.
+        hosting.sizingOptions = []
+        // The back/forward chevrons, the pane title and the sidebar's search field all ride on it.
+        hosting.sceneBridgingOptions = [.toolbars, .title]
+        window.show(chrome: SettingsWindowChrome()) { hosting }
+        editorPresenter.attach(to: hosting.view.window)
     }
 
     func showAbout() {

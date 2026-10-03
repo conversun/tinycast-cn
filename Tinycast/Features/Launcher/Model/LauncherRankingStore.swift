@@ -1,26 +1,42 @@
 import Foundation
 
-/// One learned launcher choice, keyed by the whole query the user submitted, never a prefix of it.
-/// A table written when this field held one row per prefix cannot decode here — that is the reset.
-struct LauncherRankingRecord: Codable, Hashable, Sendable {
-    let itemKey: String
-    let submittedQuery: String
-    var count: Int
-    var lastUsed: Date
+/// One entry's usage: a decaying score, and the terms it was last opened by.
+struct LauncherVisit: Codable, Hashable, Sendable {
+    /// When the decayed score falls back to 1, so a later anchor is always the higher score.
+    var anchor: Date
+    var openedAt: Date
+    /// Distinct and folded, most recent last, at most `LauncherRankingStore.termLimit`.
+    var searchTerms: [String]
 }
 
-/// Learns which result a query leads to, as bounded on-device frecency data.
+struct LauncherUsage: Sendable, Equatable {
+    /// 1 for an entry never opened, or opened too long ago to count.
+    let frecency: Double
+    /// Empty unless the entry was opened recently enough for its terms to steer a query.
+    let searchTerms: [String]
+
+    static let unused = LauncherUsage(frecency: 1, searchTerms: [])
+}
+
+/// Learns what the user opens, and by which query, as bounded on-device frecency data.
 @MainActor
 @Observable
 final class LauncherRankingStore {
-    private static let cap = 1_000
-    /// Bounded, so `SearchRelevance.protectionFloor` stays out of reach however deep a habit runs.
-    nonisolated static let maximumUsage = SearchRelevance.usageCeiling - 1
+    /// Each visit adds 100 to a score that halves every ten days and never drops below 1.
+    nonisolated static let halfLife: TimeInterval = 10 * 86_400
+    nonisolated static let visitWeight = 100.0
+    /// Past this since the last open, an entry's search terms stop steering the ranking.
+    nonisolated static let termWindow: TimeInterval = 408 * 3_600
+    nonisolated static let termLimit = 3
+    /// `exp` overflows a `Double` just past this.
+    private nonisolated static let exponentCeiling = 709.78
+    /// Caps pasted input, so one visit cannot store a paragraph as a term.
+    private static let queryLimit = 64
 
     private let fileURL: URL
     private let now: () -> Date
 
-    private(set) var records: [LauncherRankingRecord]
+    private(set) var visits: [String: LauncherVisit]
     /// Part of `AppIndex`'s cache key, invalidating a result after a visit or a reset.
     private(set) var revision = 0
 
@@ -30,120 +46,105 @@ final class LauncherRankingStore {
     init(fileURL: URL? = nil, now: @escaping () -> Date = Date.init) {
         self.fileURL = fileURL ?? Self.defaultFileURL()
         self.now = now
-
-        if let data = try? Data(contentsOf: self.fileURL),
-            let decoded = try? JSONDecoder().decode([LauncherRankingRecord].self, from: data)
-        {
-            records = decoded.filter {
-                !$0.itemKey.isEmpty && !$0.submittedQuery.isEmpty && $0.count > 0
-            }
-        } else {
-            records = []
-        }
+        let decoded =
+            (try? Data(contentsOf: self.fileURL))
+            .flatMap { try? JSONDecoder().decode([String: LauncherVisit].self, from: $0) } ?? [:]
+        visits = Self.live(decoded, at: now())
     }
 
-    var isEmpty: Bool { records.isEmpty }
+    var isEmpty: Bool { visits.isEmpty }
 
     /// Awaits the pending persist. The launcher never needs it; reading the file back does.
     func flush() async {
         await writeTask?.value
     }
 
-    /// One row per submitted query; `usage` recalls it under every prefix the user might type.
-    func record(itemKey: String, query: String) {
-        let query = Self.normalize(query)
-        guard !itemKey.isEmpty, !query.isEmpty, query.count <= Self.queryLimit else { return }
-
+    /// `query` is nil when the text was no search for the entry, like a category word.
+    func visit(itemKey: String, query: String?) {
+        guard !itemKey.isEmpty else { return }
         let timestamp = now()
-        if let index = records.firstIndex(where: {
-            $0.itemKey == itemKey && $0.submittedQuery == query
-        }) {
-            records[index].count += 1
-            records[index].lastUsed = timestamp
-        } else {
-            records.append(
-                LauncherRankingRecord(
-                    itemKey: itemKey, submittedQuery: query, count: 1, lastUsed: timestamp))
+        let previous = visits[itemKey]
+        let score = previous.map { Self.frecency(anchor: $0.anchor, at: timestamp) } ?? 1
+        var terms = previous?.searchTerms ?? []
+        if let term = query.map(Self.normalize), !term.isEmpty, term.count <= Self.queryLimit {
+            terms.removeAll { $0 == term }
+            terms.append(term)
+            terms = Array(terms.suffix(Self.termLimit))
         }
-
-        if records.count > Self.cap {
-            records.sort {
-                $0.count != $1.count ? $0.count > $1.count : $0.lastUsed > $1.lastUsed
-            }
-            records.removeLast(records.count - Self.cap)
-        }
+        visits[itemKey] = LauncherVisit(
+            anchor: Self.anchor(visitedWith: score, at: timestamp), openedAt: timestamp,
+            searchTerms: terms)
         didMutate()
     }
 
-    /// What the user has taught this query; the fold and the clock read happen once, not per row.
-    func usage(query: String) -> [String: Int] {
-        let query = Self.normalize(query)
-        guard !query.isEmpty else { return [:] }
-        var totals: [String: (count: Int, lastUsed: Date)] = [:]
-        for record in records where record.submittedQuery.hasPrefix(query) {
-            let running = totals[record.itemKey]
-            totals[record.itemKey] = (
-                (running?.count ?? 0) + record.count,
-                max(running?.lastUsed ?? .distantPast, record.lastUsed)
-            )
-        }
-        guard !totals.isEmpty else { return [:] }
-        let bucket = totals.values.reduce(0) { $0 + $1.count }
-        let timestamp = now()
-        return totals.mapValues {
-            Self.usage(
-                count: $0.count, lastUsed: $0.lastUsed, share: Double($0.count) / Double(bucket),
-                at: timestamp)
-        }
-    }
+    /// Everything one ranking pass reads, with the clock read once for the whole pass.
+    func snapshot() -> Snapshot { Snapshot(visits: visits, now: now()) }
 
-    /// Frequency never flattens, recency decays, and confidence falls as a query's picks spread.
-    nonisolated static func usage(count: Int, lastUsed: Date, share: Double, at timestamp: Date) -> Int {
-        let ageInDays = max(0, timestamp.timeIntervalSince(lastUsed)) / 86_400
-        let frequency = 2_000 * (1 - pow(Double(count) + 1, -0.30))
-        let recency = 700 * exp(-ageInDays / 14)
-        let confidence = 300 * share * min(1, Double(count) / 3)
-        return min(maximumUsage, Int((frequency + recency + confidence).rounded()))
+    struct Snapshot: Sendable {
+        let visits: [String: LauncherVisit]
+        let now: Date
+
+        func usage(for itemKey: String) -> LauncherUsage {
+            LauncherRankingStore.usage(of: visits[itemKey], at: now)
+        }
     }
 
     func hasRanking(for itemKey: String) -> Bool {
-        records.contains { $0.itemKey == itemKey }
+        visits[itemKey] != nil
     }
 
     func reset(itemKey: String) {
-        let oldCount = records.count
-        records.removeAll { $0.itemKey == itemKey }
-        guard records.count != oldCount else { return }
+        guard visits.removeValue(forKey: itemKey) != nil else { return }
         didMutate()
     }
 
     func resetAll() {
-        guard !records.isEmpty else { return }
-        records = []
+        guard !visits.isEmpty else { return }
+        visits = [:]
         didMutate()
     }
 
-    /// Replaces the table wholesale from a backup; the same filter and cap the initialiser applies.
-    func replace(_ imported: [LauncherRankingRecord]) {
-        records = Array(
-            imported
-                .filter { !$0.itemKey.isEmpty && !$0.submittedQuery.isEmpty && $0.count > 0 }
-                .prefix(Self.cap))
+    /// Replaces the table wholesale from a backup, dropping what the initialiser would.
+    func replace(_ imported: [String: LauncherVisit]) {
+        visits = Self.live(imported, at: now())
         didMutate()
     }
 
-    /// The launcher's own fold, so a query matches and is learned under one key.
+    /// The form a query is matched in, so a term is stored as the ranking will compare it.
     nonisolated static func normalize(_ query: String) -> String {
-        FuzzyMatch.normalized(query.trimmingCharacters(in: .whitespacesAndNewlines))
+        SearchText(query.trimmingCharacters(in: .whitespacesAndNewlines), transliterated: true).string
     }
 
-    /// Caps pasted input, so one visit cannot evict the bounded table with a novel key.
-    private static let queryLimit = 64
+    nonisolated static func frecency(anchor: Date, at timestamp: Date) -> Double {
+        let exponent = decay * anchor.timeIntervalSince(timestamp)
+        return max(1, exp(min(exponent, exponentCeiling)))
+    }
+
+    /// The anchor that puts the score at `score + visitWeight` right now.
+    nonisolated static func anchor(visitedWith score: Double, at timestamp: Date) -> Date {
+        timestamp.addingTimeInterval(log(score + visitWeight) / decay)
+    }
+
+    nonisolated static func usage(of visit: LauncherVisit?, at timestamp: Date) -> LauncherUsage {
+        guard let visit else { return .unused }
+        let frecency = frecency(anchor: visit.anchor, at: timestamp)
+        let recent = frecency > 1 && timestamp.timeIntervalSince(visit.openedAt) < termWindow
+        return LauncherUsage(frecency: frecency, searchTerms: recent ? visit.searchTerms : [])
+    }
+
+    private nonisolated static let decay = log(2) / halfLife
+
+    /// A passed anchor scores 1 with its terms gated off, which is exactly an entry never opened.
+    private nonisolated static func live(
+        _ table: [String: LauncherVisit], at timestamp: Date
+    ) -> [String: LauncherVisit] {
+        table.filter { !$0.key.isEmpty && $0.value.anchor > timestamp }
+    }
 
     private func didMutate() {
         revision &+= 1
         // Off-main: this lands on ↵, in front of the launch. Chained, so writes stay ordered.
-        let snapshot = records
+        let snapshot = visits
         let fileURL = fileURL
         let previous = writeTask
         writeTask = Task.detached(priority: .utility) {

@@ -44,8 +44,8 @@ export function Features() {
       id="features"
       index={1}
       label="Features"
-      title="One palette for everything you do all day."
-      intro="Almost everything ships off until you ask for it, so Tinycast is exactly as big as you make it."
+      title="One palette for the things you do all day."
+      intro="Most features are off until you turn them on, so Tinycast only runs what you use."
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {coreFeatures.map((feature) => (
@@ -55,7 +55,7 @@ export function Features() {
 
       <div className="mt-4 rounded-2xl bg-tint/4 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h3 className="text-body font-medium text-fg">Also in the box</h3>
+          <h3 className="text-body font-medium text-fg">Also included</h3>
           <Button href="/docs" variant="outline">
             Browse the docs
           </Button>

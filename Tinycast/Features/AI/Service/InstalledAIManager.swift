@@ -9,10 +9,62 @@ final class InstalledAIManager {
 
     @ObservationIgnored private let workspace: URL
     @ObservationIgnored private var refreshTasks: [InstalledAIKind: Task<Void, Never>] = [:]
+    /// The reader's command path and variables, asked at each launch so an edit takes the next one.
+    @ObservationIgnored var launchSettings: (InstalledAIKind) -> InstalledAILaunch = { _ in
+        InstalledAILaunch()
+    }
+
+    /// An admin's MCP policy makes Claude reject both MCP flags; a harness points this elsewhere.
+    nonisolated static var hasManagedMCPPolicy: Bool {
+        let path =
+            ProcessInfo.processInfo.environment["TC_CLAUDE_MANAGED_MCP"]
+            ?? "/Library/Application Support/ClaudeCode/managed-mcp.json"
+        return FileManager.default.fileExists(atPath: path)
+    }
+
+    /// No MCP server at all, for a Claude process that is handed none: a plain turn or a probe.
+    nonisolated static var claudeWithoutMCPArguments: [String] {
+        hasManagedMCPPolicy ? [] : ["--strict-mcp-config", "--mcp-config", #"{"mcpServers":{}}"#]
+    }
+
+    /// A control request answered without a prompt, so the CLI replies without calling a model.
+    nonisolated private static var claudeControlArguments: [String] {
+        [
+            "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+            "--no-session-persistence"
+        ] + claudeWithoutMCPArguments
+    }
 
     init(supportDirectory: URL = AppPaths.applicationSupport()) {
         workspace = supportDirectory.appending(
             path: "InstalledAI/Workspace", directoryHint: .isDirectory)
+        let workspace = workspace
+        let launch = Date()
+        Task.detached(priority: .utility) {
+            Self.removeStaleTurnFiles(in: workspace, olderThan: launch)
+        }
+    }
+
+    /// A turn deletes its own files as it ends, so any older than this launch outlived a crash.
+    nonisolated private static func removeStaleTurnFiles(
+        in workspace: URL, olderThan launch: Date
+    ) {
+        let fileManager = FileManager.default
+        guard
+            let files = try? fileManager.contentsOfDirectory(
+                at: workspace, includingPropertiesForKeys: [.contentModificationDateKey])
+        else { return }
+        for file in files {
+            let name = file.lastPathComponent
+            guard
+                (name.hasPrefix("tinycast-mcp-") && name.hasSuffix(".json"))
+                    || (name.hasPrefix("tinycast-prompt-") && name.hasSuffix(".txt")),
+                let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey])
+                    .contentModificationDate,
+                modified < launch
+            else { continue }
+            try? fileManager.removeItem(at: file)
+        }
     }
 
     func status(for kind: InstalledAIKind) -> InstalledAIStatus {
@@ -44,9 +96,10 @@ final class InstalledAIManager {
         refreshTasks[kind]?.cancel()
         statuses[kind] = InstalledAIStatus(phase: .checking)
         let workspace = workspace
+        let launch = launchSettings(kind)
         let task = Task { [weak self] in
             guard let self else { return }
-            let result = await Self.probe(kind, workspace: workspace)
+            let result = await Self.probe(kind, launch: launch, workspace: workspace)
             guard !Task.isCancelled else { return }
             self.statuses[result.0] = result.1
         }
@@ -86,7 +139,29 @@ final class InstalledAIManager {
         statuses[kind] = InstalledAIStatus()
     }
 
-    func provider(kind: InstalledAIKind, model: String, effort: String?) throws -> any AIProvider {
+    /// Claude Code names its own sessions; asking it here costs one small request, not a turn.
+    func claudeTitle(for description: String) async -> String? {
+        guard status(for: .claude).isReady, let executable = status(for: .claude).executable,
+            let request = InstalledAIModel.claudeTitleRequest(description)
+        else { return nil }
+        let output = await InstalledAIProbe.request(
+            executable: executable, arguments: Self.claudeControlArguments,
+            workspace: workspace,
+            environment: ExecutableLocator.environment(
+                running: executable, inherited: launchSettings(.claude).inherited(for: .claude)),
+            input: Data(request.utf8),
+            until: { output in
+                // A whole line: the ID arrives before the title, so a chunk may split between them.
+                output.split(separator: "\n", omittingEmptySubsequences: false).dropLast()
+                    .contains { $0.contains(InstalledAIModel.claudeTitleRequestID) }
+            })
+        return InstalledAIModel.claudeTitle(output).flatMap(ChatTitle.sanitize)
+    }
+
+    func provider(
+        kind: InstalledAIKind, model: String, effort: String?,
+        toolServers: AIToolServerSession? = nil
+    ) throws -> any AIProvider {
         guard kind != .codex else {
             throw AIProviderError.unavailable("Codex is handled by its app-server connection.")
         }
@@ -99,20 +174,41 @@ final class InstalledAIManager {
         }
         return InstalledCLIProvider(
             kind: kind, executable: status.executable, model: model, effort: effort,
-            workspace: workspace)
+            workspace: workspace, launch: launchSettings(kind), toolServers: toolServers)
+    }
+
+    private enum Command {
+        case found(URL)
+        case unavailable(InstalledAIStatus.Phase)
+    }
+
+    nonisolated private static func command(
+        for kind: InstalledAIKind, launch: InstalledAILaunch
+    ) async -> Command {
+        switch launch.command() {
+        case .executable(let url): return .found(url)
+        case .missing(let path):
+            return .unavailable(.failed(InstalledAILaunch.missingCommandMessage(path)))
+        case .automatic:
+            let found = await ExecutableLocator.locate(
+                kind.command, extraHomePaths: kind.extraExecutablePaths)
+            return found.map(Command.found) ?? .unavailable(.notInstalled)
+        }
     }
 
     nonisolated private static func probe(
-        _ kind: InstalledAIKind, workspace: URL
+        _ kind: InstalledAIKind, launch: InstalledAILaunch, workspace: URL
     ) async -> (InstalledAIKind, InstalledAIStatus) {
-        guard
-            let executable = await ExecutableLocator.locate(
-                kind.command, extraHomePaths: kind.extraExecutablePaths)
-        else {
-            return (kind, InstalledAIStatus(phase: .notInstalled))
+        let executable: URL
+        switch await command(for: kind, launch: launch) {
+        case .found(let url): executable = url
+        case .unavailable(let phase): return (kind, InstalledAIStatus(phase: phase))
         }
+        let environment = ExecutableLocator.environment(
+            running: executable, inherited: launch.inherited(for: kind))
         let versionResult = await InstalledAIProbe.run(
-            executable: executable, arguments: ["--version"], workspace: workspace)
+            executable: executable, arguments: ["--version"], workspace: workspace,
+            environment: environment)
         guard versionResult.status == 0 else {
             return (
                 kind,
@@ -126,19 +222,36 @@ final class InstalledAIManager {
         case .claude:
             let auth = await InstalledAIProbe.run(
                 executable: executable, arguments: ["auth", "status", "--json"],
-                workspace: workspace)
+                workspace: workspace, environment: environment)
             let loggedIn = InstalledAIProbe.loggedIn(inStatusJSON: auth.output)
+            guard auth.status == 0, loggedIn else {
+                return (
+                    kind,
+                    InstalledAIStatus(
+                        phase: .signInRequired, version: version, executable: executable)
+                )
+            }
+            // No prompt follows the request, so the CLI answers and exits without calling a model.
+            let catalog = await InstalledAIProbe.run(
+                executable: executable, arguments: claudeControlArguments, workspace: workspace,
+                environment: environment,
+                input: Data(InstalledAIModel.claudeInitializeRequest.utf8),
+                // The reader's SessionStart hooks run before the CLI answers, however slow they are.
+                timeout: .seconds(30))
+            let models = InstalledAIModel.claudeCatalog(catalog.output)
             return (
                 kind,
                 InstalledAIStatus(
-                    phase: auth.status == 0 && loggedIn ? .ready : .signInRequired,
-                    version: version, executable: executable,
-                    models: loggedIn ? InstalledAIModel.claude : [])
+                    phase: models.isEmpty
+                        ? .failed("Claude listed no models. Update Claude Code, then Check Again.")
+                        : .ready,
+                    version: version, executable: executable, models: models,
+                    account: InstalledAIModel.claudeAccount(catalog.output))
             )
         case .openCode:
             let models = await InstalledAIProbe.run(
                 executable: executable, arguments: ["models", "--pure", "--verbose"],
-                workspace: workspace)
+                workspace: workspace, environment: environment)
             let catalog = InstalledAIModel.openCodeCatalog(models.output)
             return (
                 kind,
@@ -148,18 +261,20 @@ final class InstalledAIManager {
             )
         case .grok:
             let models = await InstalledAIProbe.run(
-                executable: executable, arguments: ["models"], workspace: workspace)
+                executable: executable, arguments: ["models"], workspace: workspace, environment: environment)
             let catalog = InstalledAIModel.grokCatalog(models.output)
+            let signedIn = models.status == 0 && InstalledAIModel.grokSignedIn(models.output)
             return (
                 kind,
                 InstalledAIStatus(
-                    phase: models.status == 0 && !catalog.isEmpty ? .ready : .signInRequired,
-                    version: version, executable: executable, models: catalog)
+                    phase: signedIn && !catalog.isEmpty ? .ready : .signInRequired,
+                    version: version, executable: executable,
+                    models: signedIn ? catalog : [])
             )
         case .cursor:
             let auth = await InstalledAIProbe.run(
                 executable: executable, arguments: ["status", "--format", "json"],
-                workspace: workspace)
+                workspace: workspace, environment: environment)
             let loggedIn = InstalledAIProbe.loggedIn(inStatusJSON: auth.output)
             guard auth.status == 0, loggedIn else {
                 return (
@@ -169,7 +284,8 @@ final class InstalledAIManager {
                 )
             }
             let models = await InstalledAIProbe.run(
-                executable: executable, arguments: ["--list-models"], workspace: workspace)
+                executable: executable, arguments: ["--list-models"], workspace: workspace,
+                environment: environment)
             let catalog = InstalledAIModel.cursorCatalog(models.output)
             return (
                 kind,
@@ -184,99 +300,4 @@ final class InstalledAIManager {
             return (kind, InstalledAIStatus(phase: .idle))
         }
     }
-}
-
-enum InstalledAIProbe {
-    private static let maximumOutputBytes = 2 * 1_048_576
-    private static let readChunkBytes = 64 * 1_024
-
-    struct Result: Sendable {
-        let status: Int32
-        let output: String
-    }
-
-    private final class ProcessHandle: @unchecked Sendable {
-        private let lock = NSLock()
-        private var process: Process?
-        private var cancelled = false
-
-        func set(_ process: Process) {
-            lock.lock()
-            self.process = process
-            let shouldTerminate = cancelled
-            lock.unlock()
-            if shouldTerminate { process.terminate() }
-        }
-
-        func cancel() {
-            lock.lock()
-            cancelled = true
-            let process = self.process
-            lock.unlock()
-            if let process, process.isRunning { process.terminate() }
-        }
-    }
-
-    nonisolated static func run(
-        executable: URL, arguments: [String], workspace: URL
-    ) async -> Result {
-        let handle = ProcessHandle()
-        return await withTaskCancellationHandler(
-            operation: {
-                // Detached because the read loop and `waitUntilExit` block: never a pool thread.
-                await Task.detached {
-                    try? FileManager.default.createDirectory(
-                        at: workspace, withIntermediateDirectories: true)
-                    let process = Process()
-                    let output = Pipe()
-                    process.executableURL = executable
-                    process.arguments = arguments
-                    process.currentDirectoryURL = workspace
-                    process.standardInput = FileHandle.nullDevice
-                    process.standardOutput = output
-                    process.standardError = FileHandle.nullDevice
-                    do { try process.run() } catch { return Result(status: -1, output: "") }
-                    handle.set(process)
-                    let watchdog = Task {
-                        try? await Task.sleep(for: .seconds(10))
-                        if process.isRunning { process.terminate() }
-                    }
-                    var data = Data()
-                    while data.count < Self.maximumOutputBytes {
-                        let count = min(Self.readChunkBytes, Self.maximumOutputBytes - data.count)
-                        guard let chunk = try? output.fileHandleForReading.read(upToCount: count),
-                            !chunk.isEmpty
-                        else { break }
-                        data.append(chunk)
-                    }
-                    if data.count == Self.maximumOutputBytes, process.isRunning {
-                        process.terminate()
-                    }
-                    process.waitUntilExit()
-                    watchdog.cancel()
-                    return Result(
-                        status: process.terminationStatus,
-                        output: String(bytes: data, encoding: .utf8) ?? "")
-                }.value
-            },
-            onCancel: {
-                handle.cancel()
-            })
-    }
-
-    nonisolated static func version(in output: String) -> String? {
-        output.firstMatch(of: #/\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/#).map {
-            String($0.output)
-        }
-    }
-
-    nonisolated static func loggedIn(inStatusJSON output: String) -> Bool {
-        guard let data = output.data(using: .utf8),
-            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return false }
-        return object["loggedIn"] as? Bool == true
-            || object["authenticated"] as? Bool == true
-            || object["isAuthenticated"] as? Bool == true
-    }
-
 }

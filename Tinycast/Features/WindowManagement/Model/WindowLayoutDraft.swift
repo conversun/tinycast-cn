@@ -20,7 +20,6 @@ final class WindowLayoutDraft {
     /// Identity, never an index: removing an entry must not strand a field's binding.
     private(set) var selectedEntryID: UUID?
     private(set) var selectedDisplayUUID: String?
-    private let createdAt: Date
 
     init(layout: WindowLayout?, isCapture: Bool = false, displays: [WindowLayoutDisplay]) {
         existingID = layout?.id
@@ -30,7 +29,6 @@ final class WindowLayoutDraft {
         usesPreferredGap = layout?.usesPreferredGap ?? true
         entries = layout?.entries ?? []
         frontmostEntryID = layout?.frontmostEntryID
-        createdAt = layout?.createdAt ?? Date()
         selectedEntryID = entries.first?.id
         selectedDisplayUUID = entries.first?.display.uuid ?? displays.first?.uuid
     }
@@ -140,7 +138,7 @@ final class WindowLayoutDraft {
         WindowLayout(
             id: existingID ?? UUID(), name: name, iconSymbol: iconSymbol,
             usesPreferredGap: usesPreferredGap, entries: entries,
-            frontmostEntryID: frontmostEntryID, createdAt: createdAt)
+            frontmostEntryID: frontmostEntryID)
     }
 
     /// What Save persists; the sheet never assembles a record itself.

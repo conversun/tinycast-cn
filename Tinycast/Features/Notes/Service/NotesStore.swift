@@ -28,10 +28,10 @@ final class NotesStore {
         return NoteTitle.firstLine(of: source) ?? title
     }
     var activeFileURL: URL? { activeID.map(repository.fileURL(for:)) }
-    let notesDirectory: URL
+    private(set) var notesDirectory: URL
     var onIssue: ((Issue) -> Void)?
 
-    private let repository: NotesRepository
+    private var repository: NotesRepository
     private let loadSelection: @Sendable () -> NoteID?
     private let saveSelection: @Sendable (NoteID?) -> Void
     @ObservationIgnored private var saveDebounce: Task<Void, Never>?
@@ -39,6 +39,8 @@ final class NotesStore {
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var searchWorker: Task<[NoteSearchResult], Never>?
     private var saveFailed = false
+    /// A folder change that waits on a draft the old folder could not take yet.
+    @ObservationIgnored private var pendingRelocation: NotesRepository?
     private var searchGeneration = 0
 
     init(
@@ -63,8 +65,26 @@ final class NotesStore {
         guard isLoaded else { return await reload(preferredID: loadSelection()) }
         let repository = repository
         let result = await detached({ try repository.list() }, recover: { repository.notesDirectory })
+        guard repository.notesDirectory == notesDirectory else { return true }
         if case .success(let summaries) = result { self.summaries = summaries }
         return true
+    }
+
+    /// Moves to another folder once the open draft is saved where it was, then the new one lists.
+    func relocate(to repository: NotesRepository) async {
+        pendingRelocation = nil
+        guard repository.notesDirectory != notesDirectory else { return }
+        guard await flush() else {
+            pendingRelocation = repository
+            return
+        }
+        cancelSearch()
+        self.repository = repository
+        notesDirectory = repository.notesDirectory
+        guard isLoaded else { return }
+        // Cleared first, so a folder that fails to load leaves no old note to save into it.
+        apply(nil, summaries: [])
+        _ = await reload(preferredID: nil)
     }
 
     func reload() async -> Bool {
@@ -293,6 +313,8 @@ final class NotesStore {
         } recover: {
             repository.notesDirectory
         }
+        // A relocation while this ran owns the editor now, and loads it itself.
+        guard repository.notesDirectory == notesDirectory else { return true }
         switch result {
         case .success(let payload):
             apply(payload.1, summaries: payload.0)
@@ -326,6 +348,9 @@ final class NotesStore {
         case .success(let summaries):
             self.summaries = summaries
             isDirty = savedSource != source
+            if !isDirty, let pending = pendingRelocation {
+                Task { [weak self] in await self?.relocate(to: pending) }
+            }
         case .failure(let failure):
             saveFailed = true
             publish(.save(failure))

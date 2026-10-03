@@ -316,7 +316,7 @@ enum NoteMarkdownParser {
             guard first < end else { return nil }
             let unit = units[first]
             if unit == Unit.dash || unit == Unit.asterisk || unit == Unit.plus {
-                guard let markerEnd = separated(after: first + 1) else { return nil }
+                guard first + 1 < end, let markerEnd = separated(after: first + 1) else { return nil }
                 if let task = task(range: range, bulletEnd: first + 1, markerEnd: markerEnd) {
                     return task
                 }
@@ -328,7 +328,7 @@ enum NoteMarkdownParser {
             guard units[digitsEnd] == Unit.period || units[digitsEnd] == Unit.closeParen else {
                 return nil
             }
-            guard let markerEnd = separated(after: digitsEnd + 1) else { return nil }
+            guard digitsEnd + 1 < end, let markerEnd = separated(after: digitsEnd + 1) else { return nil }
             let number = units[first..<digitsEnd].reduce(0) { $0 * 10 + Int($1 - Unit.zero) }
             return marked(.ordered(number: number), range: range, markerEnd: markerEnd)
         }

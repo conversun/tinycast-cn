@@ -27,7 +27,7 @@ final class QuickActionRunner {
             : .unreadableApp(targetApp.localizedName ?? String(localized: "That app"))
     }
 
-    private static func accepted(_ text: String) throws -> String {
+    static func accepted(_ text: String) throws -> String {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw QuickActionFailure.noSelection
         }

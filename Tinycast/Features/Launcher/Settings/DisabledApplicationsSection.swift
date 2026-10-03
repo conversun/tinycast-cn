@@ -65,7 +65,7 @@ private struct DisabledAppRow: View {
             } icon: {
                 Image(nsImage: icon)
                     .resizable()
-                    .frame(width: 18, height: 18)
+                    .frame(width: SettingsListMetrics.iconSize, height: SettingsListMetrics.iconSize)
             }
         }
     }

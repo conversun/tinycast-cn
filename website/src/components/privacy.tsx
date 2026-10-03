@@ -61,8 +61,8 @@ export function Privacy() {
       id="privacy"
       index={3}
       label="Privacy"
-      title="Nothing turns on until you do."
-      intro="A fresh install is a launcher, a calculator and your clipboard. Everything else waits for you to switch it on, and none of it needs an account."
+      title="Off until you turn it on."
+      intro="A new install has the launcher, the calculator and clipboard history. Everything else stays off until you enable it, and nothing needs an account."
     >
       <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {privacyStats.map((stat) => (
@@ -79,7 +79,7 @@ export function Privacy() {
       <figure className="mt-4 rounded-2xl bg-tint/4 p-2">
         <figcaption className="flex items-center justify-between gap-3 px-3 pb-3 pt-2.5">
           <span className="text-small font-medium text-fg">
-            Settings, on a fresh install
+            Default settings
           </span>
           <span className="rounded-full bg-kbd-bg px-2.5 py-0.5 text-caption font-medium text-kbd">
             {offCount} of {defaultSwitches.length} off

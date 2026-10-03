@@ -9,7 +9,7 @@ export function Keyboard() {
       index={4}
       label="Keyboard"
       title="Built for the keyboard."
-      intro="Pick one shortcut to summon the palette. Everything after that is a key away, and keys follow their position, so any layout works."
+      intro="Choose one shortcut to open the palette. Everything else has a key, and shortcuts follow key position, so they work with any keyboard layout."
     >
       <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {shortcutRows.map((row) => (

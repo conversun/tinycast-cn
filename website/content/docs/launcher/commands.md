@@ -3,60 +3,62 @@ title: Commands
 description: Every built-in command, and the shell commands you write yourself.
 ---
 
-Commands are things Tinycast does, reachable by name from the launcher. Some are built in. Others
-are shell commands you write.
+Commands are actions you can run by name from the launcher. Some are built in, and you can add your
+own shell commands.
 
 ## Built-in commands
 
-Every built-in command lives in exactly one Settings pane. A feature's commands sit in that
-feature's own pane, and only appear while the feature is on. The rest live in **Settings → Commands**.
+Each built-in command belongs to one Settings pane. A feature's commands are in that feature's pane
+and only appear while the feature is on. The rest are in **Settings → Commands**.
 
 | Pane                                               | Commands                                                                                                                                                                                           |
 | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [AI](/docs/ai)                                     | AI Chat                                                                                                                                                                                            |
 | [Quick Actions](/docs/ai/quick-actions)            | Fix Grammar · Rewrite · Translate · Summarize                                                                                                                                                      |
-| [Clipboard](/docs/features/clipboard)              | Clipboard History                                                                                                                                                                                  |
+| [Clipboard](/docs/features/clipboard)              | Clipboard History · Paste Sequentially                                                                                                                                                             |
 | [Emoji & Symbols](/docs/features/emoji)            | Search Emoji & Symbols                                                                                                                                                                             |
 | [File Search](/docs/features/file-search)          | Search Files                                                                                                                                                                                       |
 | [Navigation](/docs/features/navigation)            | Switch Windows · Search Menu Bar Items                                                                                                                                                             |
 | [Calendar](/docs/features/calendar)                | Join Next Meeting · My Schedule · Create Event · Copy Meeting Link · Open in Calendar                                                                                                              |
 | [Notes](/docs/features/notes)                      | Show Notes · Create Note · Search Notes                                                                                                                                                            |
-| [Window Management](/docs/features/window-layouts) | Create Window Layout · Create Layout from Current Windows                                                                                                                                          |
+| [Window Management](/docs/features/window-layouts) | Create Window Layout · Create Layout from Current Windows · Switch Room · Create Room                                                                                                              |
 | [Quicklinks](/docs/launcher/quicklinks)            | Create Quicklink · Search Quicklinks · Import Quicklinks · Export Quicklinks                                                                                                                       |
 | [Snippets](/docs/features/snippets)                | Search Snippets · Create Snippet                                                                                                                                                                   |
 | Commands                                           | Calculator History · [Open Camera](/docs/features/camera) · Export Backup · Import Backup · Import from Raycast · Check for Updates · Settings · About Tinycast · Support Tinycast · Quit Tinycast |
 
-Two more appear only for what you type: **Open in Browser** and **Run Shell Command**. See
+Two more commands only appear for what you type: **Open in Browser** and **Run Shell Command**. See
 [Fallbacks](/docs/launcher/fallbacks).
 
 Each command's row has a launcher checkbox, a shortcut recorder and an alias field.
 
-**Every built-in command can take a global shortcut**, except Open in Browser and Run Shell Command,
-which need text to work on, and Quit Tinycast, so no stray key press can quit the app.
+You can give any built-in command a global shortcut, with three exceptions. Open in Browser and Run
+Shell Command need text to act on, and Quit Tinycast has no shortcut so a stray key press can't quit
+the app.
 
-A command that opens a screen works like a toggle: press its shortcut again to close it.
+A command that opens a screen works as a toggle: press its shortcut again to close the screen.
 
-**Enable Commands** at the top of Settings → Commands switches off every command listed in that pane,
-along with their shortcuts. Unticking one row only hides it from search; its shortcut keeps working.
+**Enable Commands** at the top of Settings → Commands turns off every command in that pane, along
+with their shortcuts. Clearing one row's checkbox only hides that command from search; its shortcut
+keeps working.
 
 ## Custom commands
 
-Give a shell command a name, and run it from search or its own global shortcut.
+Give a shell command a name, then run it from search or with its own global shortcut.
 
-**Settings → Commands → Custom Commands** holds the switch. It ships **off**.
+Turn custom commands on in **Settings → Commands → Custom Commands**. They're **off** by default.
 
 | Setting                | Default |
 | ---------------------- | ------- |
 | Enable custom commands | Off     |
 | Show in launcher       | On      |
 
-**Show in launcher** off hides the section but keeps every shortcut working.
+Turning off **Show in launcher** hides the section, but every shortcut keeps working.
 
-Only the **name** is searchable. The command itself is not, so you cannot run something by
+Only the command's **name** is searchable, not the command itself, so you can't run something by
 half-remembering its flags.
 
-Each command has an **Enabled** checkbox on its row. Unticking it keeps the command, its shortcut and
-its settings, but nothing can run it until you tick it again.
+Each command has an **Enabled** checkbox on its row. Clearing it keeps the command, its shortcut and
+its settings, but the command can't run until you select the checkbox again.
 
 ### The editor
 
@@ -69,8 +71,8 @@ its settings, but nothing can run it until you tick it again.
 | Run In                 | The folder it starts in. Empty means your home folder.                       |
 | Load shell environment | Loads your `.zshrc`, so aliases, functions and `PATH` work. Slower to start. |
 | Needs confirmation     | Asks before running. **On** by default.                                      |
-| Show output            | Opens a window with everything it prints                                     |
-| Show confirmation      | Shows a small message when it succeeds                                       |
+| Show output            | Opens a window with everything the command prints                            |
+| Show confirmation      | Shows a short message when the command succeeds                              |
 
 ### How a command runs
 
@@ -78,54 +80,56 @@ its settings, but nothing can run it until you tick it again.
 | ----------- | --------------------------------------------------- |
 | Shell       | `/bin/zsh -lc <command>`                            |
 | Folder      | Its Run In folder, or your home folder              |
-| Input       | None; anything that asks for input gets end-of-file |
+| Input       | None; anything that reads input gets an end-of-file |
 | Environment | Inherited, plus `TINYCAST=1`                        |
 
-**There is no Terminal window and no timeout.** Tinycast never stops a running command on its own,
-and a command keeps running if Tinycast quits. The one exception is the **Stop** button in the output
-window.
+**Commands run without a Terminal window and without a timeout.** Tinycast never stops a running
+command by itself, and a command keeps running if Tinycast quits. The only way to stop one is the
+**Stop** button in the output window.
 
-If the Run In folder no longer exists, the command does not run, and Tinycast tells you which folder
-is missing. Running it somewhere else would be worse.
+If the Run In folder no longer exists, the command doesn't run, and Tinycast tells you which folder
+is missing instead of running it somewhere else.
 
 ### Arguments
 
-A command with arguments asks for each one first, in order, right in the palette. The search field
-becomes the input, and the screen lists every argument with what you have answered so far.
+A command with arguments asks for each one in order, in the palette, before it runs. The search field
+becomes the input, and the screen lists every argument with the answers you've given so far.
 
-- <kbd>return</kbd> moves to the next one. On the last, it runs.
-- <kbd>delete</kbd> in an empty field goes back one and brings back what you typed.
+- <kbd>return</kbd> moves to the next argument. On the last one, it runs the command.
+- <kbd>delete</kbd> in an empty field goes back to the previous argument and restores what you typed.
 - <kbd>esc</kbd> clears your answer, and a second press cancels the run.
-- A required argument cannot be left empty.
+- A required argument can't be left empty.
 
-This works from the launcher, a favorite number, or a global shortcut.
+This works whether you run the command from the launcher, a favorite number or a global shortcut.
 
-**Values are passed to the shell as `$1`, `$2` …, never pasted into the command text.** A value like
-`; rm -rf ~` is just a string your script reads, not a second command. An empty optional argument
-still keeps its place, so `$2` never slides into `$3`.
+**Values are passed to the shell as `$1`, `$2` …, and are never inserted into the command text.** A
+value like `; rm -rf ~` is only a string your script reads, not a second command. An empty optional
+argument still keeps its position, so `$2` never shifts into `$3`.
 
 ### Load shell environment
 
-This is off by default, and it is the most common reason a command fails.
+This setting is off by default, and it's the most common reason a command fails.
 
 zsh only reads `~/.zshrc` for **interactive** shells. The default `-lc` reads `.zprofile` and
-`.zlogin`, but not `.zshrc`. So your aliases, functions and `PATH` changes are missing, and the
-command exits with **127**.
+`.zlogin`, but not `.zshrc`. As a result, your aliases, functions and `PATH` changes are missing, and
+the command exits with code **127**.
 
-Turning it on uses `-ilc`, which reads `.zshrc`. That also runs everything else your shell startup
-does, like oh-my-zsh's auto-update or a theme's background helpers.
+Turning the setting on uses `-ilc`, which reads `.zshrc`. That also runs everything else in your
+shell startup, like oh-my-zsh's auto-update or a theme's background helpers.
 
-`TINYCAST=1` lets your `.zshrc` skip that work:
+Tinycast sets `TINYCAST=1`, so your `.zshrc` can skip that work:
 
 ```bash
 [[ -n $TINYCAST ]] && return
 ```
 
-Measured against a real `.zshrc`: about 10 ms to start with it off, about 65 ms with it on.
+With a typical `.zshrc`, a command starts in about 10 ms with the setting off and about 65 ms with it
+on.
 
-When a command exits with 127 and this is off, the error says so and offers **Open Settings…**.
+When a command exits with 127 while this setting is off, the error message says so and offers
+**Open Settings…**.
 
-The other fix is to not rely on the shell at all. Use full paths:
+You can also avoid relying on the shell configuration by using full paths:
 
 ```bash
 /opt/homebrew/bin/gh pr list --limit 5
@@ -133,62 +137,63 @@ The other fix is to not rely on the shell at all. Use full paths:
 
 ### Show output
 
-With **Show output** on, a window opens as soon as the command starts and fills in as it prints, in
-the right order, with colors.
+With **Show output** on, a window opens as soon as the command starts and shows its output as it's
+printed, in order and in color.
 
 The window shows the command's name and text, the output, the result and how long it took. **Copy**
-is always there. **Stop** ends the command and everything it started; once it finishes, the button
-becomes **Run Again**. Progress bars redraw in place instead of printing a line per update.
+is always available. **Stop** ends the command and everything it started; when the command finishes,
+the button changes to **Run Again**. Progress bars update in place instead of printing a new line for
+each update.
 
-The window keeps the last 256 KB of output. Scroll up and it stops following new lines; scroll back
-to the bottom and it follows again.
+The window keeps the last 256 KB of output. If you scroll up, it stops following new output. Scroll
+back to the bottom and it follows again.
 
-With **Load shell environment** on, anything your `.zshrc` prints shows up here too. The
+With **Load shell environment** on, anything your `.zshrc` prints also appears here. The
 `TINYCAST=1` check above keeps it quiet.
 
 ### Needs confirmation
 
-On by default for every command. The palette closes, then a dialog shows the command's **name and
-full text**. <kbd>return</kbd> runs it and <kbd>esc</kbd> cancels.
+This is on by default for every command. The palette closes, and a dialog shows the command's
+**name and full text**. <kbd>return</kbd> runs it and <kbd>esc</kbd> cancels.
 
-It looks calm rather than alarming. Running a command you wrote deserves a second look, not a red
-warning. It cannot be skipped from the palette or from a shortcut, and holding a shortcut down never
-stacks up dialogs.
+The dialog is a plain confirmation rather than a red warning, since you wrote the command yourself.
+You can't skip it from the palette or a shortcut, and holding down a shortcut never opens more than
+one dialog.
 
 ### When it finishes
 
-- **Success, with Show confirmation on:** a small message shows the command's last line of output,
-  or "Ran <name>" if it printed nothing.
+- **Success, with Show confirmation on:** a short message shows the last line of output, or
+  "Ran <name>" if the command printed nothing.
 - **Failure:** a dialog shows the error output, up to the last 8 KB.
-- **With Show output on:** the output window reports the result instead, so you never get told twice.
+- **With Show output on:** the output window shows the result instead, so you're only told once.
 
-**The command text is never written to logs.**
+**Tinycast never writes the command text to its logs.**
 
 ### Editing and backups
 
 Editing a command keeps its favorite, visibility and shortcut. Deleting it removes all three.
 
-Custom commands and their shortcuts are included in [backups](/docs/reference/backup). Importing
-**warns you before it adds commands**, because a backup that quietly adds shell commands would be a
-real hazard.
+Custom commands and their shortcuts are included in [backups](/docs/reference/backup). When you
+import a backup, Tinycast **warns you before adding any commands**, so a backup can't add shell
+commands without you knowing.
 
 ## Importing Raycast script commands
 
 **Settings → Commands → Import Raycast Scripts** reads a folder of
-[Raycast script commands](https://github.com/raycast/script-commands) and adds one custom command per
-script. It is a one-time import: afterwards they are ordinary commands you can edit or delete.
+[Raycast script commands](https://github.com/raycast/script-commands) and adds a custom command for
+each script. It's a one-time import: afterward they're regular commands you can edit or delete.
 
-A file counts as a script command when it has both a shebang line and an `@raycast.title`. Helper
-scripts in the same folder are left alone.
+A file counts as a script command when it has both a shebang line and an `@raycast.title`. Other
+helper scripts in the folder are skipped.
 
 | Raycast setting                 | Becomes                                            |
 | ------------------------------- | -------------------------------------------------- |
 | `@raycast.title`                | The name                                           |
 | `@raycast.mode`                 | `compact` and `fullOutput` turn **Show output** on |
 | `@raycast.needsConfirmation`    | **Needs confirmation**                             |
-| `@raycast.argument1` to `3`     | Arguments, named by their placeholders             |
+| `@raycast.argument1` to `3`     | Arguments, named after their placeholders          |
 | `@raycast.currentDirectoryPath` | **Run In**; otherwise the script's own folder      |
 
-Raycast icons are not imported; imported commands use the terminal symbol, and you can pick another.
-The import warns you first, and skips any name you already have, so importing the same folder again
-only adds new scripts.
+Raycast icons aren't imported. Imported commands use the terminal symbol, and you can choose a
+different one. Tinycast warns you before importing and skips any name you already have, so importing
+the same folder again only adds new scripts.

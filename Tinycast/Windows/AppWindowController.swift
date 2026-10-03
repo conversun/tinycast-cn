@@ -1,27 +1,40 @@
 import AppKit
 import SwiftUI
 
+private final class AppWindow: NSWindow {
+    var closesOnEscape = false
+
+    override func cancelOperation(_ sender: Any?) {
+        if closesOnEscape { close() } else { super.cancelOperation(sender) }
+    }
+}
+
 /// Built on first show, torn down on close so its SwiftUI tree deallocates. Never quits the app.
 @MainActor
 final class AppWindowController: NSObject, NSWindowDelegate {
     private let title: String
     private let contentSize: CGSize
+    private let minimumSize: CGSize
     private let isResizable: Bool
     private let autosaveName: String?
     private let activation: ActivationPolicy
+    private let closesOnEscape: Bool
     private var window: NSWindow?
     /// Rebuilt with the window, so a chrome's state never outlives the window it decorated.
     private var chrome: WindowChrome?
 
+    /// The opening size is also the resize floor unless a smaller `minimumSize` is named.
     init(
-        title: String, contentSize: CGSize, resizable: Bool = false, autosaveName: String? = nil,
-        activation: ActivationPolicy
+        title: String, contentSize: CGSize, minimumSize: CGSize? = nil, resizable: Bool = false,
+        autosaveName: String? = nil, activation: ActivationPolicy, closesOnEscape: Bool = false
     ) {
         self.title = title
         self.contentSize = contentSize
+        self.minimumSize = minimumSize ?? contentSize
         self.isResizable = resizable
         self.autosaveName = autosaveName
         self.activation = activation
+        self.closesOnEscape = closesOnEscape
     }
 
     /// Returns `true` when a window was built, `false` when an already-open one was re-raised.
@@ -38,17 +51,15 @@ final class AppWindowController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// AppKit-built content; Settings needs it for a real `NSSplitViewController`.
+    /// A prebuilt controller; Settings needs one to bridge its SwiftUI toolbar into the window.
     @discardableResult
     func show(chrome: WindowChrome? = nil, contentViewController: () -> NSViewController) -> Bool {
         if let window {
             raise(window)
             return false
         }
-        let window = makeWindow(content: contentViewController())
-        // After the content so the inset lands on a mounted view; before `raise` to avoid a flash.
+        let window = makeWindow(content: contentViewController(), chrome: chrome)
         self.chrome = chrome
-        chrome?.install(in: window)
         self.window = window
         activation.windowDidOpen(window)
         raise(window)
@@ -92,16 +103,17 @@ final class AppWindowController: NSObject, NSWindowDelegate {
 
     // MARK: - Private
 
-    private func makeWindow(content: NSViewController) -> NSWindow {
+    private func makeWindow(content: NSViewController, chrome: WindowChrome?) -> NSWindow {
         var style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
         if isResizable { style.insert(.resizable) }
-        let window = NSWindow(
+        let window = AppWindow(
             contentRect: NSRect(origin: .zero, size: contentSize),
             styleMask: style,
             backing: .buffered,
             defer: false
         )
         window.title = title
+        window.closesOnEscape = closesOnEscape
         // Edge-to-edge under a transparent titlebar, so it reads as one surface.
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -109,8 +121,10 @@ final class AppWindowController: NSObject, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         // AppKit would otherwise resurrect the window at launch, before anything is wired up.
         window.isRestorable = false
-        window.contentMinSize = contentSize
+        window.contentMinSize = minimumSize
         window.delegate = self
+        // Before the content: a bridged SwiftUI toolbar restores the title flags it mounted over.
+        chrome?.install(in: window)
 
         window.contentViewController = content
         // `contentViewController` resets the frame to the controller's fitting size.

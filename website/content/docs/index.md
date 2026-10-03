@@ -1,47 +1,48 @@
 ---
 title: Getting started
-description: What Tinycast is, and the few minutes it takes to set up.
+description: What Tinycast is and how to set it up.
 ---
 
-Tinycast is a small, native launcher for macOS. It lives in your menu bar. Press your shortcut, a
-palette floats in over whatever you are doing, you type, and it gets out of the way.
+Tinycast is a small, native launcher for macOS that lives in your menu bar. Press your shortcut and a
+palette opens over whatever you're doing. Type what you want, press return, and the palette closes.
 
-It is built with SwiftUI and AppKit, with zero third-party dependencies, and it stays under 100 MB of
-memory. There is no Electron, no account, no sign-in and no telemetry.
+It's built with SwiftUI and AppKit, has no third-party dependencies, and uses less than 100 MB of
+memory. It doesn't use Electron, and there's no account, sign-in or telemetry.
 
 ## Set it up
 
-The first time Tinycast opens, a short welcome takes you through these steps. You can skip any of
+The first time you open Tinycast, a short welcome walks you through these steps. You can skip any of
 them and come back later.
 
 ### 1. Pick a shortcut
 
-**Tinycast ships with no shortcut bound.** Nothing happens until you choose one. That is on purpose:
-a launcher should never grab a key combination you already use.
+Tinycast doesn't come with a shortcut, so it can't take over a key combination you already use.
+Nothing happens until you choose one.
 
-The welcome screen asks for one. Later you can change it in **Settings → General → App Launcher**:
-click the field, then press the keys you want. <kbd>⌥</kbd><kbd>Space</kbd> is a common choice.
+The welcome screen asks for a shortcut. To change it later, go to
+**Settings → General → App Launcher**, click the field and press the keys you want. Many people use
+<kbd>⌥</kbd><kbd>Space</kbd>.
 
-You can also use a double-tap of one modifier key, like pressing <kbd>⌘</kbd> twice. See
+You can also double-tap a modifier key, like pressing <kbd>⌘</kbd> twice. See
 [Hotkeys](/docs/reference/hotkeys).
 
-The same step has a **Launch at login** switch, so Tinycast is ready after a restart.
+This step also has a **Launch at login** switch, so Tinycast is ready after you restart your Mac.
 
 ### 2. Allow pasting (optional)
 
-Tinycast asks for Accessibility so it can paste a clip or an emoji back into the app you came from.
-The launcher itself needs no permission. See [Permissions](/docs/permissions).
+Tinycast asks for Accessibility access so it can paste a clip or an emoji into the app you were
+using. The launcher itself doesn't need any permissions. See [Permissions](/docs/permissions).
 
 ### 3. Bring your Raycast setup (optional)
 
-If you used Raycast, pick its `.rayconfig` export. Tinycast brings your shortcuts, favorites,
-snippets, quicklinks and clipboard history across. See
+If you used Raycast, choose its `.rayconfig` export. Tinycast imports your shortcuts, favorites,
+snippets, quicklinks and clipboard history. See
 [Import from Raycast](/docs/reference/import-from-raycast).
 
 ## Turn on what you want
 
-Most features ship **off**. A feature that is off does nothing at all: nothing is scanned, nothing is
-indexed and nothing sits in memory. That is how the app stays small while the feature list is long.
+Most features are off when you install Tinycast. A feature that's off does nothing: it doesn't scan,
+index or use memory. That's how the app stays small with a long feature list.
 
 | Feature                                               | Where to turn it on          |
 | ----------------------------------------------------- | ---------------------------- |
@@ -57,15 +58,16 @@ indexed and nothing sits in memory. That is how the app stays small while the fe
 | [Custom commands](/docs/launcher/commands)            | Settings → Commands          |
 | [Extensions](/docs/extensions)                        | Settings → Extensions        |
 
-[Clipboard history](/docs/features/clipboard) is the one feature that ships on. You can turn it off
-in **Settings → Clipboard**.
+[Clipboard history](/docs/features/clipboard) is the only feature that starts on. You can turn it
+off in **Settings → Clipboard**.
 
-## The first thing to learn
+## Learn one shortcut first
 
-Everything happens in one window. Type to search, <kbd>return</kbd> to act, <kbd>⌘</kbd><kbd>K</kbd> to
-see every other action for what is selected, and <kbd>esc</kbd> to go back.
+Everything happens in one window. Type to search, press <kbd>return</kbd> to act on the selection,
+press <kbd>⌘</kbd><kbd>K</kbd> to see every other action, and press <kbd>esc</kbd> to go back.
 
-<kbd>⌘</kbd><kbd>K</kbd> matters more than it sounds. Every screen lists all of its actions there,
-with the shortcut for each one printed beside it. It is the fastest way to learn the app.
+<kbd>⌘</kbd><kbd>K</kbd> is the one to remember. Every screen lists all of its actions there, each
+with its shortcut, so it's the fastest way to learn the app.
 
-Next: [the palette](/docs/palette), or [install Tinycast](/docs/install) if you have not yet.
+Next, read about [the palette](/docs/palette), or [install Tinycast](/docs/install) if you haven't
+yet.

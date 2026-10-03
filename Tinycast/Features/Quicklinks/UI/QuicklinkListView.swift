@@ -99,10 +99,11 @@ private struct QuicklinkRow: View {
     }
 
     var body: some View {
-        HStack(spacing: metrics.spacing.lg) {
+        IconCache.observeStyle()
+        return HStack(spacing: metrics.spacing.lg) {
             Image(nsImage: IconCache.symbolIcon(named: quicklink.symbol))
                 .resizable()
-                .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
+                .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
             VStack(alignment: .leading, spacing: metrics.spacing.xxs) {
                 Text(quicklink.name)
                     .font(metrics.typography.rowTitle)

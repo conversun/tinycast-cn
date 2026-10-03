@@ -13,6 +13,133 @@ function record(name, value) {
 
 record(command + "-args.log", JSON.stringify(args));
 
+// Claude's tool loop, answered on the pipe the turn came in on; synchronous, so stalls are real.
+if (command === "claude" && args.includes("--permission-prompt-tool")) {
+  claudeToolLoop();
+  process.exit(0);
+}
+
+function claudeToolLoop() {
+  const configPath = args[args.indexOf("--mcp-config") + 1];
+  record("claude-mcp-config.log", fs.readFileSync(configPath, "utf8"));
+  record("claude-mcp-mode.log", (fs.statSync(configPath).mode & 0o777).toString(8));
+
+  const read = lines();
+  const first = read.next().value;
+  const opening = first ? JSON.parse(first) : {};
+  record("claude-prompt.log", opening.message ? opening.message.content : "");
+
+  const emit = (message) => fs.writeSync(1, JSON.stringify(message) + "\n");
+  const modelIndex = args.indexOf("--model");
+  if (modelIndex >= 0 && args[modelIndex + 1] === "round-cap") {
+    emit({ type: "result", subtype: "error_max_turns", is_error: true, result: "" });
+    return;
+  }
+  if (modelIndex >= 0 && args[modelIndex + 1] === "pair") {
+    claudeParallelCalls(read, emit);
+    return;
+  }
+
+  emit({ type: "control_request", request_id: "req_unknown", request: { subtype: "unknown" } });
+  record("claude-unknown.log", read.next().value ?? "{}");
+
+  const id = "toolu_stub";
+  emit({
+    type: "assistant",
+    message: {
+      content: [
+        { type: "tool_use", id, name: "mcp__probe__safe_echo", input: { message: "one" } },
+      ],
+    },
+  });
+  emit({
+    type: "control_request",
+    request_id: "req_1",
+    request: {
+      subtype: "can_use_tool",
+      tool_name: "mcp__probe__safe_echo",
+      input: { message: "one" },
+    },
+  });
+  const answer = JSON.parse(read.next().value ?? "{}");
+  record("claude-control.log", JSON.stringify(answer));
+  const allowed = answer.response && answer.response.response
+    && answer.response.response.behavior === "allow";
+  emit({
+    type: "user",
+    message: {
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: id,
+          is_error: !allowed,
+          content: allowed ? "echoed" : "declined",
+        },
+      ],
+    },
+  });
+  emit({
+    type: "stream_event",
+    event: { delta: { type: "text_delta", text: "Claude reply" } },
+  });
+  emit({
+    type: "result",
+    is_error: false,
+    usage: { input_tokens: 8, output_tokens: 2 },
+  });
+}
+
+/** Two calls in one assistant turn, both held open before either is answered. */
+function claudeParallelCalls(read, emit) {
+  const calls = [["toolu_a", "first_tool"], ["toolu_b", "second_tool"]];
+  emit({
+    type: "assistant",
+    message: {
+      content: calls.map(([id, tool]) => ({
+        type: "tool_use", id, name: "mcp__probe__" + tool, input: {},
+      })),
+    },
+  });
+  calls.forEach(([, tool], index) => emit({
+    type: "control_request",
+    request_id: "req_" + index,
+    request: { subtype: "can_use_tool", tool_name: "mcp__probe__" + tool, input: {} },
+  }));
+  for (const _ of calls) record("claude-control.log", read.next().value ?? "{}");
+  emit({
+    type: "user",
+    message: {
+      content: calls.map(([id]) => ({ type: "tool_result", tool_use_id: id, content: "ok" })),
+    },
+  });
+  emit({ type: "result", is_error: false, usage: { input_tokens: 8, output_tokens: 2 } });
+}
+
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/** One line at a time off fd 0, so a reply is read the moment it is written. */
+function* lines() {
+  const chunk = Buffer.alloc(65_536);
+  let pending = "";
+  for (;;) {
+    let read = 0;
+    try {
+      read = fs.readSync(0, chunk, 0, chunk.length, null);
+    } catch (error) {
+      if (error.code === "EAGAIN") { sleep(5); continue; }
+      if (error.code === "EOF") break;
+      throw error;
+    }
+    if (read === 0) break;
+    pending += chunk.toString("utf8", 0, read);
+    let newline;
+    while ((newline = pending.indexOf("\n")) !== -1) {
+      yield pending.slice(0, newline);
+      pending = pending.slice(newline + 1);
+    }
+  }
+}
+
 if (command === "opencode" && args.slice(0, 2).join(" ") === "session delete") {
   record("deleted.log", args[2]);
   process.exit(0);
@@ -37,6 +164,24 @@ composer-2.5 - Composer 2.5
   }
 }
 
+if (command === "grok") {
+  if (args.includes("--version")) {
+    console.log("1.0.40");
+    process.exit(0);
+  }
+  if (args[0] === "models") {
+    console.log(`You are not authenticated.
+
+Default model: grok-4.6
+
+Available models:
+  * grok-4.6 (default)
+  - grok-4.5
+`);
+    process.exit(0);
+  }
+}
+
 if (command === "grok" && args.slice(0, 2).join(" ") === "sessions delete") {
   record("grok-deleted.log", args[2]);
   process.exit(0);
@@ -49,6 +194,8 @@ const prompt = promptFile >= 0 && args[promptFile + 1]
 record(command + "-prompt.log", prompt);
 record(command + "-environment.log", process.env.OPENCODE_CONFIG_CONTENT ?? "");
 record(command + "-grok-environment.log", process.env.GROK_DISABLE_AUTOUPDATER ?? "");
+record(command + "-reader-environment.log", process.env.TC_READER_PROBE ?? "");
+record(command + "-path.log", process.argv[1]);
 
 const modelIndex = args.indexOf("--model");
 const model = modelIndex >= 0 ? args[modelIndex + 1] : "";

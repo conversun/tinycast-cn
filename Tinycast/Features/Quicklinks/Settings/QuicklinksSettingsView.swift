@@ -15,8 +15,11 @@ struct QuicklinksSettingsView: View {
             FeatureSwitchSection(
                 anchor: .quicklinksQuicklinks,
                 enableTitle: "Enable quicklinks",
+                enableSubtitle: "Open saved links and searches from the launcher.",
                 isEnabled: $settings.quicklinksEnabled,
-                showsInLauncher: $settings.quicklinksShowInLauncher)
+                showsInLauncher: $settings.quicklinksShowInLauncher,
+                showsIcon: true,
+                showsHeader: false)
 
             Group {
                 if !store.isAvailable { storageNotice }
@@ -159,7 +162,11 @@ private struct QuicklinkSettingsRow: View {
 
     var body: some View {
         SettingsRow(title: quicklink.name, subtitle: quicklink.link) {
-            SymbolImage(name: quicklink.symbol, size: 13)
+            SymbolImage(
+                name: quicklink.symbol,
+                size: Theme.Size.settingsRowIcon - Theme.Spacing.xs
+            )
+            .frame(width: SettingsListMetrics.iconSize, height: SettingsListMetrics.iconSize)
         } trailing: {
             if quicklink.isPinned {
                 Image(systemName: "pin.fill")

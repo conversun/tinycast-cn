@@ -81,8 +81,7 @@ If a change touches anything in the right column, the harness on the left is man
 
 | Harness | Guards |
 | --- | --- |
-| `fuzz-test` | `Launcher/Model/SearchRelevance.swift`, `EntryNaming.swift`, `ScriptRomanization.swift`, `LauncherOrder.swift` |
-| `corpus-test` | the launcher's ranking, over a dense synthetic index — **a new complaint is a new case in `Tests/launcher-corpus/corpus.json`** |
+| `fuzz-test` | `Launcher/Model/LauncherMatch.swift`, `LauncherOrder.swift`, `LauncherSuggestions.swift`, `EntryNaming.swift`, `ScriptRomanization.swift`, `SearchRelevance.swift`, `LauncherRankingStore.swift` — **a new ranking complaint is a new case in its `denseIndex`** |
 | `file-search-test` | `FileSearch/Model/`, plus the shared `FuzzyMatch` scorer |
 | `file-search-session-test` | serialized query execution, debounce coalescing and cancellation |
 | `menu-search-test` | `MenuSearch/Model/` decisions, `MenuSearch/Service/` session filtering, the shared `FuzzyMatch` scorer |
@@ -94,15 +93,16 @@ If a change touches anything in the right column, the harness on the left is man
 | `calendar-test` | all of `Calendar/Model/` — link detection, the join window, the day buckets |
 | `clipboard-search-test` | Ordinary and OCR result ordering, opt-in lifecycle, cancellation, pins and type filters |
 | `clipboard-text-test` | Apple Vision/PDF extraction, scheduling, retry backoff and recovery |
+| `paste-sequence-test` | `Clipboard/Model/PasteSequence.swift` — the walk's order, its end, and what starts it over |
 | `clipboard-test` | `Clipboard/Model/ClipboardStore.swift`, `ClipboardFilter.swift`, `ClipboardFileKind.swift`, the colour trio |
 | `pasteboard-test` | `Clipboard/Service/ClipboardManager.swift` capture and `Paster.write` — what a Finder copy reads as, and what a file entry writes back |
-| `emoji-test` | `Emoji/Model/EmojiCatalog.swift`, `EmojiGridGeometry.swift`, the generated data |
-| `emoji-search-test` | `Emoji/Service/EmojiIndex.swift`, `FrequentEmojiStore.swift`, `Scripts/gen-emoji.js`'s keyword format |
+| `emoji-test` | `Emoji/Model/EmojiCatalog.swift`, `EmojiGridGeometry.swift`, the generated data and keyword packs |
+| `emoji-search-test` | `Emoji/Service/EmojiIndex.swift`, `FrequentEmojiStore.swift`, `Scripts/gen-emoji.js`'s keyword format, multilingual search |
 | `palette-navigation-test` | `Palette/PaletteState.swift`'s screen motions — `prepare`, `replace`, `push`, `pop` |
 | `palette-selection-test` | `Features/PaletteRowIndex.swift` |
 | `interface-size-test` | `DesignSystem/InterfaceMetrics.swift`, `Features/Settings/InterfaceSize.swift`, `Extensions/Model/ExtensionFormMetrics.swift` |
 | `palette-placement-test` | `DesignSystem/Theme.swift`, `Palette/PalettePlacement.swift` |
-| `hotkey-test` | `HotKeys/Model/DoubleTapModifier.swift`, `DoubleTapDetector.swift`, `HyperKey.swift`, `HotKeyAction.swift`, `Service/KeyShortcut.swift`, and the command→action mapping in `Launcher/Model/CommandID.swift` |
+| `hotkey-test` | `HotKeys/Model/DoubleTapModifier.swift`, `DoubleTapDetector.swift`, `GlobeTapDetector.swift`, `HotKeyBinding.swift`, `HotKeySpelling.swift`, `HyperKey.swift`, `HotKeyAction.swift`, `Service/KeyShortcut.swift`, and the command→action mapping in `Launcher/Model/CommandID.swift` |
 | `fallback-test` | `Launcher/Model/Fallback.swift`, plus the `CommandID` and `Quicklink` ids it is built from |
 | `dictionary-test` | `Dictionary/Model/DictionaryEntry.swift`, `DictionaryMarkup.swift` — a real XHTML record and the plain-text fallback, read into page blocks |
 | `callout-test` | `DesignSystem/Theme.swift`, `HotKeys/UI/CalloutPlacement.swift` |
@@ -110,6 +110,7 @@ If a change touches anything in the right column, the harness on the left is man
 | `volume-test` | `SystemActions/Model/VolumeLevel.swift` |
 | `window-command-test` | `WindowManagement/WindowCommand.swift`, `WindowPlacementEngine.swift`, `WindowActionMemory.swift` |
 | `window-layout-test` | `WindowManagement/Model/WindowLayout*.swift` and `CustomWindowSize*.swift` — the layout record, its geometry and its inverse, the plan and the store; custom sizes' units, frames and store |
+| `window-room-test` | `WindowManagement/Model/Room*.swift` — every room layout and its minimum sizes, the grid, arrangement reading, window matching, parking, the plan, Tab's choices and the three stores |
 | `custom-command-test` | `CustomCommands/Model/CustomCommand.swift`, `Service/ShellCommandRunner.swift` |
 | `uninstall-test` | all five pure files in `Uninstall/Model/` |
 | `quicklink-test` | all of `Quicklinks/Model/` |
@@ -119,28 +120,38 @@ If a change touches anything in the right column, the harness on the left is man
 | `notes-editor-test` | the Notes editor, rendered and literal, with real TextKit 2 and AppKit editing objects: styling, reveal, layout fragments, keys, chords, checkboxes and links |
 | `raycast-test` | `Backup/Service/RaycastDecoder.swift`, `Scrypt.swift`, `Platform/Compression/Zlib.swift` |
 | `symbols-test` | `Extensions/Service/SymbolCatalog.swift`, against this machine's CoreGlyphs |
-| `ext-store-test` | `Extensions/Model/` — the registry model and both registry APIs' parsers |
+| `ext-store-test` | `Extensions/Model/` — GitHub source parsing and URLs, the store and Git tree parsers |
 | `ext-refresh-test` | `Extensions/Model/ExtensionRefreshPolicy.swift` — interval parsing, due dates, backoff, subtitle fallback, indicator state |
+| `ext-version-test` | `Extensions/Service/ExtensionVersionStore.swift` — what an update check reports, adopts and forgets |
 | `ext-metadata-test` | `Extensions/Service/ExtensionCommandMetadataStore.swift` — round-trip, failure runs, uninstall |
-| `ext-test` | the extension runtime end to end — boots a real bundle in JavaScriptCore and renders it |
+| `ext-test` | the extension runtime and native menu-bar lifecycle — boots shipped sources in JavaScriptCore; menu tests cover restoration, refresh serialization, actions and teardown; fetch tests cover HTTP connection cleanup, cancellation and request isolation |
 | `ext-icon-test` | `Extensions/Service/ExtensionIconCache.swift` — artwork sizing and its fallback |
-| `icon-cache-test` | `Platform/Images/IconCache.swift` — row sizing at 1×/2×, warm reuse, stamp and style invalidation, bitmap release, and that a row icon draws identically to the 96px one |
+| `icon-cache-test` | `Platform/Images/IconCache.swift` — row sizing at 1×/2×, warm reuse, stamp and style invalidation, bitmap release, fitted geometry across all 256 alpha values, and that a row icon draws identically to the 96px one |
 | `entry-icon-test` | `EntryIcon` — that each case draws, caches and prints apart from the others, and that a moved `FileIconStamp` retires the bitmap decoded before it |
 | `text-diff-test` | `QuickActions/Model/TextDiffEngine.swift` — exact chunks, Unicode, ties, token-cap boundaries and fast paths |
 | `localization-test` | Chinese translations for settings descriptions and labels, including interpolated names and counts |
 | `settings-backup-test` | `Settings/AppSettingsKey.swift`, `Backup/Model/SettingsBackupCoverage.swift` |
+| `settings-file-test` | `Settings/Model/` and `Settings/Service/` — key paths, value tokens, the printer and parser, and the repository's import, replace, save, reload and symlink handling on a scratch folder |
+| `window-file-test` | `WindowManagement/Model/WindowManagementFileFormat.swift` — command shortcuts, custom sizes, layouts and rooms as settings.json spells them, hand edits and bad records |
 | `backup-archive-test` | all of `Backup/Model/`, plus `Backup/Service/BackupStaging.swift` |
 | `updates-test` | `Updates/Model/` — version precedence, channel filtering, install route, readiness |
 | `support-test` | `Support/Model/` — when the support reminder comes due, and a clock moved backwards |
-| `mcp-test` | `MCP/Model/` and `MCPSettingsStore` — JSON-RPC framing, handles, tool names, output flattening, trust, `@server` addressing |
+| `mcp-test` | `MCP/Model/` and `MCPSettingsStore` — JSON-RPC framing, handles, tool names, output flattening, trust, `@server` addressing, the shape a vendor CLI is handed, and which servers Tinycast leaves to that CLI |
 | `mcp-stdio-test` | `MCP/Service/` against a stub server — handshake, listing, calling, and every way one can go away |
+| `mcp-oauth-test` | OAuth parsing, RFC 7636 PKCE, discovery and resource binding, loopback callback validation/cancellation, dynamic registration, supplied client credentials and their token-endpoint authentication, Keychain token rotation, concurrent refresh, the wider margin for a token lent to a CLI, redirects and one-retry 401 handling |
 
-The two harnesses that need a server to talk to bring their own: `Tests/ai-fixtures/codex-stub.js`
+The subprocess harnesses bring their own servers: `Tests/ai-fixtures/codex-stub.js`
 and `mcp-stub.js`, each copied into a scratch directory and put in front of PATH so the locator finds
 it the way it would find a real one. Both read fd 0 synchronously rather than through a stream —
 `codex-stub.js` stalls mid-turn on purpose, and an event loop would read the next line while it is
 still holding — and both write with `fs.writeSync`, so a reply is on the pipe before a mode that
-exits does.
+exits does. `installed-cli-stub.js` reads the same way for the one turn shape that answers back:
+Claude's consent channel is a reply on stdin in the middle of a turn, so the stub has to be sitting
+on the pipe when it arrives.
+
+`mcp-oauth-test` starts `Tests/ai-fixtures/mcp-oauth-stub.js` on `127.0.0.1:4963` and tests the
+single-use callback on `127.0.0.1:4962`. Both ports must be free; the harness never chooses another
+port. Its Keychain scope is unique to each run and removed on completion.
 
 A harness that passed before a change passes after it. There is no "I'll fix it next commit" and no
 commenting out a case. If a change genuinely invalidates an assertion, the assertion is rewritten in the
@@ -249,7 +260,7 @@ per build with identical `-O` settings:
 
 ```sh
 swiftc -O -swift-version 6 Tinycast/Platform/PasteboardFiles.swift \
-    Tinycast/Features/Clipboard/Model/{ClipboardStore,ClipboardFilter,ColorValue,ColorFormat,ColorSpaces}.swift \
+    Tinycast/Features/Clipboard/Model/{ClipboardStore,ClipboardFilter,ClipboardFileKind,ColorValue,ColorFormat,ColorSpaces}.swift \
     Tinycast/Features/Clipboard/Service/ClipboardManager.swift \
     Tests/clipboard-file-performance.swift -o /tmp/clipboard-file-performance
 /tmp/clipboard-file-performance
@@ -257,7 +268,8 @@ swiftc -O -swift-version 6 Tinycast/Platform/PasteboardFiles.swift \
 
 `Tests/emoji-search-performance.swift` times uncached queries, typing prefixes and memo hits against
 the loaded catalog, with process RSS and footprint as JSON; `--names` also lists every catalog name
-missing from its own top five results:
+missing from its own top five results, and `--languages fr,ja` loads those keyword packs first (run it
+from the repo root):
 
 ```sh
 swiftc -O -swift-version 6 Tinycast/Features/Emoji/Model/{EmojiCatalog,EmojiData.generated}.swift \
@@ -265,6 +277,7 @@ swiftc -O -swift-version 6 Tinycast/Features/Emoji/Model/{EmojiCatalog,EmojiData
     Tinycast/Features/Launcher/Model/SearchRelevance.swift Tinycast/Platform/{AppPaths,Memo}.swift \
     Tests/emoji-search-performance.swift -o /tmp/emoji-search-performance
 /tmp/emoji-search-performance --names
+/tmp/emoji-search-performance --languages fr,ja
 ```
 
 `Tests/notes-editor-performance.swift` installs a 100,000-character note in a real rendered editor and
@@ -301,7 +314,6 @@ Measured at the end of the 2026 refactor, on `main`. Useful as orders of magnitu
 | --- | --- |
 | Release binary | 3,655,736 B (from 3,471,592 B at the start of the refactor) |
 | Resident memory | 40–80 MB in normal use; the hard ceiling is 100 MB |
-| `SpotlightNames` cache | 76 ms cold, 0.2 ms warm |
 | `SettingsPaneScanner` warm scan | 0.014 ms (16.5 ms cold), 52 panes |
 | Largest view / owner | `RootPaletteView` 662 lines, `AppCore` 284 lines |
 | Comment density | 1,653 of 27,289 source lines (6.1%) |
@@ -328,7 +340,7 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 - Palette hotkey opens the launcher; pressing it again closes it; Escape clears a non-empty query,
   then hides on a second press; clicking away closes it
-- Search a mode command (Clipboard History, Search Emoji, Search Quicklinks, Search Files, AI Chat)
+- Search a mode command (Clipboard History, Search Emoji, Search Quicklinks, Search Files, Quick AI)
   and run it: Escape returns to the launcher **with the query still typed and the row still
   selected**, and the next press clears it. The same screen from its own global hotkey hides the
   palette instead, and shows its own header icon rather than a back chevron
@@ -376,14 +388,35 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - The type filter searches from its top band, retains its active checkmark when matched, and shows
   centred **No Results** without changing the clipboard query; its native field supports selection
 - ⌘. pins and the highlight follows the row into Pinned; ⌘⌫ deletes; ⌘↵ copies without pasting
+- With enough pins to fill the list, opening it — the first show after launch too — highlights the
+  newest clip, centred with pins above; clearing a query or the filter lands there again
 - ⌃X deletes the selected entry and ⌃⇧X clears the history, from the list and from an open ⌘K menu
 - ⌃⇧X asks first, through Tinycast's own dialog; Cancel and Esc both leave every entry in place
 - ↵ pastes into the previous app; ⌥↵ pastes without closing the palette
+- ⌃⌘↵ pastes as plain text: a text entry as typed, a file entry as its path rather than the file
+- Default action ▸ Paste as Plain Text: ↵ pastes plain, ⌃⌘↵ pastes, ⌘↵ still copies; an image
+  entry's ↵ still pastes the image and its ⌘K menu has no plain row
+- ⇧⌘T on an image row and on an image-file row copies the recognized text, and the ⌘K menu carries
+  the same Copy Text row
+- The "Reading text…" progress pill appears while the helper runs and is replaced by the outcome:
+  **Copied text**, or **No text found** when nothing was recognized
+- Copy Text on a vanished row reports by kind — "That file has moved or been deleted." for a
+  referenced file, "That image is no longer available." for a pruned blob
+- Copy Text works with clipboard text search off: the helper is bundled either way
+- Copying something else while "Reading text…" shows leaves that copy on the pasteboard, and the
+  pill says **Clipboard changed, text not copied**
+- A tall phone screenshot and a full-width Retina screenshot copy each line once, whole, in order
 - A copy from an excluded app (Settings ▸ Clipboard ▸ Disabled Applications) is **not** recorded
 - Password-manager copies are still not recorded
-- Off (Settings ▸ Clipboard ▸ Enable Clipboard History): nothing new is recorded, the launcher row
-  and its shortcut are gone, the menu-bar row is gone, and Tab rings straight past the screen
+- Off (Settings ▸ Clipboard ▸ Enable Clipboard History): nothing new is recorded, the launcher rows
+  and their shortcuts are gone, the menu-bar row is gone, and Tab rings straight past the screen
 - Off then on again: existing clips come back; Clear history erases them while it is still off
+- Paste Sequentially, bound to a shortcut: copy A, B, C, and three presses paste C, B, A into
+  the field in front; a fourth says **Nothing left to paste**; a new copy or a minute's pause
+  starts over from the newest; the history's order is unchanged afterwards; holding the shortcut
+  or double-pressing it fast never pastes one entry twice
+- A text, link, image and file row each drag into another app; a click still selects, a double
+  click still pastes, and a right click still opens ⌘K
 
 ### Launcher and icons
 
@@ -392,6 +425,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
   even with the scrollbar thumb dragged from end to end in under a second
 - An app removed since the last open drops out after a reopen
 - Learned ranking still surfaces your habitual result for a short query
+- An application row drags onto the Dock and into a Finder window as a copy, never a move, and a
+  landed drop hides the palette; a click still launches; no other kind of row drags
 
 ### Hotkeys
 
@@ -440,6 +475,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Library internals, generated trees, application bundles and hidden paths do not appear
 - Visible custom top-level home folders and cloud-drive files remain searchable
 - Return opens, Command-Return reveals in Finder, and Copy Path keeps the palette open with a HUD
+- A file and a folder drag into Finder as copies and into a browser's upload field; a cancelled drag
+  flies back and leaves the palette up, a landed one hides it
 - Replacing a query quickly never lets an older result list overwrite the current query
 - A broad `.` search can be scrolled end to end; leaving it releases its fitted icons, and repeating the
   cycle does not raise the post-close memory floor
@@ -500,9 +537,11 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
   flipping it back re-renders without dirtying the note or touching undo
 - Edit one note, switch to a shorter note, then Undo and Redo: the new note remains intact and the app
   does not terminate
-- Marked-text input, emoji, combining marks, Copy, Cut, Paste, Select All, Undo, Redo, and Find preserve
-  exact source
-- An empty note shows `Start writing…`; the footer count is right after typing, pasting and undoing
+- Marked-text input, emoji, combining marks, Copy, Cut, Paste, Select All, Undo, and Redo preserve
+  exact source; ⌘F finds occurrences in the active note with rendering on and off, and Escape closes
+  the find bar before hiding Notes
+- An empty note shows `Start writing…`; ⌘F moves it below the find bar without overlap, and closing Find
+  restores its position. The footer count is right after typing, pasting and undoing
 - With Render Markdown and Show Formatting Bar on, the band under a note holds the character count on
   the left and the round formatting button on the right; with either setting off, the old centred
   count footer is back and nothing else moved
@@ -570,6 +609,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - ↵ joins: a Zoom link opens the Zoom app, and the browser where no app claims the scheme
 - Typing a character swaps the card for the calculator's; ↑/↓ never lands on a phantom row
 - Unchecking a calendar drops its events from the launcher and My Schedule, and survives a relaunch
+- `Show in launcher` off drops the meeting entries from the launcher, yet typing `My Schedule`
+  still finds the command, and it still lists the meetings
 - Adding or deleting an event in Calendar.app updates an open palette without a reopen
 - A meeting with no link is listed and searchable, and answers Open in Calendar rather than Join
 - Import a backup taken with Calendar on: it comes back **off**, and no calendar toggle travels
@@ -578,6 +619,9 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - On Meeting Title with Show Upcoming Events at 5 minutes, the title and countdown appear at T-5 and
   step on the minute boundary, not on a keystroke
 - `Only show events with meetings` hides a linkless event and shows it again when unchecked
+- `Hide when there are no upcoming events` removes the item whenever it would show only the glyph or
+  `No upcoming events`: on Today after the last event, on 5 minutes between meetings too. It returns
+  with the next event and never moves the `Calendar in Menu Bar` picker off its choice
 - Hide Current Event on Automatically clears the entry at the start and hands the space to the next
   event inside its lead time; on 5 minutes it lingers counting up, then clears
 - Clicking the calendar item opens `Join <title>`, `Open in Calendar...`, `My Schedule` and
@@ -604,6 +648,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 ### System actions and window management
 
 - A confirmation-gated action (Restart, Quit All) confirms, showing the subject's own glyph
+- Empty Trash confirms while Finder's "Show warning before emptying the Trash" is on, and runs
+  without a dialog once it is off
 - Volume actions show the volume HUD; everything else shows the message pill
 - Holding a bound hotkey does **not** stack dialogs
 - Window commands move the window you were last in; cycle-on-repeat steps ½ → ⅓ → ⅔
@@ -612,9 +658,17 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Cycling, Restore, custom sizes and display moves all work on Notes and on Settings
 - Fullscreen on Settings toggles it; on the Notes window it does nothing
 - With the note switcher open a command places Notes; the switcher and HUDs are never placed
+- Rooms: create one from Switch Room; ⇥ glides the preview through its layouts; ↵ lands its windows
+  with the gap, hides other apps and parks their extra windows; quitting, `kill -9` then relaunching, and
+  turning Window Management off each bring every window back.
+  Repeat on two displays and with Reduce Motion on
 
 ### Extensions
 
+- Open a view-command deeplink with `fallbackText=beta`, with the palette hidden and already open:
+  the field shows `beta`; a locally filtered List/Grid shows matching rows, and a command using
+  `onSearchTextChange` receives the query when it mounts. Repeat without fallback text: the field
+  starts empty. A no-view command receives the prop without prefilling the search field.
 - Every command under Settings ▸ Extensions has Add Alias, and Record Hotkey when the mode is
   supported; an alias set there finds the command from its start and shows the chip
 - Hiding the extension from the launcher, or turning off Show in launcher, dims its alias fields
@@ -640,6 +694,7 @@ Wipe the Dev channel and check that path directly:
 ```sh
 rm -rf ~/Library/Caches/com.tinycast.app.dev
 rm -rf "$HOME/Library/Application Support/com.tinycast.app.dev"
+rm -rf ~/.config/tinycast-dev
 defaults delete com.tinycast.app.dev 2>/dev/null || true
 tccutil reset Accessibility com.tinycast.app.dev 2>/dev/null || true
 ```

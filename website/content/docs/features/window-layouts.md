@@ -1,77 +1,77 @@
 ---
 title: Window layouts
-description: Save an arrangement of apps across your displays, then put every window back with one shortcut.
+description: Save an arrangement of apps across your displays, then restore every window with one shortcut.
 ---
 
-A window layout is a saved arrangement: these apps, at these sizes, in these places, on these
-displays. Run it and Tinycast opens anything that is not running and puts every window where it
-belongs, in one pass.
+A window layout is a saved arrangement of apps, with each window's size, position and display. When
+you run a layout, Tinycast opens any apps that aren't running and moves every window into place.
 
 Layouts are part of [Window Management](/docs/features/window-management). They use its switch, its
-Accessibility grant and its gap setting, and add nothing new to install or allow.
+Accessibility permission and its gap setting, and need nothing else.
 
 ## Making a layout
 
 In **Settings → Window Management → Window Layouts**:
 
 - **New Layout** starts from scratch.
-- **Create Layout from Current Windows** captures the windows you have open right now.
+- **Create Layout from Current Windows** saves the windows you have open right now.
 
-Both are also launcher commands: **Create Window Layout** and **Create Layout from Current Windows**.
+Both are also available as launcher commands: **Create Window Layout** and **Create Layout from
+Current Windows**.
 
-A capture never saves on its own. It opens the editor so you can see it, remove windows you do not
-want, and give it a name. From the launcher, the window you were working in is marked **Bring to
-front**.
+Creating a layout from your current windows doesn't save it right away. It opens the editor so you
+can review it, remove windows you don't want, and name it. When you create it from the launcher, the
+window you were working in is marked **Bring to front**.
 
 ### The editor
 
-The left side previews each display with the windows drawn on it. Tabs above it switch between
+The left side shows a preview of each display with its windows. Use the tabs above it to switch
 displays. The right side edits the selected window.
 
-| Field             | What it sets                                                                 |
-| ----------------- | ---------------------------------------------------------------------------- |
-| App               | Which app the window belongs to                                              |
-| Argument          | Optional. A file, folder, web address or quicklink to open                   |
-| Bring to front    | Leave this window frontmost when the layout finishes. Only one per layout    |
-| Size              | Width and height, as a share of the display                                  |
-| Position          | Where it sits, on a 3 × 3 grid                                               |
-| Offset            | A nudge in points from that position                                         |
-| Use preferred gap | Inset the window by the gap from Window Management, like the tiling commands |
+| Field             | What it sets                                                                    |
+| ----------------- | ------------------------------------------------------------------------------- |
+| App               | Which app the window belongs to                                                 |
+| Argument          | Optional. A file, folder, web address or quicklink to open                      |
+| Bring to front    | Puts this window in front when the layout finishes. Only one per layout         |
+| Size              | Width and height, as a fraction of the display                                  |
+| Position          | Where it sits, on a 3 × 3 grid                                                  |
+| Offset            | An adjustment in points from that position                                      |
+| Use preferred gap | Insets the window by the gap set in Window Management, like the tiling commands |
 
-The preview moves as you type. **Save** is <kbd>⌘</kbd><kbd>return</kbd>, because plain <kbd>return</kbd>
-belongs to the field you are typing in.
+The preview updates as you type. Press <kbd>⌘</kbd><kbd>return</kbd> to **Save**, because plain
+<kbd>return</kbd> is used by the field you're typing in.
 
-A layout remembers the displays it was built for, and still shows their tabs when they are
-unplugged, so you can edit a desk layout on your laptop.
+A layout remembers the displays it was made for and keeps showing their tabs when they're
+disconnected, so you can edit a desk layout on your laptop.
 
 ## Running a layout
 
-Run a layout from the launcher, from its own global shortcut, or with the ▶ button in Settings.
+Run a layout from the launcher, with its own global shortcut, or with the ▶ button in Settings.
 
-1. Windows that are already open move into place together, in one step.
-2. Apps that are not running are opened, and each window is placed once it appears. Tinycast waits
-   up to 10 seconds per app.
-3. The window marked **Bring to front**, if there is one, is focused once everything else is done.
-   If you switched to another app while Tinycast waited, focus stays where you put it.
+1. Windows that are already open all move into place at once.
+2. Apps that aren't running are opened, and each window is placed as soon as it appears. Tinycast
+   waits up to 10 seconds for each app.
+3. The window marked **Bring to front**, if any, is focused once everything else is done. If you
+   switched to another app while Tinycast was waiting, your choice is kept.
 
-A few rules make this predictable:
+A few rules keep the results predictable:
 
-- **Existing windows are matched to the nearest slot**, so a desk that is already arranged stays
-  put and nothing swaps displays.
-- **An entry with an argument always opens a new window.** That is the only reliable way to get a
-  second window out of most apps.
-- **A missing display is skipped, never guessed.** If a monitor is unplugged, the windows meant for
-  it are left alone instead of piling onto your laptop screen.
-- Sizes are shares of the screen, so a layout still fits after you change resolution.
+- **Open windows are matched to the nearest position in the layout**, so windows that are already
+  arranged stay where they are and nothing switches displays.
+- **An entry with an argument always opens a new window**, because that's the only reliable way to
+  get a second window from most apps.
+- **Windows for a missing display are skipped.** If a monitor is disconnected, its windows are left
+  alone instead of piling up on your laptop screen.
+- Sizes are fractions of the screen, so a layout still fits after you change the resolution.
 
-**Restore Window** does not undo a layout. It returns a window to where it was before the last window
+**Restore Window** doesn't undo a layout. It returns a window to where it was before the last window
 command, not before the layout ran.
 
 ## Managing layouts
 
 Each layout in Settings has a shortcut recorder, a launcher checkbox, and buttons to run, edit,
-duplicate and delete it. **Show layouts in launcher** (on by default) takes every layout and the two
-layout commands out of search at once, without affecting the other window commands.
+duplicate and delete it. **Show layouts in launcher** (on by default) removes all layouts and the
+two layout commands from search at once, without affecting the other window commands.
 
-Layouts and their shortcuts travel in [backups](/docs/reference/backup). On another Mac, entries for
-displays it does not have are skipped, like any missing display.
+Layouts and their shortcuts are included in [backups](/docs/reference/backup). On another Mac,
+entries for displays that Mac doesn't have are skipped, the same as any missing display.

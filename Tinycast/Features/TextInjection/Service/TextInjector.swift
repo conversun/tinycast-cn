@@ -885,7 +885,9 @@ final class TextInjector {
                 virtualKey: 0,
                 keyDown: false)
         else { return nil }
-
+        // The source inherits held modifiers, and a hotkey's are still down while this types.
+        down.flags = []
+        up.flags = []
         tag(down)
         tag(up)
         down.keyboardSetUnicodeString(

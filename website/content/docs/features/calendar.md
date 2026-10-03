@@ -1,31 +1,35 @@
 ---
 title: Calendar & meetings
-description: Join the next meeting with one key, see your day, and keep the next event in the menu bar.
+description: Join your next meeting with one key, see your day, and show the next event in the menu bar.
 ---
 
-Tinycast reads the calendars already on your Mac, finds the join link in each meeting, and puts it
-one keystroke away. It works with any calendar macOS knows about, like iCloud, Google or Exchange.
+Tinycast reads the calendars already on your Mac, finds the join link in each meeting, and lets you
+join with one keystroke. It works with any calendar account macOS supports, like iCloud, Google or
+Exchange.
 
-**Settings → Calendar → Join meetings from Tinycast** holds the switch. It ships **off**. Turning it
-on explains what it reads, then macOS asks for calendar access. See [Permissions](/docs/permissions#calendars).
+Turn it on in **Settings → Calendar → Join meetings from Tinycast**. It's **off** by default. When
+you turn it on, Tinycast explains what it reads, and then macOS asks for calendar access. See
+[Permissions](/docs/permissions#calendars).
 
-Events are read on your Mac. **Nothing leaves it.**
+Events are read on your Mac and **never leave it**.
 
 ## Four ways to join
 
-- **The join card.** When a meeting is about to start, a card sits at the top of the launcher with a
-  live countdown. <kbd>return</kbd> joins.
-- **Join Next Meeting.** A command you can bind to a global shortcut. It joins what the card shows,
-  or a meeting already running, or the next meeting with a link.
-- **The menu bar.** An optional calendar item shows the next event and a menu to join it.
-- **Auto join.** Meetings can open themselves as they start.
+- **The join card.** When a meeting is about to start, a card with a live countdown appears at the
+  top of the launcher. Press <kbd>return</kbd> to join.
+- **Join Next Meeting.** A command you can assign a global shortcut. It joins the meeting shown on
+  the card, a meeting that's already running, or the next meeting with a link.
+- **The menu bar.** An optional calendar item shows your next event, and its menu lists upcoming
+  events by day.
+- **Auto join.** Meetings can open automatically when they start.
 
-If there is nothing to join, a small message says **Nothing to join right now**.
+If there's nothing to join, a short message says **Nothing to join right now**.
 
 ### The join card
 
-The card shows up a set time before a meeting starts and stays for the same time after, but never
-past the meeting's end. **Show the join card** sets that time: 1, 2, **5** (default), 10 or 15 minutes.
+The card appears a set time before a meeting starts and stays for the same amount of time after,
+but never past the meeting's end. **Show the join card** sets that time: 1, 2, **5** (default), 10
+or 15 minutes.
 
 | Action (<kbd>⌘</kbd><kbd>K</kbd>) | Shortcut                      |
 | --------------------------------- | ----------------------------- |
@@ -33,99 +37,103 @@ past the meeting's end. **Show the join card** sets that time: 1, 2, **5** (defa
 | Copy Meeting Link                 | <kbd>⌘</kbd><kbd>return</kbd> |
 | Open in Calendar                  |                               |
 
-A meeting with no link opens in Calendar instead.
+A meeting without a link opens in Calendar instead.
 
 ## Which links it finds
 
-Tinycast looks in the event's URL, location and notes, in that order. It knows **Zoom**,
+Tinycast checks the event's URL, location and notes, in that order. It recognizes **Zoom**,
 **Google Meet**, **Microsoft Teams**, **Webex**, **Jitsi**, **Whereby**, **Amazon Chime**,
 **GoTo Meeting**, **BlueJeans** and **Skype**, and falls back to any other web link in the event.
 
-- **A known service always beats a plain link**, so a "reset your password" link at the top of an
-  invite never wins over the Meet link below it.
-- Links that are not meetings, like `zoom.us/download` or a Meet dial-in page, are ignored.
-- **Zoom and Teams open in their desktop apps** when installed, and in the browser otherwise.
-- **Google Meet opens as the right account.** If you are signed in to several Google accounts, the
-  link opens as the one whose calendar holds the meeting, not the account chooser.
-- **Copy Meeting Link** copies the link exactly as it was written.
+- **A link to a known service always takes priority over a plain link**, so a "reset your password"
+  link at the top of an invite never wins over the Meet link below it.
+- Links that aren't meetings, like `zoom.us/download` or a Meet dial-in page, are ignored.
+- **Zoom and Teams open in their desktop apps** if they're installed, and in the browser otherwise.
+- **Google Meet opens with the right account.** If you're signed in to several Google accounts, the
+  link opens with the account whose calendar has the meeting, instead of the account chooser.
+- **Copy Meeting Link** copies the link exactly as it appears in the event.
 
-Declined, cancelled, all-day and finished events are skipped everywhere.
+Declined, canceled, all-day and finished events are always skipped.
 
 ## Commands
 
-| Command           | Does                                                        |
-| ----------------- | ----------------------------------------------------------- |
-| Join Next Meeting | Opens the card's meeting, the running one, or the next      |
-| My Schedule       | Opens your meetings as a list in the palette                |
-| Create Event      | Asks for a title, when it starts and how long, then adds it |
-| Copy Meeting Link | Copies the next meeting's link                              |
-| Open in Calendar  | Opens the next meeting in Calendar                          |
+| Command           | Does                                                           |
+| ----------------- | -------------------------------------------------------------- |
+| Join Next Meeting | Opens the card's meeting, the running one, or the next one     |
+| My Schedule       | Shows your meetings as a list in the palette                   |
+| Create Event      | Asks for a title, start time and duration, then adds the event |
+| Copy Meeting Link | Copies the next meeting's link                                 |
+| Open in Calendar  | Opens the next meeting in Calendar                             |
 
 Each command has a checkbox, a shortcut recorder and an alias field in **Settings → Calendar**.
 
 ### Meetings in search
 
-Upcoming meetings also show up in launcher search, in their own **Meetings** section.
+Upcoming meetings also appear in launcher search, in their own **Meetings** section.
 **Upcoming meetings in launcher** sets how many: **1 next**, **3 next**, **5 next** (default) or
-**All**. **Show in launcher** takes the meetings and the calendar commands out of search. The join
-card, the menu bar and your shortcuts keep working.
+**All**. **Show in launcher** removes meetings and calendar commands from search, while the join
+card, the menu bar item and your shortcuts keep working.
 
 ### My Schedule
 
-My Schedule lists what is left of today, and tomorrow when that is included, grouped by day. Type to
-filter. <kbd>return</kbd> joins the selected meeting, and <kbd>⌘</kbd><kbd>K</kbd> offers
+My Schedule lists your remaining events for the days Tinycast reads, grouped by day. Type to filter.
+<kbd>return</kbd> joins the selected meeting, and <kbd>⌘</kbd><kbd>K</kbd> offers
 **Open in Calendar**.
 
 ## How far ahead it reads
 
-**Include Tomorrow's Events** (on by default) reads tomorrow as well as the rest of today. Turn it
-off and every surface only looks at today.
+**Days to Show** sets how far ahead Tinycast reads: **Today**, **Today and Tomorrow** (default) or
+**Next 7 Days**. My Schedule, the menu bar item and launcher search all use this setting.
 
 ## Auto join
 
-**Auto Join Meetings** (off by default) opens a meeting as it starts.
+**Auto Join Meetings** (off by default) opens each meeting when it starts.
 
 - It only joins meetings that start **after** you turned it on.
 - It joins each meeting **once**, even if you decline the confirmation.
-- **Confirm before joining** (on by default) asks first.
+- **Confirm before joining** (on by default) asks you first.
 
 ## Camera preview
 
-**Camera Preview** (off by default) shows your camera before you join, so you can check your hair
-and your background. <kbd>return</kbd> joins and <kbd>esc</kbd> cancels.
+**Camera Preview** (off by default) shows your camera before you join, so you can check how you look
+and what's behind you. <kbd>return</kbd> joins and <kbd>esc</kbd> cancels.
 
-The preview counts as the confirmation, so you are never asked twice. The camera turns on only when
-the preview opens and off as soon as it closes. It uses the same camera screen as
+The preview replaces the confirmation, so you're never asked twice. The camera only turns on when
+the preview opens and turns off as soon as it closes. It's the same camera screen as
 [Open Camera](/docs/features/camera).
 
 ## The menu bar
 
-The calendar gets its **own** menu bar item, separate from the Tinycast icon. You can show either,
+The calendar has its **own** menu bar item, separate from the Tinycast icon. You can show either one,
 both or neither.
 
 | Setting                        | Options                                                                  | Default                          |
 | ------------------------------ | ------------------------------------------------------------------------ | -------------------------------- |
 | Calendar in Menu Bar           | Disabled · Meeting Icon · Meeting Title                                  | **Disabled**                     |
+| Days to Show                   | Today · Today and Tomorrow · Next 7 Days                                 | **Today and Tomorrow**           |
 | Show Upcoming Events           | Today · 2 · 5 · 10 · 30 minutes before                                   | **Today**                        |
 | Only show events with meetings | On · Off                                                                 | **On**                           |
 | Hide Current Event             | Keep visible, show time left · Automatically · After 5, 10 or 30 minutes | **Keep visible, show time left** |
 
-**Meeting Title** reads like `Standup • in 4 min`. Once nothing is left today, it reads
-**No upcoming events**. Today also counts the first 30 minutes after midnight.
+With **Meeting Title**, the item shows something like `Standup • in 4 min`. When there are no more
+events today, it shows **No upcoming events**. "Today" includes the first 30 minutes after midnight.
 
-The item's menu offers **Join** the meeting, **Open in Calendar…**, **My Schedule** and
-**Calendar Settings…**. **A plain click never joins.** Mis-clicking the menu bar should not open a
+The item's menu has **Join**, **Open in Calendar** and **Dismiss Event**. Below those, it lists your
+upcoming events by day, for the days set in **Days to Show**. A filled dot marks the meeting in
+progress. Click an event to join it; an event without a meeting link opens in Calendar. The menu ends
+with **My Schedule** (<kbd>⌘</kbd><kbd>O</kbd>) and **Calendar Settings…** (<kbd>⌘</kbd><kbd>,</kbd>).
+**Clicking the item itself never joins a meeting**, so a stray click in the menu bar can't start a
 call.
 
 Dragging the item out of the menu bar sets it to Disabled.
 
 ## Choosing calendars
 
-The **Calendars** list at the bottom of the pane has a checkbox per calendar. Holidays and Birthdays
-are the usual ones to switch off. A calendar you add later starts switched on.
+The **Calendars** list at the bottom of the pane has a checkbox for each calendar. Holidays and
+Birthdays are the ones people usually turn off. Calendars you add later are on by default.
 
 ## Backups
 
-Three settings stay out of [backups](/docs/reference/backup), because each is a consent: the
-calendar switch itself, **Auto Join Meetings** and **Camera Preview**. Your calendar checkboxes stay
-on this Mac too. The rest, like the menu bar choices, travel normally.
+Three settings are never included in [backups](/docs/reference/backup), because each one is a form
+of consent: the calendar switch itself, **Auto Join Meetings** and **Camera Preview**. Your calendar
+checkboxes also stay on this Mac. Other settings, like the menu bar options, are backed up as usual.

@@ -40,17 +40,23 @@ struct ShortcutRecorderPopover: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(height: Theme.Size.shortcutPopoverLine)
-
-            KeyCapChip(text: "esc", scale: .compact)
-                .opacity(0.7)
-                .frame(maxWidth: .infinity, alignment: .trailing)
         }
+        .offset(y: Theme.Spacing.sm + 1)
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
         .padding(placement.caretEdge == .top ? .top : .bottom, Theme.Size.calloutCaretHeight)
         .frame(
             width: Theme.Size.shortcutPopover.width, height: Theme.Size.shortcutPopover.height
         )
+        .overlay(alignment: .topLeading) {
+            KeyCapChip(text: "esc", scale: .compact)
+                .opacity(0.7)
+                .padding(.leading, Theme.Spacing.md)
+                .padding(
+                    .top,
+                    Theme.Spacing.sm
+                        + (placement.caretEdge == .top ? Theme.Size.calloutCaretHeight : 0))
+        }
         // Stock glass owns its elevation, as in `PopoverMenu` — no hand-tuned shadow.
         .glassEffect(
             .regular, in: CalloutShape(caretEdge: placement.caretEdge, caretX: placement.caretX))
@@ -60,8 +66,20 @@ struct ShortcutRecorderPopover: View {
         if let conflict = capture.conflict {
             return State(caps: conflict.binding.keycaps, label: conflict.owner, tint: .orange)
         }
+        if capture.awaitingSecondGlobe {
+            let secondPress = capture.heldGlobe
+            return State(
+                caps: secondPress ? HotKeyBinding.doubleGlobe.keycaps : HotKeyBinding.globe.keycaps,
+                label: secondPress ? "Release Globe" : "Press Globe again")
+        }
+        if capture.heldGlobe && capture.heldModifiers.isEmpty {
+            return State(caps: HotKeyBinding.globe.keycaps, label: "Release Globe")
+        }
+        let flags =
+            capture.heldGlobe
+            ? capture.heldModifiers.union(.function) : capture.heldModifiers
         let held = KeyShortcut.collapsedModifierSymbols(
-            from: capture.heldModifiers, hyperChord: KeyShortcut.displayedHyperChord())
+            from: flags, hyperChord: KeyShortcut.displayedHyperChord())
         guard held.isEmpty else { return State(caps: held, label: "Add a key") }
         return State(
             caps: [DoubleTapModifier.option.glyph, "A"], label: "Type a shortcut", isExample: true)
@@ -77,27 +95,84 @@ private struct ShortcutRecorderPopoverHost: ViewModifier {
     func body(content: Content) -> some View {
         content.overlayPreferenceValue(ShortcutRecorderAnchorKey.self) { anchor in
             GeometryReader { proxy in
-                if let anchor, hotKeys.recordingAction != nil {
-                    callout(field: proxy[anchor], in: proxy.size)
-                }
+                ShortcutRecorderPopoverLayer(
+                    placement: anchor.map { placement(field: proxy[$0], in: proxy.size) },
+                    recordingAction: hotKeys.recordingAction)
             }
             // Informational: clicks fall through to the session's mouse monitor, which closes.
             .allowsHitTesting(false)
-            .animation(.easeOut(duration: 0.14), value: hotKeys.recordingAction)
         }
     }
 
-    private func callout(field: CGRect, in size: CGSize) -> some View {
-        let placement = CalloutPlacement.resolve(
+    private func placement(field: CGRect, in size: CGSize) -> CalloutPlacement {
+        CalloutPlacement.resolve(
             field: field, container: size, size: Theme.Size.shortcutPopover,
             gap: Theme.Spacing.sm, inset: Theme.Spacing.xs,
             cornerRadius: Theme.Radius.menuPanel, caretWidth: Theme.Size.calloutCaretWidth)
+    }
+}
 
-        return ShortcutRecorderPopover(placement: placement)
-            .position(placement.center)
-            .transition(
-                .opacity.combined(
-                    with: .scale(0.96, anchor: placement.caretEdge == .bottom ? .bottom : .top)))
+/// Retains the last anchor while the callout animates away from it.
+private struct ShortcutRecorderPopoverLayer: View {
+    let placement: CalloutPlacement?
+    let recordingAction: HotKeyAction?
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var presentedPlacement: CalloutPlacement?
+    @State private var isVisible = false
+
+    var body: some View {
+        Color.clear.overlay {
+            if let presentedPlacement {
+                ShortcutRecorderPopover(placement: presentedPlacement)
+                    .scaleEffect(
+                        isVisible ? 1 : 0.5, anchor: scaleAnchor(for: presentedPlacement)
+                    )
+                    .opacity(isVisible ? 1 : 0)
+                    .position(presentedPlacement.center)
+            }
+        }
+        .onChange(of: placement, initial: true) { _, placement in
+            guard let placement, recordingAction != nil else { return }
+            present(at: placement)
+        }
+        .onChange(of: recordingAction, initial: true) { _, recordingAction in
+            if recordingAction == nil {
+                withAnimation(exitAnimation) { isVisible = false }
+            } else if let placement {
+                present(at: placement)
+            }
+        }
+        .task(id: isVisible) {
+            guard !isVisible, presentedPlacement != nil else { return }
+            if !reduceMotion {
+                try? await Task.sleep(for: .seconds(Theme.Duration.exit))
+            }
+            guard !Task.isCancelled, !isVisible else { return }
+            presentedPlacement = nil
+        }
+    }
+
+    private var entryAnimation: Animation? {
+        reduceMotion ? nil : .easeOut(duration: Theme.Duration.enter)
+    }
+
+    private var exitAnimation: Animation? {
+        reduceMotion ? nil : .easeIn(duration: Theme.Duration.exit)
+    }
+
+    private func present(at placement: CalloutPlacement) {
+        presentedPlacement = placement
+        guard !isVisible else { return }
+        Task { @MainActor in
+            await Task.yield()
+            guard recordingAction != nil, presentedPlacement == placement else { return }
+            withAnimation(entryAnimation) { isVisible = true }
+        }
+    }
+
+    private func scaleAnchor(for placement: CalloutPlacement) -> UnitPoint {
+        placement.caretEdge == .bottom ? .bottom : .top
     }
 }
 

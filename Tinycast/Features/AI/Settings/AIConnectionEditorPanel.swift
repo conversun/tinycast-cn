@@ -66,8 +66,8 @@ struct AIConnectionEditorPanel: View {
                         .settingsEditorTextField()
                     }
                     editorField("API Key") {
-                        SecureField(
-                            "API Key", text: $key, prompt: Text(apiKeyPlaceholder.localizedUI)
+                        RevealableSecureField(
+                            title: "API Key", text: $key, prompt: Text(apiKeyPlaceholder.localizedUI)
                         )
                         .settingsEditorTextField()
                     }

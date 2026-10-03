@@ -2,10 +2,17 @@ import Foundation
 
 /// Reused across calls: building one costs ~160 µs against ~0.5 µs to reuse it.
 enum CalcDateFormatters {
+    private enum Layout: Hashable {
+        case pattern(String)
+        case template(String)
+    }
+
     private struct Key: Hashable {
-        let pattern: String
+        let layout: Layout
         let zone: String
         let locale: String
+        /// Not part of `locale.identifier`, so the 24-hour switch would otherwise hit a stale formatter.
+        let hourCycle: Locale.HourCycle
         let calendar: Calendar.Identifier
     }
 
@@ -14,10 +21,21 @@ enum CalcDateFormatters {
     nonisolated(unsafe) private static var cache: [Key: DateFormatter] = [:]
 
     static func string(from date: Date, calendar: Calendar, zone: TimeZone, pattern: String) -> String {
+        string(from: date, calendar: calendar, zone: zone, layout: .pattern(pattern))
+    }
+
+    /// For clock times: a `j` lets the locale and the 24-hour switch choose between `h a` and `HH`.
+    static func string(from date: Date, calendar: Calendar, zone: TimeZone, template: String) -> String {
+        string(from: date, calendar: calendar, zone: zone, layout: .template(template))
+    }
+
+    private static func string(
+        from date: Date, calendar: Calendar, zone: TimeZone, layout: Layout
+    ) -> String {
         let locale = calendar.locale ?? Locale(identifier: "en_US")
         let key = Key(
-            pattern: pattern, zone: zone.identifier, locale: locale.identifier,
-            calendar: calendar.identifier)
+            layout: layout, zone: zone.identifier, locale: locale.identifier,
+            hourCycle: locale.hourCycle, calendar: calendar.identifier)
 
         lock.lock()
         defer { lock.unlock() }
@@ -28,7 +46,13 @@ enum CalcDateFormatters {
         formatter.timeZone = zone
         // Follow the injected calendar's locale so weekday/month names match the user's language.
         formatter.locale = locale
-        formatter.dateFormat = pattern
+        switch layout {
+        case .pattern(let pattern): formatter.dateFormat = pattern
+        case .template(let template):
+            formatter.setLocalizedDateFormatFromTemplate(template)
+            // ICU puts U+202F before AM/PM; a plain space keeps a pasted answer plain text.
+            formatter.dateFormat = formatter.dateFormat.replacing("\u{202F}", with: " ")
+        }
         // A zone table plus a few patterns, so the ceiling is bounded by what the grammars format.
         if cache.count >= 64 { cache.removeAll(keepingCapacity: true) }
         cache[key] = formatter

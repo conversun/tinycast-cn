@@ -48,4 +48,15 @@ struct EmojiGridGeometry {
     static func selectionAfterRemovingPin(at index: Int, remainingCount: Int) -> Int {
         min(max(index, 0), max(remainingCount - 1, 0))
     }
+
+    /// Follow the selected glyph through a rewritten section, clamping when it drops out.
+    static func selection(
+        _ sel: Int, afterSectionAt start: Int, changesFrom old: [String], to new: [String]
+    ) -> Int {
+        guard sel >= start else { return sel }
+        let offset = sel - start
+        guard offset < old.count else { return sel + new.count - old.count }
+        if let moved = new.firstIndex(of: old[offset]) { return start + moved }
+        return start + min(offset, max(new.count - 1, 0))
+    }
 }

@@ -12,10 +12,12 @@ enum HotKeyAction: Hashable, Sendable {
     case systemAction(id: SystemAction.ID)
     case windowCommand(id: WindowCommand.ID)
     case windowLayout(id: UUID)
+    case windowRoom(id: UUID)
     case customWindowSize(id: UUID)
     case quicklink(id: UUID)
     case quickAction(id: UUID)
     case appleShortcut(id: UUID)
+    case snippet(id: StoredSnippet.ID)
     /// Keyed by `AppEntry.id`, which is what survives a reinstall of the extension.
     case extensionCommand(entryID: String)
 
@@ -30,11 +32,13 @@ enum HotKeyAction: Hashable, Sendable {
         case .systemAction(let id): "hotkey.systemAction." + id.rawValue
         case .windowCommand(let id): "hotkey.windowCommand." + id.rawValue
         case .windowLayout(let id): "hotkey.windowLayout." + id.uuidString.lowercased()
+        case .windowRoom(let id): "hotkey.windowRoom." + id.uuidString.lowercased()
         case .customWindowSize(let id):
             "hotkey.customWindowSize." + id.uuidString.lowercased()
         case .quicklink(let id): "hotkey.quicklink." + id.uuidString.lowercased()
         case .quickAction(let id): "hotkey.quickAction." + id.uuidString.lowercased()
         case .appleShortcut(let id): "hotkey.appleShortcut." + id.uuidString.lowercased()
+        case .snippet(let id): "hotkey.snippet." + id
         case .extensionCommand(let entryID): "hotkey.extensionCommand." + entryID
         }
     }

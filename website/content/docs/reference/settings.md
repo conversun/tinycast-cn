@@ -1,14 +1,14 @@
 ---
 title: Settings
-description: Every Settings pane, what it holds, and its defaults.
+description: Every Settings pane, what's in it, and the defaults.
 ---
 
-Open Settings with <kbd>⌘</kbd><kbd>,</kbd> from the palette, the **Settings** command, or the menu bar
-icon. It is a normal, resizable window.
+Open Settings with <kbd>⌘</kbd><kbd>,</kbd> from the palette, the **Settings** command or the menu
+bar icon. It's a regular, resizable window.
 
-**The search field finds any setting by name**, and also by words that are not in its title: `ocr`
-finds **Search text in images and PDFs**, and `caps lock` finds **Hyper Key**. Picking a result jumps
-straight to that row.
+**The search field finds any setting by name**, and also by related words that aren't in its title:
+`ocr` finds **Search text in images and PDFs**, and `caps lock` finds **Hyper Key**. Choosing a
+result takes you straight to that setting.
 
 There are 21 panes in four groups.
 
@@ -22,7 +22,7 @@ There are 21 panes in four groups.
 
 | Setting                           | Options                                                                       | Default                           |
 | --------------------------------- | ----------------------------------------------------------------------------- | --------------------------------- |
-| Learned ranking                   | **Reset…** clears everything learned                                          | —                                 |
+| Learned ranking                   | **Reset…** clears all learned ranking                                         |                                   |
 | Hyper Key                         | None · Caps Lock · Right Control · Right Shift · Right Option · Right Command | **None**                          |
 | Quick Press                       | Does Nothing · the original key · Trigger Escape                              | **Does Nothing**                  |
 | Include Shift (⇧)                 | On · Off                                                                      | **On**                            |
@@ -44,12 +44,12 @@ See [The palette](/docs/palette), [Learned ranking](/docs/launcher#learned-ranki
 
 ### Permissions
 
-Shows whether **Accessibility** and **Calendars** are granted, and opens the right System Settings
-pane. See [Permissions](/docs/permissions).
+Shows whether **Accessibility** and **Calendars** access is granted, and opens the right System
+Settings pane. See [Permissions](/docs/permissions).
 
 ## Launcher
 
-| Pane            | What is in it                                                                                                   |
+| Pane            | What's in it                                                                                                    |
 | --------------- | --------------------------------------------------------------------------------------------------------------- |
 | Applications    | [Search Scopes](/docs/launcher#search-scopes), **Enable Applications**, and a row per app                       |
 | System Settings | **Enable System Settings**, and a row per pane                                                                  |
@@ -58,29 +58,29 @@ pane. See [Permissions](/docs/permissions).
 | Quicklinks      | [Quicklinks](/docs/launcher/quicklinks) switch, its commands, behavior, import and export                       |
 | Fallbacks       | Which [fallbacks](/docs/launcher/fallbacks) show under a search, and their order                                |
 
-A row usually has a launcher checkbox, a shortcut recorder and an [alias](/docs/launcher/aliases)
+Most rows have a launcher checkbox, a shortcut recorder and an [alias](/docs/launcher/aliases)
 field. Long lists have a filter field.
 
-The **Enable …** switch at the top of a pane turns off every row **and** every shortcut in it. A row's
-checkbox only hides that row from search.
+The **Enable …** switch at the top of a pane turns off every row **and** every shortcut in it. A
+row's checkbox only hides that row from search.
 
 ## Features
 
-Everything here ships **off**, except Clipboard and Emoji & Symbols.
+Everything here is **off** by default, except Clipboard and Emoji & Symbols.
 
-| Pane                                                  | Switch                            | Other settings                                                                                                                                                                                                                                |
-| ----------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [AI](/docs/ai)                                        | Enable AI                         | Providers, Default model, Reasoning effort, Web search, Opens to, Start a new conversation after, Keep conversations, System prompt, [MCP servers](/docs/ai/mcp), AI commands                                                                 |
-| [Quick Actions](/docs/ai/quick-actions)               | Enable Quick Actions              | Actions (Replace or Preview, shortcut, prompt, model), Add Quick Action, Model, Translate to                                                                                                                                                  |
-| [File Search](/docs/features/file-search)             | Enable File Search                | Commands, Search Scopes, Ignore Patterns                                                                                                                                                                                                      |
-| [Notes](/docs/features/notes)                         | Enable Notes                      | Notes commands                                                                                                                                                                                                                                |
-| [Snippets](/docs/features/snippets)                   | Enable snippets                   | Show in launcher, snippet commands, New Snippet, Snippets Folder                                                                                                                                                                              |
-| [Navigation](/docs/features/navigation)               | Enable navigation                 | Commands, Show Apple menu items (**Off**), Disabled Applications                                                                                                                                                                              |
-| [Window Management](/docs/features/window-management) | Enable window management          | Show in launcher, Cycling (**None**), Gap between windows (**0**), window commands, [Window Layouts](/docs/features/window-layouts)                                                                                                           |
-| [Clipboard](/docs/features/clipboard)                 | Enable Clipboard History (**On**) | Clipboard commands, Keep history for (**3 Months**), Search text in images and PDFs (**Off**), Default action (**Paste**), Disabled Applications, Clear history                                                                               |
-| [Emoji & Symbols](/docs/features/emoji)               | _(always on)_                     | Emoji commands, Emoji Skin Tone (**Default**)                                                                                                                                                                                                 |
-| [Calendar](/docs/features/calendar)                   | Join meetings from Tinycast       | Show in launcher, Upcoming meetings in launcher (**5 next**), Include Tomorrow's Events (**On**), Show the join card (**5 minutes**), Auto Join Meetings (**Off**), Camera Preview (**Off**), menu bar settings, Calendar commands, Calendars |
-| [Extensions](/docs/extensions)                        | Enable extensions                 | Show in launcher, Compatibility, installed extensions, Install, Registries, Package manager, Storage                                                                                                                                          |
+| Pane                                                  | Switch                            | Other settings                                                                                                                                                                                                                                   |
+| ----------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [AI](/docs/ai)                                        | Enable AI                         | Providers, Default model, Reasoning effort, Web search, Tool call rounds, Opens to, Start a new conversation after, Keep conversations, System prompt, [MCP servers](/docs/ai/mcp), AI commands                                                  |
+| [Quick Actions](/docs/ai/quick-actions)               | Enable Quick Actions              | Actions (Replace or Preview, shortcut, prompt, model), Add Quick Action, Model, Translate to                                                                                                                                                     |
+| [File Search](/docs/features/file-search)             | Enable File Search                | Commands, Search Scopes, Ignore Patterns                                                                                                                                                                                                         |
+| [Notes](/docs/features/notes)                         | Enable Notes                      | Notes commands                                                                                                                                                                                                                                   |
+| [Snippets](/docs/features/snippets)                   | Enable snippets                   | Show in launcher, snippet commands, New Snippet, Snippets Folder                                                                                                                                                                                 |
+| [Navigation](/docs/features/navigation)               | Enable navigation                 | Commands, Show Apple menu items (**Off**), Disabled Applications                                                                                                                                                                                 |
+| [Window Management](/docs/features/window-management) | Enable window management          | Show in launcher, Cycling (**None**), Gap between windows (**0**), window commands, [Window Layouts](/docs/features/window-layouts), [Rooms](/docs/features/rooms)                                                                               |
+| [Clipboard](/docs/features/clipboard)                 | Enable Clipboard History (**On**) | Clipboard commands, Keep history for (**3 Months**), Search text in images and PDFs (**Off**), Default action (**Paste**), Disabled Applications, Clear history                                                                                  |
+| [Emoji & Symbols](/docs/features/emoji)               | _(always on)_                     | Emoji commands, Emoji Skin Tone (**Default**)                                                                                                                                                                                                    |
+| [Calendar](/docs/features/calendar)                   | Join meetings from Tinycast       | Show in launcher, Upcoming meetings in launcher (**5 next**), Days to Show (**Today and Tomorrow**), Show the join card (**5 minutes**), Auto Join Meetings (**Off**), Camera Preview (**Off**), menu bar settings, Calendar commands, Calendars |
+| [Extensions](/docs/extensions)                        | Enable extensions                 | Show in launcher, Compatibility, installed extensions, Install, Registries, Package manager, Storage                                                                                                                                             |
 
 ## Advanced
 

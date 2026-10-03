@@ -27,6 +27,8 @@ struct MCPTests {
         trustDecidesFromStandingAndChatGrants()
         addressingTakesOnlyAKnownHandle()
         settingsPersistAndKeepHandlesApart()
+        serversBecomeWhatACLICanRunItself()
+        onlyOneCopyOfALocalServerRuns()
 
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
@@ -236,5 +238,92 @@ struct MCPTests {
 
         store.remove(id: edited.id)
         expect(store.servers.count == 1, "removal takes exactly one")
+    }
+
+    /// The same servers, shaped for the routes whose own client runs them.
+    static func serversBecomeWhatACLICanRunItself() {
+        var remote = MCPServer(
+            name: "Linear", slug: "linear",
+            transport: .http(url: "https://mcp.linear.app/mcp", headerName: "Authorization"))
+        remote.oauth = true
+        expect(
+            remote.toolServer(headerValue: "", environment: [:], bearerToken: "tok-9")?.transport
+                == .url(
+                    "https://mcp.linear.app/mcp", headerName: "Authorization",
+                    headerValue: "Bearer tok-9"),
+            "an OAuth server lends the session's token as the header Tinycast itself would send")
+        expect(
+            remote.toolServer(headerValue: "", environment: [:], bearerToken: nil) == nil,
+            "and an OAuth server nobody is signed into is not offered at all")
+        var switched = MCPServer(
+            name: "Switched", slug: "switched",
+            transport: .http(url: "https://switched.example/mcp", headerName: "X-Api-Key"))
+        switched.oauth = true
+        expect(
+            switched.toolServer(headerValue: "stale", environment: [:], bearerToken: "tok-1")?
+                .transport
+                == .url(
+                    "https://switched.example/mcp", headerName: "Authorization",
+                    headerValue: "Bearer tok-1"),
+            "a lent token always goes as Authorization, never under a header name left from before")
+
+        let open = MCPServer(
+            name: "Open", slug: "open",
+            transport: .http(url: "https://open.example/mcp", headerName: "Authorization"))
+        expect(
+            open.toolServer(headerValue: "", environment: [:], bearerToken: nil)?.transport
+                == .url("https://open.example/mcp", headerName: "Authorization", headerValue: ""),
+            "a server that needs no credential is still offered, with no header to send")
+
+        let header = MCPServer(
+            name: "Notes", slug: "notes",
+            transport: .http(url: "https://notes.example/mcp", headerName: " X-Api-Key "))
+        expect(
+            header.toolServer(headerValue: "k1", environment: [:], bearerToken: nil)?.transport
+                == .url("https://notes.example/mcp", headerName: "X-Api-Key", headerValue: "k1"),
+            "a header-authenticated server carries its own name and value, trimmed")
+
+        let local = MCPServer(
+            name: "Files", slug: "files",
+            transport: .stdio(
+                command: "/bin/node", arguments: ["s.js"], environmentKeys: ["API_KEY"]))
+        expect(
+            local.toolServer(
+                headerValue: "", environment: ["API_KEY": "s3cret", "OTHER": "x"],
+                bearerToken: nil)?
+                .transport
+                == .command(
+                    path: "/bin/node", arguments: ["s.js"], environment: ["API_KEY": "s3cret"]),
+            "a local server takes only the variables it declared, never the whole secret item")
+        expect(
+            local.toolServer(headerValue: "", environment: [:], bearerToken: nil)?.title == "Files",
+            "and both kinds keep the handle and title a transcript row is written from")
+        expect(
+            MCPServer(
+                name: "Empty", slug: "empty",
+                transport: .stdio(
+                    command: "", arguments: [], environmentKeys: [])
+            )
+            .toolServer(headerValue: "", environment: [:], bearerToken: nil) == nil,
+            "a server with no command is nothing a CLI could start")
+    }
+
+    /// Codex and Claude start their own copy of a local server; Tinycast's would be the second.
+    static func onlyOneCopyOfALocalServerRuns() {
+        let local = MCPServer(
+            name: "Files", slug: "files",
+            transport: .stdio(command: "/bin/node", arguments: [], environmentKeys: []))
+        let remote = MCPServer(
+            name: "Linear", slug: "linear",
+            transport: .http(url: "https://mcp.linear.app/mcp", headerName: "Authorization"))
+        expect(
+            local.runsInTinycast(whileCLIRouteSelected: false),
+            "on an API route Tinycast runs a local server, since it is the one calling it")
+        expect(
+            !local.runsInTinycast(whileCLIRouteSelected: true),
+            "on Codex or Claude it leaves the local server to the CLI's own copy")
+        expect(
+            remote.runsInTinycast(whileCLIRouteSelected: true),
+            "while a remote one stays connected: a session, no process, and a live status row")
     }
 }

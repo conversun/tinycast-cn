@@ -12,10 +12,12 @@ struct ClipboardScreen: PaletteScreen {
 
     var rows: [ClipboardItem] { store.search(vm.query, filter: vm.clipboardFilter) }
 
+    var landingSelection: Int { store.landingIndex(in: vm.query, filter: vm.clipboardFilter) }
+
     var primaryActionTitle: String {
-        core.settings.clipboardDefaultAction == .copy
-            ? ClipboardDefaultAction.copy.title
-            : vm.pasteTarget?.pasteTitle ?? ClipboardDefaultAction.paste.title
+        let defaultAction = core.settings.clipboardDefaultAction
+        let action = item(at: vm.selection).flatMap { defaultAction.action(for: .return, on: $0) }
+        return (action ?? defaultAction).title(pastingInto: vm.pasteTarget)
     }
 
     private func item(at selection: Int) -> ClipboardItem? {
@@ -44,6 +46,10 @@ struct ClipboardScreen: PaletteScreen {
             return true
         case .pin: return pin(at: selection)
         case .favoriteSlot(let index): return activatePinned(at: index)
+        case .copyText:
+            guard let item = item(at: selection), item.offersTextExtraction else { return false }
+            core.clipboardCoordinator.copyImageText(item)
+            return true
         default: return false
         }
     }
@@ -60,8 +66,13 @@ struct ClipboardScreen: PaletteScreen {
     /// ⌘↵ — the action ↵ is not set to.
     func secondary(at selection: Int) -> Bool {
         guard let item = item(at: selection) else { return false }
-        core.clipboardCoordinator.activate(item, inverted: true)
-        return true
+        return core.clipboardCoordinator.activate(item, chord: .command)
+    }
+
+    /// ⌃⌘↵ — Paste as Plain Text, or Paste while that is the default.
+    func tertiary(at selection: Int) -> Bool {
+        guard let item = item(at: selection) else { return false }
+        return core.clipboardCoordinator.activate(item, chord: .controlCommand)
     }
 
     /// ⌥↵ — the palette stays up, so a run of entries goes over without re-summoning it.
@@ -133,7 +144,7 @@ struct ClipboardScreen: PaletteScreen {
                         openActions()
                     },
                     onDragPayload: { core.clipboardCoordinator.dragPayload(for: $0) },
-                    onDropped: { core.clipboardCoordinator.clipDropped() }
+                    onDropped: { core.paletteCoordinator.dragLanded() }
                 )
                 .frame(width: metrics.size.clipboardListWidth)
                 Rectangle()
@@ -157,28 +168,25 @@ enum ClipboardActionsMenu {
     static func content(
         item: ClipboardItem, core: AppCore, store: ClipboardStore, target: PasteTarget?
     ) -> PopoverMenuContent {
-        let copyFirst = core.settings.clipboardDefaultAction == .copy
-        let pasteItem = PopoverMenuItem(
-            title: target?.pasteTitle ?? ClipboardDefaultAction.paste.title,
-            icon: .paste(target, fallback: "doc.on.clipboard"), shortcut: copyFirst ? "⌘↵" : "↵"
-        ) {
-            core.clipboardCoordinator.paste(item)
-        }
-        let copyItem = PopoverMenuItem(
-            title: ClipboardDefaultAction.copy.title, systemImage: "doc.on.doc",
-            shortcut: copyFirst ? "↵" : "⌘↵"
-        ) {
-            core.clipboardCoordinator.copyToClipboard(item)
-        }
-        var items: [PopoverMenuItem] =
-            (copyFirst ? [copyItem, pasteItem] : [pasteItem, copyItem]) + [
+        let defaultAction = core.settings.clipboardDefaultAction
+        // Chord order puts the default first, beside the ↵ it answers.
+        var items: [PopoverMenuItem] = ClipboardChord.allCases.compactMap { chord in
+            defaultAction.action(for: chord, on: item).map { action in
                 PopoverMenuItem(
-                    title: "Paste and Keep Window Open", icon: .paste(target, fallback: "macwindow"),
-                    shortcut: "⌥↵"
+                    title: action.title(pastingInto: target), icon: icon(for: action, target: target),
+                    shortcut: chord.label
                 ) {
-                    core.clipboardCoordinator.pasteKeepingWindowOpen(item)
+                    core.clipboardCoordinator.perform(action, on: item)
                 }
-            ]
+            }
+        }
+        items.append(
+            PopoverMenuItem(
+                title: "Paste and Keep Window Open", icon: .paste(target, fallback: "macwindow"),
+                shortcut: "⌥↵"
+            ) {
+                core.clipboardCoordinator.pasteKeepingWindowOpen(item)
+            })
         if item.isPinned {
             items.append(
                 PopoverMenuItem(
@@ -194,9 +202,21 @@ enum ClipboardActionsMenu {
                     core.clipboardCoordinator.togglePinnedClip(item)
                 })
         }
+        if item.offersTextExtraction {
+            items.append(
+                PopoverMenuItem(
+                    title: "Copy Text", systemImage: "doc.text.viewfinder",
+                    startsSection: true, shortcut: "⇧⌘T"
+                ) {
+                    core.clipboardCoordinator.copyImageText(item)
+                })
+        }
         if item.kind == .image || item.kind == .file {
             items.append(
-                PopoverMenuItem(title: "Show in Finder", systemImage: "folder", startsSection: true) {
+                PopoverMenuItem(
+                    title: "Show in Finder", systemImage: "folder",
+                    startsSection: !item.offersTextExtraction
+                ) {
                     core.clipboardCoordinator.revealClip(item)
                 })
         }
@@ -227,6 +247,16 @@ enum ClipboardActionsMenu {
         return PopoverMenuContent(header: headerText(item), items: items)
     }
 
+    private static func icon(
+        for action: ClipboardDefaultAction, target: PasteTarget?
+    ) -> PopoverMenuIcon {
+        switch action {
+        case .paste: .paste(target, fallback: "doc.on.clipboard")
+        case .copy: .symbol("doc.on.doc")
+        case .pastePlainText: .paste(target, fallback: "doc.plaintext")
+        }
+    }
+
     private static func headerText(_ item: ClipboardItem) -> String {
         switch item.kind {
         case .text:
@@ -237,5 +267,13 @@ enum ClipboardActionsMenu {
         case .image: return "Image"
         case .file: return (item.filePath as NSString?)?.lastPathComponent ?? "File"
         }
+    }
+}
+
+extension ClipboardDefaultAction {
+    /// A paste names the app it lands in, in the footer pill and the ⌘K menu alike.
+    func title(pastingInto target: PasteTarget?) -> String {
+        guard let target, self != .copy else { return title }
+        return "\(title) to \(target.name)"
     }
 }

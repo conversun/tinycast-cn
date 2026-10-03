@@ -1,23 +1,26 @@
 import Foundation
 
-/// A route that can call tools: it re-streams the turn until the model stops asking, under a cap.
+/// A route that can call tools: it re-streams the turn until the model stops or a cap ends it.
 struct AIToolLoopProvider: AIProvider {
     private let base: any AIProvider
     private let tools: [AITool]
     private let invoke: @Sendable (AIToolCall) async -> AIToolResult
 
-    /// A model that keeps calling has stopped answering; ten rounds is where the turn fails.
-    static let maxRounds = 10
+    /// A model that keeps calling has stopped answering; this many rounds is where the turn fails.
+    private let maxRounds: Int?
     static let maxResultBytes = 32_768
     /// Results bypass `boundedContext`, so the turn carries its own ceiling for what they add.
     static let maxTurnResultBytes = 131_072
+    /// Each round resends the whole turn, so with no round cap its growth has to end somewhere.
+    static let maxTurnHistoryBytes = 1_048_576
 
     init(
-        base: any AIProvider, tools: [AITool],
+        base: any AIProvider, tools: [AITool], maxRounds: Int?,
         invoke: @escaping @Sendable (AIToolCall) async -> AIToolResult
     ) {
         self.base = base
         self.tools = tools
+        self.maxRounds = maxRounds
         self.invoke = invoke
     }
 
@@ -42,7 +45,10 @@ struct AIToolLoopProvider: AIProvider {
     ) async throws {
         var messages = request.messages
         var spent = 0
-        for _ in 0..<Self.maxRounds {
+        var carried = 0
+        var rounds = 0
+        while maxRounds.map({ rounds < $0 }) ?? (carried < Self.maxTurnHistoryBytes) {
+            rounds += 1
             let round = try await streamRound(
                 request.continuing(with: messages, tools: tools), into: continuation)
             guard !round.calls.isEmpty else {
@@ -51,6 +57,7 @@ struct AIToolLoopProvider: AIProvider {
             }
             messages.append(
                 AIMessage(role: .assistant, text: round.text, toolCalls: round.calls))
+            carried += round.text.utf8.count + round.calls.reduce(0) { $0 + $1.arguments.utf8.count }
             for call in round.calls {
                 try Task.checkCancellation()
                 let tool = tools.first { $0.name == call.name }
@@ -59,11 +66,11 @@ struct AIToolLoopProvider: AIProvider {
                         id: call.id, origin: tool?.origin ?? "", title: tool?.title ?? call.name))
                 let result = await bounded(invoke(call), spent: &spent)
                 continuation.yield(.toolResult(id: call.id, isError: result.isError))
+                carried += result.content.utf8.count
                 messages.append(AIMessage(role: .tool, text: "", toolResult: result))
             }
         }
-        throw AIProviderError.responseFailed(
-            "Stopped after \(Self.maxRounds) rounds of tool calls.")
+        throw AIProviderError.responseFailed("Stopped after \(rounds) rounds of tool calls.")
     }
 
     /// One pass over the base route: text flows straight to the transcript, calls are collected.

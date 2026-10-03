@@ -173,13 +173,17 @@
   --text-heading--letter-spacing: -0.03em;
   --text-heading--font-weight: 600;
 
-  /* The hero palette scales with the viewport, so it reads like the real app.
-     Capped near the app's own 17px query and 13.5px rows: it sits in the
-     hero's right column, so it never gets the full page width to grow into. */
-  --text-demo-query: clamp(1rem, 0.9rem + 0.45vw, 1.125rem);
+  /* The hero palette at the app's own text styles, one point to one pixel. */
+  --text-demo-query: 1.25rem; /* 20px — the search field */
   --text-demo-query--line-height: 1.3;
-  --text-demo-row: clamp(0.8125rem, 0.78rem + 0.16vw, 0.875rem);
+  --text-demo-row: 0.8125rem; /* 13px — body: row titles */
   --text-demo-row--line-height: 1.4;
+  --text-demo-callout: 0.75rem; /* 12px — kind labels, the action bar */
+  --text-demo-callout--line-height: 1.3;
+  --text-demo-section: 0.6875rem; /* 11px — subheadline: section headers */
+  --text-demo-section--line-height: 1.3;
+  --text-demo-key: 0.625rem; /* 10px — caption: keycaps */
+  --text-demo-key--line-height: 1;
 
   /* The ethos pull quote, set in the serif. */
   --text-quote: clamp(2rem, 1.2rem + 2.8vw, 3.6rem); /* 32→58px */
@@ -314,21 +318,16 @@
 /* Brand surfaces — the only places colour blooms. Kept in CSS so the
    gradients derive from the brand color tokens above. */
 @layer components {
-  /* A ruled grid that fades out from the top, so the hero has texture without
-     noise. Tint-based, so the lines are ink on Light and light on Dark. */
+  /* A dot grid that fades out from the top, so the hero has texture without
+     noise. Tint-based, so the dots are ink on Light and light on Dark. */
   .bg-grid {
-    background-image:
-      linear-gradient(
-        to right,
-        rgb(var(--tc-tint) / 0.045) 1px,
-        transparent 1px
-      ),
-      linear-gradient(
-        to bottom,
-        rgb(var(--tc-tint) / 0.045) 1px,
-        transparent 1px
-      );
-    background-size: 48px 48px;
+    background-image: radial-gradient(
+      circle,
+      rgb(var(--tc-tint) / 0.14) 1px,
+      transparent 1.5px
+    );
+    background-size: 24px 24px;
+    background-position: center top;
     mask-image: radial-gradient(
       ellipse 70% 60% at 50% 0%,
       #000 30%,
@@ -399,15 +398,17 @@
     --glass-rim-far: rgb(255 255 255 / 0.5);
     --glass-shadow: rgb(0 0 0 / 0.2);
     --glass-grain: 0.09;
-    --glass-chip: rgb(0 0 0 / 0.06);
-    --glass-chip-soft: rgb(0 0 0 / 0.03);
-    --glass-key-border: rgb(0 0 0 / 0.14);
+    --glass-selection: rgb(0 0 0 / 0.09);
+    --glass-border: rgb(0 0 0 / 0.18);
+    --glass-control: rgb(255 255 255 / 0.45);
+    --glass-control-rim: rgb(255 255 255 / 0.8);
     --glass-fg: #1d1d1f;
-    --glass-fg-muted: rgb(29 29 31 / 0.62);
-    --glass-fg-subtle: rgb(29 29 31 / 0.42);
+    --glass-fg-muted: rgb(29 29 31 / 0.6);
     position: relative;
     isolation: isolate;
     overflow: hidden;
+    /* SF Pro wherever the visitor has it, as the app is set in it. */
+    font-family: -apple-system, BlinkMacSystemFont, var(--font-sans);
     background:
       radial-gradient(120% 90% at 0% 0%, var(--glass-glint), transparent 55%),
       linear-gradient(180deg, var(--glass-sheen), transparent 38%),
@@ -432,12 +433,12 @@
     --glass-rim-far: rgb(255 255 255 / 0.1);
     --glass-shadow: rgb(0 0 0 / 0.75);
     --glass-grain: 0.14;
-    --glass-chip: rgb(255 255 255 / 0.09);
-    --glass-chip-soft: rgb(255 255 255 / 0.045);
-    --glass-key-border: rgb(255 255 255 / 0.2);
+    --glass-selection: rgb(255 255 255 / 0.1);
+    --glass-border: rgb(255 255 255 / 0.2);
+    --glass-control: rgb(255 255 255 / 0.05);
+    --glass-control-rim: rgb(255 255 255 / 0.14);
     --glass-fg: #f5f5f7;
-    --glass-fg-muted: rgb(245 245 247 / 0.62);
-    --glass-fg-subtle: rgb(245 245 247 / 0.42);
+    --glass-fg-muted: rgb(245 245 247 / 0.6);
   }
 
   /* The frost: a fine grain inside the glass, as the real material has. */
@@ -472,11 +473,32 @@
     pointer-events: none;
   }
 
-  .glass-chip {
-    background-color: var(--glass-chip);
+  /* The footer's floating controls: clear glass over the rows passing under it. */
+  .glass-control {
+    background-color: var(--glass-control);
+    backdrop-filter: blur(12px) saturate(1.6);
     box-shadow:
       inset 0 1px 0 var(--glass-edge-top),
-      inset 0 0 0 1px var(--glass-edge-ring);
+      inset 0 0 0 1px var(--glass-control-rim),
+      0 1px 4px rgb(0 0 0 / 0.12);
+  }
+
+  /* The app's edge dissolve at rest: an 80px band, a quarter strength midway. */
+  .glass-dissolve {
+    mask-image: linear-gradient(
+      to bottom,
+      #000 calc(100% - 80px),
+      rgb(0 0 0 / 0.25) calc(100% - 40px),
+      transparent
+    );
+  }
+
+  /* An app icon's own depth: lit along its top, sitting a hair off the glass. */
+  .glass-app-icon {
+    box-shadow:
+      inset 0 0.5px 0 rgb(255 255 255 / 0.35),
+      inset 0 0 0 0.5px rgb(255 255 255 / 0.1),
+      0 0.5px 1.5px rgb(0 0 0 / 0.3);
   }
 
   /* A keyboard key. One complete rule rather than a stack of utilities: the

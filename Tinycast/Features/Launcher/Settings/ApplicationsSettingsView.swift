@@ -3,7 +3,9 @@ import SwiftUI
 struct ApplicationsSettingsView: View {
     var body: some View {
         Form {
-            // Scopes first: they decide what gets indexed, so they read before the results.
+            LauncherCategorySwitchSection(
+                kind: .application, anchor: .applicationsApplications)
+
             SearchScopesSection()
 
             LauncherItemsSection(
@@ -15,4 +17,5 @@ struct ApplicationsSettingsView: View {
         .settingsScrollTarget(.applications)
         .releasesFocusOnOutsideClick()
     }
+
 }

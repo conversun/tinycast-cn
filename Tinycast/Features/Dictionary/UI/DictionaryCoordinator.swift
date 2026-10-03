@@ -11,7 +11,7 @@ final class DictionaryCoordinator {
 
     /// `term` is the fallback row's query, so the screen opens already showing its entry.
     func show(term: String = "") {
-        paletteCoordinator.showPalette(mode: .dictionary, seeding: term.isEmpty ? nil : term)
+        paletteCoordinator.togglePalette(mode: .dictionary, seeding: term.isEmpty ? nil : term)
     }
 
     func copy(_ entry: DictionaryEntry) {

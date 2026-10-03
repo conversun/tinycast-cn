@@ -1,6 +1,6 @@
 import Foundation
 
-/// Turns a listing into an installed extension, in a workspace removed whichever way this ends.
+/// Installs from the store or from GitHub source, in a workspace removed whichever way this ends.
 struct ExtensionInstaller: Sendable {
     /// An install can take minutes from source, and silence for that long reads as a hang.
     enum Progress: Sendable, Equatable {
@@ -29,37 +29,49 @@ struct ExtensionInstaller: Sendable {
     let additionalSearchPaths: [String]
 
     init(
-        client: ExtensionStoreClient = ExtensionStoreClient(), packageManager: ExtensionPackageManager,
-        additionalSearchPaths: [String] = []
+        client: ExtensionStoreClient = ExtensionStoreClient(),
+        packageManager: ExtensionPackageManager = .automatic, additionalSearchPaths: [String] = []
     ) {
         self.client = client
         self.packageManager = packageManager
         self.additionalSearchPaths = additionalSearchPaths
     }
 
-    /// Copies into place before the workspace goes, so it hands back the install.
     @discardableResult
     func install(
         _ listing: ExtensionListing, onProgress: @Sendable @escaping (Progress) -> Void
+    ) async throws -> InstalledExtension {
+        try await inWorkspace(onProgress: onProgress) { workspace in
+            onProgress(.downloading)
+            return try await preparePrebuilt(from: listing.downloadURL, in: workspace)
+        }
+    }
+
+    /// Only the build is copied out; the source and its dependencies go with the workspace.
+    @discardableResult
+    func install(
+        _ source: ExtensionGitHubSource, onProgress: @Sendable @escaping (Progress) -> Void
+    ) async throws -> InstalledExtension {
+        try await inWorkspace(onProgress: onProgress) { workspace in
+            onProgress(.downloading)
+            let checkout = workspace.appendingPathComponent("source", isDirectory: true)
+            try await client.downloadFolder(source, to: checkout)
+            return try await build(
+                at: try validated(checkout),
+                into: workspace.appendingPathComponent("build", isDirectory: true),
+                onProgress: onProgress)
+        }
+    }
+
+    /// Copies into place before the workspace goes, so it hands back the install.
+    private func inWorkspace(
+        onProgress: (Progress) -> Void, prepare: (URL) async throws -> URL
     ) async throws -> InstalledExtension {
         let workspace = ExtensionCleanup.workspace(in: FileManager.default.temporaryDirectory)
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workspace) }
 
-        let prepared: URL
-        switch listing.source {
-        case .prebuiltZip(let url):
-            onProgress(.downloading)
-            prepared = try await preparePrebuilt(from: url, in: workspace)
-        case .githubFolder(let owner, let repository, let path, let ref):
-            onProgress(.downloading)
-            let source = workspace.appendingPathComponent("source", isDirectory: true)
-            try await client.downloadFolder(
-                owner: owner, repository: repository, path: path, ref: ref, to: source)
-            prepared = try await build(
-                at: source, into: workspace.appendingPathComponent("build", isDirectory: true),
-                onProgress: onProgress)
-        }
+        let prepared = try await prepare(workspace)
         onProgress(.installing)
         return try ExtensionCatalog.install(from: prepared)
     }
@@ -184,6 +196,7 @@ struct ExtensionInstaller: Sendable {
     private func run(
         _ executable: URL, arguments: [String], in directory: URL, node: URL? = nil
     ) async throws -> CommandResult {
+        try Task.checkCancellation()
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -203,34 +216,51 @@ struct ExtensionInstaller: Sendable {
         process.standardOutput = pipe
         process.standardError = pipe
 
-        return try await withCheckedThrowingContinuation { continuation in
-            // One resume, whichever of termination and timeout arrives first.
-            let state = ResumeGuard()
-            process.terminationHandler = { finished in
-                let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
-                guard state.claim() else { return }
-                continuation.resume(
-                    returning: CommandResult(
-                        status: finished.terminationStatus,
-                        output: String(decoding: data, as: UTF8.self)))
+        // Closing the install stops the child, so a cancelled build can't outlive its workspace.
+        var timeout: Task<Void, Never>?
+        defer { timeout?.cancel() }
+        let result = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                // One resume, whichever of termination and timeout arrives first.
+                let state = ResumeGuard()
+                process.terminationHandler = { finished in
+                    let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
+                    guard state.claim() else { return }
+                    continuation.resume(
+                        returning: CommandResult(
+                            status: finished.terminationStatus,
+                            output: String(decoding: data, as: UTF8.self)))
+                }
+                do {
+                    try process.run()
+                } catch {
+                    guard state.claim() else { return }
+                    continuation.resume(throwing: error)
+                    return
+                }
+                // A cancel that landed before launch found nothing running to stop.
+                if Task.isCancelled { Self.stop(process) }
+                timeout = Task {
+                    try? await Task.sleep(for: .seconds(Self.commandTimeout))
+                    guard !Task.isCancelled, process.isRunning else { return }
+                    Self.stop(process)
+                    guard state.claim() else { return }
+                    continuation.resume(
+                        returning: CommandResult(
+                            status: -1, output: String(localized: "timed out after 5 minutes")))
+                }
             }
-            do {
-                try process.run()
-            } catch {
-                guard state.claim() else { return }
-                continuation.resume(throwing: error)
-                return
-            }
-            Task {
-                try? await Task.sleep(for: .seconds(Self.commandTimeout))
-                guard process.isRunning else { return }
-                process.terminate()
-                guard state.claim() else { return }
-                continuation.resume(
-                    returning: CommandResult(
-                        status: -1, output: String(localized: "timed out after 5 minutes")))
-            }
+        } onCancel: {
+            Self.stop(process)
         }
+        try Task.checkCancellation()
+        return result
+    }
+
+    /// `Process` makes the child a group leader, so this reaches what the package manager spawned.
+    private static func stop(_ process: Process) {
+        guard process.isRunning else { return }
+        kill(-process.processIdentifier, SIGTERM)
     }
 }
 

@@ -1755,7 +1755,7 @@ enum EmojiData {
 🇬🇼|flag: guinea-bissau|fl|0|旗,flag|旗: 几内亚比绍
 🇬🇾|flag: guyana|fl|0|旗,flag|旗: 圭亚那
 🇭🇰|flag: hong kong sar china|fl|0|旗,flag|旗: 中国香港特别行政区
-🇭🇲|flag: heard & mcdonald islands|fl|0|旗,flag|旗: 赫德岛和麦克唐纳群岛
+🇭🇲|flag: heard island & mcdonald islands|fl|0|旗,flag|旗: 赫德岛和麦克唐纳群岛
 🇭🇳|flag: honduras|fl|0|旗,flag|旗: 洪都拉斯
 🇭🇷|flag: croatia|fl|0|旗,flag|旗: 克罗地亚
 🇭🇹|flag: haiti|fl|0|旗,flag|旗: 海地
@@ -1859,7 +1859,7 @@ enum EmojiData {
 🇸🇩|flag: sudan|fl|0|旗,flag|旗: 苏丹
 🇸🇪|flag: sweden|fl|0|旗,flag|旗: 瑞典
 🇸🇬|flag: singapore|fl|0|旗,flag|旗: 新加坡
-🇸🇭|flag: st. helena|fl|0|旗,flag|旗: 圣赫勒拿
+🇸🇭|flag: st. helena ascension & tristan da cunha|fl|0|旗,flag|旗: 圣赫勒拿
 🇸🇮|flag: slovenia|fl|0|旗,flag|旗: 斯洛文尼亚
 🇸🇯|flag: svalbard & jan mayen|fl|0|旗,flag|旗: 斯瓦尔巴和扬马延
 🇸🇰|flag: slovakia|fl|0|旗,flag|旗: 斯洛伐克
@@ -1877,7 +1877,7 @@ enum EmojiData {
 🇹🇦|flag: tristan da cunha|fl|0|旗,flag|旗: 特里斯坦-达库尼亚群岛
 🇹🇨|flag: turks & caicos islands|fl|0|旗,flag|旗: 特克斯和凯科斯群岛
 🇹🇩|flag: chad|fl|0|旗,flag|旗: 乍得
-🇹🇫|flag: french southern territories|fl|0|旗,flag|旗: 法属南部领地
+🇹🇫|flag: french southern and antarctic lands|fl|0|旗,flag|旗: 法属南部领地
 🇹🇬|flag: togo|fl|0|旗,flag|旗: 多哥
 🇹🇭|flag: thailand|fl|0|旗,flag|旗: 泰国
 🇹🇯|flag: tajikistan|fl|0|旗,flag|旗: 塔吉克斯坦

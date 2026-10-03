@@ -15,7 +15,9 @@ controller and footer are all that stay in [calendar.md](calendar.md).
   and blocks on `startRunning` first, then hands a settled `Feed` up — so the first frame is live
   video rather than a stage swapped out from under the user, and the TCC prompt never takes key from
   a panel already up. `stop()` runs from the fade-out's completion, so the camera light never
-  outlives the panel but is never torn down under a visible one either.
+  outlives the panel but is never torn down under a visible one either. It also drops the
+  `AVCaptureSession`, so every open builds its own: a reused session with no output of its own — the
+  preview's — restarts to a black stage.
 - **Escape, click-away and the shot all end the same way.** Every route goes through
   `CameraCoordinator.close()`, which drops the panel and stops the session; `windowDidResignKey` is
   what covers clicking away. Taking a photo closes too — the command is done, so the camera goes out
@@ -51,7 +53,8 @@ coordinator rather than in `AppSettings`: it is remembered for the launch, and a
 that grants nothing is not worth a settings key or a line in a backup.
 
 Switching cameras swaps the input inside one `beginConfiguration`/`commitConfiguration` while the
-session keeps running, so the stage never blanks. `Switch Camera` only appears when
+session keeps running, so the stage never blanks. The next open starts on the camera switched to,
+unless it has been unplugged since. `Switch Camera` only appears when
 `hasMultipleDevices` says the discovery session found more than one.
 
 ## Where it is reachable from

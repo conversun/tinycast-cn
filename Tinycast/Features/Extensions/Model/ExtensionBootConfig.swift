@@ -74,6 +74,7 @@ struct ExtensionLaunchContext: Sendable {
     var launchType: ExtensionLaunchType = .userInitiated
     /// Injected, never read: a running command keeps what it booted with.
     var isDarkAppearance: Bool
+    var launchContext: [String: RenderValue] = [:]
 
     func jsonString() -> String {
         var environment: [String: Any] = [
@@ -94,6 +95,7 @@ struct ExtensionLaunchContext: Sendable {
 
         var launchProps: [String: Any] = ["launchType": launchType.rawValue, "arguments": arguments]
         if let fallbackText { launchProps["fallbackText"] = fallbackText }
+        if !launchContext.isEmpty { launchProps["launchContext"] = launchContext.mapValues(\.jsonValue) }
 
         return ExtensionRuntime.jsonString(
             from: [

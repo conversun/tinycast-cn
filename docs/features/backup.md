@@ -52,12 +52,12 @@ A backup carries five independently selectable categories, ticked on export and 
 | `Service/BackupStaging.swift` | One scratch tree, created on init and removed on discard |
 | `Service/BackupComposer.swift` | Stores → staging; `plan` on main, `write` off it |
 | `Service/BackupApplier.swift` | Staging → stores, returning a per-category summary |
-| `Service/BackupActions.swift` | The effectful half: file pickers, the archive calls, dialogs |
+| `Service/BackupActions.swift` | The effectful half: file pickers, the archive calls, dialogs, the settings-file switch |
 | `Service/RaycastDecoder.swift` | Container recognition, decrypt and decode |
 | `Service/RaycastImportReader.swift` | Raycast → Tinycast field mapping |
 | `Service/Scrypt.swift`, `Platform/Compression/Zlib.swift` | The crypto and decompression primitives |
 | `Settings/BackupCategorySelection.swift` | The category checkboxes, on both halves of the pane |
-| `Settings/BackupSettingsView.swift` | The pane |
+| `Settings/BackupSettingsView.swift` | The pane, which also holds the [settings file](settings-file.md) switch |
 
 ## Inside the file
 
@@ -104,8 +104,7 @@ anything a day old on the next run, since a run killed mid-flight leaves its tre
 
 - `mirrored` — each `SettingsData` field paired with the `AppSettings` key it carries.
 - `externallySourced` — fields no `AppSettings` key stands behind, each saying what it reads instead.
-  `launchAtLogin` comes from `LaunchAtLogin`, which owns the login item; `showInMenuBar` is shared with
-  `MenuBarExtra` via `SettingsKey` rather than owned here.
+  `launchAtLogin` comes from `LaunchAtLogin`, which owns the login item.
 - `deliberatelyExcluded` — keys kept out on purpose, each with its reason as a string.
 
 `settings-backup-test` asserts that every `AppSettingsKey` appears in exactly one table, that no field

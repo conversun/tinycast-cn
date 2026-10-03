@@ -50,6 +50,7 @@ struct PalettePlacementTests {
         offsetsFollowTheirDisplay()
         restoringPartlyOffscreen()
         snapping()
+        expandedDetentFollowsGeometry()
         menuPanelAnchors()
         tokenGrammar()
         everyInterfaceSize()
@@ -150,34 +151,91 @@ struct PalettePlacementTests {
             "pushed one point further up it is dropped")
     }
 
-    // MARK: - Snapping home
+    // MARK: - Invisible centre line
 
     static func snapping() {
-        let target = home(laptop)
-        expect(
-            PalettePlacement.isSnapping(target, to: target, within: snap),
-            "sitting exactly on the default placement snaps")
-
-        for offset in [CGPoint(x: snap, y: 0), CGPoint(x: 0, y: -snap), CGPoint(x: snap, y: snap)] {
-            let anchor = CGPoint(x: target.x + offset.x, y: target.y + offset.y)
+        for screen in [laptop, external] {
+            let origin = home(screen)
+            let expandedY = screen.midY + metrics.size.panelHeight / 2
+            func snapped(
+                _ point: CGPoint, previous: PalettePlacement.Snap? = nil, speed: CGFloat = 0
+            ) -> PalettePlacement.Snap {
+                PalettePlacement.snapped(
+                    point, home: origin, visibleFrame: screen,
+                    expandedHeight: metrics.size.panelHeight, within: snap,
+                    previous: previous, speed: speed)
+            }
+            let freeY = (origin.y + expandedY) / 2
+            let centered = PalettePlacement.Snap(
+                anchor: CGPoint(x: origin.x, y: freeY), centeredX: true, height: nil)
             expect(
-                PalettePlacement.isSnapping(anchor, to: target, within: snap),
-                "exactly the snap distance away on \(offset) still snaps")
+                snapped(CGPoint(x: origin.x + snap, y: freeY)).anchor.x, origin.x,
+                "the centre line catches at the right boundary")
+            expect(
+                snapped(CGPoint(x: origin.x - snap, y: freeY)).anchor.x, origin.x,
+                "the centre line catches at the left boundary")
+            expect(
+                !snapped(CGPoint(x: origin.x + snap + 1, y: freeY)).centeredX,
+                "an unlatched drag does not catch beyond the entry range")
+            expect(
+                snapped(CGPoint(x: origin.x + snap * 2, y: origin.y + 1), previous: centered)
+                    .height == .home,
+                "a latched drag holds the centre line and its height detent twice as far")
+            expect(
+                !snapped(
+                    CGPoint(x: origin.x + snap * 2 + 1, y: origin.y + 1),
+                    previous: centered
+                ).centeredX,
+                "a latched drag releases beyond twice the entry range")
+            expect(
+                snapped(CGPoint(x: origin.x + snap + 1, y: origin.y + 1)).anchor
+                    == CGPoint(x: origin.x + snap + 1, y: origin.y + 1),
+                "the home detent does not extend horizontally")
+            expect(
+                snapped(CGPoint(x: origin.x + snap + 1, y: expandedY + 1)).height == nil,
+                "the expanded detent does not extend horizontally")
+            expect(
+                snapped(CGPoint(x: origin.x + 1, y: origin.y + snap)).height == .home,
+                "the home detent catches on the centre line")
+            expect(
+                snapped(CGPoint(x: origin.x + 1, y: expandedY - snap)).anchor.y,
+                expandedY, "the expanded detent centres the full-height palette")
+            expect(
+                snapped(CGPoint(x: origin.x + 1, y: freeY)).anchor.y, freeY,
+                "height remains free between the two detents")
+            let fast = PalettePlacement.maxSnapEntrySpeedPointsPerSecond + 1
+            expect(
+                !snapped(CGPoint(x: origin.x + 1, y: freeY), speed: fast).centeredX,
+                "a fast pass does not enter the centre line")
+            expect(
+                snapped(CGPoint(x: origin.x + 1, y: freeY), speed: fast - 1).centeredX,
+                "a deliberate pass can still enter the centre line")
+            expect(
+                snapped(CGPoint(x: origin.x + snap * 2, y: freeY), previous: centered, speed: fast)
+                    .centeredX,
+                "speed does not release an already held centre line")
+            expect(
+                snapped(CGPoint(x: origin.x + 1, y: origin.y + 1), previous: centered, speed: fast)
+                    .height == nil,
+                "a fast pass on the centre line does not enter a height detent")
+            let held = PalettePlacement.Snap(anchor: origin, centeredX: true, height: .home)
+            expect(
+                snapped(CGPoint(x: origin.x + 1, y: origin.y + 1), previous: held, speed: fast)
+                    .height == .home,
+                "speed does not release an already held detent")
         }
+    }
 
-        // Both axes have to be inside: near in x but far in y is not a snap.
-        expect(
-            !PalettePlacement.isSnapping(
-                CGPoint(x: target.x, y: target.y + snap + 1), to: target, within: snap),
-            "one point beyond the threshold in y does not snap")
-        expect(
-            !PalettePlacement.isSnapping(
-                CGPoint(x: target.x + snap + 1, y: target.y), to: target, within: snap),
-            "nor does one point beyond it in x")
-        expect(
-            !PalettePlacement.isSnapping(
-                CGPoint(x: target.x + 300, y: target.y - 300), to: target, within: snap),
-            "and a panel dragged properly aside stays where it was dropped")
+    static func expandedDetentFollowsGeometry() {
+        let shifted = CGRect(x: 300, y: 50, width: 1800, height: 1000)
+        for size in InterfaceSize.allCases {
+            let panelHeight = size.metrics.size.panelHeight
+            let top = PalettePlacement.expandedCenterY(
+                in: shifted, expandedHeight: panelHeight)
+            expect(
+                top - panelHeight / 2, shifted.midY,
+                "the expanded detent stays centred after display or Interface Size changes")
+        }
     }
 
     // MARK: - Menu panels

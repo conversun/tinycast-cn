@@ -5,7 +5,7 @@ struct MenuBarLabel: View {
     let appName: String
 
     var body: some View {
-        Image(systemName: "macwindow.on.rectangle")
+        Image("MenuBarIcon")
             .accessibilityLabel(appName)
     }
 }

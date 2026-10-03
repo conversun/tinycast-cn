@@ -47,7 +47,7 @@ final class MCPStdioTransport: MCPTransport {
         process.executableURL = executable
         process.arguments = arguments
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-        process.environment = Self.launchEnvironment(executable: executable, adding: environment)
+        process.environment = ExecutableLocator.environment(running: executable, adding: environment)
         process.standardInput = stdin
         process.standardOutput = stdout
         process.standardError = stderr
@@ -73,6 +73,8 @@ final class MCPStdioTransport: MCPTransport {
             throw MCPTransportError.launchFailed(error.localizedDescription)
         }
         self.process = process
+        // A server that dies mid-write must fail the write, not SIGPIPE Tinycast.
+        _ = fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
         input = stdin.fileHandleForWriting
     }
 
@@ -119,20 +121,6 @@ final class MCPStdioTransport: MCPTransport {
             try? await Task.sleep(for: .seconds(1))
             if process.isRunning { process.terminate() }
         }
-    }
-
-    /// A GUI app inherits Finder's PATH, so the server's own toolchain has to be put back on it.
-    private static func launchEnvironment(
-        executable: URL, adding environment: [String: String]
-    ) -> [String: String] {
-        let inherited = ProcessInfo.processInfo.environment
-        let paths =
-            [executable.deletingLastPathComponent().path, "/opt/homebrew/bin", "/usr/local/bin"]
-            + [inherited["PATH"] ?? "/usr/bin:/bin"]
-        return
-            inherited
-            .merging(environment) { _, server in server }
-            .merging(["NO_COLOR": "1", "PATH": paths.joined(separator: ":")]) { _, new in new }
     }
 
     private func send(_ data: Data) throws {

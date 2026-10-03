@@ -20,18 +20,51 @@ final class NoteTextView: NSTextView, InjectableTextView {
     private var rendersMarkdown: Bool { editing?.rendersMarkdown == true }
 
     /// One undoable replacement that reaches `textDidChange`, so autosave and restyling see it.
-    func performEdit(_ plan: NoteEditPlan) {
+    @discardableResult
+    func performEdit(_ plan: NoteEditPlan) -> Bool {
         breakUndoCoalescing()
-        guard shouldChangeText(in: plan.range, replacementString: plan.replacement) else { return }
-        textStorage?.replaceCharacters(in: plan.range, with: plan.replacement)
+        guard let textStorage, shouldChangeText(in: plan.range, replacementString: plan.replacement)
+        else { return false }
+        textStorage.replaceCharacters(in: plan.range, with: plan.replacement)
         didChangeText()
         setSelectedRange(plan.selection)
         breakUndoCoalescing()
+        return true
+    }
+
+    func replaceUnchangedSelection(
+        with text: String, source: String, range: NSRange
+    ) -> Bool {
+        guard isEditable, range.length > 0, string == source, selectedRange() == range else {
+            return false
+        }
+        return performEdit(
+            NoteEditPlan(
+                range: range, replacement: text,
+                selection: NSRange(location: range.location + (text as NSString).length, length: 0)))
     }
 
     /// The formatting bar's way in: the same plan, gate and undo step as the matching chord.
     func format(_ action: NoteEditAction) {
         perform(action)
+    }
+
+    func find(_ action: NSTextFinder.Action) {
+        let item = NSMenuItem()
+        item.tag = action.rawValue
+        performTextFinderAction(item)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard textStorage?.length == 0 else { return }
+        NSAttributedString(
+            string: "Start writing…",
+            attributes: [
+                .font: NoteMarkdownTypography.body,
+                .foregroundColor: NSColor(Theme.Colors.textTertiary)
+            ]
+        ).draw(at: textContainerOrigin)
     }
 
     // MARK: - Keys

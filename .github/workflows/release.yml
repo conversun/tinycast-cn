@@ -20,6 +20,8 @@ on:
 
 permissions:
   contents: write
+  # Dispatches the Website workflow, whose version and changelog are read at build time.
+  actions: write
 
 jobs:
   build:
@@ -216,6 +218,14 @@ jobs:
             git commit -m "${CASK} ${VERSION}"
             git push
           fi
+
+      # The site bakes the latest version and the changelog in at build time, so a stable release
+      # rebuilds it. A dispatch is the one event GITHUB_TOKEN may start another workflow with.
+      - name: Rebuild the website
+        if: github.event.inputs.channel == 'stable'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run website.yml --repo "$GITHUB_REPOSITORY" --ref main
 
       # Announce the release in the Discord release channel. A Components V2 (flags 32768) card:
       # channel-tinted container, title + right-aligned Download button, changelog, Homebrew block.
