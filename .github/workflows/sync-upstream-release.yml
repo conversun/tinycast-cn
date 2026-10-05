@@ -128,7 +128,7 @@ jobs:
           DETAIL: ${{ steps.merge.outputs.detail }}
         run: |
           TITLE="Sync ${UPSTREAM_TAG} needs a hand"
-          OPEN="$(gh issue list --state open --search "${TITLE} in:title" --limit 100 --json title \
+          OPEN="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "${TITLE} in:title" --limit 100 --json title \
             --jq "map(select(.title == \"${TITLE}\")) | length")"
           if [ "$OPEN" != "0" ]; then
             echo "Issue '${TITLE}' is already open; nothing to add."
@@ -140,12 +140,12 @@ jobs:
             SUMMARY="The merge applied cleanly but \`./Scripts/run-tests.sh\` failed. Last 40 lines:"
           fi
           LABEL_ARGS=()
-          if gh label create sync-blocked --color FBCA04 --description "Upstream sync needs a human" --force; then
+          if gh label create sync-blocked --repo "$GITHUB_REPOSITORY" --color FBCA04 --description "Upstream sync needs a human" --force; then
             LABEL_ARGS=(--label sync-blocked)
           else
             echo "::warning::Could not create sync-blocked; reporting without a label."
           fi
-          gh issue create --title "$TITLE" "${LABEL_ARGS[@]}" --body "$(cat <<EOF
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" "${LABEL_ARGS[@]}" --body "$(cat <<EOF
           Upstream published \`${UPSTREAM_TAG}\`. Nothing has been pushed to \`main\`.
 
           ${SUMMARY}
