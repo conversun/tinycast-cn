@@ -94,9 +94,11 @@ struct ExtensionTests {
         var failures: [String] = []
         var logs: [String] = []
         var finished = false
+        var onRender: (() -> Void)?
 
         func runtime(_ runtime: ExtensionRuntime, session: String, didRender tree: RenderTree) {
             trees.append(tree)
+            onRender?()
         }
         func runtime(_ runtime: ExtensionRuntime, session: String, didFail message: String) {
             failures.append(message)
