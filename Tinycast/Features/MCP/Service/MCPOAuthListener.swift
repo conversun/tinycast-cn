@@ -49,12 +49,19 @@ final class MCPOAuthListener {
     }
 
     func code() async throws -> String {
-        try await withTaskCancellationHandler {
-            try Task.checkCancellation()
-            if let result { return try result.get() }
-            return try await withCheckedThrowingContinuation { reply = $0 }
-        } onCancel: {
-            Task { @MainActor [weak self] in self?.cancel() }
+        do {
+            let code = try await withTaskCancellationHandler {
+                try Task.checkCancellation()
+                if let result { return try result.get() }
+                return try await withCheckedThrowingContinuation { reply = $0 }
+            } onCancel: {
+                Task { @MainActor [weak self] in self?.cancel() }
+            }
+            await task?.value
+            return code
+        } catch {
+            await task?.value
+            throw error
         }
     }
 
@@ -68,7 +75,6 @@ final class MCPOAuthListener {
         reply?.resume(with: result)
         reply = nil
         task?.cancel()
-        task = nil
     }
 
     private func run(
