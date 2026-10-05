@@ -975,6 +975,7 @@ extension ExtensionTests {
                 && recorder.failures.isEmpty && !manager.isRunning)
         foreground.shutdown()
 
+        let hangingIdle = idle(after: boots.count + 1)
         let fetchStarted = MenuStateWait {
             _ = events.revision
             return hosts.last?.name == "hanging" && hosts.last?.hasFetch == true
@@ -987,6 +988,7 @@ extension ExtensionTests {
         }
         manager.disable("extension:hanging/bar")
         await fetchCancelled.wait("disable cancels the pending host request")
+        await unloaded(hangingIdle)
         await lastRuntime?.drainHostCalls()
         check("disable cancels host requests", hosts.last?.didCancel == true && lastRuntime == nil)
         check(
