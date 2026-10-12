@@ -8,7 +8,19 @@ extension ExtensionTests {
     final class MenuEvents {
         var revision = 0
         var stops = 0
+        var releases = 0
         var foregroundRenders = 0
+    }
+
+    final class MenuRuntimeLifetime {
+        let events: MenuEvents
+
+        init(_ events: MenuEvents) { self.events = events }
+
+        deinit {
+            let events = events
+            Task { @MainActor in events.releases += 1 }
+        }
     }
 
     @MainActor
@@ -687,6 +699,9 @@ extension ExtensionTests {
                 hosts.append(host)
                 let runtime = ExtensionRuntime(hostAPI: host, runtimeURL: runtimeURL())
                 lastRuntime = runtime
+                objc_setAssociatedObject(
+                    runtime, Unmanaged.passUnretained(runtime).toOpaque(),
+                    MenuRuntimeLifetime(events), .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
                 return .init(
                     runtime: runtime, stop: { events.stops += 1 },
                     enableInteraction: { host.isInteractive = true })
@@ -698,7 +713,9 @@ extension ExtensionTests {
                 .menuBarSnapshot
         }
         func idle(after count: Int) -> MenuStateWait {
-            MenuStateWait { events.stops >= count && !manager.isRunning }
+            MenuStateWait {
+                events.stops >= count && events.releases >= count && !manager.isRunning
+            }
         }
         func ready(_ controller: ExtensionMenuBarController, _ reference: ExtensionCommandRef) -> MenuStateWait {
             let wait = MenuStateWait {
