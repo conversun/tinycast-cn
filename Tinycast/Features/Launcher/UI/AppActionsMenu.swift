@@ -50,11 +50,13 @@ enum AppActionsMenu {
                     onResetRanking()
                 })
         }
-        if isPersistent, app.canHideFromSearch {
+        // These carry their own Show in root search switch rather than a pane checkbox.
+        let hidesFromRoot = app.kind == .quicklink || app.kind == .customCommand
+        if isPersistent, app.canHideFromSearch || hidesFromRoot {
+            let title = hidesFromRoot ? "Hide from Root Search" : "Hide from Search"
             items.append(
                 PopoverMenuItem(
-                    title: "Hide from Search", systemImage: "eye.slash", shortcut: "⇧⌘H",
-                    action: onHideFromSearch))
+                    title: title, systemImage: "eye.slash", shortcut: "⇧⌘H", action: onHideFromSearch))
         }
         if running, app.kind == .application {
             items.append(
@@ -84,6 +86,21 @@ enum AppActionsMenu {
                     isDestructive: true
                 ) {
                     core.uninstallCoordinator.beginUninstall(app)
+                })
+        }
+        if app.kind == .quicklink, let quicklink = core.quicklinks.quicklink(entryID: app.id) {
+            items.append(
+                PopoverMenuItem(
+                    title: "Copy Link", systemImage: "doc.on.clipboard", startsSection: true,
+                    shortcut: "⌃⌘C"
+                ) {
+                    core.quicklinkCoordinator.copyQuicklink(id: quicklink.id)
+                })
+            items.append(
+                PopoverMenuItem(
+                    title: "Edit Quicklink", systemImage: "pencil", shortcut: "⌘E"
+                ) {
+                    core.quicklinkCoordinator.editQuicklink(quicklink)
                 })
         }
         if app.kind == .extensionCommand {
@@ -124,6 +141,13 @@ enum AppActionsMenu {
         if app.kind == .meeting, let meeting = core.calendarCoordinator.meeting(entryID: app.id) {
             return MeetingActionsMenu.content(meeting: meeting, core: core).items
         }
+        if app.kind == .customCommand, let command = core.customCommands.command(entryID: app.id) {
+            return CustomCommandActionsMenu.leadingItems(
+                command: command, coordinator: core.customCommandCoordinator
+            ) {
+                core.launcherCoordinator.launch(app, searchQuery: searchQuery)
+            }
+        }
         let primarySymbol =
             switch app.kind {
             case .application, .command, .extensionCommand: "list.dash.header.rectangle"
@@ -135,6 +159,14 @@ enum AppActionsMenu {
                 shortcut: "↵"
             ) { core.launcherCoordinator.launch(app, searchQuery: searchQuery) }
         ]
+        if app.kind == .snippet, let id = StoredSnippet.id(fromEntryID: app.id),
+            let record = core.snippetsStore.record(id: id)
+        {
+            items.append(
+                PopoverMenuItem(title: "Edit Snippet", systemImage: "pencil", shortcut: "⌘E") {
+                    core.snippetCoordinator.editSnippet(record)
+                })
+        }
         if app.canRevealInFinder {
             items.append(
                 PopoverMenuItem(title: "Show in Finder", systemImage: "folder", shortcut: "⌘↵") {

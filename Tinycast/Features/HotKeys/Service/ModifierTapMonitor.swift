@@ -20,7 +20,9 @@ private func modifierTapEventTapCallback(
     }
     let isFlagsChanged = type == .flagsChanged
     let flagsRaw = event.flags.rawValue
-    let keyCode = isFlagsChanged ? Int(event.getIntegerValueField(.keyboardEventKeycode)) : 0
+    let keyCode =
+        type == .keyDown || isFlagsChanged
+        ? Int(event.getIntegerValueField(.keyboardEventKeycode)) : -1
     MainActor.assumeIsolated {
         monitor.process(isFlagsChanged: isFlagsChanged, flagsRaw: flagsRaw, keyCode: keyCode)
     }
@@ -36,6 +38,9 @@ final class ModifierTapMonitor: HealthCheckable {
 
     /// Fired on the tap's final release, so the key is up by the time the action runs.
     @ObservationIgnored var onTrigger: ((HotKeyBinding) -> Void)?
+    @ObservationIgnored var onHoldPressed: (() -> Void)?
+    @ObservationIgnored var onHoldReleased: (() -> Void)?
+    @ObservationIgnored var onHoldCancelled: (() -> Void)?
 
     /// Set while a recorder captures, so editing a binding can't trigger it.
     var isPaused = false {
@@ -48,8 +53,13 @@ final class ModifierTapMonitor: HealthCheckable {
     private var bound: Set<HotKeyBinding> = []
     /// Advanced by the tap callback on every modifier transition; released by teardown.
     @ObservationIgnored private var doubleTapDetector = DoubleTapDetector()
-    @ObservationIgnored private var globeDetector = GlobeTapDetector()
-    @ObservationIgnored private var pendingSingleGlobe: Task<Void, Never>?
+    @ObservationIgnored private var modifierDetector = ModifierKeyDetector()
+    @ObservationIgnored private var pendingSingle: Task<Void, Never>?
+    @ObservationIgnored private var pendingHold: Task<Void, Never>?
+    @ObservationIgnored private var pendingBinding: HotKeyBinding?
+    private var globeDown = false
+    private var holdKey: ModifierKey?
+    private var holding = false
     @ObservationIgnored private var tapPort: CFMachPort?
     @ObservationIgnored private var runLoopSource: CFRunLoopSource?
     @ObservationIgnored private var sessionTokens: [NotificationToken] = []
@@ -69,9 +79,10 @@ final class ModifierTapMonitor: HealthCheckable {
     }
 
     /// Modifier-only bindings currently assigned; an empty set tears the tap down entirely.
-    func update(bound: Set<HotKeyBinding>) {
-        guard bound != self.bound else { return }
+    func update(bound: Set<HotKeyBinding>, holdKey: ModifierKey? = nil) {
+        guard bound != self.bound || holdKey != self.holdKey else { return }
         self.bound = bound
+        self.holdKey = holdKey
         resetDetectors()
         syncTapPresence()
     }
@@ -86,61 +97,105 @@ final class ModifierTapMonitor: HealthCheckable {
         if isFlagsChanged {
             let flags = CGEventFlags(rawValue: flagsRaw)
             let modifiers = Self.modifiers(in: flags)
-            let isGlobeKey = keyCode == kVK_Function
-            if !isGlobeKey || !modifiers.isEmpty { cancelPendingSingleGlobe() }
-            if let gesture = globeDetector.handle(
-                isGlobeKey: isGlobeKey, functionDown: flags.contains(.maskSecondaryFn),
-                hasOtherModifiers: !modifiers.isEmpty, at: now)
-            {
-                handleGlobe(gesture)
+            if keyCode == kVK_Function { globeDown = flags.contains(.maskSecondaryFn) }
+            let keys = ModifierKey.held(in: flagsRaw, globeDown: globeDown)
+            if let event = modifierDetector.handle(keys, at: now) {
+                handleModifier(event)
             }
             input = .modifiers(modifiers, hasOtherModifiers: Self.hasOtherModifiers(in: flags))
         } else {
-            globeDetector.cancel()
-            cancelPendingSingleGlobe()
+            // Return and Escape belong to the dictation panel while a hold is active.
+            if holding,
+                keyCode == kVK_Return || keyCode == kVK_ANSI_KeypadEnter
+                    || keyCode == kVK_Escape
+            {
+                return
+            }
+            modifierDetector.cancel()
+            cancelPendingSingle()
+            cancelHold()
             input = .otherInput
         }
         guard let modifier = doubleTapDetector.handle(input, at: now),
             bound.contains(.doubleTap(modifier))
         else { return }
+        cancelPendingSingle()
         onTrigger?(.doubleTap(modifier))
     }
 
-    private func handleGlobe(_ gesture: GlobeTapDetector.Gesture) {
-        switch gesture {
-        case .single:
-            guard bound.contains(.globe) else { return }
-            guard bound.contains(.doubleGlobe) else {
-                globeDetector.cancel()
-                onTrigger?(.globe)
+    private func handleModifier(_ event: ModifierKeyDetector.Event) {
+        switch event {
+        case .pressed(let key):
+            if let holdKey, key == holdKey {
+                pendingHold = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(DoubleTapDetector.maxHold))
+                    guard !Task.isCancelled, let self else { return }
+                    pendingHold = nil
+                    holding = true
+                    onHoldPressed?()
+                }
+            } else if key.singleBinding != pendingBinding {
+                cancelPendingSingle()
+            }
+        case .released(let key, let doubleTap, let held):
+            if key == holdKey {
+                pendingHold?.cancel()
+                pendingHold = nil
+                if holding {
+                    holding = false
+                    onHoldReleased?()
+                }
                 return
             }
-            if pendingSingleGlobe != nil {
-                cancelPendingSingleGlobe()
-                onTrigger?(.globe)
+            guard !held else { cancelPendingSingle(); return }
+            if doubleTap, bound.contains(key.doubleBinding) {
+                cancelPendingSingle()
+                onTrigger?(key.doubleBinding)
+            } else if bound.contains(key.singleBinding) {
+                cancelPendingSingle()
+                let hasDoubleTap =
+                    bound.contains(key.doubleBinding)
+                    || key.modifier.map { bound.contains(.doubleTap($0)) } == true
+                guard hasDoubleTap else {
+                    modifierDetector.cancel()
+                    onTrigger?(key.singleBinding)
+                    return
+                }
+                pendingBinding = key.singleBinding
+                pendingSingle = Task { [weak self] in
+                    try? await Task.sleep(for: ModifierKeyDetector.resolutionWindow)
+                    guard !Task.isCancelled, let self else { return }
+                    pendingSingle = nil
+                    pendingBinding = nil
+                    onTrigger?(key.singleBinding)
+                }
             }
-            // Every pause, unbind or session change cancels this, so waking needs no re-check.
-            pendingSingleGlobe = Task { [weak self] in
-                try? await Task.sleep(for: GlobeTapDetector.resolutionWindow)
-                guard !Task.isCancelled, let self else { return }
-                pendingSingleGlobe = nil
-                onTrigger?(.globe)
-            }
-        case .double:
-            cancelPendingSingleGlobe()
-            if bound.contains(.doubleGlobe) { onTrigger?(.doubleGlobe) }
+        case .cancelled:
+            cancelPendingSingle()
+            cancelHold()
         }
     }
 
-    private func cancelPendingSingleGlobe() {
-        pendingSingleGlobe?.cancel()
-        pendingSingleGlobe = nil
+    private func cancelPendingSingle() {
+        pendingSingle?.cancel()
+        pendingSingle = nil
+        pendingBinding = nil
+    }
+
+    private func cancelHold() {
+        pendingHold?.cancel()
+        pendingHold = nil
+        guard holding else { return }
+        holding = false
+        onHoldCancelled?()
     }
 
     private func resetDetectors() {
         doubleTapDetector.reset()
-        globeDetector.cancel()
-        cancelPendingSingleGlobe()
+        modifierDetector.reset()
+        globeDown = false
+        cancelPendingSingle()
+        cancelHold()
     }
 
     private static func modifiers(in flags: CGEventFlags) -> Set<DoubleTapModifier> {
@@ -261,6 +316,7 @@ final class ModifierTapMonitor: HealthCheckable {
             tearDownTap()
             needsAccessibility = true
         } else if let tapPort, !CGEvent.tapIsEnabled(tap: tapPort) {
+            resetDetectors()
             CGEvent.tapEnable(tap: tapPort, enable: true)
         }
     }

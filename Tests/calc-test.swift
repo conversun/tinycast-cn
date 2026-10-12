@@ -127,6 +127,7 @@ struct CalcTests {
         expectDisplay("3X3", "9")
         expectDisplay("3 x -2", "-6")
         expectDisplay("2xpi", "6.283185307")
+        expectDisplay("2xsin(pi/2)", "2")
         expectDisplay("6/2x(1+2)", "9")
         expectDisplay("10 x", "10")
         expectDisplay("$5 x 2", "10.00 USD")
@@ -197,6 +198,19 @@ struct CalcTests {
         expectDisplay("2hr to min", "120 min")
         expectDisplay("1day to sec", "86,400 s")
         expectDisplay("1 week to hr", "168 hr")
+        expectDisplay("3 months to days", "91.310625 day")
+        expectDisplay("3.5 years to days", "1,278.34875 day")
+        expectCopy("3.5 years to days", "1278.34875 day")
+        expectDisplay("1month in days", "30.436875 day")
+        expectDisplay("1mo -> s", "2,629,746 s")
+        expectDisplay("1YEAR to s", "31,556,952 s")
+        expectDisplay("1yr to months", "12 mo")
+        expectDisplay("12 months to years", "1 yr")
+        expectDisplay("365.2425 days to year", "1 yr")
+        expectDisplay("-0.5 years to months", "-6 mo")
+        expectDisplay("0 months to days", "0 day")
+        expectDisplay("(1 year + 6 months) to days", "547.86375 day")
+        expectBadges("3.5 years to days", source: "Years", target: "Days")
         expectDisplay("2 acre to m2", "8,093.712845 m²")
         expectDisplay("1 m² to ft²", "10.76391042 ft²")
         expectDisplay("2L -> mL", "2,000 mL")
@@ -228,6 +242,7 @@ struct CalcTests {
         expectError("10kg to sec", "Cannot convert Weight to Time.")
         expectError("100 mL to km", "Cannot convert Volume to Length.")
         expectError("1 GB to hr", "Cannot convert Digital Storage to Time.")
+        expectError("1 year to kg", "Cannot convert Time to Weight.")
 
         // Non-calculator input → no card
         expectNil("safari")
@@ -264,6 +279,7 @@ struct CalcTests {
         expectDisplay("256 >> 2", "64")
         expectDisplay("6 & 3", "2")
         expectDisplay("5 xor 3", "6")
+        expectDisplay("5 XOR 3", "6")
         expectDisplay("~1", "-2")
         expectDisplay("1 | 2 == 3", "true")
         expectDisplay("~1 == -2", "true")
@@ -300,6 +316,12 @@ struct CalcTests {
         expectBadges("1m", source: "Meters", target: "Feet")
         expectDisplay("1hr", "60 min")
         expectBadges("1hr", source: "Hours", target: "Minutes")
+        expectDisplay("3 weeks", "21 day")
+        expectDisplay("3 days", "72 hr")
+        expectDisplay("3 months", "91.310625 day")
+        expectDisplay("3.5 years", "1,278.34875 day")
+        expectBadges("3 months", source: "Months", target: "Days")
+        expectBadges("3.5 years", source: "Years", target: "Days")
         expectDisplay("5ft", "1.524 m")
         expectDisplay("100g", "3.527396195 oz")
         expectDisplay("2*3 kg", "6 kg")  // an operator keeps the answer in the units written
@@ -497,6 +519,33 @@ struct CalcTests {
         expectDisplay("100 Mbps to MB/s", "12.5 MB/s")
         expectDisplay("1 MiB/s to Mbps", "8.388608 Mbps")
         expectDisplay("1GB / 10MB/s to s", "100 s")
+        expectDisplay("500 Mbps in MBps", "62.5 MBps")
+        expectCopy("500 Mbps in MBps", "62.5 MBps")
+        expectExpression("500 Mbps in MBps", "500 Mbps")
+        expectBadges(
+            "500 Mbps in MBps", source: "Megabits per Second", target: "Megabytes per Second")
+        expectDisplay("62.5 MBps to Mbps", "500 Mbps")
+        expectDisplay("500Mbps -> MBps", "62.5 MBps")
+        expectDisplay("500 Mbps → MBps", "62.5 MBps")
+        expectDisplay("8 bps to Bps", "1 Bps")
+        expectDisplay("8 Kbps to kBps", "1 kBps")
+        expectDisplay("1 KBps to kbps", "8 Kbps")
+        expectDisplay("1 Gbps to GBps", "0.125 GBps")
+        expectDisplay("1 TBps to Tbps", "8 Tbps")
+        expectDisplay("1 MBps to kBps", "1,000 kBps")
+        expectDisplay("1 GBps to MBps", "1,000 MBps")
+        expectDisplay("1 TBps to GBps", "1,000 GBps")
+        expectDisplay("1 MBps to MB/s", "1 MB/s")
+        expectDisplay("8 Mb/s to MBps", "1 MBps")
+        expectDisplay("1 MiB/s to MBps", "1.048576 MBps")
+        expectDisplay("MBps Mbps", "8 Mbps")
+        expectDisplay("1 Bps", "8 bps")
+        expectDisplay("1 kBps", "8 Kbps")
+        expectDisplay("1 MBps", "8 Mbps")
+        expectDisplay("1 GBps", "8 Gbps")
+        expectDisplay("1 TBps", "8 Tbps")
+        expectDisplay("500 Mbps + 62.5 MBps", "125 MBps")
+        expectDisplay("1GB / 10MBps to s", "100 s")
         expectDisplay("8kbit to B", "1,000 B")
         expectDisplay("1um to nm", "1,000 nm")
         expectDisplay("1 GHz to MHz", "1,000 MHz")
@@ -638,10 +687,20 @@ struct CalcTests {
         // A slash date still reads as a date when the other side names a keyword
         expectDisplayAt("9/4 - today", "42 days")
         expectDisplayAt("today - 9/4", "-42 days")
-        // Bare date/unit words alone are app searches, not cards
-        expectNilAt("today")
+        // A lone word naming one moment answers; one that recurs is still an app search
+        expectDisplayAt("today", "24 July")
+        expectDisplayAt("tomorrow", "25 July")
+        expectDisplayAt("yesterday", "23 July")
+        expectDisplayAt("now", "24 July at 12:18 AM")
+        expectBadgesAt("tomorrow", source: "Friday, 24 July", target: "Saturday")
+        expectExpression("Today", "Today")
+        expectDisplayAt("time", "12:18 AM")
+        expectBadgesAt("time", source: "Friday, 24 July", target: "UTC")
         expectNilAt("july")
-        expectNilAt("tomorrow")
+        expectNilAt("monday")
+        expectNilAt("noon")
+        expectNilAt("todays")
+        expectNilAt("times")
 
         // Angle units (deg is a real unit now, not just a trig postfix)
         expectDisplay("1 deg", "0.01745329252 rad")
@@ -718,6 +777,25 @@ struct CalcTests {
         expectDisplay("1kUSD to EUR", "920.00 EUR")
         expectDisplay("£50 in dollars", "63.29 USD")
         expectDisplay("$100 to yen", "15,700.00 JPY")
+        expectDisplay("400K xof in €", "609.80 EUR")
+        expectDisplay("400K xof to €", "609.80 EUR")
+        expectDisplay("400K XOF in €", "609.80 EUR")
+        expectDisplay("400Kxof to eur", "609.80 EUR")
+        expectDisplay("400000 XoF to eur", "609.80 EUR")
+        expectDisplay("xof 400K to €", "609.80 EUR")
+        expectCopy("400K xof in €", "609.80 EUR")
+        expectBadges("400K xof in €", source: "West African CFA Franc", target: "Euro")
+        expectDisplay("100 xrp to usd", "50.00 USD")
+        expectDisplay("100XRP to usd", "50.00 USD")
+        expectDisplay("2 x 100xrp to usd", "100.00 USD")
+        expectDisplay("-100 xrp to usd", "-50.00 USD")
+        for code in ["XAF", "XPF", "XCD", "XCG", "XDR", "XAU", "XAG", "XLM", "XMR"] {
+            expectError("100 \(code.lowercased()) to usd", "No exchange rate for \(code).")
+            expectError("100\(code) in usd", "No exchange rate for \(code).")
+        }
+        expectErrorWithoutRates(
+            "400K xof in €", "Exchange rates unavailable — check your connection.")
+        expectNil("100 xofx to eur")
         // Sub-cent cross-rates widen instead of collapsing to 0.00
         expectDisplay("1 jpy to usd", "0.006369 USD")
         // …and stay in plain notation past 1e-5, where "%g" would flip to "5.539e-05"
@@ -973,6 +1051,7 @@ struct CalcTests {
 
         // Timespans break a duration into the units that fit it
         expectDisplay("145 mins to timespan", "2 hr 25 min")
+        expectDisplay("1 month to timespan", "4 wk 2 day 10 hr 29 min 6 s")
         expectDisplay("8700 s to timespan", "2 hr 25 min")
         expectDisplay("90000 s to timespan", "1 day 1 hr")
         expectDisplay("55 h to timespan", "2 day 7 hr")
@@ -1073,7 +1152,8 @@ struct CalcTests {
             calendar.timeZone = TimeZone(identifier: home)!
             let expected = CalcResult(
                 expression: "5:30 PM", sourceBadge: "Los Angeles", targetBadge: target,
-                payload: .value(display: time + dayNote, copyText: time))
+                payload: .value(display: time + dayNote, copyText: time),
+                canChain: false)
             for query in [
                 "5:30pm SF", "5:30 pm SF", "17:30 San Francisco", "5:30 PM SFO",
                 "  5:30\tpm\u{00A0}sf  "
@@ -1132,7 +1212,6 @@ struct CalcTests {
         expectDisplay("1 cup to ml", "236.5882365 mL")
         expectNil("time in xyzzy")
         expectNil("in tokyo")
-        expectNil("time")
 
         // IATA airport codes, which Foundation has no notion of
         expectDisplayAt("time in vie", "2:18 AM")
@@ -1265,11 +1344,9 @@ struct CalcTests {
         expectBadgesAt("25. aug", source: "Friday, 24 July", target: "Tuesday")
         // A bare date takes the year it is nearest, so it agrees with the same date plus a shift
         expectDisplayAt("25. aug + 3", "28 August")
-        // A month or a relative word alone is still an app search
+        // A month alone is still an app search
         expectNilAt("july")
         expectNilAt("aug")
-        expectNilAt("today")
-        expectNilAt("tomorrow")
 
         // Date arithmetic chains left to right, however many terms it carries
         expectDisplayAt("17.2.26 + 100 week days - 4 + 2", "5 July")
@@ -1341,20 +1418,23 @@ struct CalcTests {
         expectDisplayAt("what time is it to Tokyo", "9:18 AM")
         let usaExpected = CalcResult(
             expression: "12:00 PM", sourceBadge: "UTC", targetBadge: "New York",
-            payload: .value(display: "8:00 AM", copyText: "8:00 AM"))
+            payload: .value(display: "8:00 AM", copyText: "8:00 AM"),
+            canChain: false)
         let usaNow = CalcEngine.evaluate("now in usa", now: zoneNow, calendar: clock.calendar)
         check("now in usa", expected: "true", got: "\(usaNow == usaExpected)")
         for query in ["Canada timezone", "Canada time zone", "timezone Canada", "timezone in Canada"] {
             let expected = CalcResult(
                 expression: "12:00 PM", sourceBadge: "UTC", targetBadge: "Toronto",
-                payload: .value(display: "8:00 AM", copyText: "8:00 AM"))
+                payload: .value(display: "8:00 AM", copyText: "8:00 AM"),
+                canChain: false)
             let actual = CalcEngine.evaluate(query, now: zoneNow, calendar: clock.calendar)
             check(query, expected: "true", got: "\(actual == expected)")
         }
         for query in ["Canada time to China", "Canada timezone to China", "Canada time zone to China"] {
             let expected = CalcResult(
                 expression: "8:00 AM", sourceBadge: "Toronto", targetBadge: "Shanghai",
-                payload: .value(display: "8:00 PM", copyText: "8:00 PM"))
+                payload: .value(display: "8:00 PM", copyText: "8:00 PM"),
+                canChain: false)
             let actual = CalcEngine.evaluate(query, now: zoneNow, calendar: clock.calendar)
             check(query, expected: "true", got: "\(actual == expected)")
         }
@@ -1482,9 +1562,6 @@ struct CalcTests {
         expectDisplayAt("1:00 - 3:00", "-2 hr", calendar: vienna)
         let springNow = clock.calendar.date(from: DateComponents(year: 2026, month: 3, day: 29))!
         expectNilAt("2:30am vienna in london", now: springNow, calendar: vienna)
-        // A lone date word is still an app search
-        expectNilAt("tomorrow")
-        expectNilAt("today")
 
         // Spoken function and operator names
         expectDisplay("square root of 625", "25")
@@ -1536,6 +1613,7 @@ struct CalcTests {
         expectDisplay("2hr + 30min to min", "150 min")
 
         localeTests()
+        chainTests()
 
         print("\n\(passes) passed, \(failures) failed")
         exit(failures == 0 ? 0 : 1)
@@ -1701,6 +1779,33 @@ struct CalcTests {
         check("history [search]", expected: "3.8", got: italian.canonical("3,8") ?? "nil")
     }
 
+    static func chainTests() {
+        for query in [
+            "2^10", "1/3", "100 usd to eur", "10 km to mi", "1m", "255 to hex", "145 mins to timespan",
+            "20% off 500", "2^10 +"
+        ] {
+            check(query + " [chains]", expected: "true", got: chains(evaluate(query)))
+        }
+        for query in [
+            "now + 90 min", "now + 90 min +", "today", "time", "time in Tokyo", "3pm London in Tokyo",
+            "5 > 3",
+            "ratio of 1920 to 1080"
+        ] {
+            check(query + " [chains]", expected: "false", got: chains(evaluate(query)))
+        }
+        check(
+            "now + 90 min [chains, localized]", expected: "false",
+            got: chains(evaluateLocalized("now + 90 min", italian)))
+    }
+
+    static func evaluate(_ query: String) -> CalcResult? {
+        CalcEngine.evaluate(query, now: clock.now, calendar: clock.calendar, rates: fx)
+    }
+
+    static func chains(_ result: CalcResult?) -> String {
+        result.map { "\($0.canChain)" } ?? "nil"
+    }
+
     static func evaluateLocalized(_ query: String, _ format: CalcNumberFormat) -> CalcResult? {
         CalcEngine.evaluate(
             query, now: clock.now, calendar: clock.calendar, rates: fx, format: format
@@ -1777,6 +1882,7 @@ struct CalcTests {
         rates: [
             "USD": 1, "EUR": 0.92, "GBP": 0.79, "JPY": 157, "INR": 83.5, "CAD": 1.36,
             "KRW": 1330, "IDR": 18053, "CHF": 0.81, "AED": 3.6725, "SGD": 1.35,
+            "XOF": 603.48, "XRP": 2,
             "BTC": 1.0 / 60_000, "ETH": 1.0 / 2_000, "SOL": 1.0 / 100, "DOGE": 10
         ],
         fetchedAt: Date(timeIntervalSince1970: 1_785_000_000))

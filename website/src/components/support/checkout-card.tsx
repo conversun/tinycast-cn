@@ -32,6 +32,7 @@ export function CheckoutCard() {
   const amount = preset ?? Number(custom);
   const valid = Number.isInteger(amount) && amount >= 1 && amount <= maxAmount;
   const cadence = plan === "monthly" ? " / month" : "";
+  const action = plan === "monthly" ? "Subscribe for" : "Buy for";
 
   // Back from Polar restores this page from the back-forward cache, spinner and all.
   useEffect(() => {
@@ -87,7 +88,7 @@ export function CheckoutCard() {
 
       <fieldset className="mt-6">
         <legend className="font-mono text-eyebrow uppercase text-fg-muted">
-          Amount
+          Price (USD{cadence})
         </legend>
         <div className="mt-3 grid grid-cols-4 gap-2">
           {presetAmounts.map((value) => (
@@ -120,8 +121,8 @@ export function CheckoutCard() {
           <span className="font-mono text-body text-fg-subtle">$</span>
           <input
             inputMode="numeric"
-            placeholder="Other amount"
-            aria-label="Other amount in US dollars"
+            placeholder="Other price"
+            aria-label={`Other price in US dollars${cadence}`}
             value={custom}
             onFocus={() => setPreset(null)}
             onChange={(event) => {
@@ -144,7 +145,7 @@ export function CheckoutCard() {
         ) : (
           <SupportIcon size={20} />
         )}
-        {valid ? `Support with $${amount}${cadence}` : "Choose an amount"}
+        {valid ? `${action} $${amount}${cadence}` : "Choose a price"}
       </button>
 
       <p
@@ -171,8 +172,8 @@ export function CheckoutCard() {
       </div>
       <p className="mt-1.5 text-center text-caption text-fg-subtle">
         {plan === "monthly"
-          ? "Cancel anytime from the link in your receipt."
-          : "A one-time payment that doesn't renew."}
+          ? "Renews monthly until canceled. Cancel anytime in your Polar customer portal."
+          : "A one-time purchase that doesn't renew."}
       </p>
     </div>
   );

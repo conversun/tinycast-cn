@@ -21,11 +21,11 @@ export function SupporterCount() {
     <p className="rise mt-6 inline-flex h-8 items-center gap-2 rounded-full bg-kbd-bg px-3.5 text-small text-kbd">
       <SupportIcon size={16} />
       <span>
-        Backed by{" "}
+        Purchased by{" "}
         <span className="font-mono font-medium">
           {total.toLocaleString("en")}
         </span>{" "}
-        {total === 1 ? "supporter" : "supporters"}
+        {total === 1 ? "person" : "people"}
       </span>
     </p>
   );

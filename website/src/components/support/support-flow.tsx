@@ -13,11 +13,9 @@ function parsePlan(value: string | null): Plan | null {
 
 type Props = {
   intro: ReactNode;
-  reasons: ReactNode;
 };
 
-/** `intro` and `reasons` are server-rendered and passed through, so only the card ships as JS. */
-export function SupportFlow({ intro, reasons }: Props) {
+export function SupportFlow({ intro }: Props) {
   const [returned, setReturned] = useState<Plan | null>(null);
 
   // Polar's return adds ?thanks=<plan>; drop it so a reload shows the card again.
@@ -31,11 +29,10 @@ export function SupportFlow({ intro, reasons }: Props) {
     setReturned(plan);
   }, []);
 
-  // Phones read intro → card → reasons; from lg the card holds the right column beside both.
   return (
-    <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-x-20 lg:gap-y-14">
+    <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-20">
       {intro}
-      <div className="relative lg:col-start-2 lg:row-span-2 lg:row-start-1">
+      <div className="relative">
         <span
           aria-hidden="true"
           className="mark-bloom pointer-events-none absolute inset-x-0 -top-16 h-72 opacity-60"
@@ -44,7 +41,6 @@ export function SupportFlow({ intro, reasons }: Props) {
           {returned ? <ThankYou plan={returned} /> : <CheckoutCard />}
         </div>
       </div>
-      {reasons}
     </div>
   );
 }

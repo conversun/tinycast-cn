@@ -1,4 +1,5 @@
 import { site } from "../data/site";
+import { supportHero } from "../data/support";
 import { Button } from "./ui/button";
 import { GitHubLogo, Logo, SupportIcon } from "./ui/icon";
 
@@ -22,17 +23,15 @@ export function Support() {
         <GlowingMark />
       </div>
       <h2 className="mx-auto mt-14 max-w-2xl text-closing">
-        Enjoying Tinycast?
+        {supportHero.title}
       </h2>
       <p className="mx-auto mt-4 max-w-lg text-pretty text-body-lg text-fg-muted">
-        Tinycast is free and open source, and it will stay that way. If
-        you&apos;d like to support its development, you can contribute.
-        It&apos;s optional.
+        {supportHero.intro}
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Button href={site.support} size="lg">
           <SupportIcon size={18} />
-          Support development
+          Support Tinycast
         </Button>
         <Button href={site.repo} variant="ghost" size="lg">
           <GitHubLogo size={16} />

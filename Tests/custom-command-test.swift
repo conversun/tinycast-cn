@@ -21,6 +21,68 @@ struct CustomCommandTests {
             }
         }
 
+        // MARK: Editor
+
+        let editor = CustomCommandEditorSession(command: nil)
+        check("a new editor starts on its name", editor.focusedField == .name)
+        check("an empty editor cannot save", !editor.canSave)
+        check(
+            "a new editor preserves command defaults",
+            editor.draft().isEnabled && editor.draft().showsInRootSearch
+                && !editor.loadsShellEnvironment && !editor.requiresConfirmation
+                && !editor.showsConfirmation && !editor.showsOutput && editor.arguments.isEmpty
+                && editor.workingDirectory.isEmpty && editor.iconSymbol == nil)
+        editor.name = "   "
+        editor.shellCommand = "/usr/bin/true"
+        check("a whitespace-only name cannot save", !editor.canSave)
+        editor.name = "Test Command"
+        editor.shellCommand = "\n "
+        check("a whitespace-only script cannot save", !editor.canSave)
+        editor.shellCommand = "/usr/bin/true"
+        check("a named nonempty script can save", editor.canSave)
+        editor.advanceFocus(backwards: true)
+        check("Shift-Tab wraps to the last option", editor.focusedField == .output)
+        editor.advanceFocus(backwards: false)
+        check("Tab wraps back to the name", editor.focusedField == .name)
+        for _ in 0..<CustomCommandArgument.limit { editor.addArgument() }
+        let argumentIDs = editor.arguments.map(\.id)
+        check("adding an argument focuses its name", editor.focusedField == .argumentName(argumentIDs[2]))
+        editor.addArgument()
+        check("the editor enforces the argument cap", editor.arguments.map(\.id) == argumentIDs)
+        check("Tab skips Add at the argument cap", !editor.focusOrder.contains(.addArgument))
+        editor.focusedField = .removeArgument(argumentIDs[1])
+        editor.removeArgument(id: argumentIDs[1])
+        check(
+            "removal keeps the neighboring argument identities",
+            editor.arguments.map(\.id)
+                == [argumentIDs[0], argumentIDs[2]])
+        check(
+            "removing a focused argument focuses its successor",
+            editor.focusedField == .argumentName(argumentIDs[2]))
+        check("removal restores Add to the focus order", editor.focusOrder.contains(.addArgument))
+        editor.removeArgument(id: argumentIDs[2])
+        editor.removeArgument(id: argumentIDs[0])
+        check("removing the last argument focuses Add", editor.focusedField == .addArgument)
+        let source = CustomCommand(
+            name: "Original", command: "printf '%s' \"$1\"", isEnabled: false,
+            showsInRootSearch: false,
+            loadsShellEnvironment: true, requiresConfirmation: true, showsConfirmation: true,
+            arguments: [CustomCommandArgument(name: "Query", isOptional: true)], showsOutput: true,
+            workingDirectory: "~/Documents", iconSymbol: "hammer")
+        let editing = CustomCommandEditorSession(command: source)
+        check("editing carries every existing field", editing.draft() == source)
+        editing.focusedField = .rootSearch
+        editing.advanceFocus(backwards: false)
+        check(
+            "Tab includes root-search visibility before execution options",
+            editing.focusedField == .shellEnvironment)
+        editing.name = "Renamed"
+        editing.shellCommand = "/usr/bin/true"
+        check(
+            "editing preserves the UUID and enabled flag",
+            editing.draft().id == source.id
+                && !editing.draft().isEnabled)
+
         // MARK: Store
 
         let store = CustomCommandStore(defaults: defaults)
@@ -64,10 +126,24 @@ struct CustomCommandTests {
         check("a new command is enabled", store.command(id: added.id)?.isEnabled == true)
         store.setEnabled(false, id: added.id)
         check("disabling is stored", store.command(id: added.id)?.isEnabled == false)
+        check("disabled commands are absent from the browser", store.matching("").isEmpty)
         check(
             "disabling keeps every other field intact",
             store.command(id: added.id)?.command == "/usr/bin/true")
         store.setEnabled(true, id: added.id)
+
+        check("a new command shows in root search", store.command(id: added.id)?.showsInRootSearch == true)
+        store.setShowsInRootSearch(false, id: added.id)
+        check("the browser includes root-hidden commands", store.matching("").map(\.id) == [added.id])
+        check(
+            "browser search ignores case and outer whitespace",
+            store.matching("  SCREENS\n").map(\.id) == [added.id])
+        check("browser search never matches script content", store.matching("/usr/bin/true").isEmpty)
+        check("unmatched browser search returns no rows", store.matching("No such command").isEmpty)
+        check(
+            "hiding from root search is stored and leaves it enabled",
+            store.command(id: added.id)?.showsInRootSearch == false
+                && store.command(id: added.id)?.isEnabled == true)
 
         let expected = store.commands
         check(
@@ -117,6 +193,9 @@ struct CustomCommandTests {
         check(
             "a record written before the enabled flag loads as enabled",
             CustomCommandStore(defaults: defaults).commands.first?.isEnabled == true)
+        check(
+            "a record written before the root-search flag still shows there",
+            CustomCommandStore(defaults: defaults).commands.first?.showsInRootSearch == true)
 
         // MARK: Batch add
 
@@ -232,6 +311,31 @@ struct CustomCommandTests {
         check(
             "a folder yields its script commands in name order and nothing else",
             RaycastScriptImport.scan(directory: scriptDirectory).map(\.name) == ["First", "Second"])
+
+        // Linked scripts import, keeping the link's path so the command follows its target.
+        let linkTarget = scriptDirectory.appendingPathComponent("nested/linked.sh")
+        try? Data("#!/bin/bash\n# @raycast.title Linked\nprintf '%s' 'linked-target-ran'\n".utf8)
+            .write(to: linkTarget)
+        let link = scriptDirectory.appendingPathComponent("c-linked.sh")
+        try? FileManager.default.createSymbolicLink(at: link, withDestinationURL: linkTarget)
+        // Checked, or a link that was never made would pass "doesn't import" for free.
+        let skippedLinksMade =
+            (try? FileManager.default.createSymbolicLink(
+                at: scriptDirectory.appendingPathComponent("d-dangling.sh"),
+                withDestinationURL: scriptDirectory.appendingPathComponent("missing.sh"))) != nil
+            && (try? FileManager.default.createSymbolicLink(
+                at: scriptDirectory.appendingPathComponent("e-folder"),
+                withDestinationURL: scriptDirectory.appendingPathComponent("nested"))) != nil
+        check("the dangling and folder links exist", skippedLinksMade)
+        let withLinks = RaycastScriptImport.scan(directory: scriptDirectory)
+        check(
+            "a linked script imports; a dangling or folder link doesn't",
+            withLinks.map(\.name) == ["First", "Second", "Linked"])
+        let linked = withLinks.first { $0.name == "Linked" }
+        check("a linked script keeps its link's path", linked?.command.contains(link.path) == true)
+        let linkedRun = await ShellCommandRunner.run(
+            linked?.command ?? "", workingDirectory: linked?.workingDirectory)
+        check("a linked script runs its target", linkedRun.standardOutput == "linked-target-ran")
 
         // The whole run, through `"$@"`: an imported script reads its value as data, never as syntax.
         try? Data("#!/bin/bash\n# @raycast.title Echo\nprintf '%s' \"$1\"\n".utf8).write(
@@ -409,6 +513,36 @@ struct CustomCommandTests {
             "a value carrying shell syntax is data, not code",
             injected.log.contains("; touch /tmp/tinycast-should-not-exist")
                 && !FileManager.default.fileExists(atPath: "/tmp/tinycast-should-not-exist"))
+
+        // MARK: Another interpreter
+
+        // The same text means `x` to zsh; only bash itself answers `y`.
+        let bashArray = await ShellCommandRunner.run("#!/bin/bash\na=(x y)\nprintf '%s' \"${a[1]}\"")
+        check("a #! line picks the interpreter that runs the text", bashArray.standardOutput == "y")
+
+        let scripted = await ShellCommandRunner.run(
+            "#!/bin/sh\nprintf '%s\\n' \"$0\" \"$1\"",
+            arguments: ["; touch /tmp/tinycast-script-should-not-exist"])
+        let scriptedLines = scripted.standardOutput?.split(separator: "\n").map(String.init) ?? []
+        check(
+            "a #! script reads its value as data, never as syntax",
+            scriptedLines.last == "; touch /tmp/tinycast-script-should-not-exist"
+                && !FileManager.default.fileExists(atPath: "/tmp/tinycast-script-should-not-exist"))
+        check(
+            "a #! script's file is gone once it exits",
+            scriptedLines.count == 2 && !FileManager.default.fileExists(atPath: scriptedLines[0]))
+
+        let streamedScript = await collect(
+            ShellCommandRunner.stream("#!/bin/bash\nprintf '%s\\n' \"$BASH\""))
+        check(
+            "a #! script streams under the pty too",
+            streamedScript.log.contains("/bin/bash") && streamedScript.result?.succeeded == true)
+
+        let missingInterpreter = await ShellCommandRunner.run("#!/nope/bash\ntrue")
+        check(
+            "a missing interpreter is named in the failure",
+            missingInterpreter.termination == .exited(status: 127)
+                && missingInterpreter.standardError?.contains("/nope/bash") == true)
 
         // MARK: Inline argument values
 

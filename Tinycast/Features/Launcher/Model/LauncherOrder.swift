@@ -20,6 +20,28 @@ enum LauncherOrder {
         }
     }
 
+    struct CategoryQuery: Sendable {
+        let name: String
+        private let query: FuzzyMatch.Query
+        private static let prefixLength = 3
+
+        init(_ raw: String) {
+            name = FuzzyMatch.normalized(raw.split(whereSeparator: \.isWhitespace).joined(separator: " "))
+            query = FuzzyMatch.Query(name)
+        }
+
+        func matches(_ candidate: FuzzyMatch.Candidate) -> Bool {
+            guard !query.isEmpty, let match = FuzzyMatch.match(query, candidate: candidate) else {
+                return false
+            }
+            switch match.tier {
+            case .exact: return true
+            case .prefix, .wordStart: return match.queryLength >= Self.prefixLength
+            case .substring, .subsequence: return false
+            }
+        }
+    }
+
     struct Signals: Sendable {
         var alias: SearchText?
         var usage: LauncherUsage

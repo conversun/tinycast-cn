@@ -14,6 +14,7 @@ struct SettingsFileTest {
         testFormat()
         testParseIssues()
         try await testRepository()
+        try testCommit()
         try testReplace()
         try testUnreadable()
         try testSymlink()
@@ -46,16 +47,16 @@ struct SettingsFileTest {
             "sections follow the Settings sidebar",
             SettingsFileKey.sections == [
                 "general", "appearance", "hyperKey", "calculator", "search", "applications",
-                "commands", "quicklinks", "appleShortcuts", "ai", "quickActions", "fileSearch",
-                "notes", "snippets", "navigation", "windowManagement", "clipboard", "emoji",
-                "calendar", "extensions"
+                "systemSettings", "systemActions", "commands", "quicklinks", "appleShortcuts", "ai",
+                "quickActions", "dictation", "fileSearch", "notes", "snippets", "navigation",
+                "windowManagement", "clipboard", "emoji", "calendar", "extensions"
             ])
 
         // A file that could switch one of these on would grant what only the app may ask for.
         let grantPaths = [
             "snippets.enabled", "extensions.enabled", "calendar.enabled",
             "calendar.autoJoinMeetings", "calendar.cameraPreview", "quickActions.enabled",
-            "ai.mcpEnabled", "mcp.enabled", "clipboard.textSearchEnabled"
+            "ai.mcpEnabled", "mcp.enabled", "clipboard.textSearchEnabled", "dictation.enabled"
         ]
         check(
             "no capability grant has a settings.json key",
@@ -115,6 +116,7 @@ struct SettingsFileTest {
             .autoSwitchInputSource: .null,
             .searchScopes: .array(["/Applications", "~/Applications"]),
             .showInMenuBar: true,
+            .automaticallyCheckForUpdates: false,
             .escapeKeyBehavior: "say \"hi\"\\ / é\n\t\u{01}",
             .fileSearchIgnorePatterns: .array([]),
             .popToRootTimeout: 5,
@@ -124,6 +126,7 @@ struct SettingsFileTest {
             {
               "general": {
                 "showInMenuBar": true,
+                "automaticallyCheckForUpdates": false,
                 "popToRootSeconds": 5,
                 "escapeKeyBehavior": "say \\"hi\\"\\\\ / é\\n\\t\\u0001",
                 "autoSwitchInputSource": null
@@ -257,6 +260,26 @@ struct SettingsFileTest {
         try await Task.sleep(for: .milliseconds(50))
         synced.flush()
         check("flush writes a pending change at once", contents(of: url).contains(#""ABC""#))
+    }
+
+    private static func testCommit() throws {
+        let folder = scratchFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appending(path: "settings.json")
+        try write(#"{"general": {"showInMenuBar": false}}"#, to: url)
+
+        let fixture = Fixture()
+        var shownAtCommit: Bool?
+        let moved = SettingsFileIssue.invalidEntry(.showInMenuBar, "moved")
+        let repository = SettingsFileRepository(fileURL: url, bindings: bindings(fixture)) {
+            shownAtCommit = fixture.shows
+            return [moved]
+        }
+        var reported: [[SettingsFileIssue]] = []
+        repository.onIssues = { reported.append($0) }
+        repository.start(importing: true)
+        check("commit runs once every key has applied", shownAtCommit == false)
+        check("and what it reports joins the file's issues", reported == [[moved]])
     }
 
     private static func testReplace() throws {

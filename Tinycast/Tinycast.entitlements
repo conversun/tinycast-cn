@@ -13,6 +13,9 @@
 	<!-- Undeclared, tccd refuses the prompt outright: no dialog, and the request resolves as denied. -->
 	<key>com.apple.security.device.camera</key>
 	<true/>
+	<!-- Microphone capture belongs to Tinycast; the Dictation helper only receives audio over a pipe. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
 </dict>

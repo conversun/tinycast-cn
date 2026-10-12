@@ -6,7 +6,6 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import type { Slide } from "yet-another-react-lightbox";
 import { galleryItems, type GalleryItem } from "../data/gallery";
-import { cn } from "../lib/cn";
 import { Section } from "./ui/section";
 
 // The lightbox is ~30 KB gzipped and does nothing until a tile is clicked.
@@ -69,7 +68,7 @@ export function Gallery() {
       index={2}
       label="In action"
       title="Straight from the app."
-      intro="The palette at the top of this page is a recreation. These screenshots come from Tinycast itself. Click one to see it full size."
+      intro="The palette at the top of this page is a recreation. These screenshots and videos come from Tinycast itself. Click to enlarge an image or play a video."
     >
       <div className="overflow-hidden rounded-xl border border-border/70 bg-surface shadow-xs">
         <div className="flex min-h-11 items-center gap-3 border-b border-border/60 px-4 py-1.5 font-mono text-micro uppercase text-fg-muted">
@@ -78,40 +77,23 @@ export function Gallery() {
             className="size-1.5 rounded-full bg-violet"
           />
           Captured in Tinycast
-          <span className="ml-auto hidden sm:inline">Click any to enlarge</span>
+          <span className="ml-auto hidden sm:inline">Click to view or play</span>
         </div>
-        {/* The tour video leads at double size and the last still runs double
-            width, so the stills fill every row without a gap. */}
         <div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
           {galleryItems.map((item, i) => {
-            const isLead = i === 0;
-            const isLast = i === galleryItems.length - 1;
             return (
               <button
                 key={`${item.title}-${i}`}
                 type="button"
                 onClick={() => open(i)}
-                className={cn(
-                  "group flex flex-col gap-2 text-left",
-                  isLead && "sm:col-span-2 lg:row-span-2",
-                  isLast && "sm:col-span-2",
-                )}
+                className="group flex flex-col gap-2 text-left"
               >
-                <figure
-                  className={cn(
-                    "relative aspect-video w-full overflow-hidden rounded-lg ring-1 ring-border/60 transition-shadow duration-200 group-hover:ring-border-strong",
-                    (isLead || isLast) && "lg:aspect-auto lg:flex-1",
-                  )}
-                >
+                <figure className="relative aspect-video w-full overflow-hidden rounded-lg ring-1 ring-border/60 transition-shadow duration-200 group-hover:ring-border-strong">
                   <Image
                     src={tileImage(item)}
                     alt={item.title}
                     fill
-                    sizes={
-                      isLead || isLast
-                        ? "(min-width: 640px) 50vw, 90vw"
-                        : "(min-width: 1024px) 25vw, (min-width: 640px) 45vw, 90vw"
-                    }
+                    sizes="(min-width: 1024px) 25vw, (min-width: 640px) 45vw, 90vw"
                     className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                   />
                   {item.type === "video" && (

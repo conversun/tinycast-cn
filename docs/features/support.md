@@ -1,8 +1,9 @@
 # Support
 
 One window, one checkout link, and a checkbox deciding whether it may ever reopen itself. Every other
-surface — the website's hero and footer, the docs sidebar, the README badge — is a bare link to the
-same URL, so `SupportCoordinator.checkout` is the only place the destination is written down.
+surface — the website's hero and footer, the docs sidebar, the README badge — links to the same URL,
+so `SupportCoordinator.checkout` is the only place the app's destination is written down. The website
+hero shares the checkout page's brief offer copy from `website/src/data/support.ts`.
 
 ## Invariants
 
@@ -20,14 +21,14 @@ same URL, so `SupportCoordinator.checkout` is the only place the destination is 
   turned it off should stay off across a restore.
 - **The schedule state is a file, not a default.** `support-reminder.json` lives under
   `AppPaths.applicationSupport()`, not `caches()` — a purged cache would reset the anchor and ask
-  early. It holds `firstSeenAt` and `lastAskedAt` and nothing else; the *preference* stays in
+  early. It holds `firstSeenAt` and `lastAskedAt` and nothing else; the _preference_ stays in
   `AppSettings`, and the two never mix.
 - **The first ask lands one interval after first run, not after launch.** With no `lastAskedAt` the
   anchor is `firstSeenAt`, stamped the first time the store finds no file, so a fresh install is
   never asked on day one.
-- **One button, one link.** `SupportCoordinator.checkout` is the only destination, and no surface
-  restates what is behind it — the checkout page owns that, so nothing here can fall out of step
-  with it. Adding a second button means adding a second thing to keep in sync.
+- **One button, one link.** `SupportCoordinator.checkout` is the only app destination. The checkout
+  page owns the offer and fulfillment details; the website hero reuses its brief product copy.
+  Adding a second button means adding a second thing to keep in sync.
 - **The button is the composition, not its footer.** It sits under the hero at 46pt tall, because this
   window asks where the update window reports — an actions row pinned to the bottom edge reads as a
   utility dialog.
@@ -37,12 +38,12 @@ same URL, so `SupportCoordinator.checkout` is the only place the destination is 
 
 ## How it is put together
 
-| Piece | Holds |
-| --- | --- |
-| `Model/SupportReminderSchedule.swift` | pure — seconds until the next ask, clamped at both ends |
-| `Service/SupportReminderStore.swift` | the JSON state, and the one `Task` pump that offers the ask |
-| `UI/SupportCoordinator.swift` | the window's lifecycle, the checkout link, the anchor write |
-| `UI/SupportWindowView.swift` | the window: hero, the button, and the reminder checkbox |
+| Piece                                 | Holds                                                       |
+| ------------------------------------- | ----------------------------------------------------------- |
+| `Model/SupportReminderSchedule.swift` | pure — seconds until the next ask, clamped at both ends     |
+| `Service/SupportReminderStore.swift`  | the JSON state, and the one `Task` pump that offers the ask |
+| `UI/SupportCoordinator.swift`         | the window's lifecycle, the checkout link, the anchor write |
+| `UI/SupportWindowView.swift`          | the window: hero, the button, and the reminder checkbox     |
 
 `SupportReminderStore.advance()` is one turn of the pump: it answers how long to sleep, and calls
 `onDue` when the wait has reached zero. `AppCore.start()` wires that closure to

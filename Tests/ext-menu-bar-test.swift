@@ -724,6 +724,13 @@ extension ExtensionTests {
             metadata.recordMenuBarRun(
                 extension: reference.extensionName, command: reference.commandName, now: .distantPast)
         }
+        func stateDetails() -> String {
+            let completed = storage.localStorageValue(extension: "first", key: "completed")
+            let confirmed = storage.localStorageValue(extension: "first", key: "confirmed")
+            return
+                "boots=\(boots.map(\.0)), running=\(manager.isRunning), runtimeAlive=\(lastRuntime != nil), "
+                + "completed=\(String(describing: completed)), confirmed=\(String(describing: confirmed)), errors=\(failures)"
+        }
         check("install does not run a menu command", boots.isEmpty && metadata.menuBarCommands().isEmpty)
         let initialIdle = idle(after: boots.count + 1)
         manager.run(first, command: first.manifest.commands[0])
@@ -774,11 +781,11 @@ extension ExtensionTests {
                 "action writes into its own extension",
                 storage.localStorageValue(extension: "first", key: "clicked")
                     == .string("left-click")
-                    && storage.localStorageValue(extension: "second", key: "clicked") == nil)
+                    && storage.localStorageValue(extension: "second", key: "clicked") == nil, stateDetails())
             check(
                 "action snapshot updates before unloading",
                 snapshot(firstRef)?.title == "Updated"
-                    && !manager.isRunning && lastRuntime == nil)
+                    && !manager.isRunning && lastRuntime == nil, stateDetails())
         } else {
             check("refresh action exists", false)
         }
@@ -846,7 +853,7 @@ extension ExtensionTests {
             "scheduled refresh preserves an explicit background launch's payload",
             storage.localStorageValue(extension: "second", key: "launch")
                 == .string("background:kept:payload")
-                && !manager.isRunning)
+                && !manager.isRunning, stateDetails())
 
         let promotedReady = ready(controller, firstRef)
         manager.run(first, command: first.manifest.commands[0], type: .background)
@@ -857,7 +864,7 @@ extension ExtensionTests {
         check(
             "opening promotes the existing background host",
             boots.count == backgroundBoots
-                && hosts.last?.isInteractive == true)
+                && hosts.last?.isInteractive == true, stateDetails())
         if let index = controller.menu.items.firstIndex(where: { $0.title == "Confirm" }) {
             let confirmIdle = idle(after: boots.count)
             controller.menuDidClose(controller.menu)
@@ -866,7 +873,7 @@ extension ExtensionTests {
             check(
                 "actions can confirm after opening a background refresh",
                 storage.localStorageValue(extension: "first", key: "confirmed") == .bool(true)
-                    && !manager.isRunning)
+                    && !manager.isRunning, stateDetails())
         } else {
             check("confirmation action exists", false)
         }
@@ -886,7 +893,8 @@ extension ExtensionTests {
             check(
                 "clicking immediately after opening runs the fresh action and unloads",
                 storage.localStorageValue(extension: "first", key: "confirmed") == .bool(true)
-                    && boots.count == beforeEarlyClick + 1 && !manager.isRunning && lastRuntime == nil)
+                    && boots.count == beforeEarlyClick + 1 && !manager.isRunning && lastRuntime == nil,
+                stateDetails())
         } else {
             check("early confirmation action exists", false)
         }
@@ -896,7 +904,7 @@ extension ExtensionTests {
         manager.synchronize(installed)
         await unloaded(overdueIdle)
         check("overdue refresh runs with background launch type", boots.last?.1 == .background)
-        check("background refresh unloads", !manager.isRunning && lastRuntime == nil)
+        check("background refresh unloads", !manager.isRunning && lastRuntime == nil, stateDetails())
         metadata.flush()
         let restored = ExtensionCommandMetadataStore(fileURL: metadataFile)
         check(
@@ -922,7 +930,7 @@ extension ExtensionTests {
             "null removes item without forgetting activation",
             metadata.metadata(extension: "empty", command: "bar").menuBarEnabled
                 && metadata.metadata(extension: "empty", command: "bar").menuBarSnapshot == nil
-                && !manager.isRunning)
+                && !manager.isRunning, stateDetails())
         let (foreground, _, recorder) = makeRuntime()
         defer { foreground.shutdown() }
         recorder.onRender = { events.foregroundRenders += 1 }
@@ -949,7 +957,7 @@ extension ExtensionTests {
         check(
             "background no-view receives scoped context",
             storage.localStorageValue(extension: "job", key: "context")
-                == .string("background:menu") && !manager.isRunning && lastRuntime == nil)
+                == .string("background:menu") && !manager.isRunning && lastRuntime == nil, stateDetails())
         check(
             "no-view launch creates no menu snapshot",
             !metadata.metadata(extension: "job", command: "bar").menuBarEnabled)
@@ -972,7 +980,8 @@ extension ExtensionTests {
         check(
             "foreground keeps rendering during background commands",
             recorder.trees.count > foregroundRenders + 3
-                && recorder.failures.isEmpty && !manager.isRunning)
+                && recorder.failures.isEmpty && !manager.isRunning,
+            "renders=\(recorder.trees.count), baseline=\(foregroundRenders), " + stateDetails())
         foreground.shutdown()
 
         let hangingIdle = idle(after: boots.count + 1)

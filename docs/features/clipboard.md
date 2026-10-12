@@ -78,6 +78,11 @@ the cap, and even a rejected modern file URL suppresses the legacy filenames fal
 re-capturing Tinycast's own writes, every write stamps a private `internalType` marker on the
 pasteboard and the poller skips anything carrying it.
 
+A ⌘C Tinycast sends to read a selection can't carry that marker, since the other app writes it.
+`pauseCapture()` and `resumeCapture()` bracket that borrow instead: the poller skips every tick in
+between, and the restore's baseline keeps the copy from being recorded once it resumes.
+`TextInjector` refuses a second borrow while one is in flight, so the pause is never nested.
+
 `stop()` is the off switch: it drops the timer and the fast-user-switching observers, and clears the
 `isCapturing` flag that `prepareForTinycastPasteboardMutation` reads — so a paste Tinycast performs
 itself no longer drains the pasteboard into history either.

@@ -76,21 +76,25 @@ struct ShortcutRecorder: View {
                 .accessibilityLabel("Open Accessibility settings")
                 .help("Modifier-only hotkeys need Accessibility access. Click to grant it.")
             }
-            ForEach(Array(binding.keycaps.enumerated()), id: \.offset) { _, cap in
-                Text(cap)
-                    .font(Theme.Typography.keyCap)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, Theme.Spacing.xs)
-                    .frame(
-                        minWidth: Theme.Size.recorderKeyCap, minHeight: Theme.Size.recorderKeyCap
-                    )
-                    .background(
-                        RoundedRectangle(
-                            cornerRadius: Theme.Radius.recorderKeyCap, style: .continuous
+            HStack(spacing: Theme.Spacing.xs) {
+                ForEach(Array(binding.recorderKeycaps.enumerated()), id: \.offset) { _, cap in
+                    KeyCapChip.Label(text: cap, prefix: binding.recorderPrefix)
+                        .font(Theme.Typography.keyCap)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, Theme.Spacing.xs)
+                        .frame(
+                            minWidth: Theme.Size.recorderKeyCap, minHeight: Theme.Size.recorderKeyCap
                         )
-                        .fill(Color.primary.opacity(0.08))
-                    )
+                        .background(
+                            RoundedRectangle(
+                                cornerRadius: Theme.Radius.recorderKeyCap, style: .continuous
+                            )
+                            .fill(Color.primary.opacity(0.08))
+                        )
+                }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(binding.keycaps.joined(separator: " "))
         }
         .frame(maxWidth: .infinity)
         // Overlaid, not a row member, so it costs the caps no width.

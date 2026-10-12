@@ -19,6 +19,7 @@ struct FuzzTest {
         sensitivity()
         transliteration()
         naming()
+        categories()
         comparator()
         denseIndex()
         suggestions()
@@ -320,6 +321,36 @@ struct FuzzTest {
             usage == ["Maps", "Arc", "Mail", "Zed"], "got \(usage)")
     }
 
+    static func categories() {
+        print("\n# category queries")
+        let names = ["Window Management", "Window Command", "Window Layouts", "Window Layout"]
+            .map(FuzzyMatch.Candidate.init)
+        func matching(_ raw: String) -> [String] {
+            names.filter(LauncherOrder.CategoryQuery(raw).matches).map(\.text)
+        }
+        for query in ["win", "window", "WINDOW", "ｗｉｎｄｏｗ", "wíndow", " \twindow\n"] {
+            check("'\(query)' finds both window categories", matching(query).count == names.count)
+        }
+        check(
+            "a partial category phrase narrows to management",
+            matching("window man") == ["window management"])
+        check(
+            "category whitespace is folded once",
+            matching("window \t\n man") == ["window management"])
+        check("a later word finds its category", matching("manage") == ["window management"])
+        check("a label finds the same category", matching("window com") == ["window command"])
+        check("a later layout word stays specific", matching("lay") == ["window layouts", "window layout"])
+        for query in ["", " \t\n", "w", "wi", "ind", "wnd", "windowx", "window manager"] {
+            check("'\(query)' expands no categories", matching(query).isEmpty)
+        }
+        check(
+            "an exact short category is still valid",
+            LauncherOrder.CategoryQuery("AI").matches(FuzzyMatch.Candidate("AI")))
+        check(
+            "canonical category names share the launcher fold",
+            LauncherOrder.CategoryQuery(" \nＳＹＳＴＥＭ\tSettings ").name == "system settings")
+    }
+
     // MARK: - A dense index
 
     static let now = Date(timeIntervalSince1970: 2_000_000_000)
@@ -343,6 +374,7 @@ struct FuzzTest {
             Item(name: "Game Center", priority: 1), Item(name: "Sound", priority: 1),
             Item(name: "Tinycast Settings"), Item(name: "Calculator History"),
             Item(name: "AI Chat", boosted: ["ai", "chat"]), Item(name: "Search Files"),
+            Item(name: "Switch Windows"),
             Item(name: "Search Notes"), Item(name: "Show Notes"), Item(name: "Set Volume"),
             Item(name: "Search", subtitle: "Brew"), Item(name: "Upgrade", subtitle: "Brew"),
             Item(name: "Signature Block", alternates: ["sig"])
@@ -387,7 +419,8 @@ struct FuzzTest {
             ("gddt", "高德地图", "…and its initials"),
             ("telegram", "Телеграм", "a Cyrillic name typed in Latin"),
             ("sig", "Signature Block", "a snippet's keyword"),
-            ("brew", "Search", "an extension's title lists its commands")
+            ("brew", "Search", "an extension's title lists its commands"),
+            ("window", "Switch Windows", "an ordinary command still matches a category prefix")
         ]
         for test in cases {
             let ranked = rank(test.query, index)

@@ -159,6 +159,11 @@ Arguments are unique and requested in first-appearance order, including argument
 snippets. Inserted clipboard, selection, and argument values are literal: token-shaped text inside a
 value is not expanded again.
 
+`{selection}` is read through Accessibility. When that reads nothing, a snippet you insert yourself —
+from the launcher, Search Snippets or its shortcut — falls back to a ⌘C, as described in
+[quick-actions.md](quick-actions.md#reading-the-selection). Keyword expansion never sends one: a typed
+keyword leaves nothing selected.
+
 Snippet references are case-insensitive. Duplicate names or keywords resolve deterministically by
 file-path identity. Nested references support five levels, detect cycles by file identity, and leave
 the original reference token visible when a target is missing, cyclic, or beyond the depth limit.
@@ -232,11 +237,32 @@ shortcut, file name and character count.
 which reads `previousApp` before hiding the panel and then calls the same `expandSnippet` funnel a
 launcher row does — so template expansion, cursor placement, the Accessibility prompt, the
 confirmation HUD and the pasteboard lease are the ones described below, not a second copy of them.
-The rest of the menu is **Edit Snippet** and **Create Snippet**, which hand off to the pane's editor
-through `AppCore.pendingSnippetEdit`, and **Show in Finder**.
+The rest of the menu is **Edit Snippet** (⌘E) and **Create Snippet** (⌘N), which open the launcher
+editor, **Show in Finder** (⌘↵), and **Delete Snippet** (⌃X), separated at the bottom in red. Deletion
+always confirms before removing the snippet file and reports a failure without losing the record.
+These shortcuts also work with the menu closed; ⌘N works even when the browser has no rows.
 
 `Create Snippet` is a launcher command as well as a menu row because the palette swallows ⌘K when a
 screen has no rows: an empty library would otherwise open a browser with nothing to do.
+
+## Launcher editor
+
+`SnippetCoordinator` owns a `SnippetEditorSession`, presented by `SnippetEditorScreen` in
+`PaletteMode.snippetEditor`. **Create Snippet**, **Edit Snippet** (⌘E) in the browser or root search,
+and the settings library's **New Snippet** and **Edit** buttons open this same editor; Settings has no
+second editor. The fields stay inside `Features/Snippets/UI/`, not in the palette shell or the extension form.
+
+The template is on the left, with its own **Insert…** placeholder menu, separate from Actions.
+It uses the palette's searchable popup, keeping its existing placeholder groups.
+**Name**, **Keyword**, **Enabled** and **Show confirmation** are on the right. The draft keeps the
+loaded record and its source revision; no file is created or changed before **Save Snippet**.
+The template grows with its text; only the whole form scrolls, never an individual field or column.
+A blank name disables Save.
+An IO or revision failure leaves the draft open and shows the error beside its fields.
+
+**⌘↵** saves; plain **↵** inserts a template line break. **Tab** and **Shift-Tab** walk the fields,
+**⌥Tab** types a tab character, and **Escape** cancels and returns to the previous launcher screen, or closes a directly summoned
+editor. Saving also returns to the previous screen. No snippet expansion or paste is part of editing.
 
 ## Shortcuts
 
@@ -244,7 +270,8 @@ Each snippet can hold a global shortcut, recorded on its row in **Settings → S
 as keycaps on its launcher and browser rows. `SnippetCoordinator.expandSnippetFromHotKey` refuses
 while the feature or the snippet is off, then calls the same `expandSnippet` funnel a launcher row
 does. Its target is `InjectionTarget.current()`, or what the palette covered while the palette is
-open.
+open. A window of ours that is not an editor resolves no target — Settings, straight after recording
+the shortcut — so the press shows a HUD asking for a text field rather than doing nothing.
 
 **The shortcut's own modifiers are still held when delivery starts.** A keyboard event built from
 `.combinedSessionState` inherits them, so a Unicode keystroke clears its flags like every other
@@ -254,7 +281,7 @@ deleted files are in [hotkeys.md](hotkeys.md#persistence).
 ## Confirmation HUD
 
 The confirmation is per snippet and off by default: the only gate is `show_confirmation: true`, set
-from the snippet's editor in **Settings → Snippets**. Nothing about it reaches settings backups.
+from the launcher editor. Nothing about it reaches settings backups.
 The feature switch — which carries keyword-monitoring consent — is likewise excluded from backups.
 
 `MessageHUDController` is shared rather than snippet-specific. It takes a message and a `DialogTone`
@@ -274,8 +301,9 @@ not report completion and therefore cannot show it.
 
 There are two delivery tiers, and the target picks which one runs.
 
-`InjectionTarget.ownEditor` is one of our own views — today only `NoteTextView`, which opts in by
-adopting `InjectableTextView`. It is written in process with `insertText(_:replacementRange:)`:
+`InjectionTarget.ownEditor` is one of our own views — `NoteTextView` and AI Chat's
+`ComposerTextView`, which opt in by adopting `InjectableTextView`. It is written in process with
+`insertText(_:replacementRange:)`:
 undoable in the editor's own `UndoManager`, and needing no Accessibility grant, no pasteboard lease,
 no app activation and no event posting. Rules 1, 3 and 4 below do not apply — our own storage is
 authoritative, so there is nothing to sniff for and nothing to read back.
@@ -402,6 +430,12 @@ a given app takes is a manual check.
 
 ### Manual sweep
 
+- Create from the launcher and from **Settings → Snippets → New Snippet**: the same launcher form opens.
+- Enter a multiline template, tab through its existing options and insert a placeholder: plain Return
+  stays in the template, while **⌘↵** saves only after a name is entered.
+- Edit from a filtered snippet list, then save or cancel: its search and selection are restored.
+- Cancel a new draft: no file appears. Change an edited file externally: Save reports a conflict and
+  keeps the draft, without overwriting the external edit.
 - Type a keyword in the **ChatGPT composer inside a Chromium browser**: it expands. This is rule 1 and
   rule 4 together — the composer is skipped over Accessibility and typed into in four-unit keystrokes.
 - Type one in a **VSCodium editor pane**: it expands, where the Accessibility value stays empty.

@@ -68,7 +68,7 @@ camera preview, and individual events as searchable launcher entries.
 - **`MeetingSpan`** — how far ahead the store reads, and the phrasing that names those days.
 - **`MenuBarSummary`** — which event the menu bar carries, and for how long.
 - **`AutoJoinPolicy`** — whether a meeting should open itself, and which one.
-- **`EventDraft`** — what the New Event prompt collects, before anything touches the calendar.
+- **`EventDraft`** — what the Create Event editor collects, before anything touches the calendar.
 - **`MeetingDetails`** — one occurrence's location, notes as plain text, and attendees.
 
 ### Finding the link
@@ -154,7 +154,7 @@ the option to hide a current event immediately or after a chosen delay.
 | --- | --- | --- |
 | Join Next Meeting | Opens the link for the carded, running, or next meeting. | yes |
 | My Schedule | Opens the `.schedule` palette mode. | yes |
-| Create Event | Prompts for a title, a start and a duration, and writes the event. | yes |
+| Create Event | Opens the launcher form for a title, a start and a duration, and writes the event. | yes |
 | Copy Meeting Link | The same meeting's link, to the pasteboard. | no |
 | Open in Calendar | Hands the meeting to Calendar.app. | no |
 
@@ -163,6 +163,21 @@ through the join card's own ⌘K menu instead, where the meeting they act on is 
 
 A miss reports through the HUD (`Nothing to join right now`), not a dialog: it is transient and there
 is nothing to acknowledge.
+
+## Create Event
+
+`CalendarCoordinator` owns a lazy `EventEditorSession`; `EventEditorScreen` presents its fields inside
+the launcher, using the native form input and input-menu components. The old dialog editor is gone.
+Only the existing fields are offered: title, start offset (Now, 15, 30 or 60 minutes), and duration
+(15, 30, 45 or 60 minutes). Defaults remain Now and 30 minutes. The event still goes to EventKit's
+default calendar for new events, with the start offset measured when the user saves.
+
+Tab and Shift-Tab cycle the three fields; Return, Space or Down opens a focused choice. A blank or
+whitespace-only title disables Create Event, including ⌘↵. Escape or Back discards the draft and restores
+the previous search and selection; an editor summoned from a hotkey closes instead. Permission and
+feature consent are checked at both open and save. Disabling Calendar closes its editor.
+Invoking Create Event again while its editor is open preserves the current draft and navigation;
+while the palette is hidden with that editor kept, it summons the palette back onto the same draft.
 
 ## Reading the store
 
@@ -266,6 +281,13 @@ occurrence rather than per series — dismissing today's standup says nothing ab
 `start >= armedAt`, `now >= start`, and not already joined. Reusing `UpcomingWindow.carded` rather
 than inventing a second window is what keeps one knob, `joinWindowMinutes`, governing the card, the
 chord and auto join alike.
+
+**Only join known meeting services** (`autoJoinNamedProvidersOnly`, off by default) keeps auto join
+to the ten named providers. A `.generic` link is as often a booking page, a document or a calendar's
+own help link as it is a call, and placeholder events carry plenty of them. The bare links are set
+aside **before** `carded` picks, not after: filtering the pick would let a placeholder starting a
+minute earlier hold the card's slot and starve the call beside it. The card, the chord and the menu
+bar still offer a bare link — only the unattended join skips it.
 
 The meeting is marked joined **before** the confirmation is raised, so declining does not re-ask a
 minute later.

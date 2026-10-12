@@ -37,7 +37,28 @@ struct SnippetsScreen: PaletteScreen {
         core.snippetCoordinator.expandSnippetFromPalette(id: record.id)
     }
 
-    func secondary(at selection: Int) -> Bool { false }
+    /// ⌘↵ reveals the file, as it does on a snippet's launcher row.
+    func secondary(at selection: Int) -> Bool {
+        guard let record = record(at: selection) else { return false }
+        core.snippetCoordinator.showSnippetInFinder(record)
+        return true
+    }
+
+    func perform(_ shortcut: PaletteShortcut, at selection: Int) -> Bool {
+        if shortcut == .newItem {
+            core.snippetCoordinator.editSnippet(nil)
+            return true
+        }
+        guard let record = record(at: selection) else { return false }
+        switch shortcut {
+        case .edit:
+            core.snippetCoordinator.editSnippet(record)
+        case .delete:
+            Task { await core.snippetCoordinator.deleteSnippet(id: record.id) }
+        default: return false
+        }
+        return true
+    }
 
     func body(selection: Int, scroll: ScrollIntent) -> AnyView {
         AnyView(content(selection: selection, scroll: scroll))
@@ -86,16 +107,24 @@ enum SnippetActionsMenu {
                 PopoverMenuItem(title: "Paste Snippet", systemImage: "text.quote", shortcut: "↵") {
                     core.snippetCoordinator.expandSnippetFromPalette(id: record.id)
                 },
-                PopoverMenuItem(title: "Edit Snippet", systemImage: "pencil", startsSection: true) {
-                    core.paletteCoordinator.hidePalette(restoreFocus: false)
+                PopoverMenuItem(
+                    title: "Edit Snippet", systemImage: "pencil", startsSection: true, shortcut: "⌘E"
+                ) {
                     core.snippetCoordinator.editSnippet(record)
                 },
-                PopoverMenuItem(title: "Create Snippet", systemImage: "plus") {
-                    core.paletteCoordinator.hidePalette(restoreFocus: false)
+                PopoverMenuItem(title: "Create Snippet", systemImage: "plus", shortcut: "⌘N") {
                     core.snippetCoordinator.editSnippet(nil)
                 },
-                PopoverMenuItem(title: "Show in Finder", systemImage: "folder", startsSection: true) {
+                PopoverMenuItem(
+                    title: "Show in Finder", systemImage: "folder", startsSection: true, shortcut: "⌘↵"
+                ) {
                     core.snippetCoordinator.showSnippetInFinder(record)
+                },
+                PopoverMenuItem(
+                    title: "Delete Snippet", systemImage: "trash", startsSection: true,
+                    shortcut: "⌃X", isDestructive: true
+                ) {
+                    Task { await core.snippetCoordinator.deleteSnippet(id: record.id) }
                 }
             ])
     }

@@ -23,9 +23,18 @@ struct HTTPAIProvider: AIProvider {
                             String(localized: "The provider returned an invalid HTTP response."))
                     }
                     guard response.statusCode == 200 else {
-                        throw AIProviderError.responseFailed(Self.statusMessage(response))
+                        let body = await Self.body(of: bytes)
+                        try Task.checkCancellation()
+                        throw AIProviderError.responseFailed(
+                            AIProviderFailure.described(
+                                String(localized: String.LocalizationValue(
+                                    AIProviderFailure.statusLine(
+                                        response.statusCode,
+                                        retryAfter: response.value(forHTTPHeaderField: "Retry-After")))),
+                                said: AIProviderFailure.providerMessage(in: body),
+                                secrets: [apiKey]))
                     }
-                    var decoder = AIStreamDecoder(shape: configuration.shape)
+                    var decoder = AIStreamDecoder(shape: configuration.shape, secrets: [apiKey])
                     var chunk = Data()
                     chunk.reserveCapacity(2_048)
                     // Per line, not per 2 KB: a short reply must show before the stream closes.
@@ -102,19 +111,31 @@ struct HTTPAIProvider: AIProvider {
         return URLSession(configuration: configuration)
     }
 
-    private static func statusMessage(_ response: HTTPURLResponse) -> String {
-        switch response.statusCode {
-        case 401, 403:
-            return String(localized: "API key rejected — check it in Settings.")
-        case 429:
-            guard let retryAfter = response.value(forHTTPHeaderField: "Retry-After"),
-                let seconds = Int(retryAfter), seconds >= 0
-            else { return String(localized: "Rate limit reached — try again later.") }
-            return "Rate limit reached — retry after \(seconds) seconds."
-        case 500...599:
-            return "The provider is temporarily unavailable (HTTP \(response.statusCode))."
-        default:
-            return "The provider rejected the model or request (HTTP \(response.statusCode))."
+    /// A refusal's body comes with its headers; the status is never held longer than this for one.
+    private static let bodyWait: Duration = .seconds(5)
+
+    /// What arrived by the end, the cap or the wait; a broken-off body still leaves the status.
+    private static func body(of bytes: URLSession.AsyncBytes) async -> Data {
+        await withTaskGroup(of: Data?.self) { group in
+            group.addTask {
+                var body = Data()
+                var iterator = bytes.makeAsyncIterator()
+                while body.count < AIProviderFailure.bodyLimit, let byte = try? await iterator.next() {
+                    body.append(byte)
+                }
+                return body
+            }
+            group.addTask {
+                try? await Task.sleep(for: bodyWait)
+                return nil
+            }
+            var body = Data()
+            // Whichever ends first stops the other; a reader stopped early hands over its part.
+            for await read in group {
+                if let read { body = read }
+                group.cancelAll()
+            }
+            return body
         }
     }
 

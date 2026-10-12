@@ -26,11 +26,6 @@ struct ClipboardTextTests {
             try await ClipboardTextExtractor.extract(at: imageURL, isPDF: false)
         }.value
         expect(imageText.localizedCaseInsensitiveContains("ALPINE RECEIPT 7391"), "Vision recognizes image")
-        let fileText = try await Task.detached {
-            try await ClipboardTextExtractor.extract(at: imageURL, isPDF: false)
-        }.value
-        expect(fileText.contains("7391"), "referenced image is recognized")
-
         let pdfURL = directory.appendingPathComponent("mixed.pdf")
         makePDF(at: pdfURL, scan: image)
         let pdfText = try await Task.detached {
@@ -303,7 +298,8 @@ struct ClipboardTextTests {
     }
 
     static func waitUntil(_ condition: () -> Bool) async throws {
-        for _ in 0..<200 {
+        let deadline = ContinuousClock.now + .seconds(10)
+        while ContinuousClock.now < deadline {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(10))
         }

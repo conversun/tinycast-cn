@@ -19,6 +19,12 @@ struct QuicklinkListScreen: PaletteScreen {
 
     var primaryActionTitle: String { "Open Quicklink" }
 
+    /// A prompt for one row opens on that row, so the show's reset can't move it back to the top.
+    var landingSelection: Int {
+        guard let pending = vm.pendingArgumentEntryID else { return 0 }
+        return rows.firstIndex { $0.entryID == pending } ?? 0
+    }
+
     private func quicklink(at selection: Int) -> Quicklink? {
         let rows = rows
         return rows.indices.contains(selection) ? rows[selection] : nil
@@ -28,14 +34,14 @@ struct QuicklinkListScreen: PaletteScreen {
         guard let quicklink = quicklink(at: selection) else { return nil }
         return QuicklinkActionsMenu.content(
             quicklink: quicklink, core: core,
-            values: QuicklinkArgumentsAccessory.values(for: quicklink, core: core, vm: vm))
+            values: QuicklinkArgumentsAccessory.values(for: quicklink, vm: vm))
     }
 
     func activate(at selection: Int) {
         guard let quicklink = quicklink(at: selection) else { return }
         core.quicklinkCoordinator.openQuicklink(
             id: quicklink.id,
-            values: QuicklinkArgumentsAccessory.values(for: quicklink, core: core, vm: vm))
+            values: QuicklinkArgumentsAccessory.values(for: quicklink, vm: vm))
     }
 
     /// The header's argument fields, which is where a templated link collects its values.
@@ -55,29 +61,26 @@ struct QuicklinkListScreen: PaletteScreen {
         }
         core.quicklinkCoordinator.openQuicklink(
             id: quicklink.id, forcingDefaultApp: true,
-            values: QuicklinkArgumentsAccessory.values(for: quicklink, core: core, vm: vm))
+            values: QuicklinkArgumentsAccessory.values(for: quicklink, vm: vm))
         return true
     }
 
     func perform(_ shortcut: PaletteShortcut, at selection: Int) -> Bool {
+        if shortcut == .newItem {
+            core.quicklinkCoordinator.editQuicklink(nil)
+            return true
+        }
+        guard let quicklink = quicklink(at: selection) else { return false }
+        let coordinator = core.quicklinkCoordinator
         switch shortcut {
-        case .commandDelete: return delete(at: selection)
-        case .pin: return pin(at: selection)
+        case .edit: coordinator.editQuicklink(quicklink)
+        case .duplicate: coordinator.duplicateQuicklink(id: quicklink.id)
+        case .copyPath: coordinator.copyQuicklink(id: quicklink.id)
+        case .pin: coordinator.toggleQuicklinkPinned(id: quicklink.id)
+        case .showInFinder: return coordinator.showQuicklinkInFinder(quicklink)
+        case .delete: Task { await coordinator.deleteQuicklink(id: quicklink.id) }
         default: return false
         }
-    }
-
-    /// ⌘. — mirrors the Actions menu row; pinning lifts the row into the Pinned section.
-    private func pin(at selection: Int) -> Bool {
-        guard let quicklink = quicklink(at: selection) else { return false }
-        core.quicklinkCoordinator.toggleQuicklinkPinned(id: quicklink.id)
-        return true
-    }
-
-    /// ⌘⌫ — deletion honours the "confirm before deleting" setting inside `AppCore`.
-    private func delete(at selection: Int) -> Bool {
-        guard let quicklink = quicklink(at: selection) else { return false }
-        Task { await core.quicklinkCoordinator.deleteQuicklink(id: quicklink.id) }
         return true
     }
 
@@ -136,12 +139,23 @@ enum QuicklinkActionsMenu {
                 })
         }
         items.append(
-            PopoverMenuItem(title: "Edit Quicklink", systemImage: "pencil", startsSection: true) {
-                core.paletteCoordinator.hidePalette(restoreFocus: false)
+            PopoverMenuItem(title: "Copy Link", systemImage: "doc.on.clipboard", shortcut: "⌃⌘C") {
+                core.quicklinkCoordinator.copyQuicklink(id: quicklink.id)
+            })
+        items.append(
+            PopoverMenuItem(
+                title: "Edit Quicklink", systemImage: "pencil", startsSection: true, shortcut: "⌘E"
+            ) {
                 core.quicklinkCoordinator.editQuicklink(quicklink)
             })
         items.append(
-            PopoverMenuItem(title: "Duplicate Quicklink", systemImage: "plus.square.on.square") {
+            PopoverMenuItem(title: "Create Quicklink", systemImage: "plus", shortcut: "⌘N") {
+                core.quicklinkCoordinator.editQuicklink(nil)
+            })
+        items.append(
+            PopoverMenuItem(
+                title: "Duplicate Quicklink", systemImage: "plus.square.on.square", shortcut: "⌘D"
+            ) {
                 core.quicklinkCoordinator.duplicateQuicklink(id: quicklink.id)
             })
         items.append(
@@ -157,30 +171,17 @@ enum QuicklinkActionsMenu {
                 ) {
                     core.quicklinkCoordinator.toggleQuicklinkPinned(id: quicklink.id)
                 })
-        items.append(
-            PopoverMenuItem(
-                title: quicklink.showsInRootSearch
-                    ? "Hide from Root Search" : "Show in Root Search",
-                systemImage: quicklink.showsInRootSearch ? "eye.slash" : "eye"
-            ) {
-                core.quicklinkCoordinator.setQuicklinkShowsInRootSearch(
-                    !quicklink.showsInRootSearch, id: quicklink.id)
-            })
-        // Revealing needs a real path, which a template lacks until it expands.
-        if case .path(let path)? = QuicklinkDestination.detect(quicklink.link),
-            !QuicklinkDestination.containsPlaceholder(quicklink.link)
-        {
+        if QuicklinkCoordinator.revealablePath(of: quicklink) != nil {
             items.append(
                 PopoverMenuItem(
                     title: "Show in Finder", systemImage: "folder", startsSection: true, shortcut: "⌘F"
                 ) {
-                    core.paletteCoordinator.hidePalette(restoreFocus: false)
-                    AppLauncher.showInFinder(URL(fileURLWithPath: path))
+                    core.quicklinkCoordinator.showQuicklinkInFinder(quicklink)
                 })
         }
         items.append(
             PopoverMenuItem(
-                title: "Delete Quicklink", systemImage: "trash", startsSection: true, shortcut: "⌘⌫",
+                title: "Delete Quicklink", systemImage: "trash", startsSection: true, shortcut: "⌃X",
                 isDestructive: true
             ) {
                 Task { await core.quicklinkCoordinator.deleteQuicklink(id: quicklink.id) }

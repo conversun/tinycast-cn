@@ -5,6 +5,7 @@
 
 import { createHarness, bootConfig, describeTree } from "./test.mjs";
 import { transformSync } from "esbuild";
+import { runModuleFixtures } from "./modules-fixtures.mjs";
 
 let passes = 0;
 let failures = 0;
@@ -167,6 +168,43 @@ export default function Command() {
 }
 `;
 
+const malformedUtf8Cases = [
+  [0x68, 0xc3, 0xa9, 0xf0, 0x9f, 0x98, 0x80],
+  [0xff],
+  [0x41, 0xc3],
+  [0xe2, 0x28, 0xa1],
+  [0xc0, 0xaf],
+  [0xed, 0xa0, 0x80],
+  [0xf4, 0x90, 0x80, 0x80],
+  [0xf8, 0x88, 0x80, 0x80, 0x80],
+  [0xf0, 0x9f, 0x98],
+  [0x30, 0x82, 0x01, 0x0a, 0x02, 0x82, 0x01, 0x01, 0x00, 0xbb, 0xfe, 0x9c],
+];
+
+const malformedUtf8Source = `
+import { Buffer } from "node:buffer";
+import { Detail } from "@raycast/api";
+
+const cases = ${JSON.stringify(malformedUtf8Cases)};
+
+export default function Command() {
+  const fatal = (bytes) => {
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(bytes));
+      return "none";
+    } catch (error) {
+      return error.code;
+    }
+  };
+  const lines = cases.flatMap((bytes) => [
+    JSON.stringify(Buffer.from(bytes).toString("utf8")),
+    JSON.stringify(new TextDecoder().decode(Uint8Array.from(bytes))),
+    fatal(bytes),
+  ]);
+  return <Detail markdown={lines.join("\\n")} />;
+}
+`;
+
 const nodeSource = `
 import path from "node:path";
 import os from "node:os";
@@ -251,6 +289,66 @@ export default function Command() {
 }
 `;
 
+const slowBufferSource = `
+const { Buffer } = require("buffer");
+
+module.exports.default = () => {
+  const SafeBuffer = Buffer.from && Buffer.alloc && Buffer.allocUnsafe && Buffer.allocUnsafeSlow
+    ? Buffer : function (size) { return Buffer(size); };
+  const selected = new SafeBuffer(4);
+  const first = SafeBuffer.allocUnsafeSlow(4);
+  const second = SafeBuffer.allocUnsafeSlow(4);
+  first[0] = 91;
+  globalThis.__slowBuffer = {
+    selected: Buffer.isBuffer(selected) && selected.length === 4,
+    enumerable: Object.keys(Buffer).includes("allocUnsafeSlow"),
+    bytes: Array.from(second),
+    independent: first.buffer !== second.buffer,
+    empty: Buffer.isBuffer(Buffer.allocUnsafeSlow(0)) && Buffer.allocUnsafeSlow(0).length === 0,
+  };
+};
+`;
+
+const onceSource = `
+const { EventEmitter } = require("events");
+
+module.exports.default = () => {
+  const emitter = new EventEmitter();
+  const calls = [];
+  const chained = emitter.once("ready", function (...args) {
+    calls.push([this === emitter, ...args, emitter.listenerCount("ready")]);
+    emitter.emit("ready", "recursive");
+  }) === emitter;
+  const emitted = emitter.emit("ready", "value", 7);
+  const repeated = emitter.emit("ready", "again");
+  let removedCalls = 0;
+  function removed() { removedCalls++; }
+  emitter.once("removed", removed).removeListener("removed", removed);
+  emitter.emit("removed");
+  const ordinary = [];
+  emitter.on("ordinary", function (value) { ordinary.push([this === emitter, value]); });
+  emitter.emit("ordinary", 1);
+  emitter.emit("ordinary", 2);
+  globalThis.__once = { calls, chained, emitted, repeated, removedCalls, ordinary };
+};
+`;
+
+// apple-passwords lazily requires `@raycast/api` through `createRequire`, so it must resolve
+// through the same registry as a top-level require.
+const createRequireSource = `
+import { createRequire } from "module";
+import { Detail } from "@raycast/api";
+
+const requireFromHere = createRequire("/fixtures/package.json");
+
+export default function Command() {
+  const api = requireFromHere("@raycast/api");
+  const path = requireFromHere("node:path");
+  const parts = [String(api.List !== undefined), String(api.ActionPanel !== undefined), path.join("a", "b")];
+  return <Detail markdown={parts.join("\\n")} />;
+}
+`;
+
 // Bundled HTTP clients (axios) construct and probe a Response at module scope, before any component
 // mounts — a host-shaped constructor took the whole command down with them.
 const responseSource = `
@@ -313,8 +411,6 @@ export default async function Command() {
 }
 `;
 
-// A URLSearchParams body sets no header of its own, so the spec's derived Content-Type is the only
-// thing an OAuth token endpoint has: without it Google reads the form body as JSON and rejects it.
 const contentTypeSource = `
 export default async function Command() {
   const url = "https://example.test/token";
@@ -397,6 +493,30 @@ export default async function Command() {
     request.on("error", reject);
     request.end("ping");
   });
+}
+`;
+
+const unixHTTPSource = `
+import http from "node:http";
+
+export default async function Command() {
+  globalThis.__unixHTTP = [];
+  for (const input of [
+    { socketPath: "/var/run/docker.sock", path: "/containers/json?all=1", method: "post" },
+    "http://unused.test/images/json",
+  ]) {
+    const result = await new Promise((resolve, reject) => {
+      const options = typeof input === "string" ? { socketPath: "/tmp/docker.sock" } : {};
+      const request = http.request(input, options, (response) => {
+        const chunks = [];
+        response.on("data", (chunk) => chunks.push(chunk));
+        response.on("end", () => resolve({ status: response.statusCode, hex: Buffer.concat(chunks).toString("hex") }));
+      });
+      request.on("error", reject);
+      request.end(Buffer.from([0, 255, 1]));
+    });
+    globalThis.__unixHTTP.push(result);
+  }
 }
 `;
 
@@ -675,82 +795,6 @@ export default async function Command() {
 }
 `;
 
-const oauthSource = `
-import { OAuth } from "@raycast/api";
-
-export default async function Command() {
-  const client = new OAuth.PKCEClient({
-    redirectMethod: OAuth.RedirectMethod.Web,
-    providerName: "GitHub",
-    providerId: "github",
-    description: "Connect your GitHub account",
-  });
-
-  const req = await client.authorizationRequest({
-    endpoint: "https://github.com/login/oauth/authorize",
-    clientId: "client-123",
-    scope: "repo read:user",
-  });
-
-  const authRes = await client.authorize(req);
-
-  const tokenSet = new OAuth.TokenSet({
-    accessToken: "gho_secret123",
-    refreshToken: "ghr_secret456",
-    expiresIn: 3600,
-  });
-
-  await client.setTokens(tokenSet);
-  const retrieved = await client.getTokens();
-
-  const expiredToken = new OAuth.TokenSet({
-    accessToken: "expired_token",
-    expiresIn: 20,
-    updatedAt: new Date(Date.now() - 30000),
-  });
-
-  globalThis.__oauthTest = {
-    verifierLen: req.codeVerifier.length,
-    challengeLen: req.codeChallenge.length,
-    stateLen: req.state.length,
-    url: req.toURL(),
-    authCode: authRes.authorizationCode,
-    retrievedAccessToken: retrieved?.accessToken,
-    retrievedRefreshToken: retrieved?.refreshToken,
-    isExpiredLive: tokenSet.isExpired(),
-    isExpiredOld: expiredToken.isExpired(),
-  };
-
-  await client.removeTokens();
-  const afterRemove = await client.getTokens();
-  globalThis.__oauthTest.afterRemove = afterRemove;
-}
-`;
-
-// `@raycast/utils` stores the provider's raw token response, which carries no timestamp, so the
-// stored time is the only thing `isExpired()` can count from; without it a token never expired.
-const tokenExpirySource = `
-import { OAuth } from "@raycast/api";
-
-export default async function Command() {
-  const client = new OAuth.PKCEClient({ redirectMethod: OAuth.RedirectMethod.Web, providerName: "Google", providerId: "google" });
-  await client.setTokens({ access_token: "ya29.a", refresh_token: "1//r", expires_in: 3599, token_type: "Bearer" });
-  const fresh = await client.getTokens();
-  const realNow = Date.now;
-  Date.now = () => realNow() + 2 * 3600 * 1000;
-  const laterExpired = (await client.getTokens()).isExpired();
-  Date.now = realNow;
-  const unstamped = new OAuth.PKCEClient({ redirectMethod: OAuth.RedirectMethod.Web, providerName: "Old", providerId: "unstamped" });
-  const legacy = await unstamped.getTokens();
-  globalThis.__expiry = {
-    freshExpired: fresh.isExpired(),
-    freshStampedNow: fresh.updatedAt instanceof Date && Math.abs(fresh.updatedAt.getTime() - realNow()) < 5000,
-    laterExpired,
-    unstampedExpired: legacy.isExpired(),
-  };
-}
-`;
-
 const noViewSource = `
 import { Clipboard, showHUD } from "@raycast/api";
 
@@ -882,6 +926,43 @@ export async function runFixtures() {
     check("one screen after pop", screens.length === 1, String(screens.length));
   });
 
+  await run("safe-buffer selects the modern Buffer API", slowBufferSource, "no-view", async (harness) => {
+    const result = harness.call("globalThis.__slowBuffer");
+    check("safe-buffer's modern capability guard avoids the callable fallback", result?.selected === true, harness.state.failures.join(" | "));
+    check("slow allocation is copied by statics-enumerating consumers", result?.enumerable === true);
+    check("slow allocations are zero-filled", JSON.stringify(result?.bytes) === "[0,0,0,0]");
+    check("slow allocations do not share backing memory", result?.independent === true);
+    check("zero-sized slow allocations remain Buffers", result?.empty === true);
+  });
+
+  await run("EventEmitter.once preserves the emitter receiver", onceSource, "no-view", async (harness) => {
+    const result = harness.call("globalThis.__once");
+    check("once forwards its receiver and arguments", JSON.stringify(result?.calls) === '[[true,"value",7,0]]', JSON.stringify(result?.calls));
+    check("once remains chainable", result?.chained === true);
+    check("once removes itself before recursive emission", result?.emitted === true && result?.repeated === false);
+    check("once can still be removed using the original listener", result?.removedCalls === 0);
+    check("ordinary listeners retain their receiver and repeated delivery", JSON.stringify(result?.ordinary) === "[[true,1],[true,2]]");
+  });
+
+  // A plist's binary <data> must decode without aborting the host read.
+  await run("Malformed UTF-8 decodes the way Node does", malformedUtf8Source, "view", async (harness) => {
+    const lines = findNode(harness.state.trees.at(-1), "Detail").props.markdown.split("\n");
+    const fatal = (bytes) => {
+      try {
+        new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(bytes));
+        return "none";
+      } catch (error) {
+        return error.code;
+      }
+    };
+    malformedUtf8Cases.forEach((bytes, index) => {
+      const expected = JSON.stringify(Buffer.from(bytes).toString("utf8"));
+      check(`Buffer bytes ${index}`, lines[index * 3] === expected, lines[index * 3]);
+      check(`TextDecoder bytes ${index}`, lines[index * 3 + 1] === expected, lines[index * 3 + 1]);
+      check(`fatal TextDecoder bytes ${index}`, lines[index * 3 + 2] === fatal(bytes), lines[index * 3 + 2]);
+    });
+  });
+
   await run("Node shims and web globals", nodeSource, "view", async (harness) => {
     const markdown = findNode(harness.state.trees.at(-1), "Detail").props.markdown.split("\n");
     const expected = [
@@ -937,6 +1018,12 @@ export async function runFixtures() {
       "ERR_INVALID_URL_SCHEME",
     ];
     expected.forEach((value, index) => check(`shim ${index}: ${value}`, markdown[index] === value, markdown[index]));
+  });
+
+  await run("createRequire resolves through the module registry", createRequireSource, "view", async (harness) => {
+    const markdown = findNode(harness.state.trees.at(-1), "Detail").props.markdown.split("\n");
+    check("lazily requires @raycast/api", markdown[0] === "true" && markdown[1] === "true", markdown.join(","));
+    check("resolves a Node builtin", markdown[2] === "a/b", markdown[2]);
   });
 
   await run("Response takes the Web spec's constructor", responseSource, "no-view", async (harness) => {
@@ -1037,6 +1124,7 @@ export async function runFixtures() {
       const result = harness.call("globalThis.__http");
       const spec = httpSpecs[0] ?? {};
       check("sends one request over the fetch bridge", httpSpecs.length === 1, String(httpSpecs.length));
+      check("ordinary HTTP does not select a Unix socket", spec.socketPath === undefined);
       check("uppercases the method", spec.method === "POST", String(spec.method));
       check("joins a multi-valued header", spec.headers?.["x-probe"] === "one, two", JSON.stringify(spec.headers));
       check("leaves content negotiation to the transport", spec.headers?.["accept-encoding"] === undefined);
@@ -1062,6 +1150,19 @@ export async function runFixtures() {
       },
     },
   );
+
+  const unixSpecs = [];
+  await run("Docker HTTP preserves its Unix socket", unixHTTPSource, "no-view", async (harness) => {
+    check("options preserve Docker's socket path", unixSpecs[0]?.socketPath === "/var/run/docker.sock");
+    check("URL requests preserve the supplied socket", unixSpecs[1]?.socketPath === "/tmp/docker.sock");
+    check("keeps the API path and query", unixSpecs[0]?.url === "http://localhost/containers/json?all=1");
+    check("keeps the request method and binary body", unixSpecs[0]?.method === "POST" && unixSpecs[0]?.bodyBase64 === "AP8B");
+    const result = harness.call("globalThis.__unixHTTP");
+    check("returns HTTP errors and binary bodies", result?.length === 2 && result.every((r) => r.status === 404 && r.hex === "00ff01"));
+  }, { stubs: { "fetch.request": ([spec]) => {
+    unixSpecs.push(spec);
+    return { status: 404, headers: {}, bodyBase64: "AP8B" };
+  } } });
 
   const socketOpens = [];
   const lookups = [];
@@ -1204,40 +1305,6 @@ export async function runFixtures() {
     },
   );
 
-  await run("OAuth PKCEClient and TokenSet", oauthSource, "no-view", async (harness) => {
-    const result = harness.call("globalThis.__oauthTest");
-    check("generates PKCE codeVerifier and challenge", result?.verifierLen >= 43 && result?.challengeLen >= 43, JSON.stringify(result));
-    check("generates OAuth state", result?.stateLen >= 20);
-    check("builds correct authorization URL with redirect_uri", new URL(result.url).searchParams.get("redirect_uri") === "https://raycast.com/redirect?packageName=Extension" && new URL(result.url).searchParams.get("client_id") === "client-123");
-    check("authorize returns authorization code", result?.authCode === "auth-code-12345");
-    check("stores and retrieves TokenSet with tokens", result?.retrievedAccessToken === "gho_secret123" && result?.retrievedRefreshToken === "ghr_secret456");
-    check("TokenSet isExpired calculation works", result?.isExpiredLive === false && result?.isExpiredOld === true);
-    check("removeTokens cleans up tokens", result?.afterRemove === undefined || result?.afterRemove === null);
-  });
-
-  const storedTokens = new Map([["unstamped", JSON.stringify({ access_token: "ya29.old", expires_in: 3599 })]]);
-  await run(
-    "a stored token expires from the time it was stored",
-    tokenExpirySource,
-    "no-view",
-    async (harness) => {
-      const result = harness.call("globalThis.__expiry");
-      check("a just-stored token is not expired", result?.freshExpired === false, JSON.stringify(result));
-      check("setTokens stamps updatedAt with the storage time", result?.freshStampedNow === true, JSON.stringify(result));
-      check("the same token two hours later is expired", result?.laterExpired === true, JSON.stringify(result));
-      check("a stored token with no timestamp counts as expired", result?.unstampedExpired === true, JSON.stringify(result));
-    },
-    {
-      stubs: {
-        "oauth.setTokens": (args) => {
-          storedTokens.set(args[0], args[1]);
-          return null;
-        },
-        "oauth.getTokens": (args) => storedTokens.get(args[0]) ?? null,
-      },
-    },
-  );
-
   await run("no-view command", noViewSource, "no-view", async (harness) => {
     check("ran to completion", harness.state.finished === true);
     check("ran the body", harness.call("globalThis.__ranNoView") === true);
@@ -1254,6 +1321,22 @@ export async function runFixtures() {
     const dump = describeTree(harness.state.trees.at(-1));
     check("finishes loading", dump.includes("isLoading=false"), dump);
     check("renders the resolved items", dump.includes("alpha") && dump.includes("beta"));
+  });
+
+  await run("error boundary can recover its view", `
+    import { Component } from "react";
+    import { Detail } from "@raycast/api";
+    class Boundary extends Component {
+      state = { failed: false };
+      componentDidCatch() { this.setState({ failed: true }); }
+      render() {
+        return this.state.failed ? <Detail markdown="Recovered" /> : this.props.children;
+      }
+    }
+    function Broken() { throw new Error("Handled failure"); }
+    export default function Command() { return <Boundary><Broken /></Boundary>; }
+  `, "view", async (harness) => {
+    check("boundary fallback reaches host", findNode(harness.state.trees.at(-1), "Detail")?.props.markdown === "Recovered");
   });
 
   await run("Menu bar hooks, alternates and async actions", `
@@ -1305,6 +1388,8 @@ export async function runFixtures() {
   await wait();
   check("a throwing component reports a failure", harness.state.failures.some((message) => message.includes("kaboom")), harness.state.failures.join("|"));
   harness.stop("s1");
+
+  await runModuleFixtures(check);
 
   console.log(failures === 0 ? "\nAll runtime fixtures passed." : `\n${failures} check(s) failed.`);
   if (import.meta.url === `file://${process.argv[1]}`) process.exit(failures === 0 ? 0 : 1);

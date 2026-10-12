@@ -3,35 +3,9 @@ import SwiftUI
 struct GeneralSettingsView: View {
     @Environment(AppCore.self) private var core
     @Environment(AppSettings.self) private var settings
-    private var hyperTap: HyperKeyTap { core.hyperKeyTap }
     private var launcherRanking: LauncherRankingStore { core.launcherRanking }
     @State private var confirmingRankingReset = false
     @State private var inputSources: [InputSourceSwitcher.Option] = []
-
-    /// The Hyper modifier chord as prose glyphs, tracking the Include Shift toggle.
-    private var hyperGlyphs: String { settings.hyperKeyIncludesShift ? "⌃⌥⇧⌘" : "⌃⌥⌘" }
-
-    /// Localized before substitution: a key name baked into prose can never match a key.
-    private var hyperKeyName: String { settings.hyperKey.title.localizedUI }
-
-    /// Only a choice made here resets Quick Press: settings.json may set both keys at once.
-    private var hyperKeySelection: Binding<HyperKeyPhysicalKey> {
-        Binding(
-            get: { settings.hyperKey },
-            set: { key in
-                guard key != settings.hyperKey else { return }
-                settings.hyperKey = key
-                // A Quick Press choice is meaningless for a different key.
-                settings.hyperKeyQuickPress = .none
-                if key != .none { Permissions.ensureAccessibility() }
-            })
-    }
-
-    /// The missing-permission half is its own row, so it can carry the button that fixes it.
-    private var hyperSubtitle: String {
-        guard settings.hyperKey != .none else { return String(localized: "Remap one key to \(hyperGlyphs) held together.") }
-        return String(localized: "\(hyperKeyName) sends \(hyperGlyphs), shown as ✦ in shortcuts.")
-    }
 
     var body: some View {
         @Bindable var settings = settings
@@ -51,6 +25,10 @@ struct GeneralSettingsView: View {
                 Toggle(isOn: $settings.showInMenuBar) {
                     SettingsRowTitle(.generalGeneral, "Show in menu bar")
                     Text("Shortcuts still work when hidden.")
+                }
+                Toggle(isOn: $settings.automaticallyCheckForUpdates) {
+                    SettingsRowTitle(.generalGeneral, "Automatically check for updates")
+                    Text("Check for Updates remains available when off.")
                 }
                 Picker(selection: $settings.popToRootTimeout) {
                     ForEach(PopToRootTimeout.allCases) { timeout in
@@ -110,49 +88,7 @@ struct GeneralSettingsView: View {
                 SettingsSectionHeader(.generalAppearance)
             }
 
-            Section {
-                Picker(selection: hyperKeySelection) {
-                    ForEach(HyperKeyPhysicalKey.allCases) { key in
-                        Text(key.title.localizedUI).tag(key)
-                    }
-                } label: {
-                    SettingsRowTitle(.generalHyperKey, "Hyper Key")
-                    Text(hyperSubtitle)
-                }
-
-                if hyperTap.status == .needsAccessibility {
-                    HStack(alignment: .center, spacing: Theme.Spacing.lg) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .foregroundStyle(.orange)
-                            .frame(width: Theme.Size.settingsRowIcon)
-                        Text("Remapping needs Accessibility access.")
-                            .foregroundStyle(.orange)
-                        Spacer(minLength: Theme.Spacing.lg)
-                        Button("Grant Access…") { Permissions.openAccessibilitySettings() }
-                    }
-                }
-
-                if settings.hyperKey.hasOriginalFunction {
-                    Picker(selection: $settings.hyperKeyQuickPress) {
-                        Text("Does Nothing").tag(HyperKeyQuickPress.none)
-                        if let original = settings.hyperKey.quickPressOriginalTitle {
-                            Text(original.localizedUI).tag(HyperKeyQuickPress.originalKey)
-                        }
-                        Text("Trigger Escape").tag(HyperKeyQuickPress.escape)
-                    } label: {
-                        SettingsRowTitle(.generalHyperKey, "Quick Press")
-                        Text("When \(hyperKeyName) is pressed alone.")
-                    }
-                }
-
-                Toggle(isOn: $settings.hyperKeyIncludesShift) {
-                    SettingsRowTitle(.generalHyperKey, "Include Shift (⇧)")
-                }
-                // Flipping it re-points recorded chords, so it needs a chord to mean.
-                .settingsEnabled(settings.hyperKey != .none)
-            } header: {
-                SettingsSectionHeader(.generalHyperKey)
-            }
+            HyperKeySettingsSection()
 
             Section {
                 Picker(selection: $settings.calcNumberStyle) {
@@ -175,7 +111,7 @@ struct GeneralSettingsView: View {
                 }
                 Picker(selection: $settings.rootSearchSensitivity) {
                     ForEach(SearchSensitivity.allCases) { sensitivity in
-                        Text(sensitivity.title).tag(sensitivity)
+                        Text(LocalizedStringKey(sensitivity.title)).tag(sensitivity)
                     }
                 } label: {
                     SettingsRowTitle(.generalSearch, "Search sensitivity")
@@ -239,7 +175,7 @@ private struct WindowModeRow: View {
         }
     }
 
-    private func option(_ title: String, image: String, compact: Bool) -> some View {
+    private func option(_ title: LocalizedStringKey, image: String, compact: Bool) -> some View {
         let selected = settings.compactMode == compact
         return Button {
             settings.compactMode = compact

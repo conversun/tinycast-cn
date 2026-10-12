@@ -19,11 +19,16 @@ enum RaycastScriptImport {
             contents
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
             .compactMap { url in
-                guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+                // A symlink reports its own type, not its target's; script folders are often links.
+                guard isRegularFile(url) || isRegularFile(url.resolvingSymlinksInPath()),
                     let source = head(of: url)
                 else { return nil }
                 return command(at: url, source: source)
             }
+    }
+
+    private static func isRegularFile(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
     }
 
     /// A file is a script command when it names an interpreter and declares a title.

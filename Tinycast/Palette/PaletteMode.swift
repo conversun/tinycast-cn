@@ -14,16 +14,26 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     /// Choosing a room's windows and apps; the room was named on the Rooms screen.
     case roomWindows
     case schedule
+    case eventEditor
+    case customCommandEditor
+    case customCommands
     /// One meeting's read-only page, pushed from that meeting's own actions.
     case meetingDetails
     case uninstall
     case quicklinks
+    case quicklinkEditor
     case snippets
+    case snippetEditor
     case dictionary
     /// A Raycast extension command rendering into the palette.
     case extensionCommand
 
     var id: String { rawValue }
+
+    var isNativeEditor: Bool {
+        self == .snippetEditor || self == .quicklinkEditor || self == .eventEditor
+            || self == .customCommandEditor
+    }
 
     var systemImage: String {
         switch self {
@@ -39,10 +49,12 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .rooms: return "door.left.hand.open"
         case .roomWindows: return "macwindow.badge.plus"
         case .schedule: return "calendar"
+        case .eventEditor: return "calendar.badge.plus"
+        case .customCommandEditor, .customCommands: return CustomCommand.sfSymbol
         case .meetingDetails: return "calendar"
         case .uninstall: return "trash"
-        case .quicklinks: return Quicklink.sfSymbol
-        case .snippets: return "curlybraces"
+        case .quicklinks, .quicklinkEditor: return Quicklink.sfSymbol
+        case .snippets, .snippetEditor: return "curlybraces"
         case .dictionary: return "book.closed"
         case .extensionCommand: return "puzzlepiece.extension"
         }
@@ -61,10 +73,15 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .rooms: return String(localized: "Search rooms, or name a new one…")
         case .roomWindows: return String(localized: "Search windows, or type an app to add…")
         case .schedule: return String(localized: "Search your schedule…")
+        case .eventEditor: return String(localized: "Event editor")
+        case .customCommandEditor: return String(localized: "Command editor")
+        case .customCommands: return String(localized: "Search custom commands…")
         case .meetingDetails: return String(localized: "Meeting details")
         case .uninstall: return String(localized: "Filter files and folders by name…")
         case .quicklinks: return String(localized: "Search quicklinks…")
+        case .quicklinkEditor: return String(localized: "Quicklink editor")
         case .snippets: return String(localized: "Search snippets…")
+        case .snippetEditor: return String(localized: "Snippet editor")
         case .dictionary: return String(localized: "Look up a word…")
         // Replaced by the command's own `searchBarPlaceholder` whenever it declares one.
         case .extensionCommand: return String(localized: "Search…")

@@ -53,6 +53,23 @@ enum Permissions {
         await AVCaptureDevice.requestAccess(for: .video)
     }
 
+    static func microphoneAccess() -> AVAuthorizationStatus {
+        AVCaptureDevice.authorizationStatus(for: .audio)
+    }
+
+    nonisolated static func requestMicrophoneAccess() async -> Bool {
+        await AVCaptureDevice.requestAccess(for: .audio)
+    }
+
+    @MainActor
+    static func openMicrophoneSettings() {
+        guard
+            let url = URL(
+                string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+        else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     @MainActor
     static func openCalendarSettings() {
         guard

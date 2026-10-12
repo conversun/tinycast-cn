@@ -87,21 +87,6 @@ struct Quicklink: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// What `{selection}` falls back to when the target app exposes no readable selection.
-enum QuicklinkSelectionFallback: String, CaseIterable, Identifiable, Sendable {
-    case ask
-    case clipboard
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .ask: return "Ask for it"
-        case .clipboard: return "Use the clipboard"
-        }
-    }
-}
-
 enum QuicklinkError: LocalizedError, Equatable {
     case emptyName
     case emptyLink

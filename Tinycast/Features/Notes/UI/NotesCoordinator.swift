@@ -320,7 +320,7 @@ final class NotesCoordinator {
             NSWorkspace.shared.open(store.notesDirectory)
             return
         }
-        NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+        AppLauncher.showInFinder(fileURL)
     }
 
     func moveToTopRight() {

@@ -29,7 +29,7 @@ final class AIChatCoordinator {
         window = AppWindowController(
             title: "AI Chat", contentSize: Theme.Size.aiChatWindow,
             minimumSize: Theme.Size.aiChatWindowMinimum, resizable: true,
-            autosaveName: "AIChatWindow", activation: core.activationPolicy)
+            autosaveName: "AIChatWindow", activation: core.activationPolicy, closesOnEscape: true)
         chats.onReplyFinished = { [weak self] chat in self?.nameIfNeeded(chat) }
     }
 
@@ -78,9 +78,15 @@ final class AIChatCoordinator {
         }
     }
 
+    func toggleWindow() {
+        guard !closeWindowIfKey() else { return }
+        showWindow()
+    }
+
     /// The window's views read these through the coordinator, never through `AppCore`.
     var history: ChatHistoryStore { core.chatHistory }
     var aiSettings: AISettingsStore { core.aiSettings }
+    var dictation: DictationCoordinator { core.dictationCoordinator }
 
     func focusExisting() -> Bool {
         window.focus()
@@ -104,6 +110,14 @@ final class AIChatCoordinator {
             core.showMessage("That chat could not be opened.", tone: .danger)
             return
         }
+    }
+
+    /// The sidebar's filter is the view's own state, so ⌃Tab walks every saved chat.
+    func openAdjacentChat(step: Int) {
+        guard let target = history.conversations.pinnedFirst.adjacent(
+            to: chats.window.session.id, step: step)
+        else { return }
+        openChat(id: target.id)
     }
 
     /// Quick AI's ⌘J: the conversation, its staged files and the half-typed line all move over.
@@ -171,6 +185,7 @@ final class AIChatCoordinator {
                 title: "Delete chat?", message: "“\(title)” will be removed. This can't be undone.",
                 symbol: "trash", confirmTitle: "Delete")
         else { return }
+        core.chatGPTSubscription.turns.discardConversation(id: id)
         chats.delete(id: id)
     }
 
@@ -182,6 +197,9 @@ final class AIChatCoordinator {
                     + "This can't be undone.",
                 symbol: "trash", confirmTitle: "Delete All")
         else { return }
+        for conversation in core.chatHistory.conversations where !conversation.isPinned {
+            core.chatGPTSubscription.turns.discardConversation(id: conversation.id)
+        }
         chats.deleteAll()
     }
 
@@ -350,6 +368,10 @@ final class AIChatCoordinator {
 
     func showMCPSettings() {
         settingsCoordinator.showSettings(tab: .ai)
+    }
+
+    func showDictationSettings() {
+        settingsCoordinator.showSettings(tab: .dictation)
     }
 
     /// The server a draft is addressed to, so the composer can show it as a chip while typing.

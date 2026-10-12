@@ -56,6 +56,21 @@ gate — it neither runs the harnesses nor builds the app, so the whole bar in
 
 ## Releasing
 
+### Chinese fork
+
+`conversun/tinycast-cn` publishes through `release-cn.yml`, not the upstream workflow.
+Dispatch it with the CN version (`0.11.19-cn.1`), upstream stable tag (`v0.11.19`),
+an exact verified source commit and `prerelease=false`. The source may include newer upstream
+`main` commits; the release tag always points to the verified fork commit.
+
+The workflow checks localization and runs the harnesses, builds a signed Universal app,
+checks both architectures in the app and its two helpers, verifies signatures, and publishes
+`Tinycast-CN-<version>.dmg`. It updates `conversun/homebrew-tinycast-cn` when the tap deploy key
+is available. The CN bundle identifier is `com.conversun.tinycast-cn`; its Dictation helper
+derives the `.dictation` identifier through `TINYCAST_BUNDLE_IDENTIFIER`.
+
+### Upstream channels
+
 `.github/workflows/release.yml` builds and publishes a DMG from GitHub Actions, no local machine
 needed. Run it from the **Actions** tab (`Release` → **Run workflow**) and pick:
 
@@ -75,10 +90,14 @@ A stable run then fans out to a second job, `universal`, which rebuilds the same
 `ARCHS="arm64 x86_64"` and attaches `Tinycast-Universal-<version>.dmg` / `.zip` to the release the
 first job created, then bumps `tinycast-universal`. macOS 26 is the last release that boots on Intel,
 and those Macs need both slices. Both jobs pin `ARCHS` explicitly and assert the slices on *every*
-shipping binary — the app and the bundled `ClipboardTextHelper`: trusting `ARCHS_STANDARD` is what
+shipping binary — the app, `ClipboardTextHelper` and `Tinycast Dictation`: trusting `ARCHS_STANDARD` is what
 shipped a thin arm64 build to Intel users once already, and it also keeps the Apple silicon download
 from silently gaining a slice it never needs. A thin helper inside a universal app is the quiet form
-of the same bug: the app boots on Intel and only clipboard OCR stops working.
+of the same bug: the app boots on Intel and only clipboard OCR or dictation stops working.
+
+Channel builds override `TINYCAST_BUNDLE_IDENTIFIER`, not the target-wide `PRODUCT_BUNDLE_IDENTIFIER`.
+The Dictation helper derives its own identifier with a `.dictation` suffix; signature verification
+checks that its bundle and signing identifiers agree and remain distinct from the main app.
 
 ### Release notes
 

@@ -6,26 +6,28 @@ and an emoji picker. It also **runs Raycast extensions** natively, in JavaScript
 SwiftUI + AppKit, running as an accessory with no Dock icon (`LSUIElement`). Zero third-party
 dependencies.
 
-## Posture: latest-only, always
+## Posture: modern-first, always
 
-**Tinycast targets one macOS — the current stable release — and nothing else.** macOS 26+, the Xcode 26
-toolchain, Swift 6 language mode. There is no compatibility floor to defend, no shim layer and no
-deprecation debt, and that is the single largest reason the codebase stays as small as it does.
+**Tinycast supports macOS 26 and later, with macOS 27 strongly preferred.** Swift 6+ with complete
+strict concurrency is required. Prefer the latest Swift patterns and modern Apple APIs.
 
-Write code as if the platform released yesterday:
+Prefer current APIs and language features:
 
-- **Prefer the modern Apple API**, always. Observation over `ObservableObject`. Swift Concurrency over
-  `DispatchQueue` or completion handlers. `SMAppService` over login-item shims. Structured concurrency
-  over detached bookkeeping.
-- **Migrate, never wrap.** When an API gains a modern replacement, adopt it and delete the old call
-  site. A wrapper that preserves an old spelling is the thing this project has spent the most effort
-  removing.
+- **Prefer the modern Apple API**, always. Observation over `ObservableObject`. `SMAppService` over
+  login-item shims.
+- **Prefer synchronous code.** Keep short UI and state operations synchronous on `@MainActor`.
+  Introduce concurrency only for genuinely asynchronous operations or blocking work that must leave
+  the main actor. Shared state alone does not justify `async`, a `Task`, or an actor. Preserve
+  synchronous callback returns and event ordering. When concurrency is needed, prefer structured
+  concurrency with clear ownership and cancellation. Strict concurrency checking enforces safety;
+  it does not require making operations asynchronous.
+- **Migrate, never wrap.** Adopt modern replacements directly and delete obsolete call sites. Do not
+  keep wrappers that only preserve an old spelling.
 - **A deprecated API is a defect**, not a warning to live with.
-- **No compatibility layers, no legacy workarounds, no older architectural patterns.** Delete rather
-  than deprecate; raising the minimum macOS *deletes* the code that supported the old one.
-- **Never introduce backwards compatibility unless explicitly asked for it.** No version flags, no
-  migration scaffolding, no "just in case" fallbacks. The codebase carries no migration, and adding
-  one needs an explicit task saying so.
+- **Verify API and language-feature availability** against the SDK and compiler used by the build
+  and CI. Use direct availability checks where macOS 27+ APIs require them to preserve macOS 26 support.
+- **No compatibility layers, legacy workarounds or obsolete patterns.** No migration scaffolding,
+  support below macOS 26 or speculative fallbacks. Keep the implementation direct.
 
 Carbon is a deliberate capability-gap dependency rather than inertia: nothing modern registers a
 system-wide chord, and HIToolbox's TIS APIs remain the public input-source mechanism. Full reasoning in
@@ -33,26 +35,26 @@ system-wide chord, and HIToolbox's TIS APIs remain the public input-source mecha
 
 ## Where things are
 
-| Folder | Holds |
-| --- | --- |
-| `Tinycast/App/` | `@main`, `AppDelegate`, `AppCore` — the composition root |
-| `Tinycast/DesignSystem/` | shared visual primitives; `Theme.swift` is the only design-token source |
-| `Tinycast/Platform/` | system shims: `Permissions`, `AppPaths`, `Signposts`, `NotificationToken`, … |
-| `Tinycast/Palette/` | the palette shell: panel, window controller, `RootPaletteView`, `PaletteScreen` |
-| `Tinycast/Windows/` | the non-palette AppKit surfaces: `Dialog/`, `HUD/`, `About/`, `AppWindowController` |
-| `Tinycast/Features/` | one folder per feature; larger ones split `Model/` `Service/` `UI/` `Settings/` |
-| `Tests/` | the standalone harnesses — one Swift file each, no XCTest target |
-| `Scripts/` | every executable script: test runner, data generators, packaging, linting, editor setup |
+| Folder                   | Holds                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `Tinycast/App/`          | `@main`, `AppDelegate`, `AppCore` — the composition root                                |
+| `Tinycast/DesignSystem/` | shared visual primitives; `Theme.swift` is the only design-token source                 |
+| `Tinycast/Platform/`     | system shims: `Permissions`, `AppPaths`, `Signposts`, `NotificationToken`, …            |
+| `Tinycast/Palette/`      | the palette shell: panel, window controller, `RootPaletteView`, `PaletteScreen`         |
+| `Tinycast/Windows/`      | the non-palette AppKit surfaces: `Dialog/`, `HUD/`, `About/`, `AppWindowController`     |
+| `Tinycast/Features/`     | one folder per feature; larger ones split `Model/` `Service/` `UI/` `Settings/`         |
+| `Tests/`                 | the standalone harnesses — one Swift file each, no XCTest target                        |
+| `Scripts/`               | every executable script: test runner, data generators, packaging, linting, editor setup |
 
-| Read it before you | Doc |
-| --- | --- |
-| change how anything is wired or owned | [architecture.md](docs/architecture.md) |
-| write Swift — naming, style, concurrency, budgets, comments | [standards.md](docs/standards.md) |
-| claim a change is done | [testing.md](docs/testing.md) |
-| build, run or regenerate data | [development.md](docs/development.md) |
-| add or restyle any view | [ui.md](docs/ui.md) |
-| touch one feature's internals | [features/](docs/features/) — each opens with its invariants |
-| package or ship a build | [release.md](docs/release.md) |
+| Read it before you                                          | Doc                                                          |
+| ----------------------------------------------------------- | ------------------------------------------------------------ |
+| change how anything is wired or owned                       | [architecture.md](docs/architecture.md)                      |
+| write Swift — naming, style, concurrency, budgets, comments | [standards.md](docs/standards.md)                            |
+| claim a change is done                                      | [testing.md](docs/testing.md)                                |
+| build, run or regenerate data                               | [development.md](docs/development.md)                        |
+| add or restyle any view                                     | [ui.md](docs/ui.md)                                          |
+| touch one feature's internals                               | [features/](docs/features/) — each opens with its invariants |
+| package or ship a build                                     | [release.md](docs/release.md)                                |
 
 ## Non-negotiables
 
@@ -65,8 +67,13 @@ feature's doc, under its own `## Invariants`.
   fact — clock, filesystem, home directory, rates — as an injected parameter. The harnesses compile the
   shipped sources, so this is enforced by compilation rather than convention.
 - **Swift 6 language mode: data-race violations are hard errors.** `@MainActor` is the default,
-  cross-actor model types are `Sendable`, and heavy or IO-bound work goes off-main as `nonisolated`
-  functions driven by `Task.detached`. Do not add a second actor.
+  model values shared across isolation boundaries are `Sendable`, and exclusive ownership transfer
+  uses `sending`. Heavy or IO-bound work goes off-main. Prefer `@concurrent` async functions when work
+  must leave the caller's actor; use `Task.detached` when an independent task is needed. Do not add a
+  second actor.
+- **Async results can become stale across suspension.** Before applying them, validate cancellation,
+  operation identity and destination where they can change. Long-lived work has an owner and teardown;
+  detached or callback-backed work owned by a caller follows that caller's cancellation.
 - **Dark is the baseline, and a colour's dark branch is the literal it always was.** `Theme.Colors`
   resolves per appearance through `ramp`/`adaptive`; every dark value is the `Color.white.opacity(…)`
   the forced-dark build shipped, restated rather than re-derived. Retune a light branch freely — change
@@ -86,13 +93,13 @@ feature's doc, under its own `## Invariants`.
   never reaches inside one. An extension renders untrusted third-party code whose shape we do not
   control, so it must never be able to force a change on a launcher surface.
   **Duplicating a view or a piece of layout maths to keep it here is the correct trade**, and the one
-  place the no-duplication rule yields. What *is* shared: `Theme`'s base tokens (spacing, radius,
+  place the no-duplication rule yields. What _is_ shared: `Theme`'s base tokens (spacing, radius,
   colour), `InterfaceMetrics` as the view over those same base tokens, `PopoverMenuItem` as a data
   shape, and `Platform/`. What is never shared: anything with
   "how an extension looks or moves" in it. `ExtensionActionsPanel` and `ExtensionGridGeometry` exist
   precisely because the palette's own menu and the emoji grid must stay free to change without them.
 - **`AppEntry.Kind` is the only thing that says what an entry is.** One case per launcher section and
-  per `VisibilityStore` category — never re-derive a category by sniffing an entry ID. Which *pane*
+  per `VisibilityStore` category — never re-derive a category by sniffing an entry ID. Which _pane_
   lists a command is a separate fact, and `SettingsTab.ownedCommands` is the only place that states it.
 - **Generated files are never hand-edited.** `EmojiData.generated.swift` and
   `Resources/EmojiKeywords/` come from `node Scripts/gen-emoji.js`, `CurrencyData.generated.swift` from `node Scripts/gen-currencies.js`,
@@ -108,12 +115,12 @@ feature's doc, under its own `## Invariants`.
 - **A new preference also gets a `SettingsFileKey`** and its binding in `SettingsFileSchema`, so the
   opt-in `settings.json` mirror carries it; the exhaustive switch fails the build until it is bound.
   See [settings-file.md](docs/features/settings-file.md).
-- **A type's suffix says what it *is*** — `Store`, `Coordinator`, `Controller`, `Manager`, `Engine`,
+- **A type's suffix says what it _is_** — `Store`, `Coordinator`, `Controller`, `Manager`, `Engine`,
   `Policy` and the rest each name a specific responsibility. **Semantic correctness always wins over
   suffix consistency:** pick the suffix that describes the type honestly, add a new one when none fits,
   and never rename a well-named type just to match the table.
   Full table: [standards.md#naming](docs/standards.md#naming).
-- **Comments are rare, one line, and explain the *why*** — the gotcha or invariant, never the what.
+- **Comments are rare, one line, and explain the _why_** — the gotcha or invariant, never the what.
   **Never two in a row, never extended into a block**: if one line can't carry it, name a function,
   constant or type instead. Cap 100 characters, delete rather than update, and never comment a change
   you just made. Nothing lints this; get it right the first time.

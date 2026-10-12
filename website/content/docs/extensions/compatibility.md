@@ -9,9 +9,6 @@ We tested Tinycast against the 37 extensions installed in Raycast on the develop
 
 **32 of 37 extensions, and 114 of 147 view commands, open and render.**
 
-These numbers come from that test. It was run before sign-in support was added, so extensions that
-need sign-in weren't counted. The numbers should go up.
-
 ## Supported
 
 **Components.** `List` and `Grid` with sections, empty views, item details and search bar dropdowns.
@@ -24,16 +21,8 @@ published extensions also work.
 `showHUD`, `confirmAlert`, `closeMainWindow`, `popToRoot`, `clearSearchBar`, `open`, `trash`,
 `showInFinder`, `getApplications`, `getDefaultApplication`, `getFrontmostApplication`,
 `getSelectedText`, `getSelectedFinderItems`, `launchCommand`, `updateCommandMetadata`,
-`openExtensionPreferences`, `useNavigation`, `OAuth`, `Icon`, `Color`, `Image.Mask`,
+`openExtensionPreferences`, `useNavigation`, `Icon`, `Color`, `Image.Mask`,
 `Keyboard.Shortcut.Common`, `LaunchType`.
-
-**Signing in with OAuth.** `OAuth.PKCEClient` works with all three of Raycast's redirect methods.
-Tokens are stored in your login Keychain, separately for each extension, and removed when you
-uninstall it.
-
-To receive the redirect, Tinycast registers the `raycast://` link type. If Raycast is also
-installed, macOS decides which app receives those links. A sign-in that never returns times out
-after five minutes.
 
 **Node built-ins.** `path`, `fs` and `fs/promises`, `os`, `child_process`, `crypto`, `zlib`,
 `http` and `https`, `stream`, `util`, `events`, `buffer`, `url`, `querystring`, `punycode`,
@@ -51,8 +40,9 @@ with the palette closed. A `no-view` command with an `interval` can refresh on a
 native menu items and refresh on their manifest interval, without keeping JavaScript in memory
 between runs; see [Menu bar commands](/docs/extensions#menu-bar-commands).
 
-**`raycast://` links** are handled inside Tinycast. A link to an installed extension command runs
-that command, whether it comes from another app, the browser or an extension, with its `arguments`,
+**`raycast://` links** are handled inside Tinycast. Tinycast registers this link type; if Raycast is
+also installed, macOS decides which app receives those links. A link to an installed extension command
+runs that command, whether it comes from another app, the browser or an extension, with its `arguments`,
 `fallbackText` and `launchType` applied. `tinycast://` links work the same way. Any other link
 reopens the palette, since passing it on would open Raycast itself.
 
@@ -60,7 +50,6 @@ reopens the palette, since passing it on would open Raycast itself.
 
 | Gap                                              | Why                                                                                       |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| **Raycast's sign-in proxy**                      | Providers that need `oauth.raycast.com` to exchange tokens still fail                     |
 | **`AI`, `BrowserExtension`, `WindowManagement`** | These are Raycast services with no local equivalent. Using one fails with a clear message |
 | **WebSocket**                                    | Not available yet                                                                         |
 | **Canceling a `fetch` in progress**              | The caller gets its `AbortError`, but the request still finishes in the background        |

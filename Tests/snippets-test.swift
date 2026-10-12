@@ -2,6 +2,7 @@
 
 import AppKit
 import Foundation
+import SwiftUI
 
 @main
 @MainActor
@@ -13,6 +14,7 @@ struct SnippetsTests {
         // The in-process delivery tier drives a real text view, which needs AppKit awake.
         _ = NSApplication.shared
         testIdentityAndRevision()
+        testEditorSession()
         testRaycastImport()
         try testMarkdownCodec()
         try testRepositoryStorage()
@@ -51,6 +53,62 @@ struct SnippetsTests {
         check(
             "source revision changes with source content",
             SnippetSourceRevision(content: "same") != SnippetSourceRevision(content: "same\n"))
+    }
+
+    private static func testEditorSession() {
+        let editor = SnippetEditorSession(record: nil)
+        check(
+            "new editor has no file and cannot save without a name", editor.record == nil && !editor.canSave)
+        check(
+            "new editor preserves the existing option defaults", editor.isEnabled && !editor.showsConfirmation
+        )
+        editor.name = "  Example \n"
+        editor.keyword = "  !example  "
+        editor.text = "  First\nSecond\n"
+        check("named draft can be saved", editor.canSave)
+        check(
+            "editor trims metadata without changing template whitespace",
+            editor.snippet == Snippet(name: "Example", text: editor.text, keyword: "!example"))
+        editor.keyword = " \n"
+        check("blank editor keyword is normalized to nil", editor.snippet.keyword == nil)
+        editor.isSaving = true
+        check("a pending save cannot be submitted twice", !editor.canSave)
+        editor.isSaving = false
+        editor.name = " \n"
+        check("whitespace-only name cannot be saved", !editor.canSave)
+
+        let original = record(
+            "/tmp/editor.md",
+            Snippet(
+                name: "Original", text: "Hello", keyword: "!hello", isEnabled: false,
+                showsConfirmation: true))
+        let editing = SnippetEditorSession(record: original)
+        check("editing keeps the loaded record and source revision", editing.record == original)
+        check("editing starts with every original option", editing.snippet == original.snippet)
+        editing.name = "Changed"
+        check("draft changes do not modify the loaded record", editing.record?.snippet.name == "Original")
+        let end = editing.text.index(editing.text.startIndex, offsetBy: 2)
+        editing.selection = TextSelection(range: editing.text.startIndex..<end)
+        editing.focusedField = .keyword
+        editing.insert("{date}")
+        check("placeholder replaces the selected text", editing.text == "{date}llo")
+        check("placeholder returns focus to the template", editing.focusedField == .template)
+        editing.insert("{time}")
+        check("successive placeholders stay at the caret", editing.text == "{date}{time}llo")
+        editing.selection = nil
+        editing.insert("{cursor}")
+        check("placeholder without a selection appends", editing.text == "{date}{time}llo{cursor}")
+        editing.text = "Avant 👋 après"
+        let cursor = editing.text.index(editing.text.startIndex, offsetBy: 7)
+        editing.selection = TextSelection(range: cursor..<cursor)
+        editing.insert("\n")
+        check("Return inserts a line break at the Unicode caret", editing.text == "Avant 👋\n après")
+        editing.advanceFocus(backwards: false)
+        check("Tab advances to the name", editing.focusedField == .name)
+        editing.advanceFocus(backwards: true)
+        check("Shift-Tab returns to the template", editing.focusedField == .template)
+        editing.advanceFocus(backwards: true)
+        check("form focus wraps through the existing options", editing.focusedField == .confirmation)
     }
 
     private static func testRaycastImport() {
@@ -617,6 +675,42 @@ struct SnippetsTests {
         check(
             "the reader's clipboard is restored afterwards",
             backing.string(forType: .string) == "Original")
+
+        let manager = ClipboardManager()
+        let paused = TextInjector(clipboardManager: manager, settings: AppSettings())
+        seed("Original")
+        let probe = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(60))
+            let pausesAtCopy = manager.pauses
+            let item = NSPasteboardItem()
+            item.setString("the selection", forType: .string)
+            backing.clearContents()
+            _ = backing.writeObjects([item])
+            return pausesAtCopy
+        }
+        _ = await paused.copySelection(from: nil, pasteboard: pasteboard)
+        let pausesAtCopy = await probe.value
+        check("history is paused while the borrowed copy lands", pausesAtCopy == 1)
+        check("the restore is baselined before history resumes", manager.syncedWhilePaused)
+        check("a landed copy resumes history", manager.pauses == 0)
+        _ = await paused.copySelection(from: nil, pasteboard: pasteboard)
+        check("a copy that never lands resumes history", manager.pauses == 0)
+
+        // Two borrows in flight: the later one must not read the earlier one's restore as a copy.
+        seed("Secret")
+        let first = Task { @MainActor in
+            await injector.copySelection(from: nil, pasteboard: pasteboard)
+        }
+        try? await Task.sleep(for: .milliseconds(100))
+        let second = await injector.copySelection(from: nil, pasteboard: pasteboard)
+        let earlier = await first.value
+        check(
+            "overlapping borrows never return the clipboard as a selection: "
+                + "\(earlier ?? "nil"), \(second ?? "nil")",
+            earlier == nil && second == nil)
+        check(
+            "overlapping borrows leave the clipboard as it was",
+            backing.string(forType: .string) == "Secret")
     }
 
     /// Our panels never activate, so the frontmost app is not where the typist's caret is.
@@ -1366,15 +1460,20 @@ struct SnippetsTests {
                 in: "{argument name=\"Repo\"}/{argument name=\"Branch\"}?q={argument name=\"Repo\"}"
             ).map(\.name) == ["Repo", "Branch"])
         check(
-            "an argument that answers itself is never asked for",
+            "an argument with a default is still offered, but optional",
             SnippetTemplateEngine.declaredArguments(
-                in: "{argument name=\"Tone\" default=\"happy\"}"
-            ).isEmpty)
+                in: "{argument name=\"Tone\" default=\"happy\"}")
+                == [.init(name: "Tone", options: [], isOptional: true)])
+        check(
+            "an occurrence without a default leaves the argument owed",
+            SnippetTemplateEngine.declaredArguments(
+                in: "{argument name=\"Tone\" default=\"happy\"}/{argument name=\"Tone\"}")
+                == [.init(name: "Tone", options: [], isOptional: false)])
         check(
             "options travel with a declared argument as they do with a missing one",
             SnippetTemplateEngine.declaredArguments(
                 in: "{argument name=\"Tone\" options=\"happy, sad\"}")
-                == [.init(name: "Tone", options: ["happy", "sad"])])
+                == [.init(name: "Tone", options: ["happy", "sad"], isOptional: false)])
         check(
             "a template that reads only the clipboard declares no arguments",
             SnippetTemplateEngine.declaredArguments(in: "https://x.dev/?q={clipboard}").isEmpty)
@@ -1516,17 +1615,21 @@ struct SnippetsTests {
             SnippetTemplateEngine.expand(aliasSnippet, snippets: [], context: context).text
                 == "[a b&c]")
 
-        // usesSelection drives the selection-fallback setting.
         check(
-            "usesSelection sees both spellings",
-            SnippetTemplateEngine.usesSelection("a {selection} b")
-                && SnippetTemplateEngine.usesSelection("a {selectedText} b"))
+            "readsSelection sees both spellings",
+            expand("a {selection} b").readsSelection && expand("a {selectedText} b").readsSelection)
         check(
-            "usesSelection is false for a template that reads no selection",
-            !SnippetTemplateEngine.usesSelection("{clipboard} {date}"))
+            "readsSelection is false for a template that reads no selection",
+            !expand("{clipboard} {date}").readsSelection)
         check(
-            "usesSelection parses rather than searches, so a malformed token does not count",
-            !SnippetTemplateEngine.usesSelection("{selection offset=1}"))
+            "readsSelection parses rather than searches, so a malformed token does not count",
+            !expand("{selection offset=1}").readsSelection)
+        let quoting = record("/tmp/quoting.md", Snippet(name: "Quoting", text: "> {selection}"))
+        let quoted = record("/tmp/quoted.md", Snippet(name: "Quoted", text: "{snippet:Quoting}"))
+        check(
+            "readsSelection reaches into a nested snippet",
+            SnippetTemplateEngine.expand(quoted, snippets: [quoting, quoted], context: context)
+                .readsSelection)
 
         // {query} is Raycast's spelling of {argument}.
         check(
@@ -1970,7 +2073,13 @@ private final class StubPasteboard: PasteboardAccess {
 final class ClipboardManager {
     static let internalType = NSPasteboard.PasteboardType("com.tinycast.internal")
     func prepareForTinycastPasteboardMutation() {}
-    func synchronizeAfterTinycastPasteboardMutation(changeCount: Int) {}
+    private(set) var pauses = 0
+    private(set) var syncedWhilePaused = false
+    func synchronizeAfterTinycastPasteboardMutation(changeCount: Int) {
+        syncedWhilePaused = pauses > 0
+    }
+    func pauseCapture() { pauses += 1 }
+    func resumeCapture() { pauses -= 1 }
 }
 
 @MainActor

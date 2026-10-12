@@ -51,6 +51,7 @@ enum CommandCatalog {
 extension SettingsTab {
     var ownedCommands: [CommandID] {
         switch self {
+        case .commands: [.createCustomCommand, .searchCustomCommands]
         case .quicklinks:
             [.createQuicklink, .searchQuicklinks, .importQuicklinks, .exportQuicklinks]
         case .ai: [.quickAI, .aiChat]

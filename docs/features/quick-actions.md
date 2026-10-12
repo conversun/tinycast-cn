@@ -222,7 +222,10 @@ first, because Chromium builds its accessibility tree only once something asks a
 apps and VS Code otherwise answer every attribute with nothing.
 
 When Accessibility yields nothing, `TextInjector.copySelection` borrows a ⌘C: snapshot the
-pasteboard, synthesise the chord, wait for `changeCount` to **move**, read, restore. It lives on
+pasteboard, pause clipboard history, synthesise the chord, wait for `changeCount` to **move**, read,
+restore, resume. The pause keeps the borrowed copy out of history. Only one borrow runs at a time:
+a second would snapshot the first one's copy and read its restore as a selection, so it returns
+nothing instead. It lives on
 `TextInjector` because the pasteboard has one owner — the same lease, queue and `ClipboardManager`
 coordination a paste needs, and a second owner would race it.
 
@@ -234,6 +237,10 @@ false-positives when the same text was already on the clipboard.
 Copying is the fallback and never the first try: it synthesises a keystroke into somebody else's app.
 When both tiers come back empty, only an Accessibility result of `.empty` justifies "nothing is
 selected"; otherwise the app told us nothing either way and says so.
+
+Quicklinks and snippets read `{selection}` through the same two tiers, with one rule of their own:
+the ⌘C is sent only when the expanded template reads the selection. A snippet's keyword expansion
+never sends one, since a typed keyword leaves nothing selected.
 
 ## Delivery
 
@@ -292,5 +299,5 @@ failure handler, so automatic expansion stays silent as before.
   button closes the panel and opens Language & Region.
 - Revoke Accessibility while enabled: a HUD explains instead of failing silently.
 - Harnesses: `quick-action-test` (action metadata, prompt boundaries, preview choices, routes and
-  their repair, diffs) and
-  `text-diff-test` (exact chunks, Unicode, ties, token boundaries and fast paths).
+  their repair) and
+  `text-diff-test` (exact chunks, coalescing, Unicode, ties, token boundaries and fast paths).

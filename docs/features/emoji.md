@@ -17,17 +17,17 @@ A palette sub-screen (reached like Clipboard / Calculator History) presenting a 
 
 ## Layout
 
-| Path | Role |
-| --- | --- |
-| `Model/EmojiCatalog.swift` | The catalog model — groups, names, keywords |
-| `Model/EmojiGridGeometry.swift` | Pure grid math — columns, item sizing |
-| `Model/EmojiData.generated.swift` | The dataset |
-| `Resources/EmojiKeywords/<language>.txt` | CLDR keyword packs, `glyph\|terms` per line |
-| `Service/EmojiIndex.swift` | Search index over the catalog |
-| `Service/FrequentEmojiStore.swift` | Persisted emoji history and usage counts |
-| `Service/PinnedEmojiStore.swift` | Persisted pins, in the order the user set |
-| `UI/EmojiGridView.swift` | The SwiftUI grid |
-| `UI/EmojiScreen.swift`, `UI/EmojiCoordinator.swift` | The palette screen and its action surface |
+| Path                                                | Role                                        |
+| --------------------------------------------------- | ------------------------------------------- |
+| `Model/EmojiCatalog.swift`                          | The catalog model — groups, names, keywords |
+| `Model/EmojiGridGeometry.swift`                     | Pure grid math — columns, item sizing       |
+| `Model/EmojiData.generated.swift`                   | The dataset                                 |
+| `Resources/EmojiKeywords/<language>.txt`            | CLDR keyword packs, `glyph\|terms` per line |
+| `Service/EmojiIndex.swift`                          | Search index over the catalog               |
+| `Service/FrequentEmojiStore.swift`                  | Persisted emoji history and usage counts    |
+| `Service/PinnedEmojiStore.swift`                    | Persisted pins, in the order the user set   |
+| `UI/EmojiGridView.swift`                            | The SwiftUI grid                            |
+| `UI/EmojiScreen.swift`, `UI/EmojiCoordinator.swift` | The palette screen and its action surface   |
 
 The index and the store are **effects**, so they live under `Service/` — only the three files above them
 are pure.
@@ -43,9 +43,9 @@ are pure.
   leading word: `birthday` keeps 🎂 first, and `pray` favours the annotation over "prayer beads".
 - **Colon-wrapped queries are unwrapped**, so `:+1:` reuses CLDR's `+1` annotation with no alias table.
 - **Other languages add keywords; English always stays.** `AppCore` loads one pack per language in
-  `Locale.preferredLanguages`, matched by `Bundle.preferredLocalizations` (`zh-HK` reads `zh-Hant`), so
-  a Chinese Mac finds 🐱 by `猫` and by `cat`. Pack terms join the keywords after the English ones, so
-  an English name match still ranks first. An English-only Mac reads no pack. The generator drops terms
+  `Locale.preferredLanguages`, matched by `Bundle.preferredLocalizations` (`zh-CN` reads `zh-Hans`), so
+  a Simplified Chinese Mac finds 🐱 by `猫` and by `cat`. Pack terms join after the English keywords,
+  so an English name match still ranks first. An English-only Mac reads no pack. The generator drops terms
   English already has, folds `’` to `'`, and gives katakana a hiragana twin, since an IME shows hiragana
   until conversion. Packs ship for German, Spanish, French, Japanese, Korean, Portuguese, Russian and
   both Chinese scripts.

@@ -20,7 +20,6 @@ final class SnippetArgumentsState {
 struct SnippetArgumentFields: View {
     @Environment(\.metrics) private var metrics
     let state: SnippetArgumentsState
-    @FocusState private var focusedArgument: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: metrics.spacing.xl) {
@@ -34,7 +33,6 @@ struct SnippetArgumentFields: View {
                             "", text: value(for: argument.name),
                             prompt: Text(argument.name)
                         )
-                        .focused($focusedArgument, equals: argument.name)
                         .dialogTextField()
                     } else {
                         OptionChips(
@@ -46,7 +44,6 @@ struct SnippetArgumentFields: View {
                 .accessibilityLabel("Snippet argument \(argument.name)")
             }
         }
-        .onAppear { focusedArgument = state.arguments.first { $0.options.isEmpty }?.name }
     }
 
     private func value(for name: String) -> Binding<String> {

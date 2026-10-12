@@ -3,21 +3,16 @@ import { Footer } from "../../components/footer";
 import { Nav } from "../../components/nav";
 import { SupportFlow } from "../../components/support/support-flow";
 import { SupporterCount } from "../../components/support/supporter-count";
-import {
-  reasonsLabel,
-  runningCosts,
-  supportHero,
-  supportReasons,
-} from "../../data/support";
+import { supportHero } from "../../data/support";
 
 const description =
-  "Tinycast is free and open source. If you enjoy it, you can support its development with a monthly or one-time payment through Polar.";
+  "Enjoying Tinycast? Buy a premium wallpaper pack with an included Discord role. Tinycast remains free and open source.";
 
 export const metadata: Metadata = {
-  title: "Support",
+  title: "Enjoying Tinycast?",
   description,
   alternates: { canonical: "/support/" },
-  openGraph: { title: "Support Tinycast", description, url: "/support/" },
+  openGraph: { title: "Enjoying Tinycast?", description, url: "/support/" },
 };
 
 function Intro() {
@@ -35,37 +30,14 @@ function Intro() {
   );
 }
 
-function Reasons() {
-  return (
-    <div>
-      <p className="font-mono text-eyebrow uppercase text-fg-muted">
-        {reasonsLabel}
-      </p>
-      <ul className="mt-4 divide-y divide-border border-y border-border">
-        {supportReasons.map((reason) => (
-          <li key={reason.title} className="py-5">
-            <h2 className="text-body font-medium text-fg">{reason.title}</h2>
-            <p className="mt-1 max-w-lg text-pretty text-small text-fg-muted">
-              {reason.body}
-            </p>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-5 max-w-lg text-pretty text-small text-fg-subtle">
-        {runningCosts}
-      </p>
-    </div>
-  );
-}
-
 export default function SupportPage() {
   return (
-    <>
+    <div className="flex min-h-dvh flex-col">
       <Nav />
-      <main className="mx-auto max-w-7xl px-4 pb-24 pt-12 sm:px-10 sm:pt-20">
-        <SupportFlow intro={<Intro />} reasons={<Reasons />} />
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-12 sm:px-10 sm:pt-20">
+        <SupportFlow intro={<Intro />} />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }

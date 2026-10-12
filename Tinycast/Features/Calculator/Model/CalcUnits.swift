@@ -113,6 +113,7 @@ enum CalcUnits {
         // Time
         "ms": ("s", false), "s": ("ms", false), "min": ("s", false), "hr": ("min", false),
         "day": ("hr", false), "week": ("day", false),
+        "mo": ("day", false), "yr": ("day", false),
         "workdays": ("hr", false),
         // Area
         "mm²": ("in2", false), "cm²": ("in2", false), "m²": ("ft2", false), "km²": ("mi2", false),
@@ -145,6 +146,8 @@ enum CalcUnits {
         // Data transfer rate
         "Mbps": ("kbps", false), "Gbps": ("mbps", false), "Kbps": ("bps", false),
         "bps": ("kbps", false), "Tbps": ("gbps", false),
+        "Bps": ("bps", false), "kBps": ("kbps", false), "MBps": ("mbps", false),
+        "GBps": ("gbps", false), "TBps": ("tbps", false),
         "Wh": ("kwh", false), "mWh": ("wh", false), "kWh": ("wh", false), "MWh": ("kwh", false),
         "W": ("kw", false), "mW": ("w", false), "kW": ("w", false), "MW": ("kw", false),
         "A": ("ma", false), "mA": ("a", false), "µA": ("ma", false), "MA": ("a", false),

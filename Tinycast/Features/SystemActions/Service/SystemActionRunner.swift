@@ -1,25 +1,6 @@
 import AppKit
-import Carbon
 import CoreAudio
 import Darwin
-
-struct SystemActionFailure: LocalizedError, Sendable {
-    enum Settings: Sendable {
-        case accessibility
-        case automation
-        case bluetooth
-    }
-
-    let message: String
-    let settings: Settings?
-
-    init(_ message: String, settings: Settings? = nil) {
-        self.message = message
-        self.settings = settings
-    }
-
-    var errorDescription: String? { message }
-}
 
 struct SystemActionFeedback: Sendable {
     let title: String
@@ -51,15 +32,17 @@ enum SystemActionRunner {
     {
         switch id {
         case .lockScreen:
-            try postKey(keyCode: CGKeyCode(kVK_ANSI_Q), flags: [.maskControl, .maskCommand])
+            try lockScreen()
         case .sleep:
             try await runProcess("/usr/bin/pmset", arguments: ["sleepnow"])
         case .sleepDisplays:
             try await runProcess("/usr/bin/pmset", arguments: ["displaysleepnow"])
         case .restart:
-            try await runAppleScript("tell application \"System Events\" to restart")
+            try await runAppleScript(
+                "tell application \"System Events\" to restart with state saving preference")
         case .shutDown:
-            try await runAppleScript("tell application \"System Events\" to shut down")
+            try await runAppleScript(
+                "tell application \"System Events\" to shut down with state saving preference")
         case .logOut:
             try await runAppleScript("tell application \"System Events\" to log out")
         case .showScreenSaver:
@@ -84,6 +67,11 @@ enum SystemActionRunner {
             try postMediaKey(18)
         case .toggleMute:
             try toggleMute()
+        case .toggleMicrophoneMute:
+            let muted = try await Task.detached {
+                try await toggleMicrophoneMute()
+            }.value
+            return SystemActionFeedback(muted ? "Microphone Muted" : "Microphone Unmuted")
         case .volumeUp:
             try stepVolume(up: true)
         case .volumeDown:
@@ -339,20 +327,17 @@ enum SystemActionRunner {
         }
     }
 
-    private static func postKey(keyCode: CGKeyCode, flags: CGEventFlags) throws {
-        guard Permissions.ensureAccessibility() else {
-            throw SystemActionFailure(
-                "Allow Tinycast to control your Mac in Accessibility settings, then try again.",
-                settings: .accessibility)
+    private static func lockScreen() throws {
+        let path = "/System/Library/PrivateFrameworks/login.framework/Versions/Current/login"
+        guard let handle = dlopen(path, RTLD_NOW) else {
+            throw SystemActionFailure("Screen locking is unavailable on this Mac.")
         }
-        let source = CGEventSource(stateID: .combinedSessionState)
-        guard let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
-            let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
-        else { throw SystemActionFailure("macOS could not create the keyboard event.") }
-        down.flags = flags
-        up.flags = flags
-        down.post(tap: .cghidEventTap)
-        up.post(tap: .cghidEventTap)
+        defer { dlclose(handle) }
+        typealias LockScreen = @convention(c) () -> Int32
+        guard let symbol = dlsym(handle, "SACLockScreenImmediate") else {
+            throw SystemActionFailure("This macOS version does not expose screen locking.")
+        }
+        _ = unsafeBitCast(symbol, to: LockScreen.self)()
     }
 
     private static func postMediaKey(_ key: Int32) throws {

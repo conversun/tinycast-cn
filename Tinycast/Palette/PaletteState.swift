@@ -11,10 +11,11 @@ struct PaletteFrame: Equatable {
 @MainActor
 @Observable
 final class PaletteState {
-    var mode: PaletteMode = .launcher
+    var mode: PaletteMode = .launcher { didSet { restoredSelection = nil } }
     /// The screens below `mode`, innermost last: a summon starts a new one, navigating pushes on.
     private(set) var backStack: [PaletteFrame] = []
-    var query: String = ""
+    var query: String = "" { didSet { restoredSelection = nil } }
+    @ObservationIgnored private(set) var restoredSelection: Int?
     var selection: Int = 0
     /// True while an IME holds marked text, which leaves `query` empty. The panel publishes it.
     var isComposing = false
@@ -36,6 +37,8 @@ final class PaletteState {
     var resetToken = UUID()
     /// Bumped when an action reorders the list, so the highlight scrolls back into view.
     var followToken = UUID()
+    /// Bumped when an action rewrites the query, so the field lands with the caret after it.
+    private(set) var queryRewriteToken = UUID()
     /// AppKit binds ⌘. to `cancelOperation:`, so the field editor eats it before `onKeyPress`.
     private(set) var pinChordToken = UUID()
     /// Bumped when AppKit resolves ⌘1…⌘0 to a slot index from the physical number row.
@@ -104,16 +107,19 @@ final class PaletteState {
 
     /// Open `mode` over the current screen, which a back step returns to.
     func push(mode: PaletteMode) {
-        backStack.append(PaletteFrame(mode: self.mode, query: query, selection: selection))
+        if !self.mode.isNativeEditor {
+            backStack.append(PaletteFrame(mode: self.mode, query: query, selection: selection))
+        }
         replace(mode: mode)
     }
 
     /// Restore the screen underneath, false when this one is the root.
-    func pop() -> Bool {
+    func pop(preservingSelection: Bool = false) -> Bool {
         guard let frame = backStack.popLast() else { return false }
         openScreen(frame.mode)
         query = frame.query
         selection = frame.selection
+        restoredSelection = preservingSelection ? frame.selection : nil
         // Not `resetToken`: landing the list again would throw away the selection restored here.
         followToken = UUID()
         return true
@@ -173,6 +179,11 @@ final class PaletteState {
 
     func noteMenuPresentation() {
         menuPresentationToken = UUID()
+    }
+
+    func rewriteQuery(_ text: String) {
+        query = text
+        queryRewriteToken = UUID()
     }
 
     func noteFavoriteSlot(_ index: Int) {

@@ -13,6 +13,7 @@ struct SystemAction: Identifiable, Hashable, Sendable {
         case nextTrack = "next-track"
         case previousTrack = "previous-track"
         case toggleMute = "toggle-mute"
+        case toggleMicrophoneMute = "toggle-microphone-mute"
         case volumeUp = "volume-up"
         case volumeDown = "volume-down"
         case setVolume = "set-volume"
@@ -86,6 +87,7 @@ enum SystemActionCatalog {
         case .nextTrack: return String(localized: "Next Track")
         case .previousTrack: return String(localized: "Previous Track")
         case .toggleMute: return String(localized: "Toggle Mute")
+        case .toggleMicrophoneMute: return String(localized: "Toggle Microphone Mute")
         case .volumeUp: return String(localized: "Turn Volume Up")
         case .volumeDown: return String(localized: "Turn Volume Down")
         case .setVolume: return String(localized: "Set Volume…")
@@ -122,6 +124,7 @@ enum SystemActionCatalog {
         case .nextTrack: return "forward.end"
         case .previousTrack: return "backward.end"
         case .toggleMute: return "speaker.slash"
+        case .toggleMicrophoneMute: return "mic.slash"
         case .volumeUp: return "speaker.plus"
         case .volumeDown: return "speaker.minus"
         case .setVolume, .volume0, .volume25, .volume50, .volume75, .volume100:

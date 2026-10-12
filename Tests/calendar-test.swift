@@ -36,7 +36,9 @@ struct CalendarTests {
         menuBarTitles()
         autoJoinFiresOnce()
         autoJoinRespectsArming()
+        autoJoinSkipsBareLinks()
         eventDrafts()
+        eventEditor()
         meetingDetails()
 
         print("\(passes)/\(passes + failures) passed")
@@ -119,6 +121,10 @@ struct CalendarTests {
             MeetingLink.detect(in: "line one\nhttps://whereby.com/acme\nline three")?.url
                 .absoluteString == "https://whereby.com/acme",
             "a newline ends the URL")
+        expect(
+            MeetingLink.detect(in: "line one\r\nhttps://whereby.com/acme\r\nline three")?.url
+                .absoluteString == "https://whereby.com/acme",
+            "a CRLF line break ends the URL")
         expect(
             MeetingLink.detect(in: "HTTPS://WHEREBY.COM/Acme")?.provider == .whereby,
             "the scheme and host match case-insensitively")
@@ -472,7 +478,7 @@ struct CalendarTests {
 
     static func autoJoinFiresOnce() {
         let window = UpcomingWindow(leadMinutes: 5)
-        let policy = AutoJoinPolicy(armedAt: at(0))
+        let policy = AutoJoinPolicy(armedAt: at(0), namedProvidersOnly: false)
         let meeting = event(id: "standup", start: 60, minutes: 30)
         let start = at(60)
 
@@ -508,7 +514,7 @@ struct CalendarTests {
         let window = UpcomingWindow(leadMinutes: 5)
         let running = event(id: "running", start: 60, minutes: 60)
         // Armed a minute into a meeting that was already under way.
-        let policy = AutoJoinPolicy(armedAt: at(61))
+        let policy = AutoJoinPolicy(armedAt: at(61), namedProvidersOnly: false)
         expect(
             policy.meeting(from: [running], now: at(61), window: window, joined: []) == nil,
             "arming the switch mid-call does not yank you into the call")
@@ -517,6 +523,28 @@ struct CalendarTests {
             policy.meeting(from: [running, later], now: at(90), window: window, joined: [])?.id
                 == "later",
             "but the next meeting after arming is fair game")
+    }
+
+    static func autoJoinSkipsBareLinks() {
+        let window = UpcomingWindow(leadMinutes: 5)
+        let placeholder = event(id: "placeholder", start: 60)
+        let call = event(id: "call", start: 60, link: link("https://zoom.us/j/8901234567"))
+        let start = at(60)
+
+        expect(
+            AutoJoinPolicy(armedAt: at(0), namedProvidersOnly: false)
+                .meeting(from: [placeholder], now: start, window: window, joined: [])?.id
+                == "placeholder",
+            "a bare link still auto joins by default")
+        let namedOnly = AutoJoinPolicy(armedAt: at(0), namedProvidersOnly: true)
+        expect(
+            namedOnly.meeting(from: [placeholder], now: start, window: window, joined: []) == nil,
+            "named providers only leaves a bare link to the card")
+        let earlier = event(id: "earlier", start: 58)
+        expect(
+            namedOnly.meeting(from: [earlier, call], now: start, window: window, joined: [])?.id
+                == "call",
+            "and a bare link the card would pick first does not shadow a call beside it")
     }
 
     // MARK: - The event draft
@@ -543,6 +571,34 @@ struct CalendarTests {
         expect(EventDraft.label(startOffset: 15) == "15 min", "a smaller offset reads in minutes")
         expect(EventDraft.label(duration: 45) == "45 min", "so does a sub-hour duration")
         expect(EventDraft.label(duration: 60) == "1 hr", "an hour reads as an hour")
+    }
+
+    static func eventEditor() {
+        let editor = EventEditorSession()
+        expect(!editor.draft.isValid, "the event editor opens with an invalid blank title")
+        expect(editor.draft.startOffsetMinutes == 0, "new events still start now")
+        expect(editor.draft.durationMinutes == 30, "new events still last thirty minutes")
+        expect(editor.focusedField == .title, "the title takes initial focus")
+        editor.advanceFocus(backwards: false)
+        expect(editor.focusedField == .start, "Tab reaches the start choice")
+        editor.advanceFocus(backwards: false)
+        expect(editor.focusedField == .duration, "then reaches duration")
+        editor.advanceFocus(backwards: false)
+        expect(editor.focusedField == .title, "Tab wraps without leaving the form")
+        editor.advanceFocus(backwards: true)
+        expect(editor.focusedField == .duration, "Shift-Tab wraps backwards")
+        editor.advanceFocus(backwards: true)
+        expect(editor.focusedField == .start, "Shift-Tab returns to start")
+        editor.advanceFocus(backwards: true)
+        expect(editor.focusedField == .title, "then returns to title")
+        editor.draft.title = " \n "
+        expect(!editor.draft.isValid, "a whitespace-only editor cannot create an event")
+        editor.draft.title = "  Réunion 🎉  "
+        editor.draft.startOffsetMinutes = 15
+        editor.draft.durationMinutes = 45
+        expect(editor.draft.trimmedTitle == "Réunion 🎉", "the editor preserves Unicode titles")
+        expect(editor.draft.start(from: at(10)) == at(25), "start is relative to saving, not opening")
+        expect(editor.draft.end(from: at(10)) == at(70), "duration starts at the selected offset")
     }
 
     // MARK: - Meeting details

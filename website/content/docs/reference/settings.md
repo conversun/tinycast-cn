@@ -20,24 +20,25 @@ There are 21 panes in four groups.
 | ------------ | -------- |
 | App Launcher | **None** |
 
-| Setting                           | Options                                                                       | Default                           |
-| --------------------------------- | ----------------------------------------------------------------------------- | --------------------------------- |
-| Learned ranking                   | **Reset…** clears all learned ranking                                         |                                   |
-| Hyper Key                         | None · Caps Lock · Right Control · Right Shift · Right Option · Right Command | **None**                          |
-| Quick Press                       | Does Nothing · the original key · Trigger Escape                              | **Does Nothing**                  |
-| Include Shift (⇧)                 | On · Off                                                                      | **On**                            |
-| Theme                             | System · Light · Dark                                                         | **System**                        |
-| Interface size                    | Default · Large · Larger                                                      | **Default**                       |
-| Background transparency           | Less to More, with Reset                                                      | Middle                            |
-| Compact mode                      | On · Off                                                                      | Off                               |
-| Show favorites in compact mode    | On · Off                                                                      | **On**                            |
-| Follow the cursor across displays | On · Off                                                                      | **On**                            |
-| Drag to reposition                | On · Off                                                                      | Off                               |
-| Launch at login                   | On · Off                                                                      | Off                               |
-| Show in menu bar                  | On · Off                                                                      | **On**                            |
-| Pop to Root Search                | Immediately · After 5, 15, 30, 60 or 90 seconds                               | **Immediately**                   |
-| Escape Key Behavior               | Navigate back or close window · Close window and pop to root                  | **Navigate back or close window** |
-| Auto-switch input source          | None, or any keyboard input source you have                                   | **None**                          |
+| Setting                           | Options                                                            | Default                           |
+| --------------------------------- | ------------------------------------------------------------------ | --------------------------------- |
+| Learned ranking                   | **Reset…** clears all learned ranking                              |                                   |
+| Hyper Key                         | None · Caps Lock · Left or Right Control, Shift, Option or Command | **None**                          |
+| Quick Press                       | Does Nothing · the original key · Trigger Escape                   | **Does Nothing**                  |
+| Include Shift (⇧)                 | On · Off                                                           | **On**                            |
+| Secure Input Compatibility        | On · Off (Caps Lock only)                                          | **Off**                           |
+| Theme                             | System · Light · Dark                                              | **System**                        |
+| Interface size                    | Default · Large · Larger                                           | **Default**                       |
+| Background transparency           | Less to More, with Reset                                           | Middle                            |
+| Compact mode                      | On · Off                                                           | Off                               |
+| Show favorites in compact mode    | On · Off                                                           | **On**                            |
+| Follow the cursor across displays | On · Off                                                           | **On**                            |
+| Drag to reposition                | On · Off                                                           | Off                               |
+| Launch at login                   | On · Off                                                           | Off                               |
+| Show in menu bar                  | On · Off                                                           | **On**                            |
+| Pop to Root Search                | Immediately · After 5, 15, 30, 60 or 90 seconds                    | **Immediately**                   |
+| Escape Key Behavior               | Navigate back or close window · Close window and pop to root       | **Navigate back or close window** |
+| Auto-switch input source          | None, or any keyboard input source you have                        | **None**                          |
 
 See [The palette](/docs/palette), [Learned ranking](/docs/launcher#learned-ranking) and
 [Hotkeys](/docs/reference/hotkeys#hyper-key).

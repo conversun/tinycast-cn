@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 @Observable
 final class VisibilityStore {
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     private let itemsKey = "hiddenLauncherItems"
     private let kindsKey = "hiddenLauncherKinds"
 
@@ -13,7 +13,8 @@ final class VisibilityStore {
     /// AppIndex includes this in its result key, invalidating a list when the visible set moves.
     private(set) var revision = 0
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         hiddenItemKeys = Set(defaults.stringArray(forKey: itemsKey) ?? [])
         disabledKinds = Set(defaults.stringArray(forKey: kindsKey) ?? [])
     }
@@ -39,13 +40,17 @@ final class VisibilityStore {
         entry.settingsOwner != nil || isKindEnabled(entry.kind)
     }
 
-    func isItemVisible(_ entry: AppEntry) -> Bool {
-        !hiddenItemKeys.contains(key(for: entry))
-    }
+    func isItemVisible(_ entry: AppEntry) -> Bool { isItemVisible(key: key(for: entry)) }
+
+    func isItemVisible(key: String) -> Bool { !hiddenItemKeys.contains(key) }
 
     func setItemVisible(_ visible: Bool, for entry: AppEntry) {
-        let k = key(for: entry)
-        if visible { hiddenItemKeys.remove(k) } else { hiddenItemKeys.insert(k) }
+        setItemVisible(visible, forKey: key(for: entry))
+    }
+
+    func setItemVisible(_ visible: Bool, forKey key: String) {
+        guard isItemVisible(key: key) != visible else { return }
+        if visible { hiddenItemKeys.remove(key) } else { hiddenItemKeys.insert(key) }
         revision &+= 1
         defaults.set(Array(hiddenItemKeys), forKey: itemsKey)
     }
@@ -64,6 +69,7 @@ final class VisibilityStore {
     }
 
     func setKindEnabled(_ enabled: Bool, for kind: AppEntry.Kind) {
+        guard isKindEnabled(kind) != enabled else { return }
         if enabled { disabledKinds.remove(kind.rawValue) } else { disabledKinds.insert(kind.rawValue) }
         revision &+= 1
         defaults.set(Array(disabledKinds), forKey: kindsKey)
@@ -76,7 +82,7 @@ final class VisibilityStore {
         case .settingsPane: isKindEnabled(.systemSettings)
         case .systemAction: isKindEnabled(.systemAction)
         case .command(let id): id.owner == nil ? isKindEnabled(.command) : true
-        case .togglePalette, .quickAction, .customCommand, .windowCommand, .customWindowSize,
+        case .togglePalette, .dictation, .quickAction, .customCommand, .windowCommand, .customWindowSize,
             .windowLayout, .windowRoom, .quicklink, .appleShortcut, .snippet, .extensionCommand:
             true
         }

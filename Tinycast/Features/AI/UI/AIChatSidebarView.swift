@@ -20,12 +20,9 @@ struct AIChatSidebarView: View {
 
     /// Recency order already groups each day together, so a bucket only ever opens once.
     private var sections: [ChatSection] {
-        let results = history.search(query)
         var sections: [ChatSection] = []
-        let pinned = results.filter(\.isPinned)
-        if !pinned.isEmpty { sections.append(ChatSection(title: "Pinned", conversations: pinned)) }
-        for conversation in results where !conversation.isPinned {
-            let title = DateBucket(for: conversation.updatedAt).title
+        for conversation in history.search(query).pinnedFirst {
+            let title = conversation.isPinned ? "Pinned" : DateBucket(for: conversation.updatedAt).title
             if sections.last?.title == title {
                 sections[sections.count - 1].conversations.append(conversation)
             } else {
@@ -44,7 +41,13 @@ struct AIChatSidebarView: View {
         }
         // The field sits under the toolbar's material, so it needs its own clearance from the top.
         .padding(.top, Theme.Spacing.md)
-        .onExitCommand { query = "" }
+        .onExitCommand {
+            if query.isEmpty {
+                _ = coordinator.closeWindowIfKey()
+            } else {
+                query = ""
+            }
+        }
     }
 
     @ViewBuilder private var list: some View {

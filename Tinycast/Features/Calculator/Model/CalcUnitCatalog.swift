@@ -109,6 +109,8 @@ enum CalcUnitCatalog {
         hr|Hours|3600.0|h,hr,hrs,hour,hours
         day|Days|86400.0|d,day,days
         week|Weeks|604800.0|wk,week,weeks
+        mo|Months|2629746.0|mo,month,months
+        yr|Years|31556952.0|yr,year,years
         workdays|Workdays|28800.0|workday,workdays,businessday,businessdays
         area
         mm²|Square Millimeters|1e-06|mm2,sqmm
@@ -190,6 +192,11 @@ enum CalcUnitCatalog {
         Mbps|Megabits per Second|125000.0|mbps,mbit/s,mb/s
         Gbps|Gigabits per Second|125000000.0|gbps,gbit/s,gb/s
         Tbps|Terabits per Second|125000000000.0|tbps,tbit/s,tb/s
+        Bps|Bytes per Second|1.0|Bps
+        kBps|Kilobytes per Second|1000.0|kBps,KBps
+        MBps|Megabytes per Second|1000000.0|MBps
+        GBps|Gigabytes per Second|1000000000.0|GBps
+        TBps|Terabytes per Second|1000000000000.0|TBps
         acceleration
         m/s²|Meters per Second Squared|1.0|m/s2,mps2
         force

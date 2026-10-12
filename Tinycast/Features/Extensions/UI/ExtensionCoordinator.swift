@@ -103,6 +103,15 @@ final class ExtensionCoordinator {
 
     // MARK: - Managing one extension from the launcher
 
+    func showStoreInstall(_ install: ExtensionDeepLink.StoreInstall) {
+        paletteCoordinator.hidePalette(restoreFocus: false)
+        if settings.extensionsEnabled { core.pendingExtensionStoreInstall = install }
+        settingsCoordinator.showSettings(tab: .extensions)
+        if !settings.extensionsEnabled {
+            core.showMessage("Extensions are disabled — enable them in Settings", tone: .danger)
+        }
+    }
+
     /// Opens Settings on the extension a launcher row belongs to.
     func showExtensionSettings(for app: AppEntry) {
         guard let (owner, _) = extensions.resolve(app) else { return }
@@ -264,9 +273,6 @@ final class ExtensionCoordinator {
     /// True while the palette is on screen — a toast has somewhere to render only then.
     var isPaletteVisible: Bool { paletteCoordinator.isVisible }
 
-    /// True while an OAuth authorization flow is actively awaiting callback.
-    var isAuthorizing: Bool { extensions.isAuthorizing }
-
     func closeMainWindow() {
         paletteCoordinator.hidePalette(restoreFocus: false)
     }
@@ -278,6 +284,17 @@ final class ExtensionCoordinator {
 
     func clearSearchBar() {
         palette.query = ""
+    }
+
+    var extensionSearch: ExtensionSearchState.Screen? {
+        guard palette.mode == .extensionCommand else { return nil }
+        return ExtensionSearchState.Screen(query: palette.query, selection: palette.selection)
+    }
+
+    func showExtensionSearch(_ search: ExtensionSearchState.Screen, tree: RenderTree) {
+        let count = ExtensionScreen(tree: tree, query: search.query).items.count
+        palette.query = search.query
+        palette.selection = min(max(search.selection, 0), max(count - 1, 0))
     }
 
     /// Its own window: a no-view command closes the palette before the pill is done.

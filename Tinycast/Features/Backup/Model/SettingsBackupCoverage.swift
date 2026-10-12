@@ -11,7 +11,9 @@ enum SettingsBackupCoverage {
         "hyperKey": .hyperKey,
         "hyperKeyIncludesShift": .hyperKeyIncludesShift,
         "hyperKeyQuickPress": .hyperKeyQuickPress,
+        "hyperKeySecureInputCompatibility": .hyperKeySecureInputCompatibility,
         "showInMenuBar": .showInMenuBar,
+        "automaticallyCheckForUpdates": .automaticallyCheckForUpdates,
         "emojiSkinTone": .emojiSkinTone,
         "emojiGridColumns": .emojiGridColumns,
         "popToRootSeconds": .popToRootTimeout,
@@ -47,7 +49,7 @@ enum SettingsBackupCoverage {
         "quicklinksEnabled": .quicklinksEnabled,
         "quicklinksShowInLauncher": .quicklinksShowInLauncher,
         "quicklinkOpensNewWindow": .quicklinkOpensNewWindow,
-        "quicklinkSelectionFallback": .quicklinkSelectionFallback,
+        "quicklinkPassesSelectedText": .quicklinkPassesSelectedText,
         "quicklinkConfirmsBeforeDelete": .quicklinkConfirmsBeforeDelete,
         "appleShortcutsEnabled": .appleShortcutsEnabled,
         "extensionsShowInLauncher": .extensionsShowInLauncher,
@@ -56,6 +58,7 @@ enum SettingsBackupCoverage {
         "calendarSpan": .calendarSpan,
         "joinWindowMinutes": .joinWindowMinutes,
         "autoJoinConfirms": .autoJoinConfirms,
+        "autoJoinNamedProvidersOnly": .autoJoinNamedProvidersOnly,
         "menuBarEvents": .menuBarEvents,
         "calendarMenuBarDisplay": .calendarMenuBarDisplay,
         "menuBarLinkedEventsOnly": .menuBarLinkedEventsOnly,
@@ -71,6 +74,19 @@ enum SettingsBackupCoverage {
 
     /// Keys kept out of a backup on purpose, each with the reason it has to stay out.
     static let deliberatelyExcluded: [String: String] = [
+        AppSettingsKey.dictationEnabled.rawValue:
+            "Microphone capture is an opt-in capability on this Mac; a backup must not enable it.",
+        AppSettingsKey.dictationMode.rawValue: "Dictation preferences stay local until backup supports them.",
+        AppSettingsKey.dictationModel.rawValue: "Downloaded models are local to this Mac.",
+        AppSettingsKey.dictationLanguage.rawValue:
+            "Dictation preferences stay local until backup supports them.",
+        AppSettingsKey.dictationMicrophone.rawValue: "Names a microphone attached to this Mac.",
+        AppSettingsKey.dictationDestination.rawValue:
+            "An import must not change where dictated text is sent.",
+        AppSettingsKey.dictationAdaptsCapitalization.rawValue:
+            "Dictation preferences stay local until backup supports them.",
+        AppSettingsKey.dictationIdleRelease.rawValue:
+            "Dictation memory use stays a device-local preference.",
         AppSettingsKey.clipboardTextSearchEnabled.rawValue:
             "Background OCR is an opt-in processing choice on this Mac; a backup must not enable it.",
         AppSettingsKey.snippetsEnabled.rawValue:

@@ -67,8 +67,9 @@ typealias MenuPanelClipPath =
 
     init(
         popover: PopoverMenuContent, selection: Binding<Int>, width: CGFloat? = nil,
+        visibleRows: CGFloat? = nil,
         search: PopoverMenu.Search, onActivate: @escaping (Int) -> Void,
-        preferredSelection: Int? = nil
+        preferredSelection: Int? = nil, extraRowsHeight: CGFloat = 0
     ) {
         self.init(
             rowCount: popover.items.count, preferredSelection: preferredSelection,
@@ -76,8 +77,9 @@ typealias MenuPanelClipPath =
                 AnyView(
                     PopoverMenu(
                         header: popover.header, items: popover.items, selection: selection,
-                        width: width, onActivate: onActivate,
-                        attachment: corner.popoverAttachment, search: search))
+                        width: width, visibleRows: visibleRows, onActivate: onActivate,
+                        attachment: corner.popoverAttachment, search: search,
+                        extraRowsHeight: extraRowsHeight))
             },
             activate: { popover.items[$0].action() },
             isSelectable: { popover.items[$0].isSelectable },
@@ -96,7 +98,7 @@ private extension MenuPanelCorner {
         switch self {
         case .bottomLeading: .bottomLeading
         case .bottomTrailing: .bottomTrailing
-        case .belowHeaderTrailing: .none
+        case .belowHeaderTrailing, .belowControl: .none
         }
     }
 }
@@ -116,6 +118,7 @@ private extension MenuPanelCorner {
 
     /// False when the selection can't be acted on, which hides the footer pill and swallows ⌘K.
     func hasPrimaryAction(at selection: Int) -> Bool
+    func isPrimaryActionEnabled(at selection: Int) -> Bool
     /// False when ⌘K would open on nothing, which hides the Actions half of the footer group.
     func hasActions(at selection: Int) -> Bool
     /// True while the selected row edits with ↑/↓ itself, which leaves those keys to it.
@@ -152,6 +155,7 @@ private extension MenuPanelCorner {
 
 extension PaletteScreen {
     func hasPrimaryAction(at selection: Int) -> Bool { true }
+    func isPrimaryActionEnabled(at selection: Int) -> Bool { true }
     func hasActions(at selection: Int) -> Bool { true }
     var hidesSearchField: Bool { false }
     var actsWithoutRows: Bool { false }

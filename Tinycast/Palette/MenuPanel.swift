@@ -43,9 +43,12 @@ final class MenuPanel: NSPanel {
         super.resignKey()
         paletteState?.noteCommandHeld(false)
         guard onKeyDown != nil else { return }
+        let presentation = paletteState?.menuPresentationToken
         Task { @MainActor [weak self] in
             await Task.yield()
-            guard let self, onKeyDown != nil else { return }
+            guard let self, onKeyDown != nil, !isKeyWindow,
+                paletteState?.menuPresentationToken == presentation
+            else { return }
             onResignKey?(parent?.isKeyWindow == true)
         }
     }
@@ -92,6 +95,7 @@ final class MenuPanelController {
         let root = AnyView(content.paletteEnvironment(core))
         setContent(root, clipPath: clipPath, in: panel)
         self.parent = parent
+        (parent as? PalettePanel)?.onDismissMenu = onDismiss
         panel.ignoresMouseEvents = false
         // Open disarmed: a menu opened by click lands under the pointer, which chose no row of it.
         core.palette.disarmHoverHighlight(pointerAt: NSEvent.mouseLocation)
@@ -193,6 +197,7 @@ final class MenuPanelController {
     }
 
     func hide() {
+        (parent as? PalettePanel)?.onDismissMenu = nil
         guard let panel else {
             cancelTransitions()
             return
@@ -245,6 +250,7 @@ final class MenuPanelController {
     private func detach(_ panel: MenuPanel) {
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
+        hosting?.rootView = AnyView(EmptyView())
     }
 
     private func ensurePanel(state: PaletteState) -> MenuPanel {
@@ -268,17 +274,19 @@ final class MenuPanelController {
         // `bottomBar`'s own padding: a menu's edge must line up with the button it hangs off.
         let inset = metrics.spacing.md
         let frame = corner.frame(
-            contentSize: size, parentFrame: parent.frame, inset: inset,
+            contentSize: size, parentFrame: parent.frame,
+            visibleFrame: parent.screen?.visibleFrame ?? parent.frame, inset: inset,
             headerExtent: metrics.size.headerPadding + metrics.size.headerHeight)
-        let canvas = corner.scaledFrame(frame, by: motion.maximumScale)
+        let anchor = corner.layerAnchor(for: frame, parentFrame: parent.frame)
+        let canvas = corner.scaledFrame(frame, by: motion.maximumScale, parentFrame: parent.frame)
         let next = Placement(canvas: canvas, corner: corner)
         // Every arrow key re-pushes the tree; reconfiguring would cut the reveal short.
         guard resetMotion || next != placement else { return }
         placement = next
         panel.setFrame(canvas, display: true)
         configureHosting(
-            contentSize: size, canvasSize: canvas.size, scale: modelScale, corner: corner,
-            metrics: metrics)
+            contentSize: size, canvasSize: canvas.size, scale: modelScale, anchor: anchor,
+            corner: corner, metrics: metrics)
         refreshShadow(panel)
     }
 
@@ -347,8 +355,8 @@ final class MenuPanelController {
     }
 
     private func configureHosting(
-        contentSize: NSSize, canvasSize: NSSize, scale: CGFloat, corner: MenuPanelCorner,
-        metrics: InterfaceMetrics
+        contentSize: NSSize, canvasSize: NSSize, scale: CGFloat, anchor: CGPoint,
+        corner: MenuPanelCorner, metrics: InterfaceMetrics
     ) {
         guard let hosting, let layer = hosting.layer, let clipPath else { return }
         CATransaction.begin()
@@ -357,8 +365,8 @@ final class MenuPanelController {
         layer.setAffineTransform(.identity)
         hosting.frame = NSRect(origin: .zero, size: contentSize)
         layer.bounds = NSRect(origin: .zero, size: contentSize)
-        layer.anchorPoint = corner.layerAnchor
-        layer.position = corner.layerPosition(in: canvasSize)
+        layer.anchorPoint = anchor
+        layer.position = CGPoint(x: canvasSize.width * anchor.x, y: canvasSize.height * anchor.y)
         let mask = (layer.mask as? CAShapeLayer) ?? CAShapeLayer()
         mask.frame = NSRect(origin: .zero, size: contentSize)
         mask.isGeometryFlipped = layer.isGeometryFlipped

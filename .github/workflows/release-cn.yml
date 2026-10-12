@@ -99,17 +99,21 @@ jobs:
             ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Tinycast Self-Signed" \
             OTHER_CODE_SIGN_FLAGS="--timestamp=none" \
-            PRODUCT_BUNDLE_IDENTIFIER="com.conversun.tinycast-cn" \
+            TINYCAST_BUNDLE_IDENTIFIER="com.conversun.tinycast-cn" \
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             build
-          BIN="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast"
-          ARCHS_BUILT="$(lipo -archs "$BIN")"
-          for WANT in arm64 x86_64; do
-            case " $ARCHS_BUILT " in
-              *" $WANT "*) ;;
-              *) echo "::error::Missing $WANT slice; built: $ARCHS_BUILT"; exit 1 ;;
-            esac
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app"
+          for BIN in "$APP/Contents/MacOS/Tinycast" "$APP/Contents/Helpers/ClipboardTextHelper" \
+            "$APP/Contents/Helpers/Tinycast Dictation.app/Contents/MacOS/Tinycast Dictation"; do
+            ARCHS_BUILT="$(lipo -archs "$BIN")"
+            for WANT in arm64 x86_64; do
+              case " $ARCHS_BUILT " in
+                *" $WANT "*) ;;
+                *) echo "::error::${BIN##*/}: missing $WANT slice; built: $ARCHS_BUILT"; exit 1 ;;
+              esac
+            done
           done
+          ./Scripts/verify-signature.sh "$APP"
 
       - name: Package DMG
         env:

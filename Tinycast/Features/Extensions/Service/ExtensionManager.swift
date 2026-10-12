@@ -35,8 +35,6 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
     /// Whether the commands reach the launcher at all; independent of `isEnabled`.
     private(set) var showsInLauncher = true
 
-    var isAuthorizing: Bool { oauthSession.isAuthorizing }
-
     let storage: ExtensionStorage
     /// Extension-scoped state the launcher and Settings read through here, like `storage`.
     let appearances = ExtensionAppearanceStore()
@@ -45,7 +43,6 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
     private let storeVersions = ExtensionVersionStore(fileURL: ExtensionCatalog.storeVersionsFile())
     @ObservationIgnored private let runtime: ExtensionRuntime
     @ObservationIgnored private let bridge: ExtensionHostBridge
-    @ObservationIgnored private let oauthSession = ExtensionOAuthSession()
     @ObservationIgnored private weak var appIndex: AppIndex?
     @ObservationIgnored private weak var coordinator: ExtensionCoordinator?
 
@@ -59,7 +56,7 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
     @ObservationIgnored private var backgroundFailure: String?
     @ObservationIgnored private var backgroundTask: Task<Void, Never>?
     @ObservationIgnored private var nextToastID = 1
-    @ObservationIgnored private var lastOAuthExtensionName: String?
+    @ObservationIgnored private var searchState = ExtensionSearchState()
 
     init(clipboardStore: ClipboardStore) {
         storage = ExtensionStorage(directory: ExtensionCatalog.storageDirectory())
@@ -110,7 +107,6 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
                             hostAPI: bridge,
                             priority: type == .background ? .utility : .userInitiated),
                         stop: {
-                            host.stop()
                             bridge.context = nil
                         }, enableInteraction: { host.enableInteraction() })
                 },
@@ -350,7 +346,6 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
                 extensionName: installedExtension.manifest.name, commandName: $0.name
             ).entryID
         }
-        ExtensionOAuthKeychain.removeAllTokens(extensionName: installedExtension.manifest.name)
         try? ExtensionCatalog.uninstall(installedExtension)
         storage.removeAll(extension: installedExtension.manifest.name)
         commandMetadata.removeAll(extension: installedExtension.manifest.name)
@@ -492,7 +487,6 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
     }
 
     func stop() async {
-        oauthSession.cancel()
         guard let sessionID else {
             resetSessionState()
             return
@@ -511,6 +505,7 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
         toasts = []
         navigationDepth = 1
         accessoryValues = [:]
+        searchState = ExtensionSearchState()
     }
 
     // MARK: - Background refresh
@@ -570,9 +565,18 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
     /// One headless run right now, without touching the enable flag or the palette.
     func refreshNow(_ entry: AppEntry) {
         guard let (owner, command) = resolve(entry),
-            ExtensionRefreshPolicy.isSchedulable(mode: command.mode, interval: command.interval),
-            running == nil, backgroundSessionID == nil
+            ExtensionRefreshPolicy.isSchedulable(mode: command.mode, interval: command.interval)
         else { return }
+        let reference = ExtensionCommandRef(
+            extensionName: owner.manifest.name, commandName: command.name)
+        if let refusal = ExtensionRefreshPolicy.refreshNowRefusal(
+            foregroundRunning: running != nil,
+            refreshingCommand: backgroundRef?.entryID,
+            command: reference.entryID)
+        {
+            coordinator?.showHUD(refusal)
+            return
+        }
         Task { [weak self] in
             await self?.runInBackground(owner, command: command)
             self?.restartBackgroundLoop()
@@ -776,6 +780,14 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
         Task { await runtime.dispatch(session: sessionID, handler: handler, payload: payload) }
     }
 
+    func searchQueryChanged(to query: String) {
+        searchState.queryChanged(to: query)
+    }
+
+    func landingSelection(for query: String, rowCount: Int) -> Int {
+        searchState.landingSelection(for: query, rowCount: rowCount)
+    }
+
     // MARK: - Search-bar dropdowns
 
     /// What the dropdown shows: the extension's own `value` when it controls one, else the pick.
@@ -826,6 +838,11 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
 
     func runtime(_ runtime: ExtensionRuntime, session: String, didRender tree: RenderTree) {
         guard session == sessionID else { return }
+        if let current = coordinator?.extensionSearch,
+            let search = searchState.navigate(to: tree.depth, current: current)
+        {
+            coordinator?.showExtensionSearch(search, tree: tree)
+        }
         state = .rendered(tree)
         navigationDepth = tree.depth
         seedSearchBarAccessory(in: tree)
@@ -994,26 +1011,5 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
         coordinator?.runExtensionCommand(
             entry(for: command, in: owner), arguments: link.arguments,
             fallbackText: link.fallbackText, launchType: link.launchType)
-    }
-
-    func authorizeOAuth(options: ExtensionOAuthAuthorizeOptions) async throws -> ExtensionOAuthAuthorizeResult
-    {
-        lastOAuthExtensionName = running?.extensionName
-        return try await oauthSession.authorize(options: options)
-    }
-
-    func getOAuthTokens(providerId: String) -> String? {
-        guard let extName = running?.extensionName ?? lastOAuthExtensionName else { return nil }
-        return ExtensionOAuthKeychain.getTokens(extensionName: extName, providerId: providerId)
-    }
-
-    func setOAuthTokens(providerId: String, tokens: String) {
-        guard let extName = running?.extensionName ?? lastOAuthExtensionName else { return }
-        ExtensionOAuthKeychain.setTokens(tokens, extensionName: extName, providerId: providerId)
-    }
-
-    func removeOAuthTokens(providerId: String) {
-        guard let extName = running?.extensionName ?? lastOAuthExtensionName else { return }
-        ExtensionOAuthKeychain.removeTokens(extensionName: extName, providerId: providerId)
     }
 }
