@@ -175,4 +175,5 @@ jobs:
       prerelease: ${{ needs.sync.outputs.prerelease == 'true' }}
       upstream_tag: ${{ needs.sync.outputs.upstream_tag }}
       ref: ${{ needs.sync.outputs.source_commit }}
+      release_notes: "同步上游 ${{ needs.sync.outputs.upstream_tag }}，保留中文本地化和拼音搜索。"
     secrets: inherit

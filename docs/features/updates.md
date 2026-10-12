@@ -1,12 +1,12 @@
 # Updates
 
-By default, Tinycast checks GitHub Releases once a day and offers the newest release for its own
+By default, Tinycast CN checks `conversun/tinycast-cn` releases once a day and offers the newest release for its own
 channel in a native window with its release notes, installs it and relaunches. There is no Sparkle and
-no appcast: the release feed the website already reads is the feed the app reads.
+no appcast: GitHub's release feed is the updater's feed.
 
 ## Invariants
 
-- **Tinycast installs its own updates, and Homebrew stays out of the way.** Both casks declare
+- **Tinycast installs its own updates, and Homebrew stays out of the way.** The CN cask declares
   `auto_updates true`, which is Homebrew's own flag for an app that manages its own version. `brew
   update && brew upgrade` therefore skips Tinycast entirely — it is never reported outdated, never
   re-downloaded, and a self-updated copy is never trashed or rolled back. `brew install`, `brew
@@ -14,21 +14,17 @@ no appcast: the release feed the website already reads is the feed the app reads
 - **The archive is a zip, never the DMG.** A zip expands with `ditto`; a DMG would have to be mounted,
   which means a volume, a Spotlight handle and a detach that can fail. A release published without a
   zip is not installable and is not offered.
-- **The zip is chosen by architecture.** A stable release carries a thin arm64 zip and a
-  `-Universal-` one. Intel takes the universal zip and is offered *nothing* if it is missing, since a
-  thin build would install and then refuse to launch; Apple silicon prefers the thin zip and falls
-  back to universal.
+- **The zip is chosen by architecture.** CN publishes one `-Universal-` zip for both architectures.
+  Intel takes the universal zip and is offered nothing if it is missing. Apple silicon can prefer a
+  thin zip when one exists, and otherwise uses universal.
 - **Nobody ever runs `xattr`.** An archive Tinycast fetched itself is not quarantined — macOS sets
   that flag for sandboxed downloaders and for apps that opt in with `LSFileQuarantineEnabled`, and
   Tinycast is neither. `Quarantine` checks anyway through `getxattr`/`removexattr` rather than the
   `xattr` tool, and an app that still carries the flag is refused rather than installed.
 - **The signature is the only integrity guarantee.** A downloaded bundle is trusted when its seal
-  validates, nested helper included, *and* it either satisfies the Developer ID requirement pinned in
-  `BundleSignature` or carries the byte-identical leaf certificate the running app does. The
-  requirement names the team, so a certificate renewal strands nobody; the leaf match is the path a
-  copy installed before the Developer ID switch has, and it goes away once none is left. `notarized`
-  is deliberately not in the requirement — it resolves the ticket through `syspolicyd` or the
-  network, so an offline Mac would refuse a bundle the chain already proves is ours.
+  validates across all architectures and nested helpers, and carries the byte-identical leaf
+  certificate of the running CN copy. An upstream Developer ID does not grant trust. Replacing the
+  CN signing certificate requires a manual upgrade; a new certificate is never silently accepted.
 - **A build only ever updates within its own channel.** The channels are separate bundle ids installed
   side by side; crossing would mean installing a different app. `com.tinycast.app.dev` never updates
   at all, and does not advertise the command.
@@ -71,14 +67,19 @@ no appcast: the release feed the website already reads is the feed the app reads
 
 | Bundle id | Channel | Takes |
 | --- | --- | --- |
-| `com.tinycast.app` | `.stable` | releases |
-| `com.tinycast.app.beta` | `.beta` | prereleases |
+| `com.conversun.tinycast-cn` | `.stable` | CN releases |
+| `com.conversun.tinycast-cn.beta` | `.beta` | CN prereleases |
 | anything else | `.development` | nothing |
 
-`AppVersion` parses `MAJOR.MINOR.PATCH` and `MAJOR.MINOR.PATCH-beta.N` with semver precedence: a
-prerelease sorts below the release it leads to, and `beta.10` above `beta.9`. Everything else parses
-to nil, so an off-shape tag can never be offered as an update. A release whose tag disagrees with
-its `prerelease` flag is treated as mis-published and skipped.
+`AppVersion` parses the upstream triple and optional `-beta.N`, followed by optional `-cn.N`.
+The feed requires the CN suffix: plain upstream tags are not offered. The upstream triple and
+beta precedence are compared first, then the CN revision numerically. Thus `0.11.19-cn.2` updates
+`0.11.19-cn.1`, while `0.11.20-cn.1` outranks both. `cn.N` is not itself a prerelease;
+`0.11.20-beta.1-cn.1` is. A tag disagreeing with its GitHub `prerelease` flag is skipped.
+
+Versions through `0.11.19-cn.1` lack the CN updater. They must upgrade once by DMG or Homebrew
+(`brew upgrade --cask --greedy tinycast-cn` includes a cask marked `auto_updates true`).
+Debug and upstream bundle ids are development channels and never consume the CN feed.
 
 The Intel build is *not* a channel. It shares the stable tag, version, bundle id and signature, so it
 resolves to `.stable` like any other; `ReleaseArchitecture` picks its asset, and nothing about
@@ -111,11 +112,10 @@ One route, whatever the install came from:
 
 1. Stream the zip into `~/Library/Caches/<bundle-id>/Updates/`, with real byte progress and a Cancel
    that actually aborts the transfer.
-2. `ditto -x -k` it into a staging folder, and take whatever `.app` lands there — the bundle is named
-   for its channel, so it is `Tinycast Beta.app` on beta.
+2. `ditto -x -k` it into a staging folder and take the `.app` inside. CN uses `Tinycast.app`.
 3. Check quarantine natively; clear it if somehow present, and refuse the update if it survives.
 4. Verify the bundle id, the version, and that the code signature is valid and proves the bundle is
-   ours — by the pinned Developer ID requirement, or by the running app's own leaf certificate.
+   ours by the running app's own leaf certificate.
 5. `FileManager.replaceItemAt`. The staging folder is on the same volume as `/Applications`, which is
    what lets this be atomic. A non-writable `/Applications` is reported, not worked around; there is
    no privileged helper.
@@ -127,10 +127,10 @@ setting, clipboard entry, note or snippet is affected by an update, by `brew upg
 
 ## Releasing into it
 
-`.github/workflows/release.yml` publishes two assets from one build: the DMG people download by hand
-and the cask installs, and `Tinycast-<version>.zip` for the updater. A stable run adds a
-`Tinycast-Universal-<version>` pair from its `universal` job, uploaded second so the thin zip stays
-first in the asset list — builds predating architecture-aware selection take whichever comes first.
+`.github/workflows/release-cn.yml` publishes `Tinycast-CN-<version>.dmg` for manual/Homebrew installs
+and `Tinycast-CN-Universal-<version>.zip` for the updater, from the same signed Universal build.
+CI expands the ZIP and checks its signatures and both slices in the app and both helpers before
+publishing it or enabling Homebrew's `auto_updates`.
 The zip is made with
 
 ```sh
@@ -140,10 +140,10 @@ ditto -c -k --keepParent --sequesterRsrc "$APP" "dist/$ZIP_FILE"
 which is the only zip that leaves the code signature verifiable — plain `zip` drops symlinks and
 breaks the seal, and the signature check above would then reject every update.
 
-The body it publishes is composed by `Scripts/release-notes.sh`: GitHub's generated changelog first,
+The CN workflow combines the supplied Chinese changelog with GitHub's generated merge records,
 then `<!-- tinycast:install -->`, then the install text. Anything a release wants the update window to
 show has to go above that marker — see [release.md](../release.md#release-notes).
 
-**The casks must declare `auto_updates true`** in `abue-ammar/homebrew-tinycast`. Without it Homebrew
+**The cask declares `auto_updates true`** in `conversun/homebrew-tinycast-cn`. Without it Homebrew
 compares its Caskroom receipt against the cask version, sees a self-updated app as outdated forever,
 and re-installs over it on the next `brew upgrade`.

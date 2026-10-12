@@ -22,6 +22,9 @@ details in [signing.md](signing.md).
 
 ## How the in-app updater consumes a release
 
+This section describes upstream packaging and version rules. The CN fork's separate feed,
+bundle identifiers and fork revisions are described under [Chinese fork](#chinese-fork).
+
 Every release publishes two assets from one build: `Tinycast-<version>.dmg`, which people download by
 hand and which the cask installs, and `Tinycast-<version>.zip`, which the in-app updater installs. The
 zip is produced with `ditto -c -k --keepParent --sequesterRsrc` — the only zip that leaves the code
@@ -59,15 +62,48 @@ gate — it neither runs the harnesses nor builds the app, so the whole bar in
 ### Chinese fork
 
 `conversun/tinycast-cn` publishes through `release-cn.yml`, not the upstream workflow.
-Dispatch it with the CN version (`0.11.19-cn.1`), upstream stable tag (`v0.11.19`),
-an exact verified source commit and `prerelease=false`. The source may include newer upstream
-`main` commits; the release tag always points to the verified fork commit.
+The intended next stable release is `v0.11.19-cn.2`, based on `v0.11.19`.
+Dispatch it with `version=0.11.19-cn.2`, `upstream_tag=v0.11.19`,
+an exact verified source commit, `prerelease=false`, and a Chinese `release_notes` changelog.
+For this release, use a Chinese summary such as “适配 CN 应用内更新：支持 CN 修订号比较，
+并通过签名校验的 Universal ZIP 安装更新。” Supply a fresh changelog for each later release;
+the workflow does not repeat this release's adaptation announcement.
+The source may include newer upstream `main` commits; the release tag always points to the
+verified fork commit.
 
 The workflow checks localization and runs the harnesses, builds a signed Universal app,
-checks both architectures in the app and its two helpers, verifies signatures, and publishes
-`Tinycast-CN-<version>.dmg`. It updates `conversun/homebrew-tinycast-cn` when the tap deploy key
-is available. The CN bundle identifier is `com.conversun.tinycast-cn`; its Dictation helper
-derives the `.dictation` identifier through `TINYCAST_BUNDLE_IDENTIFIER`.
+checks both architectures in the app and its two helpers, and verifies signatures. From that
+same signed app it packages both `Tinycast-CN-<version>.dmg` for manual/Homebrew installation
+and `Tinycast-CN-Universal-<version>.zip` for the updater, using
+`ditto -c -k --keepParent --sequesterRsrc`. Before either asset is uploaded or published,
+the ZIP is expanded into scratch storage, its signature is verified again, and both `arm64`
+and `x86_64` slices are checked in all three binaries.
+
+CN versions are `<triple>-cn.N` for stable builds or `<triple>-beta.N-cn.N` for beta builds.
+The final `cn.N` is a fork revision, not a prerelease indicator: `0.11.19-cn.2` is a stable
+successor to `0.11.19-cn.1`. The upstream version and beta sequence sort first, then the numeric
+CN revision. Stable releases use `prerelease=false` and `com.conversun.tinycast-cn`; beta releases
+use `prerelease=true` and `com.conversun.tinycast-cn.beta`. Each Dictation helper derives its
+`.dictation` identifier through `TINYCAST_BUNDLE_IDENTIFIER`. The CN-only updater uses the fork's
+release feed and does not update upstream bundle identifiers.
+
+The release body puts the supplied Chinese changelog and GitHub-generated merge records
+(compared with the previous non-draft release in the same stable/beta channel) above
+`<!-- tinycast:install -->`. Homebrew and quarantine instructions remain below it, so the
+update window shows changes rather than installation commands. Both dispatch and reusable
+workflow callers must supply `release_notes`.
+
+After ZIP validation and release publication, stable runs update `conversun/homebrew-tinycast-cn`
+when `HOMEBREW_TAP_DEPLOY_KEY` is available; prereleases never bump the cask. The deploy key
+still grants access only to the tap. The cask's version and SHA-256 match the **DMG**, not the
+ZIP, and the bump sets `auto_updates true` so ordinary Homebrew upgrades do not overwrite a
+self-updated app. Without the key, the workflow warns and leaves the tap unchanged.
+
+An older CN installation that does not recognize the CN channel/version format cannot bootstrap
+this updater by itself. Install the updater-capable DMG manually, or use
+`brew update && brew upgrade --cask --greedy tinycast-cn` for that initial upgrade, including
+a cask marked `auto_updates true`. Subsequent CN updates use the validated ZIP in-app;
+beta users must install the beta DMG initially because the tap tracks only stable releases.
 
 ### Upstream channels
 
@@ -101,7 +137,8 @@ checks that its bundle and signing identifiers agree and remain distinct from th
 
 ### Release notes
 
-`Scripts/release-notes.sh` composes the release body, and CI runs it just before `gh release create`.
+For upstream releases, `Scripts/release-notes.sh` composes the release body, and CI runs it just
+before `gh release create`.
 It is safe to run by hand against any tag — it only reads:
 
 ```sh
@@ -128,7 +165,7 @@ pings `@everyone`.
 
 ### Homebrew tap automation
 
-Each job's final step rewrites the `version` + `sha256` of its cask (`tinycast`, `tinycast@beta` or
+Each upstream job's final step rewrites the `version` + `sha256` of its cask (`tinycast`, `tinycast@beta` or
 `tinycast-universal`) in the [`homebrew-tinycast`](https://github.com/abue-ammar/homebrew-tinycast) tap
 and pushes. It needs a `HOMEBREW_TAP_TOKEN` repo secret — a fine-grained PAT with **Contents:
 read/write** on the tap repo. Without the secret the step logs a warning and skips; the release still

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "CN version, e.g. 0.8.2-beta.37-cn.2"
+        description: "CN version, e.g. 0.11.19-cn.2 or 0.11.20-beta.1-cn.1"
         type: string
         required: true
       prerelease:
@@ -15,6 +15,10 @@ on:
         default: true
       upstream_tag:
         description: "Upstream Tinycast release tag"
+        type: string
+        required: true
+      release_notes:
+        description: "Chinese changelog for this release (Markdown, no installation instructions)"
         type: string
         required: true
       ref:
@@ -31,6 +35,9 @@ on:
         type: boolean
         default: false
       upstream_tag:
+        type: string
+        required: true
+      release_notes:
         type: string
         required: true
       ref:
@@ -92,14 +99,17 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           BUILD_NUMBER: ${{ github.run_number }}
+          PRERELEASE: ${{ inputs.prerelease }}
         run: |
           ./Scripts/run-tests.sh
+          BUNDLE_ID="com.conversun.tinycast-cn"
+          if [ "$PRERELEASE" = "true" ]; then BUNDLE_ID="${BUNDLE_ID}.beta"; fi
           xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Release \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Tinycast Self-Signed" \
             OTHER_CODE_SIGN_FLAGS="--timestamp=none" \
-            TINYCAST_BUNDLE_IDENTIFIER="com.conversun.tinycast-cn" \
+            TINYCAST_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             build
           APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app"
@@ -126,10 +136,40 @@ jobs:
           diskutil image create from "$STAGE" --format UDZO --volumeName "Tinycast" \
             "dist/Tinycast-CN-${VERSION}.dmg"
 
+      - name: Package and verify Universal updater ZIP
+        id: updater_zip
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app"
+          ZIP="dist/Tinycast-CN-Universal-${VERSION}.zip"
+          ditto -c -k --keepParent --sequesterRsrc "$APP" "$ZIP"
+          SCRATCH="$(mktemp -d)"
+          trap 'rm -rf "$SCRATCH"' EXIT
+          ditto -x -k "$ZIP" "$SCRATCH"
+          EXPANDED_APP="$SCRATCH/Tinycast.app"
+          ./Scripts/verify-signature.sh "$EXPANDED_APP"
+          "${TMPDIR:-/tmp}/tinycast-harness/updates-test" "$EXPANDED_APP"
+          for BIN in "$EXPANDED_APP/Contents/MacOS/Tinycast" \
+            "$EXPANDED_APP/Contents/Helpers/ClipboardTextHelper" \
+            "$EXPANDED_APP/Contents/Helpers/Tinycast Dictation.app/Contents/MacOS/Tinycast Dictation"; do
+            ARCHS_BUILT="$(lipo -archs "$BIN")"
+            for WANT in arm64 x86_64; do
+              case " $ARCHS_BUILT " in
+                *" $WANT "*) ;;
+                *) echo "::error::${BIN##*/}: missing $WANT slice; built: $ARCHS_BUILT"; exit 1 ;;
+              esac
+            done
+          done
+          echo "validated=true" >> "$GITHUB_OUTPUT"
+
       - uses: actions/upload-artifact@v7
         with:
           name: Tinycast-CN-${{ inputs.version }}
-          path: dist/Tinycast-CN-${{ inputs.version }}.dmg
+          path: |
+            dist/Tinycast-CN-${{ inputs.version }}.dmg
+            dist/Tinycast-CN-Universal-${{ inputs.version }}.zip
+          if-no-files-found: error
 
       - name: Publish GitHub release
         env:
@@ -138,20 +178,35 @@ jobs:
           PRERELEASE: ${{ inputs.prerelease }}
           UPSTREAM_TAG: ${{ inputs.upstream_tag }}
           SOURCE_COMMIT: ${{ inputs.ref }}
+          CN_RELEASE_NOTES: ${{ inputs.release_notes }}
+          GH_REPO: ${{ github.repository }}
         run: |
           PRERELEASE_FLAG=()
           if [ "$PRERELEASE" = "true" ]; then PRERELEASE_FLAG=(--prerelease); fi
-          # printf, not a heredoc: a heredoc body would have to sit at column 0 and break the
-          # YAML block scalar. %s for the backticks keeps the shell from running the fences.
+          if [ -z "$(printf '%s' "$CN_RELEASE_NOTES" | tr -d '[:space:]')" ] || \
+            [[ "$CN_RELEASE_NOTES" == *'<!-- tinycast:install -->'* ]]; then
+            echo "::error::Provide a Chinese changelog without the installation marker."
+            exit 1
+          fi
+          PREVIOUS="$(gh release list --limit 200 --json tagName,isDraft,isPrerelease --jq \
+            "[.[] | select(.isDraft | not) | select(.isPrerelease == ${PRERELEASE})
+              | .tagName | select(. != \"v${VERSION}\")] | first // empty")"
+          NOTES_ARGS=(-f "tag_name=v${VERSION}" -f "target_commitish=${SOURCE_COMMIT}")
+          if [ -n "$PREVIOUS" ]; then NOTES_ARGS+=(-f "previous_tag_name=${PREVIOUS}"); fi
+          GENERATED="$(gh api "repos/${GH_REPO}/releases/generate-notes" "${NOTES_ARGS[@]}" --jq .body)"
+          printf '## 更新内容\n\n%s\n\n基于上游 [%s](https://github.com/abue-ammar/tinycast/releases/tag/%s)。\n\n## 合并记录\n\n%s\n\n<!-- tinycast:install -->\n\n' \
+            "$CN_RELEASE_NOTES" "$UPSTREAM_TAG" "$UPSTREAM_TAG" "$GENERATED" \
+            > "$RUNNER_TEMP/notes.md"
           BT='```'
           printf '%s\n\n%ssh\nbrew trust --tap conversun/tinycast-cn\nbrew tap conversun/tinycast-cn\nbrew install --cask tinycast-cn\n%s\n\n%s\n\n%ssh\nxattr -dr com.apple.quarantine "/Applications/Tinycast.app"\n%s\n\n%s\n' \
-            '**推荐通过 Homebrew 安装** —— 安装和更新时会自动清除 quarantine 标记，不用手动跑任何命令：' \
+            '**稳定版推荐通过 Homebrew 安装** —— 安装时会自动清除 quarantine 标记；后续更新由应用内更新器处理：' \
             "$BT" "$BT" \
             '直接下载 DMG 的话，本构建是自签名的，macOS 会拦下它，需要清除一次隔离标记：' \
             "$BT" "$BT" \
-            "基于上游 [${UPSTREAM_TAG}](https://github.com/abue-ammar/tinycast/releases/tag/${UPSTREAM_TAG}) 同步构建。" \
-            > "$RUNNER_TEMP/notes.md"
+            '尚未适配 CN 更新器的旧版需先手动安装新版 DMG，或通过 Homebrew 完成首次升级；测试版请直接下载 DMG。' \
+            >> "$RUNNER_TEMP/notes.md"
           gh release create "v${VERSION}" "dist/Tinycast-CN-${VERSION}.dmg" \
+            "dist/Tinycast-CN-Universal-${VERSION}.zip" \
             --target "$SOURCE_COMMIT" \
             --title "Tinycast CN ${VERSION}" \
             --notes-file "$RUNNER_TEMP/notes.md" \
@@ -160,7 +215,7 @@ jobs:
       # A deploy key on the tap, not a PAT: write access to exactly one repo and nothing else.
       # Skipped for a prerelease: `brew upgrade --cask tinycast-cn` is the stable channel.
       - name: Update Homebrew cask
-        if: ${{ !inputs.prerelease }}
+        if: ${{ !inputs.prerelease && steps.updater_zip.outputs.validated == 'true' }}
         env:
           TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
           VERSION: ${{ inputs.version }}
@@ -179,6 +234,13 @@ jobs:
           # Anchored so the sha256 inside a comment or URL can never be the one rewritten.
           sed -i '' -E "s|^  version \".*\"|  version \"${VERSION}\"|" "$CASK_FILE"
           sed -i '' -E "s|^  sha256 \".*\"|  sha256 \"${SHA}\"|" "$CASK_FILE"
+          if grep -q '^  auto_updates ' "$CASK_FILE"; then
+            sed -i '' -E 's|^  auto_updates .*|  auto_updates true|' "$CASK_FILE"
+          else
+            sed -i '' '/^  sha256 /a\
+            auto_updates true
+            ' "$CASK_FILE"
+          fi
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
