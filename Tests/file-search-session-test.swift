@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 actor FileSearchProbe {
     private var active = 0
@@ -7,6 +8,7 @@ actor FileSearchProbe {
     private let pausedQuery: String?
     private var pauseEnabled: Bool
     private var pausedContinuation: CheckedContinuation<Void, Never>?
+    private let paused = AsyncStream<Void>.makeStream()
 
     init(pausing query: String? = nil) {
         pausedQuery = query
@@ -20,9 +22,8 @@ actor FileSearchProbe {
         if pauseEnabled, query == pausedQuery {
             await withCheckedContinuation { continuation in
                 pausedContinuation = continuation
+                paused.continuation.yield()
             }
-        } else {
-            try? await Task.sleep(for: .milliseconds(80))
         }
         active -= 1
         let home = URL(fileURLWithPath: "/Users/test")
@@ -34,15 +35,8 @@ actor FileSearchProbe {
     }
 
     func waitUntilPaused() async -> Bool {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(1))
-        while pausedContinuation == nil, ContinuousClock.now < deadline {
-            try? await Task.sleep(for: .milliseconds(5))
-        }
-        guard pausedContinuation != nil else {
-            pauseEnabled = false
-            return false
-        }
-        return true
+        var iterator = paused.stream.makeAsyncIterator()
+        return await iterator.next() != nil
     }
 
     func resumePausedSearch() {
@@ -64,6 +58,13 @@ struct FileSearchSessionTests {
     }
 
     static func main() async {
+        let timeout = Task {
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled else { return }
+            print("FAIL: the async operation completed before the timeout")
+            exit(1)
+        }
+        defer { timeout.cancel() }
         await coalescesQueuedQueries()
         await serializesRunningQueries()
         await cancellationPreventsPendingWork()
@@ -85,8 +86,9 @@ struct FileSearchSessionTests {
         guard await probe.waitUntilPaused() else { return expect(false, "the first query starts") }
         session.search("an")
         session.search("annual")
-        await probe.resumePausedSearch()
-        await waitUntil { session.state == .ready && session.results.first?.name == "annual" }
+        await waitUntil({ session.state == .ready && session.results.first?.name == "annual" }) {
+            await probe.resumePausedSearch()
+        }
 
         let snapshot = await probe.snapshot()
         expect(snapshot.calls == ["a", "annual"], "keystrokes queued behind a search collapse")
@@ -100,8 +102,9 @@ struct FileSearchSessionTests {
         expect(firstStarted, "the first query starts")
         guard firstStarted else { return }
         session.search("second")
-        await probe.resumePausedSearch()
-        await waitUntil { session.state == .ready && session.results.first?.name == "second" }
+        await waitUntil({ session.state == .ready && session.results.first?.name == "second" }) {
+            await probe.resumePausedSearch()
+        }
 
         let snapshot = await probe.snapshot()
         expect(snapshot.calls == ["first", "second"], "the superseding query still runs")
@@ -114,9 +117,9 @@ struct FileSearchSessionTests {
         session.search("running")
         guard await probe.waitUntilPaused() else { return expect(false, "the query starts") }
         session.search("queued")
-        session.cancel()
+        let cancelled = session.cancel()
         await probe.resumePausedSearch()
-        try? await Task.sleep(for: .milliseconds(60))
+        await cancelled?.value
 
         let snapshot = await probe.snapshot()
         expect(snapshot.calls == ["running"], "cancelling drops the queued search")
@@ -128,27 +131,35 @@ struct FileSearchSessionTests {
         let session = makeSession(probe: probe)
         session.cancel()
         expect(session.state == .idle && session.results.isEmpty, "an idle cancel changes nothing")
-        session.search("report")
-        await waitUntil { session.state == .ready && session.results.first?.name == "report" }
+        await waitUntil({ session.state == .ready && session.results.first?.name == "report" }) {
+            session.search("report")
+        }
         session.cancel()
         session.cancel()
         expect(session.state == .idle && session.results.isEmpty, "a repeated cancel stays idle")
-        session.search("report")
-        await waitUntil { session.state == .ready && session.results.first?.name == "report" }
+        await waitUntil({ session.state == .ready && session.results.first?.name == "report" }) {
+            session.search("report")
+        }
 
         let snapshot = await probe.snapshot()
         expect(snapshot.calls == ["report", "report"], "a cancelled query runs again when retyped")
     }
 
     static func refreshRerunsThePublishedQuery() async {
-        let probe = FileSearchProbe()
+        let probe = FileSearchProbe(pausing: "")
         let session = makeSession(probe: probe)
-        session.refresh()
-        session.search("report")
-        await waitUntil { session.state == .ready }
-        session.refresh()
-        await waitUntil { session.state == .ready }
-        try? await Task.sleep(for: .milliseconds(20))
+        let prepared = session.refresh()
+        guard await probe.waitUntilPaused() else { return expect(false, "the recent query starts") }
+        await waitUntil({ session.state == .ready }) {
+            session.search("report")
+            await probe.resumePausedSearch()
+        }
+        await prepared?.value
+        var refreshed: Task<Void, Never>?
+        await waitUntil({ session.state == .ready }) {
+            refreshed = session.refresh()
+        }
+        await refreshed?.value
 
         let snapshot = await probe.snapshot()
         expect(
@@ -159,13 +170,13 @@ struct FileSearchSessionTests {
     static func blankScreenOpensOnKeptRecents() async {
         let probe = FileSearchProbe()
         let session = makeSession(probe: probe)
-        session.refresh()
-        try? await Task.sleep(for: .milliseconds(150))
-        session.search("")
-        expect(
-            session.state == .ready && !session.results.isEmpty,
-            "prepared recents show before any search returns")
-        await waitUntil { session.state == .ready }
+        await session.refresh()?.value
+        await waitUntil({ session.state == .ready }) {
+            session.search("")
+            expect(
+                session.state == .ready && !session.results.isEmpty,
+                "prepared recents show before any search returns")
+        }
         session.cancel()
         session.search("")
         expect(!session.results.isEmpty, "recents survive the palette closing")
@@ -178,10 +189,10 @@ struct FileSearchSessionTests {
     static func recentRefreshLeavesTheOpenListAlone() async {
         let probe = FileSearchProbe()
         let session = makeSession(probe: probe)
-        session.search("report")
-        await waitUntil { session.state == .ready }
-        session.refreshRecent()
-        try? await Task.sleep(for: .milliseconds(150))
+        await waitUntil({ session.state == .ready }) {
+            session.search("report")
+        }
+        await session.refreshRecent().value
         expect(session.results.first?.name == "report", "a Recent refresh leaves the open list alone")
         session.cancel()
         session.search("")
@@ -191,10 +202,12 @@ struct FileSearchSessionTests {
     static func blankQueryLoadsRecents() async {
         let probe = FileSearchProbe()
         let session = makeSession(probe: probe)
-        session.search("")
-        await waitUntil { session.state == .ready }
-        session.search("report")
-        await waitUntil { session.state == .ready && session.results.first?.name == "report" }
+        await waitUntil({ session.state == .ready }) {
+            session.search("")
+        }
+        await waitUntil({ session.state == .ready && session.results.first?.name == "report" }) {
+            session.search("report")
+        }
 
         let snapshot = await probe.snapshot()
         expect(
@@ -205,12 +218,13 @@ struct FileSearchSessionTests {
     static func filterChangeRerunsTheQuery() async {
         let probe = FileSearchProbe()
         let session = makeSession(probe: probe)
-        session.search("report")
-        await waitUntil { session.state == .ready }
-        session.search("report", filter: .images)
-        await waitUntil { session.state == .ready }
-        session.search("report", filter: .images)
-        try? await Task.sleep(for: .milliseconds(40))
+        await waitUntil({ session.state == .ready }) {
+            session.search("report")
+        }
+        await waitUntil({ session.state == .ready }) {
+            session.search("report", filter: .images)
+        }
+        await session.search("report", filter: .images)?.value
 
         let snapshot = await probe.snapshot()
         expect(
@@ -224,11 +238,40 @@ struct FileSearchSessionTests {
         }
     }
 
-    static func waitUntil(_ condition: @escaping @MainActor () -> Bool) async {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(1))
-        while !condition(), ContinuousClock.now < deadline {
-            try? await Task.sleep(for: .milliseconds(5))
+    @MainActor
+    final class StateWait {
+        private let condition: () -> Bool
+        private let changes = AsyncStream<Void>.makeStream()
+
+        init(_ condition: @escaping () -> Bool) {
+            self.condition = condition
+            track()
         }
+
+        private func track() {
+            withObservationTracking {
+                _ = condition()
+            } onChange: { [changes] in
+                changes.continuation.yield()
+            }
+        }
+
+        func wait() async {
+            var iterator = changes.stream.makeAsyncIterator()
+            while await iterator.next() != nil {
+                if condition() { return }
+                track()
+            }
+        }
+    }
+
+    static func waitUntil(
+        _ condition: @escaping @MainActor () -> Bool,
+        performing action: () async -> Void
+    ) async {
+        let observation = StateWait(condition)
+        await action()
+        await observation.wait()
         expect(condition(), "the async operation completed before the timeout")
     }
 }

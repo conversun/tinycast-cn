@@ -47,35 +47,45 @@ final class FileSearchSession {
     }
 
     /// An empty query is a request too: the blank screen lists what changed recently.
-    func search(_ rawQuery: String, filter: FileSearchFilter = .all) {
+    @discardableResult
+    func search(_ rawQuery: String, filter: FileSearchFilter = .all) -> Task<Void, Never>? {
         let query = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let request = Request(query: query, filter: filter)
-        guard request != self.request else { return }
+        guard request != self.request else { return workerTask }
         enqueue(request)
-        guard request == .recent, let recent else { return }
-        results = recent
-        state = .ready
+        if request == .recent, let recent {
+            results = recent
+            state = .ready
+        }
+        return workerTask
     }
 
     /// Re-runs the published request; Recent's kept rows follow even behind a typed query.
-    func refresh() {
+    @discardableResult
+    func refresh() -> Task<Void, Never>? {
         if let request { enqueue(request) }
-        if request != .recent { refreshRecent() }
+        if request != .recent { return refreshRecent() }
+        return workerTask
     }
 
     /// Only the kept rows move, so a list on screen never shifts under the pointer.
-    func refreshRecent() {
-        Task { [weak self] in await self?.run(.recent) }
+    @discardableResult
+    func refreshRecent() -> Task<Void, Never> {
+        Task { [weak self] in
+            await self?.run(.recent)
+        }
     }
 
     /// Idle already means no results and nothing that can publish, so it notifies no observer.
-    func cancel() {
-        guard request != nil else { return }
+    @discardableResult
+    func cancel() -> Task<Void, Never>? {
+        guard request != nil else { return workerTask }
         revision &+= 1
         pending = nil
         request = nil
         results = []
         state = .idle
+        return workerTask
     }
 
     /// A trashed row names a file that is gone, so it leaves the published results with it.
