@@ -70,7 +70,8 @@ after the named stable tag.
 The source may include newer upstream `main` commits; the release tag always points to the
 verified fork commit.
 
-The workflow checks localization and runs the harnesses, builds a signed Universal app,
+The workflow runs on `macos-26-intel` with Xcode 26, checks localization and runs the harnesses,
+builds a signed Universal app,
 checks both architectures in the app and its three helpers, and verifies signatures. From that
 same signed app it packages both `Tinycast-CN-<version>.dmg` for manual/Homebrew installation
 and `Tinycast-CN-Universal-<version>.zip` for the updater, using
