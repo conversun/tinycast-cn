@@ -1,34 +1,8 @@
-import QuartzCore
 import SwiftUI
 
-/// Which arrow pair a move came from: ↑/↓ or ←/→.
 enum PaletteAxis {
     case vertical
     case horizontal
-}
-
-/// Scale and timing supplied by content while the palette owns the window mechanics.
-@MainActor struct MenuPanelMotion {
-    let entryScale: CGFloat
-    let maximumScale: CGFloat
-    let exitScaleDelta: CGFloat
-    let expansionDuration: TimeInterval
-    let settleDuration: TimeInterval
-    let exitDuration: TimeInterval
-    let expansionTiming: CAMediaTimingFunction
-    let settleTiming: CAMediaTimingFunction
-    let exitTiming: CAMediaTimingFunction
-
-    static let palette = MenuPanelMotion(
-        entryScale: Theme.MenuMotion.entryScale,
-        maximumScale: Theme.MenuMotion.maximumScale,
-        exitScaleDelta: Theme.MenuMotion.exitScaleDelta,
-        expansionDuration: Theme.MenuMotion.expansionDuration,
-        settleDuration: Theme.MenuMotion.settleDuration,
-        exitDuration: Theme.MenuMotion.exitDuration,
-        expansionTiming: Theme.MenuMotion.expansionTiming,
-        settleTiming: Theme.MenuMotion.settleTiming,
-        exitTiming: Theme.MenuMotion.exitTiming)
 }
 
 typealias MenuPanelClipPath =
@@ -36,13 +10,11 @@ typealias MenuPanelClipPath =
         _ bounds: CGRect, _ metrics: InterfaceMetrics, _ corner: MenuPanelCorner
     ) -> CGPath
 
-/// A menu supplied by a palette screen, including its rendering and row activation.
 @MainActor struct PaletteMenuContent {
     let rowCount: Int
     let preferredSelection: Int?
     let isSelectable: (Int) -> Bool
     let clipPath: MenuPanelClipPath
-    let motion: MenuPanelMotion
     /// Built on demand: `moveMenu` resolves the open menu on every arrow key.
     let view: (MenuPanelCorner) -> AnyView
     /// Bounds-checked by the caller against `rowCount`, so a row index is always one this menu has.
@@ -53,8 +25,7 @@ typealias MenuPanelClipPath =
         view: @escaping (MenuPanelCorner) -> AnyView,
         activate: @escaping (Int) -> Void,
         isSelectable: @escaping (Int) -> Bool = { _ in true },
-        clipPath: @escaping MenuPanelClipPath,
-        motion: MenuPanelMotion
+        clipPath: @escaping MenuPanelClipPath
     ) {
         self.rowCount = rowCount
         self.preferredSelection = preferredSelection
@@ -62,7 +33,6 @@ typealias MenuPanelClipPath =
         self.activate = activate
         self.isSelectable = isSelectable
         self.clipPath = clipPath
-        self.motion = motion
     }
 
     init(
@@ -88,8 +58,7 @@ typealias MenuPanelClipPath =
                     attachment: corner.popoverAttachment, radius: metrics.radius.menuPanel,
                     attachedRadius: metrics.size.menuButton / 2
                 ).path(in: bounds).cgPath
-            },
-            motion: .palette)
+            })
     }
 }
 
@@ -173,7 +142,7 @@ extension PaletteScreen {
         return PaletteMenuContent(
             popover: filtered.content, selection: menuSelection,
             search: PopoverMenu.Search(
-                placeholder: "Search for actions…", placement: .bottom),
+                placeholder: String(localized: "Search for actions…"), placement: .bottom),
             onActivate: onActivate, preferredSelection: filtered.bestMatch)
     }
     func tertiary(at selection: Int) -> Bool { false }

@@ -4,7 +4,6 @@ import SwiftUI
 /// What both HUDs agree on: one at a time, replace, fade, dwell, fade away.
 @MainActor
 final class HUDPresenter {
-    /// Where the panel sits above the bottom of the visible frame.
     enum Anchor {
         case edgeInset(CGFloat)
         case heightFraction(CGFloat)
@@ -26,7 +25,7 @@ final class HUDPresenter {
     func show(_ view: some View, size: CGSize? = nil, dwells: Bool = true, interactive: Bool = false) {
         let panel = panel ?? make(acceptsMouseEvents: interactive)
         panel.ignoresMouseEvents = !interactive
-        let host = NSHostingView(rootView: view)
+        let host = NSHostingView(rootView: view.motionScope())
         // Never size from `host.frame` after attaching: AppKit resets it to the content rect.
         let content = size ?? host.fittingSize
         host.setFrameSize(content)

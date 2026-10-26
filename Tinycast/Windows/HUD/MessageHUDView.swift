@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The message pill, led by its tone's mark or a spinner. See docs/ui.md#dialogs--hud.
 struct MessageHUDView: View {
     enum Accessory {
         case tone(DialogTone)
@@ -48,7 +47,7 @@ struct MessageHUDView: View {
     private var content: some View {
         HStack(spacing: metrics.spacing.md) {
             mark
-            Text(message.localizedUI)
+            Text(message)
                 .font(metrics.typography.bar)
                 .foregroundStyle(Color.primary)
                 .lineLimit(1)

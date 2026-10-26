@@ -255,5 +255,6 @@ private struct LauncherItemCell: View {
         .environment(visibility)
         .environment(aliases)
         .environment(hotKeys)
+        .motionScope()
     }
 }

@@ -13,11 +13,12 @@ test("localization gate rejects missing keys and known rendering regressions", (
   try {
     fs.mkdirSync(path.join(fixture, "Scripts"));
     fs.copyFileSync(path.join(root, "Scripts/check-localization.js"), path.join(fixture, "Scripts/check-localization.js"));
+    fs.copyFileSync(path.join(root, "Scripts/check-localizations.js"), path.join(fixture, "Scripts/check-localizations.js"));
     fs.cpSync(path.join(root, "Tinycast"), path.join(fixture, "Tinycast"), {
       recursive: true,
       filter: (file) => !file.endsWith(".generated.swift") && !file.includes("Assets.xcassets"),
     });
-    const check = () => spawnSync(process.execPath, [path.join(fixture, "Scripts/check-localization.js")], {
+    const check = (...args) => spawnSync(process.execPath, [path.join(fixture, "Scripts/check-localization.js"), ...args], {
       encoding: "utf8",
     });
     const expectFailure = (fragment) => {
@@ -25,19 +26,50 @@ test("localization gate rejects missing keys and known rendering regressions", (
       assert.equal(result.status, 1, result.stdout + result.stderr);
       assert.ok(result.stderr.includes(fragment), result.stderr);
     };
-    assert.equal(check().status, 0);
-    const tablePath = path.join(fixture, "Tinycast/zh-Hans.lproj/Localizable.strings");
+    const initial = check();
+    assert.equal(initial.status, 0, initial.stdout + initial.stderr);
+    const tablePath = path.join(fixture, "Tinycast/Resources/Localizable.xcstrings");
     const table = fs.readFileSync(tablePath, "utf8");
     for (const key of ["Navigate back or close window", "Larger"]) {
-      const changed = table.replace(new RegExp(`^"${key}".*\\n`, "m"), "");
+      const catalog = JSON.parse(table);
+      delete catalog.strings[key];
+      const changed = JSON.stringify(catalog, null, 2);
       assert.notEqual(changed, table, `Fixture has no ${key} key`);
       fs.writeFileSync(tablePath, changed);
       expectFailure(`missing “${key}”`);
     }
-    fs.writeFileSync(tablePath, table + '\n"Snippets" = "重复";\n');
+    fs.writeFileSync(tablePath, table.replace('  "strings" : {', '  "strings" : {\n    "Snippets" : {},'));
     expectFailure("Duplicate key: Snippets");
-    fs.writeFileSync(tablePath, table + '\n"Regression %@" = "回归 %lld";\n');
-    expectFailure("Format arguments differ");
+    const malformed = JSON.parse(table);
+    malformed.strings.Snippets.localizations["zh-Hans"].stringUnit.value = "回归 %lld";
+    malformed.strings["Regression %@"] = structuredClone(malformed.strings.Snippets);
+    fs.writeFileSync(tablePath, JSON.stringify(malformed, null, 2));
+    expectFailure("has specifiers");
+    const missingLanguage = JSON.parse(table);
+    delete missingLanguage.strings.Snippets.localizations.fr;
+    fs.writeFileSync(tablePath, JSON.stringify(missingLanguage, null, 2));
+    expectFailure("has no fr translation");
+    const empty = JSON.parse(table);
+    empty.strings.Snippets.localizations["zh-Hans"].stringUnit.value = "";
+    fs.writeFileSync(tablePath, JSON.stringify(empty, null, 2));
+    expectFailure("Empty translation");
+    fs.writeFileSync(tablePath, table);
+    const legacyFolder = path.join(fixture, "Tinycast/zh-Hans.lproj");
+    fs.mkdirSync(legacyFolder, { recursive: true });
+    const legacyPath = path.join(legacyFolder, "Localizable.strings");
+    fs.writeFileSync(legacyPath, '"Snippets" = "文本片段";\n');
+    expectFailure("duplicates compiled catalog output");
+    fs.rmSync(legacyPath);
+    const extractedPath = path.join(fixture, "Localizable.xcstrings");
+    fs.writeFileSync(extractedPath, JSON.stringify({
+      sourceLanguage: "en", strings: { "Source-only regression key": {} }, version: "1.0",
+    }));
+    const extracted = check("--extracted", extractedPath);
+    assert.equal(extracted.status, 1, extracted.stdout + extracted.stderr);
+    assert.ok(extracted.stderr.includes("missing “Source-only regression key”"), extracted.stderr);
+    fs.writeFileSync(extractedPath, table);
+    const covered = check("--extracted", extractedPath);
+    assert.equal(covered.status, 0, covered.stdout + covered.stderr);
     fs.writeFileSync(tablePath, table);
     const viewPath = path.join(fixture, "Tinycast/Features/WindowManagement/Settings/WindowLayoutsSection.swift");
     const view = fs.readFileSync(viewPath, "utf8");

@@ -25,10 +25,10 @@ struct SettingsSidebarView: View {
     private var browse: some View {
         List(selection: selection) {
             ForEach(SettingsSection.allCases) { section in
-                Section(section.title.localizedUI) {
+                Section(section.title) {
                     ForEach(section.tabs) { tab in
                         Label {
-                            Text(tab.title.localizedUI)
+                            Text(tab.title)
                         } icon: {
                             SettingsTabIcon(
                                 systemImage: tab.systemImage,
@@ -61,7 +61,6 @@ struct SettingsSidebarView: View {
                 }
             }
             .listStyle(.sidebar)
-            // Arrowing through results moves the pane with the selection, as System Settings does.
             .onChange(of: highlighted) { _, id in
                 guard let entry = results.first(where: { $0.id == id }) else { return }
                 navigation.select(entry.tab, revealing: entry.target)
@@ -94,7 +93,7 @@ private struct SettingsSearchResultRow: View {
     var body: some View {
         Label {
             VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                Text(entry.title.localizedUI).lineLimit(1)
+                Text(entry.title).lineLimit(1)
                 Text(entry.breadcrumb)
                     .font(.caption)
                     .foregroundStyle(.secondary)

@@ -24,7 +24,7 @@ final class UpdateCoordinator {
     /// Environment injection and activity reads only — never for state this type owns.
     private unowned let core: AppCore
     @ObservationIgnored private lazy var window = AppWindowController(
-        title: "Software Update".localizedUI, contentSize: UpdateWindowView.initialSize,
+        title: String(localized: "Software Update"), contentSize: UpdateWindowView.initialSize,
         activation: core.activationPolicy)
     @ObservationIgnored private var installTask: Task<Void, Never>?
 
@@ -120,6 +120,7 @@ final class UpdateCoordinator {
         installTask = Task { [weak self] in
             do {
                 try await installer.install(release, onProgress: onProgress)
+                self?.store.recordInstall(of: release.version)
                 self?.stage = .readyToRelaunch
             } catch is CancellationError {
                 self?.stage = .available(release)
@@ -151,10 +152,8 @@ final class UpdateCoordinator {
         window.close()
     }
 
-    /// `NSApp.terminate`, never `exit`: it flushes a note draft and returns the HID remap.
     func relaunch() {
-        RelaunchRunner.relaunchAfterExit(Bundle.main.bundleURL)
-        NSApp.terminate(nil)
+        core.relaunch()
     }
 
     // MARK: - Private

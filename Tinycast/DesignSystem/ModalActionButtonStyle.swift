@@ -27,6 +27,7 @@ struct ModalActionButtonStyle: ButtonStyle {
                 .frame(height: metrics.size.dialogButtonHeight)
                 .contentShape(Capsule())
                 .background(Capsule().fill(fill))
+                .animation(.easeOut(duration: Theme.Duration.hover), value: hovered)
                 .opacity(isEnabled ? 1 : 0.45)
                 .onHover { hovered = $0 }
         }

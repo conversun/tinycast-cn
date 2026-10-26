@@ -12,8 +12,8 @@ final class CodexAppServerClient {
         var errorDescription: String? {
             switch self {
             case .executableMissing:
-                return "Install the Codex CLI to use your Codex account."
-            case .launchFailed(let detail): return "Codex could not start: \(detail)"
+                return String(localized: "Install the Codex CLI to use your Codex account.")
+            case .launchFailed(let detail): return String(localized: "Codex could not start: \(detail)")
             case .processExited(let detail), .requestFailed(let detail): return detail
             case .timedOut: return String(localized: "Codex did not respond in time.")
             }
@@ -137,10 +137,11 @@ final class CodexAppServerClient {
         // The list is only readable at launch, so the old process cannot be talked into it.
         if isRunning {
             onRelaunch?()
-            stop(error: ClientError.processExited("Codex stopped."))
+            stop(error: ClientError.processExited(String(localized: "Codex stopped.")))
         }
         guard let secrets = CodexMCPLaunch.environment(servers: toolServers) else {
-            throw ClientError.launchFailed("Two MCP servers' secrets would share one variable.")
+            throw ClientError.launchFailed(
+                String(localized: "Two MCP servers' secrets would share one variable."))
         }
         do {
             try FileManager.default.createDirectory(
@@ -165,21 +166,30 @@ final class CodexAppServerClient {
                 inherited: inherited)
         else {
             throw ClientError.launchFailed(
-                "Tinycast could not read which MCP servers your Codex configuration runs, so it "
-                    + "could not keep them out of the chat. Run \u{201C}codex mcp list\u{201D} "
-                    + "in Terminal to see why.")
+                String(
+                    localized: """
+                        Tinycast could not read which MCP servers your Codex configuration runs, so it \
+                        could not keep them out of the chat. Run \u{201C}codex mcp list\u{201D} in \
+                        Terminal to see why.
+                        """))
         }
         try checkNotStopped(since: generation)
         if let name = CodexMCPLaunch.unaddressableName(foreign) {
             throw ClientError.launchFailed(
-                "Your Codex MCP server \u{201C}\(name)\u{201D} cannot be kept out of a Tinycast "
-                    + "chat, because a dot or an equals sign in its name cannot be addressed. "
-                    + "Rename it in your Codex configuration.")
+                String(
+                    localized: """
+                        Your Codex MCP server \u{201C}\(name)\u{201D} cannot be kept out of a Tinycast \
+                        chat, because a dot or an equals sign in its name cannot be addressed. Rename it \
+                        in your Codex configuration.
+                        """))
         }
         if let taken = CodexMCPLaunch.takenName(servers: toolServers, foreignNames: foreign) {
             throw ClientError.launchFailed(
-                "Your Codex configuration has its own MCP server named \u{201C}\(taken)\u{201D}. "
-                    + "Rename it to use this Tinycast server with Codex.")
+                String(
+                    localized: """
+                        Your Codex configuration has its own MCP server named \u{201C}\(taken)\u{201D}. \
+                        Rename it to use this Tinycast server with Codex.
+                        """))
         }
         let process = Process()
         let stdin = Pipe()
@@ -251,7 +261,9 @@ final class CodexAppServerClient {
     func request(
         method: String, params: [String: Any] = [:], timeout: Duration = .seconds(15)
     ) async throws -> [String: JSONValue] {
-        guard isRunning else { throw ClientError.processExited("Codex is not running.") }
+        guard isRunning else {
+            throw ClientError.processExited(String(localized: "Codex is not running."))
+        }
         let id = nextID
         nextID += 1
         return try await withTaskCancellationHandler {
@@ -291,7 +303,7 @@ final class CodexAppServerClient {
     /// A `stop` that landed while a launch was reading the list outranks the launch.
     private func checkNotStopped(since generation: Int) throws {
         guard generation == self.generation else {
-            throw ClientError.processExited("Codex stopped.")
+            throw ClientError.processExited(String(localized: "Codex stopped."))
         }
     }
 
@@ -324,8 +336,7 @@ final class CodexAppServerClient {
         // An unterminated multi-megabyte line means whatever is talking is not the app server.
         guard outputBuffer.count > Self.outputLimit else { return }
         let message = String(
-            localized:
-                "Codex sent an unterminated oversized response and was disconnected.")
+            localized: "Codex sent an unterminated oversized response and was disconnected.")
         onExit?(message)
         stop(error: ClientError.processExited(message))
     }
@@ -406,9 +417,7 @@ final class CodexAppServerClient {
         guard exited == processID else { return }
         let detail = String(decoding: stderrBuffer, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let message =
-            detail.isEmpty
-            ? String(localized: "Codex exited with status \(Int(status)).") : detail
+        let message = detail.isEmpty ? String(localized: "Codex exited with status \(status).") : detail
         onExit?(message)
         cleanup(error: ClientError.processExited(message))
     }

@@ -33,7 +33,7 @@ final class PaletteDropGuideController {
             panel.orderFrontRegardless()
         }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = Theme.Duration.dropGuide
+            context.duration = Motion.duration(Theme.Duration.dropGuide)
             panel.animator().alphaValue = 1
         }
     }
@@ -74,7 +74,7 @@ final class PaletteDropGuideController {
         guard let panel, panel.isVisible else { return }
         hideTask?.cancel()
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = Theme.Duration.dropGuide
+            context.duration = Motion.duration(Theme.Duration.dropGuide)
             panel.animator().alphaValue = 0
         }
         hideTask = Task { [weak self] in

@@ -11,7 +11,7 @@ struct GeneralSettingsView: View {
         @Bindable var settings = settings
         return Form {
             Section {
-                SettingsRow(title: "App Launcher", anchor: .generalGlobalShortcuts) {
+                SettingsRow(title: "Show Launcher", anchor: .generalGlobalShortcuts) {
                     ShortcutRecorder(action: .togglePalette)
                 }
             } header: {
@@ -19,20 +19,27 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                Picker(selection: $settings.language) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(verbatim: language.title).tag(language)
+                    }
+                } label: {
+                    SettingsRowTitle(.generalGeneral, "Language")
+                }
                 Toggle(isOn: $settings.launchAtLogin) {
                     SettingsRowTitle(.generalGeneral, "Launch at login")
                 }
                 Toggle(isOn: $settings.showInMenuBar) {
                     SettingsRowTitle(.generalGeneral, "Show in menu bar")
-                    Text("Shortcuts still work when hidden.")
+                    Text("Shortcuts still work when the menu bar icon is hidden.")
                 }
                 Toggle(isOn: $settings.automaticallyCheckForUpdates) {
                     SettingsRowTitle(.generalGeneral, "Automatically check for updates")
-                    Text("Check for Updates remains available when off.")
+                    Text("You can still check for updates manually.")
                 }
                 Picker(selection: $settings.popToRootTimeout) {
                     ForEach(PopToRootTimeout.allCases) { timeout in
-                        Text(timeout.title.localizedUI).tag(timeout)
+                        Text(timeout.title).tag(timeout)
                     }
                 } label: {
                     SettingsRowTitle(.generalGeneral, "Pop to Root Search")
@@ -40,7 +47,7 @@ struct GeneralSettingsView: View {
                 }
                 Picker(selection: $settings.escapeKeyBehavior) {
                     ForEach(EscapeKeyBehavior.allCases) { behavior in
-                        Text(behavior.title.localizedUI).tag(behavior)
+                        Text(behavior.title).tag(behavior)
                     }
                 } label: {
                     SettingsRowTitle(.generalGeneral, "Escape Key Behavior")
@@ -65,28 +72,33 @@ struct GeneralSettingsView: View {
             Section {
                 Picker(selection: $settings.appearance) {
                     ForEach(AppAppearance.allCases) { appearance in
-                        Text(appearance.title.localizedUI).tag(appearance)
+                        Text(appearance.title).tag(appearance)
                     }
                 } label: {
-                    SettingsRowTitle(.generalAppearance, "Theme")
+                    SettingsRowTitle(.generalAppearance, "Appearance")
+                }
+                Toggle(isOn: $settings.animationsEnabled) {
+                    SettingsRowTitle(.generalAppearance, "Show animations")
                 }
                 InterfaceSizeRow()
                 WindowModeRow()
-                Toggle(isOn: $settings.showFavoritesInCompactMode) {
-                    SettingsRowTitle(.generalAppearance, "Show favorites in compact mode")
-                    Text("Launch them with ⌘1–⌘5.")
-                }
-                .settingsEnabled(settings.compactMode)
+                    .background {
+                        if !settings.compactMode {
+                            Color.clear.settingsAnchor(.generalCompactShortcuts)
+                        }
+                    }
                 Toggle(isOn: $settings.openOnCursorScreen) {
                     SettingsRowTitle(.generalAppearance, "Follow the cursor across displays")
                 }
                 Toggle(isOn: $settings.paletteDraggable) {
-                    SettingsRowTitle(.generalAppearance, "Drag to reposition")
-                    Text("Drag the strip above the search field.")
+                    SettingsRowTitle(.generalAppearance, "Drag to move the launcher")
+                    Text("Move the launcher by dragging the search bar.")
                 }
             } header: {
                 SettingsSectionHeader(.generalAppearance)
             }
+
+            if settings.compactMode { CompactShortcutsSection() }
 
             HyperKeySettingsSection()
 
@@ -94,11 +106,11 @@ struct GeneralSettingsView: View {
                 Picker(selection: $settings.calcNumberStyle) {
                     ForEach(CalcNumberStyle.allCases) { style in
                         let sample = core.regionNumberFormat.format(for: style).localized("1,234,567.89")
-                        Text("\(style.title.localizedUI) (\(sample))").tag(style)
+                        Text(verbatim: "\(style.title) (\(sample))").tag(style)
                     }
                 } label: {
                     SettingsRowTitle(.generalCalculator, "Number format")
-                    Text("With a decimal comma, ; separates arguments.")
+                    Text("With a decimal comma, use ; to separate arguments.")
                 }
             } header: {
                 SettingsSectionHeader(.generalCalculator)
@@ -107,7 +119,7 @@ struct GeneralSettingsView: View {
             Section {
                 Toggle(isOn: $settings.launcherShowsSuggestions) {
                     SettingsRowTitle(.generalSearch, "Show suggestions")
-                    Text("What you open most, while the search field is empty.")
+                    Text("Shows your most-used items when the search field is empty.")
                 }
                 Picker(selection: $settings.rootSearchSensitivity) {
                     ForEach(SearchSensitivity.allCases) { sensitivity in
@@ -115,7 +127,7 @@ struct GeneralSettingsView: View {
                     }
                 } label: {
                     SettingsRowTitle(.generalSearch, "Search sensitivity")
-                    Text("Lower finds names from scattered letters.")
+                    Text("A lower value allows less exact matches.")
                 }
                 LabeledContent {
                     Button("Reset…", role: .destructive) {
@@ -165,17 +177,18 @@ private struct WindowModeRow: View {
 
     var body: some View {
         SettingsRow(
-            title: "Window mode", subtitle: "Choose how the launcher opens.",
+            title: "Window mode",
+            subtitle: String(localized: "Choose how the launcher opens."),
             subtitleLineLimit: 2, alignment: .top, anchor: .generalAppearance
         ) {
             HStack(spacing: Theme.Spacing.md) {
-                option("Compact", image: "WindowModeCompact", compact: true)
-                option("Expanded", image: "WindowModeExpanded", compact: false)
+                option(String(localized: "Compact"), image: "WindowModeCompact", compact: true)
+                option(String(localized: "Expanded"), image: "WindowModeExpanded", compact: false)
             }
         }
     }
 
-    private func option(_ title: LocalizedStringKey, image: String, compact: Bool) -> some View {
+    private func option(_ title: String, image: String, compact: Bool) -> some View {
         let selected = settings.compactMode == compact
         return Button {
             settings.compactMode = compact
@@ -238,7 +251,7 @@ private struct InterfaceSizeRow: View {
     var body: some View {
         SettingsRow(
             title: "Interface size",
-            subtitle: "Scales the launcher and its panels, not Settings.",
+            subtitle: String(localized: "Resizes the launcher and its panels, but not Settings."),
             anchor: .generalAppearance
         ) {
             HStack(spacing: Theme.Spacing.xs) {
@@ -254,14 +267,14 @@ private struct InterfaceSizeRow: View {
         return Button {
             settings.interfaceSize = size
         } label: {
-            Text("Aa")
+            Text(verbatim: "Aa")
                 .font(.system(size: Self.glyph[size] ?? 13, weight: .medium))
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
                 .settingsOptionSegment(isSelected: selected)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(size.title.localizedUI)
+        .accessibilityLabel(size.title)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .help(size.title.localizedUI)
+        .help(size.title)
     }
 }

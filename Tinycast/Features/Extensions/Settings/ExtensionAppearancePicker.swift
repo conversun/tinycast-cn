@@ -71,7 +71,7 @@ struct ExtensionAppearancePicker: View {
                     .pointerStyle(.horizontalText)
                 Picker("", selection: $category) {
                     ForEach(catalog.categories) { item in
-                        Text(item.title.localizedUI).tag(item)
+                        Text(item.title).tag(item)
                     }
                 }
                 .labelsHidden()
@@ -135,13 +135,8 @@ struct ExtensionAppearancePicker: View {
     }
 
     private func footnote(_ count: Int) -> String {
-        if query.isEmpty {
-            return count == 1
-                ? String(localized: "1 symbol in \(category.title.localizedUI)")
-                : String(localized: "\(count) symbols in \(category.title.localizedUI)")
-        }
-        return count == 1
-            ? String(localized: "1 symbol matching")
+        query.isEmpty
+            ? String(localized: "\(count) symbols in \(category.title)")
             : String(localized: "\(count) symbols matching")
     }
 }

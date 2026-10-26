@@ -3,11 +3,12 @@ import AppKit
 enum AppLauncher {
 
     @MainActor
-    static func launch(_ url: URL) {
-        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    static func launch(_ url: URL, allowsRunningApplicationSubstitution: Bool = true) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.allowsRunningApplicationSubstitution = allowsRunningApplicationSubstitution
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration)
     }
 
-    /// Hands the URL to whatever the system registers for its scheme — the default browser, for web.
     @MainActor
     static func open(_ url: URL) {
         NSWorkspace.shared.open(url)
@@ -50,7 +51,6 @@ enum AppLauncher {
         }.value
     }
 
-    /// Opens System Settings at the pane backed by the given extension bundle ID.
     @MainActor
     static func openSettingsPane(bundleID: String) {
         guard let url = URL(string: "x-apple.systempreferences:" + bundleID) else { return }
@@ -79,11 +79,10 @@ enum AppLauncher {
         }
     }
 
-    /// Quits every instance; only an unforced quit lets unsaved work put up its sheet.
     @MainActor
     @discardableResult
-    static func quit(bundleID: String, force: Bool = false) -> Bool {
-        let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+    static func quit(bundleID: String, url: URL? = nil, force: Bool = false) -> Bool {
+        let running = runningApplications(bundleID: bundleID, at: url)
         for app in running {
             if force { app.forceTerminate() } else { app.terminate() }
         }
@@ -96,33 +95,41 @@ enum AppLauncher {
     /// A refused quit — a save sheet left standing — relaunches nothing.
     @MainActor
     static func restart(bundleID: String, url: URL) async {
-        let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
-        guard !running.isEmpty, await quitAwaitingExit(running) else { return }
-        launch(url)
+        let target = url.resolvingSymlinksInPath().standardizedFileURL
+        let running = runningApplications(bundleID: bundleID, at: target)
+        guard !running.isEmpty, !Task.isCancelled, await quitAwaitingExit(running), !Task.isCancelled
+        else { return }
+        launch(target, allowsRunningApplicationSubstitution: false)
     }
 
-    /// Observes before it terminates, so an instance that exits at once can't outrun the wait.
+    @MainActor
+    static func quitAwaitingExit(bundleID: String, url: URL) async -> Bool {
+        let running = runningApplications(bundleID: bundleID, at: url)
+        return await quitAwaitingExit(running)
+    }
+
+    @MainActor
+    private static func runningApplications(bundleID: String, at url: URL?) -> [NSRunningApplication] {
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+        guard let target = url?.resolvingSymlinksInPath().standardizedFileURL else { return running }
+        return running.filter { $0.bundleURL?.resolvingSymlinksInPath().standardizedFileURL == target }
+    }
+
     @MainActor
     private static func quitAwaitingExit(_ apps: [NSRunningApplication]) async -> Bool {
-        let center = NSWorkspace.shared.notificationCenter
-        let (exits, continuation) = AsyncStream.makeStream(of: pid_t.self)
-        let observer = center.addObserver(
-            of: NSWorkspace.shared, for: NSWorkspace.DidTerminateApplicationMessage.self
-        ) { continuation.yield($0.application.processIdentifier) }
-        defer { center.removeObserver(observer) }
-
-        var pending = Set(apps.map(\.processIdentifier))
+        guard !Task.isCancelled else { return false }
         for app in apps { app.terminate() }
 
-        let grace = Task {
-            try? await Task.sleep(for: exitGrace); continuation.finish()
+        let deadline = ContinuousClock.now + exitGrace
+        while apps.contains(where: { !$0.isTerminated }) {
+            guard !Task.isCancelled, ContinuousClock.now < deadline else { return false }
+            do {
+                try await Task.sleep(for: .milliseconds(50))
+            } catch {
+                return false
+            }
         }
-        defer { grace.cancel() }
-        for await pid in exits {
-            pending.remove(pid)
-            if pending.isEmpty { return true }
-        }
-        return false
+        return !Task.isCancelled
     }
 
     /// Finder is never a Quit All target: `terminate()` only makes it relaunch.

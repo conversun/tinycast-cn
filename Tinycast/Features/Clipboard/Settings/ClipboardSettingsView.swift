@@ -49,7 +49,7 @@ struct ClipboardSettingsView: View {
             DisabledApplicationsSection(
                 bundleIDs: $settings.clipboardDisabledApps,
                 anchor: .clipboardDisabledApplications,
-                footer: "Copies from these apps aren't recorded."
+                footer: String(localized: "Copies from these apps aren't recorded.")
             )
             .settingsEnabled(settings.clipboardEnabled)
 
@@ -58,7 +58,7 @@ struct ClipboardSettingsView: View {
                     Button("Clear…", role: .destructive) { confirmingClear = true }
                 } label: {
                     SettingsRowTitle(.clipboardDisabledApplications, "Clear history")
-                    Text("Removes every clip and image.")
+                    Text("Removes every item in the history.")
                 }
             }
         }

@@ -11,10 +11,10 @@ struct NoteHeadingMenuView: View {
     }
 
     private static let rows = [
-        Row(level: 1, title: "Heading 1", shortcut: "⌥⌘1"),
-        Row(level: 2, title: "Heading 2", shortcut: "⌥⌘2"),
-        Row(level: 3, title: "Heading 3", shortcut: "⌥⌘3"),
-        Row(level: 0, title: "Text", shortcut: "⌥⌘0")
+        Row(level: 1, title: String(localized: "Heading 1"), shortcut: "⌥⌘1"),
+        Row(level: 2, title: String(localized: "Heading 2"), shortcut: "⌥⌘2"),
+        Row(level: 3, title: String(localized: "Heading 3"), shortcut: "⌥⌘3"),
+        Row(level: 0, title: String(localized: "Text"), shortcut: "⌥⌘0")
     ]
 
     private var surface: RoundedRectangle {
@@ -59,7 +59,7 @@ private struct NoteHeadingMenuRow: View {
                     .foregroundStyle(Theme.Colors.menuSymbol)
                     .opacity(isCurrent ? 1 : 0)
                     .frame(width: Theme.Size.menuIcon, height: Theme.Size.menuIcon)
-                Text(title.localizedUI)
+                Text(title)
                     .font(Theme.Typography.menuRow)
                     .lineLimit(1)
                 Spacer(minLength: Theme.Spacing.sm)
@@ -82,7 +82,7 @@ private struct NoteHeadingMenuRow: View {
         .buttonStyle(.plain)
         .focusable(false)
         .onHover { hovered = $0 }
-        .accessibilityLabel(title.localizedUI)
+        .accessibilityLabel(title)
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 }

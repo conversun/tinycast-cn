@@ -15,7 +15,7 @@ struct ColorCard: View {
     var body: some View {
         HStack(spacing: 0) {
             LeadCardColumn(
-                text: AttributedString(primary.string(for: color)), badge: primary.title.localizedUI)
+                text: AttributedString(primary.string(for: color)), badge: primary.title)
             Image(systemName: "arrow.right")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.tertiary)
@@ -38,7 +38,7 @@ enum ColorActionsMenu {
     static func content(color: ColorValue, core: AppCore) -> PopoverMenuContent {
         let primary = ColorFormat.primary(for: color)
         return PopoverMenuContent(
-            header: "Copy Color as…",
+            header: String(localized: "Copy Color as…"),
             items: ColorFormat.offered(for: color).map { format in
                 PopoverMenuItem(
                     title: format.title, icon: .blank,

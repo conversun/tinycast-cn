@@ -41,7 +41,6 @@ struct QuickActionResultView: View {
         .background(Theme.Colors.panelScrim)
         .background(GlassEffectView())
         .clipShape(RoundedRectangle(cornerRadius: metrics.radius.dialog, style: .continuous))
-        .panelEntrance()
         // Reported, not measured: the frame above is ours, so reading it back would feed itself.
         .onChange(of: panelHeight, initial: true) { onHeight(panelHeight) }
     }
@@ -93,7 +92,7 @@ struct QuickActionResultView: View {
             HStack(spacing: metrics.spacing.sm) {
                 SymbolImage(name: state.action.symbol, size: metrics.size.quickActionHeaderIcon)
                     .foregroundStyle(Theme.Colors.textSecondary)
-                Text(state.action.title.localizedUI)
+                Text(state.action.title)
                     .font(metrics.typography.panelTitle)
                 Spacer(minLength: metrics.spacing.md)
             }
@@ -117,7 +116,7 @@ struct QuickActionResultView: View {
         case .running, .finished:
             output
         case .failed(let message):
-            Label(message.localizedUI, systemImage: "exclamationmark.triangle")
+            Label(message, systemImage: "exclamationmark.triangle")
                 .font(metrics.typography.rowTitle)
                 .foregroundStyle(Theme.Colors.textSecondary)
         case .needsLanguageDownload:
@@ -131,7 +130,7 @@ struct QuickActionResultView: View {
         if !chunks.isEmpty {
             // One `Text` per chunk would break the wrap, so the runs are styled inside one string.
             prose(Text(attributed(chunks)))
-        } else if state.action == .summarize {
+        } else if state.action.rendersMarkdown {
             ChatMarkdownText(blocks: MarkdownBlock.parse(state.output, midStream: state.isRunning))
         } else {
             prose(Text(state.output))

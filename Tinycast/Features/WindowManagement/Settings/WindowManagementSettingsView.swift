@@ -64,11 +64,11 @@ struct WindowManagementSettingsView: View {
         return Section {
             Picker(selection: $settings.windowCycle) {
                 ForEach(WindowCycle.allCases) { cycle in
-                    Text(cycle.title.localizedUI).tag(cycle)
+                    Text(cycle.title).tag(cycle)
                 }
             } label: {
                 SettingsRowTitle(.windowManagementOptions, "Cycling")
-                Text(settings.windowCycle.detail.localizedUI)
+                Text(settings.windowCycle.detail)
             }
 
             LabeledContent {
@@ -124,13 +124,12 @@ struct WindowManagementSettingsView: View {
                         command: command, showsInLauncher: settings.windowManagementShowInLauncher)
                 }
             } header: {
-                Text(section.group.title.localizedUI)
+                Text(section.group.title)
             }
         }
     }
 }
 
-/// One command's alias, shortcut recorder and visibility checkbox, shaped like the shortcuts row.
 private struct WindowCommandSettingsRow: View {
     let command: WindowCommand
     let showsInLauncher: Bool

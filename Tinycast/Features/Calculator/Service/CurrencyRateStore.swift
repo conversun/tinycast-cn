@@ -15,8 +15,8 @@ final class CurrencyRateStore {
     /// Shorter retry, so a machine offline at launch picks rates up soon after it reconnects.
     private static let retryInterval: TimeInterval = 30 * 60
 
-    /// The newest snapshot, nil until the first one lands.
     private(set) var rates: CurrencyRates?
+    private(set) var isRefreshing = false
 
     private let fileURL: URL
     @ObservationIgnored private var pump: Task<Void, Never>?
@@ -50,6 +50,17 @@ final class CurrencyRateStore {
         }
     }
 
+    /// The pump re-measures age from `completedAt` when it wakes, so its schedule needs no reset.
+    func refresh() {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        Task {
+            await fetchAndStore()
+            isRefreshing = false
+        }
+    }
+
+    @discardableResult
     private func fetchAndStore() async -> Bool {
         guard let result = await Self.fetch() else { return false }
         rates = result.rates

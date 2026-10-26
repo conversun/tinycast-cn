@@ -1,13 +1,10 @@
 import CoreGraphics
 import Foundation
 
-/// A user-defined window command: one size at one position, applied to the focused window.
-/// See docs/features/window-management.md#custom-sizes.
 struct CustomWindowSize: Codable, Hashable, Identifiable, Sendable {
     static let entryIDPrefix = "window-size:"
     static let sfSymbol = "macwindow.and.cursorarrow"
 
-    /// One axis's length, in the unit the user typed it in.
     struct Dimension: Codable, Hashable, Sendable {
         enum Unit: String, Codable, CaseIterable, Sendable {
             case points
@@ -48,7 +45,6 @@ struct CustomWindowSize: Codable, Hashable, Identifiable, Sendable {
             return min(available, max(WindowLayoutGeometry.minimumLength, requested))
         }
 
-        /// The same length restated in `unit`, measured against `available`.
         func converted(to unit: Unit, in available: CGFloat) -> Dimension {
             guard unit != self.unit, available > 0 else { return Dimension(value, unit) }
             let points = unit == .percent ? CGFloat(value) : CGFloat(value) * available / 100
@@ -108,10 +104,9 @@ struct CustomWindowSize: Codable, Hashable, Identifiable, Sendable {
 
     var entryID: String { Self.entryIDPrefix + id.uuidString.lowercased() }
 
-    /// The settings row's subtitle: what this size does, in one line.
     var summary: String {
         let base = "\(width.label) × \(height.label) · \(anchor.title)"
-        return offset == .zero ? base : "\(base) · Offset \(offset.x), \(offset.y) pt"
+        return offset == .zero ? base : String(localized: "\(base) · Offset \(offset.x), \(offset.y) pt")
     }
 
     static func id(fromEntryID entryID: String) -> UUID? {
@@ -169,9 +164,9 @@ enum CustomWindowSizeValidationError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .emptyName: return "Enter a name for the size."
-        case .duplicateName: return "A custom size with this name already exists."
-        case .invalidCharacter: return "Names cannot contain null characters."
+        case .emptyName: return String(localized: "Enter a name for the size.")
+        case .duplicateName: return String(localized: "A custom size with this name already exists.")
+        case .invalidCharacter: return String(localized: "Names cannot contain null characters.")
         }
     }
 }

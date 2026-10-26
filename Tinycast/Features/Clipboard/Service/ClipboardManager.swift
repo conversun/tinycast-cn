@@ -5,9 +5,6 @@ final class ClipboardManager {
     /// Marker we attach to the pasteboard when *we* write to it, so polling ignores our own pastes.
     static let internalType = NSPasteboard.PasteboardType("com.tinycast.internal")
 
-    /// Longest text captured; bigger copies are skipped, truncation losing the tail.
-    static let maxTextLength = 32_000
-
     /// Markers put on secret copies by password managers, browsers and the OS.
     static let sensitiveTypes: Set<NSPasteboard.PasteboardType> = [
         .init("org.nspasteboard.ConcealedType"),
@@ -40,7 +37,6 @@ final class ClipboardManager {
         startPolling()
     }
 
-    /// Turning the feature off: the poller, the observers and the drain all go with it.
     func stop() {
         isCapturing = false
         sessionTokens = []
@@ -160,7 +156,7 @@ final class ClipboardManager {
         if let text = pb.string(forType: .string),
             !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         {
-            guard text.count <= Self.maxTextLength else { return }
+            guard text.count <= ClipboardStore.maxTextLength else { return }
             store.addText(text, sourceBundleID: sourceBundleID)
             return
         }

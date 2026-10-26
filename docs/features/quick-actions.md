@@ -151,6 +151,12 @@ nothing on every route, and a 3B model is markedly worse at it. `NLLanguageRecog
 source language, because `TranslationSession(installedSource:target:)` needs a concrete one and
 `LanguageAvailability` reports only a status.
 
+**A download is a locale, not a language.** Apple matches `en-US` and `en-GB` separately, so the bare
+`en` the recognizer reports finds only the first and calls an installed `en-GB` pair missing — which
+read as *Chinese hasn't been downloaded yet* on a Mac that had Chinese. Both sides are retried across
+every supported spelling of the same script before the panel names a language, and the language it
+names is the one with no downloaded asset of its own.
+
 `TranslationError` is annotated `macOS 26.4` while the deployment floor is `26.0`, so failures are
 caught as plain `Error` and reported by what was asked rather than by matching its cases.
 
@@ -184,9 +190,10 @@ which is a closed two-case enum measured once at present time — a growing stre
 Non-activating, so the target app keeps its selection while the panel holds key. Keys go through
 `sendEvent`: `↵` replaces, `⌘C` copies, `esc` dismisses; click-away dismisses like every other
 borderless surface. The panel is anchored by its **top-left** and re-measured as the reply arrives —
-centring on every measure would walk it up the screen. Summarize uses chat's `ChatMarkdownText` and
-`MarkdownBlock.parse`, keeping its whole result selectable across paragraphs and headings, with the
-same math as chat; `midStream` is on while it runs, so an equation still arriving is held back.
+centring on every measure would walk it up the screen. Summarize and custom actions use chat's
+`ChatMarkdownText` and `MarkdownBlock.parse`, keeping the whole result selectable across paragraphs
+and headings, with the same math as chat; `midStream` is on while it runs, so an equation still
+arriving is held back.
 
 The body is a `ScrollView` with its height **set** rather than capped: a scroll view has no ideal
 height, so `NSHostingView.fittingSize` measures it as nothing and the body collapses to a slot. The
@@ -297,6 +304,10 @@ failure handler, so automatic expansion stays silent as before.
   `quickActionModelOverrides`.
 - Translate into a language that has not been downloaded: the panel names the language, and its
   button closes the panel and opens Language & Region.
+- Download English (UK) alone, with English (US) absent, and translate English text: the panel must
+  translate rather than call the target language missing.
+- Translate Korean text with Korean not downloaded and the target language installed: the panel names
+  Korean, the language that is actually missing.
 - Revoke Accessibility while enabled: a HUD explains instead of failing silently.
 - Harnesses: `quick-action-test` (action metadata, prompt boundaries, preview choices, routes and
   their repair) and

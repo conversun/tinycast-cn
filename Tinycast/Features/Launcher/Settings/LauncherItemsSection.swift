@@ -4,6 +4,8 @@ import SwiftUI
 struct LauncherCategorySwitchSection: View {
     let kind: AppEntry.Kind
     let anchor: SettingsAnchor
+    /// Spelled out by the caller, so it is the very string its search entry carries.
+    let title: LocalizedStringResource
 
     @Environment(VisibilityStore.self) private var visibility
 
@@ -16,8 +18,8 @@ struct LauncherCategorySwitchSection: View {
                 )
             ) {
                 SettingsFeatureToggleLabel(
-                    anchor: anchor, title: "Enable \(anchor.title)",
-                    subtitle: "Off hides all of them and stops their shortcuts.")
+                    anchor: anchor, title: title,
+                    subtitle: "Disables the feature and its associated shortcuts.")
             }
         }
     }
@@ -27,7 +29,8 @@ struct LauncherCategorySwitchSection: View {
 struct LauncherItemsSection: View {
     let kind: AppEntry.Kind
     let anchor: SettingsAnchor
-    let searchPrompt: String
+    let searchPrompt: LocalizedStringResource
+    var emptyMessage: LocalizedStringResource = "Nothing here yet."
 
     @Environment(AppIndex.self) private var appIndex
     @Environment(VisibilityStore.self) private var visibility
@@ -45,7 +48,8 @@ struct LauncherItemsSection: View {
         Section {
             SettingsFilterField(prompt: searchPrompt, query: $query)
             LauncherItemsList(
-                entries: entries, query: query, isEnabled: visibility.isKindEnabled(kind))
+                entries: entries, query: query, isEnabled: visibility.isKindEnabled(kind),
+                emptyMessage: emptyMessage)
         } header: {
             SettingsSectionHeader(anchor)
         }
@@ -53,11 +57,11 @@ struct LauncherItemsSection: View {
     }
 }
 
-/// The rows under a filter field, or what to say when there are none; shared by item panes.
 struct LauncherItemsList: View {
     let entries: [AppEntry]
     let query: String
     let isEnabled: Bool
+    var emptyMessage: LocalizedStringResource = "Nothing here yet."
 
     @Environment(VisibilityStore.self) private var visibility
     @Environment(AliasStore.self) private var aliases
@@ -66,7 +70,7 @@ struct LauncherItemsList: View {
 
     var body: some View {
         if entries.isEmpty {
-            Text(query.isEmpty ? String(localized: "Nothing here yet.") : String(localized: "No matches for “\(query)”."))
+            Text(query.isEmpty ? emptyMessage : "No matches for “\(query)”.")
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
         } else if entries.first?.kind != .application && entries.first?.kind != .appleShortcut {

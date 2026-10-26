@@ -61,6 +61,9 @@ struct FormTextArea: NSViewRepresentable {
         if view.textContainerInset != inset { view.textContainerInset = inset }
         if view.isEditable != isEnabled { view.isEditable = isEnabled }
         if view.isSelectable != isEnabled { view.isSelectable = isEnabled }
+        // Otherwise it shrinks to its text, and SwiftUI's unflipped host drops it to the bottom.
+        let minSize = NSSize(width: 0, height: minimumHeight)
+        if view.minSize != minSize { view.minSize = minSize }
         view.setAccessibilityLabel(label)
         if view.string != text {
             if let storage = view.textStorage {

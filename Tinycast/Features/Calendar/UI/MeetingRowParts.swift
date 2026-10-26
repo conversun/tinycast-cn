@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The calendar-colour bar between a meeting row's icon and its title.
 struct CalendarBar: View {
     @Environment(\.metrics) private var metrics
     let color: MeetingEvent.CalendarColor?
@@ -20,13 +19,13 @@ struct MeetingTiming: View {
     let now: Date
 
     var body: some View {
-        let pill = UpcomingWindow.rowPill(for: meeting, now: now, calendar: .current)
+        let pill = UpcomingWindow.rowPill(for: meeting, now: now, calendar: .current, locale: .current)
         HStack(spacing: metrics.spacing.md) {
             Text(MeetingTimeFormat.range(of: meeting))
                 .font(metrics.typography.rowTrailing)
                 .foregroundStyle(meeting.isInProgress(now: now) ? .primary : .secondary)
             ZStack {
-                Text(UpcomingWindow.countdown(to: now + 60 * 60, now: now)).hidden()
+                Text(UpcomingWindow.countdown(to: now + 60 * 60, now: now, locale: .current)).hidden()
                 Text(UpcomingWindow.dayLabel(now + 24 * 60 * 60, calendar: .current)).hidden()
                 Text(pill?.text ?? "")
                     .foregroundStyle(pill?.isImminent == true ? .primary : .secondary)

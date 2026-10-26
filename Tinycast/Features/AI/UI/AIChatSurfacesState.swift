@@ -5,9 +5,7 @@ import Observation
 @MainActor
 @Observable
 final class AIChatSurfacesState {
-    /// The palette's conversation.
     private(set) var quickAI: AIChatState
-    /// The AI Chat window's conversation.
     private(set) var window: AIChatState
     /// Window conversations left mid-reply; each saves itself when its reply ends.
     private var answeringElsewhere: [UUID: AIChatState] = [:]
@@ -70,6 +68,23 @@ final class AIChatSurfacesState {
     func newWindowChat() {
         guard !window.session.messages.isEmpty else { return }
         show(makeState())
+    }
+
+    func applyWindowOpenPolicy(opensTo: AIOpensTo, newAfter: AINewChatAfter, now: Date = Date()) {
+        guard !window.isStreaming else { return }
+        guard window.draft.isEmpty, window.pendingAttachments.isEmpty else { return }
+        let hasTranscript = !window.session.messages.isEmpty
+        let recent = history.conversations.first
+        let decision = AIConversationOpenPolicy.decide(
+            opensTo: opensTo, newAfter: newAfter,
+            lastActiveAt: hasTranscript ? window.session.updatedAt : recent?.updatedAt, now: now)
+        switch decision {
+        case .resume:
+            guard !hasTranscript, let recent, holder(of: recent.id) !== quickAI else { return }
+            openInWindow(id: recent.id)
+        case .startNew:
+            newWindowChat()
+        }
     }
 
     /// Quick AI's conversation moves over whole, reply and staged files included.

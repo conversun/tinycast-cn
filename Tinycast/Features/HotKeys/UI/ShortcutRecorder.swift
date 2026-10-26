@@ -37,7 +37,6 @@ struct ShortcutRecorder: View {
             .contentShape(shape)
             .onTapGesture { hotKeys.recordingAction = isRecording ? nil : action }
             .onHover { hovered = $0 }
-            // Hand the callout this field's bounds while it's the open one.
             .anchorPreference(key: ShortcutRecorderAnchorKey.self, value: .bounds) {
                 isRecording ? $0 : nil
             }
@@ -55,7 +54,7 @@ struct ShortcutRecorder: View {
         if let binding = hotKeys.binding(for: action) {
             boundLabel(binding)
         } else {
-            Text(isRecording ? "Listening…" : "Record Hotkey")
+            Text(isRecording ? "Waiting for a shortcut…" : "Record Hotkey")
                 .font(Theme.Typography.keyCap)
                 .foregroundStyle(unsetInk)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -94,7 +93,7 @@ struct ShortcutRecorder: View {
                 }
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(binding.keycaps.joined(separator: " "))
+            .accessibilityLabel(KeyCapChip.inlineText(binding.keycaps, separator: " "))
         }
         .frame(maxWidth: .infinity)
         // Overlaid, not a row member, so it costs the caps no width.

@@ -21,11 +21,14 @@ final class HyperKeyManager: HealthCheckable {
 
     @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let hotKeys: HotKeyManager
-    @ObservationIgnored private let tap: HyperKeyTap
+    @ObservationIgnored private let tap = HyperKeyTap()
     @ObservationIgnored private let remapper = KeyboardRemapper()
     @ObservationIgnored private let secureInput = SecureInputMonitor()
+    @ObservationIgnored private let instanceLock = HyperKeyInstanceLock()
     @ObservationIgnored private var observers: [NotificationToken] = []
+    @ObservationIgnored private var darwinObservers: [DarwinNotificationToken] = []
     @ObservationIgnored private var runningAppsObservation: NSKeyValueObservation?
+    @ObservationIgnored private var permissionRetry: Task<Void, Never>?
     @ObservationIgnored private var pauseReasons: Set<PauseReason> = []
 
     private enum PauseReason {
@@ -35,7 +38,6 @@ final class HyperKeyManager: HealthCheckable {
     init(settings: AppSettings, hotKeys: HotKeyManager) {
         self.settings = settings
         self.hotKeys = hotKeys
-        tap = HyperKeyTap(settings: settings)
     }
 
     func start() {
@@ -44,6 +46,7 @@ final class HyperKeyManager: HealthCheckable {
         remapper.clearLeftovers()
         observeSettings()
         observeSystem()
+        secureInput.start()
         apply()
     }
 
@@ -54,7 +57,7 @@ final class HyperKeyManager: HealthCheckable {
 
     /// The HID remap outlives the process, so hand the key back before exiting.
     func prepareForTermination() {
-        remapper.apply(nil)
+        stop(.off)
     }
 
     func diagnostics() -> HyperKeyDiagnostics {
@@ -74,8 +77,25 @@ final class HyperKeyManager: HealthCheckable {
             capsLockMappingConflicts: key == .capsLock
                 ? HyperKeyConflictScanner.capsLockRemaps().map { name(of: $0, among: keyboards) }
                 : [],
+            takeover: takeover(),
+            keyboardTaps: HyperKeyConflictScanner.keyboardTaps(),
             secureInputCompatibilityActive: status == .active && isSecureInputCompatible,
             secureInput: secureInput.report())
+    }
+
+    /// Read on demand: another app taking the key over leaves nothing for Tinycast to observe.
+    func takeover() -> HyperKeyDiagnostics.Takeover? {
+        guard status == .active else { return nil }
+        let keyboards = remapper.overriddenKeyboardNames
+        guard !keyboards.isEmpty else { return nil }
+        let suspects =
+            HyperKeyConflictScanner.runningConflicts().map(\.name)
+            + HyperKeyConflictScanner.keyboardTaps().map(\.appName)
+        return HyperKeyDiagnostics.Takeover(
+            keyboards: keyboards,
+            likelyApps: suspects.reduce(into: []) { apps, app in
+                if !apps.contains(app) { apps.append(app) }
+            })
     }
 
     // MARK: - Applying
@@ -86,52 +106,85 @@ final class HyperKeyManager: HealthCheckable {
         guard let route = key.route(secureInputCompatible: isSecureInputCompatible) else {
             return stop(.off)
         }
-        if let blocker = HyperKeyConflictScanner.runningBlocker() {
-            if status != .blocked(appName: blocker) { onProblem?(String(localized: "Quit \(blocker) to use the Hyper Key")) }
-            return stop(.blocked(appName: blocker))
-        }
+        if let blocker = HyperKeyConflictScanner.runningBlocker() { return block(by: blocker) }
         guard pauseReasons.isEmpty else { return stop(.paused) }
-        if route.remap != nil, remapper.mapping == nil { tap.unlatchCapsLock() }
-        guard remapper.apply(route.remap) else { return stop(.remapUnavailable) }
-        tap.route = route
-        healthTicker?.subscribe(self)
-        status = tap.install() ? .active : .needsAccessibility
+        guard Permissions.isAccessibilityTrusted() else { return retryLater(.needsAccessibility) }
+        guard instanceLock.acquire() else { return block(by: otherInstanceName) }
+        setRoute(route)
+        guard tap.install() else { return retryLater(.needsAccessibility) }
+        if key == .capsLock, remapper.mapping == nil { tap.unlatchCapsLock() }
+        // A modifier needs no remap, so cleanup still pending on some keyboard cannot block it.
+        guard remapper.apply(route.remap) || route.remap == nil else { return retryLater(.remapUnavailable) }
+        healthTicker?.unsubscribe(self)
+        status = .active
         syncSecureInputHotKeys()
     }
 
-    private func stop(_ status: Status) {
-        tap.route = nil
+    private func block(by appName: String) {
+        if status != .blocked(appName: appName) {
+            onProblem?(String(localized: "Quit \(appName) to use the Hyper Key"))
+        }
+        retryLater(.blocked(appName: appName))
+    }
+
+    private func retryLater(_ status: Status) {
+        stop(status, retrying: true)
+    }
+
+    private func stop(_ status: Status, retrying: Bool = false) {
+        setRoute(nil)
         tap.tearDown()
         remapper.apply(nil)
-        healthTicker?.unsubscribe(self)
-        self.status = status
+        instanceLock.release()
+        if retrying { healthTicker?.subscribe(self) } else { healthTicker?.unsubscribe(self) }
+        if self.status != status { self.status = status }
         syncSecureInputHotKeys()
+    }
+
+    private func setRoute(_ route: HyperKeyRoute?) {
+        tap.configure(
+            route: route, includesShift: settings.hyperKeyIncludesShift,
+            quickPress: settings.hyperKeyQuickPress)
+        hotKeys.capture.hyperRoute = route
+    }
+
+    private var otherInstanceName: String {
+        instanceLock.holder().flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
+            ?? "Tinycast"
     }
 
     /// That press latched Caps Lock on a keyboard that lost the remap, so undo it once repaired.
     private func repairRemap() {
-        guard status == .active, remapper.repair() else { return }
-        tap.unlatchCapsLock()
+        guard status == .active else { return }
+        let result = remapper.repair()
+        guard result.succeeded else { return retryLater(.remapUnavailable) }
+        if result.changed, settings.hyperKey == .capsLock { tap.unlatchCapsLock() }
     }
 
     private var isSecureInputCompatible: Bool {
         settings.hyperKey.supportsSecureInputCompatibility && settings.hyperKeySecureInputCompatibility
     }
 
-    /// One-second watchdog while a key is live. See docs/features/hotkeys.md#lifecycle.
+    /// One-second retry while waiting, never while active. See docs/features/hotkeys.md#lifecycle.
     func healthCheck() {
-        guard tap.route != nil else { return }
-        secureInput.refresh()
-        let previous = status
-        if !tap.isInstalled {
-            if tap.install() { status = .active }
-        } else if !Permissions.isAccessibilityTrusted() {
-            tap.tearDown()
-            status = .needsAccessibility
-        } else if tap.isEnabled == false {
-            tap.reenable()
+        apply()
+    }
+
+    /// macOS drops a tap whose grant is revoked, so rebuilding also re-checks the grant.
+    private func recoverTap() {
+        guard status == .active, tap.isEnabled != true else { return }
+        tap.tearDown()
+        apply()
+    }
+
+    /// tccd announces a change before the new grant reads back, so the retry waits a beat.
+    private func permissionsChanged() {
+        permissionRetry?.cancel()
+        permissionRetry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            self?.apply()
         }
-        if status != previous { syncSecureInputHotKeys() }
     }
 
     // MARK: - Secure Input
@@ -163,6 +216,7 @@ final class HyperKeyManager: HealthCheckable {
             _ = settings.hyperKey
             _ = settings.hyperKeySecureInputCompatibility
             _ = settings.hyperKeyIncludesShift
+            _ = settings.hyperKeyQuickPress
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
@@ -190,6 +244,14 @@ final class HyperKeyManager: HealthCheckable {
             },
             observe(distributed, Notification.Name("com.apple.screenIsUnlocked")) {
                 $0.resume(.screenLocked)
+            }
+        ]
+        darwinObservers = [
+            DarwinNotificationToken("com.apple.coregraphics.eventTapRemoved") { [weak self] in
+                self?.recoverTap()
+            },
+            DarwinNotificationToken("com.apple.tcc.access.changed") { [weak self] in
+                self?.permissionsChanged()
             }
         ]
         observeBlockingApps()
@@ -238,6 +300,6 @@ final class HyperKeyManager: HealthCheckable {
         if identity.isDefault { return String(localized: "All keyboards") }
         return keyboards.first {
             $0.vendorID == identity.vendorID && $0.productID == identity.productID
-        }?.name ?? String(localized: "Keyboard \(identity.vendorID)-\(identity.productID)")
+        }?.name ?? String(localized: "Keyboard \(String(identity.vendorID))-\(String(identity.productID))")
     }
 }

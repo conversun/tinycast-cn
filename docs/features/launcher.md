@@ -1,7 +1,20 @@
 # App launcher & root search
 
-`AppIndex.scan()` runs off-main, enumerates the user's search scopes, and dedups by bundle ID (the
-earliest scope wins; within one folder, the newest `CFBundleShortVersionString` does).
+`AppIndex.scan()` runs off-main and keeps each distinct application path in launcher results.
+Settings and app pickers retain one representative per bundle ID: the earliest scope wins;
+within one folder, the newest `CFBundleShortVersionString` does.
+
+Copies sharing a bundle ID keep app-wide aliases, visibility, ranking, favorites and global shortcuts.
+Favorites and Suggestions show the representative, while the other copies remain in ordinary results.
+Version subtitles distinguish copies; equal or missing versions also show the containing folder.
+Return opens the selected path with running-application substitution disabled, so a different running
+version cannot replace it. Restart also reopens the selected path. Bundle-ID-based operations such as
+Window Layouts retain macOS's default running-application substitution. Uninstall is unavailable while
+indexed copies share the bundle ID, because their support files and preferences may be shared.
+
+`./Scripts/run-tests.sh app-installation-test` covers the shipped index and app-wide preferences.
+Set `TINYCAST_TEST_APP_LAUNCH=1` for temporary native-app launch, quit and restart checks; the harness
+reports notification-dependent checks as skipped when the session cannot deliver workspace events.
 
 ## Invariants
 
@@ -34,6 +47,9 @@ earliest scope wins; within one folder, the newest `CFBundleShortVersionString` 
   apply to applications and quietly skip snippets — and nothing is built per keystroke. `AppIndex.scan`
   names the app slice on its own, off-main: transliterating a CJK index is ICU work, and
   `publishEntries` runs on the main actor whenever any unrelated slice changes.
+- **Tinycast never translates a name it did not write.** Apps, panes, quicklinks, snippets and
+  extensions read the way their source names them. A built-in command shows its translated name and
+  keeps its English source as an alternate title, so `clipboard` finds it in every language.
 - **The fields stay separate.** Which field matched is half of what the comparator reads — an exact
   subtitle, an exact alternate title and a keyword hit are three different rules.
 - **`Model/SearchScopes.swift` and `Model/LauncherRankingStore.swift` are pure too** — the ranking store
@@ -60,9 +76,9 @@ prevent cycles.
 
 Within one folder, bundles are listed newest `CFBundleShortVersionString` first, compared as numbers
 so `26.6` outranks `9.4`. A tie or an unreadable version falls back to Finder's name order. Because
-the scan keeps a bundle ID's first copy, two Xcodes in `/Applications` resolve to the newest, every
-scan, and the embedded apps follow their parent. Scope order still comes first: listing an older
-copy as its own earlier scope pins it (#1288).
+the first copy represents its bundle ID, the newest Xcode in `/Applications` represents the app in
+Settings and Favorites, and the embedded apps follow their parent. Scope order still comes first:
+listing an older copy as its own earlier scope pins it (#1288). Search retains every copy.
 
 The defaults cover `/Applications` and `/System/Applications` plus their `Utilities` folders,
 `/System/Library/CoreServices/Applications`, the cryptex apps under
@@ -180,16 +196,19 @@ matches, and is learned, under the same key. ASCII text skips ICU entirely on a 
 ## Names in the user's language
 
 `BundleLocalization` reads both `InfoPlist.loctable` and `<code>.lproj/InfoPlist.strings` for
-`Locale.preferredLanguages` plus English. This matters because `CFBundle` resolves only
+macOS's own languages (`SystemLanguages.preferred`) plus English — not `Locale.preferredLanguages`,
+which turns into Tinycast's interface language once one is picked, and would rename every app. This matters because `CFBundle` resolves only
 `InfoPlist.strings`, and every app under `/System/Applications` translates in the loctable alone — so
 all 65 of them read English on every Mac, whatever language it is set to.
 
-A tag carrying a script is read under two more codes, because no one folder name covers it: a
-`zh-Hans-CN` Mac also reads `zh-Hans`, the folder most third-party apps ship, then `zh_CN`, the key
-Apple's own loctables use. A script-only `zh-Hans` maximizes to reach the same region. A tag without a
-script otherwise keeps its exact, underscore and bare-language forms. Bokmål (`nb`) additionally
-reads `no` after `nb`, because Apple's Norwegian loctables use that key; an explicit `nb.lproj` still
-wins. Other languages, including Nynorsk (`nn`), gain no alias.
+A tag carrying a script is read under more codes, because no one folder name covers it: a
+`zh-Hans-US` Mac also reads `zh-Hans`, the folder most third-party apps ship, then its own region
+`zh_US`, then `zh_CN`, the script's home region and the key Apple's own loctables use. A region is read
+only when it writes the tag's script, so `zh-Hans-HK` skips the Traditional `zh_HK`, and `zh-Hant-HK`
+reads `zh_HK` before `zh_TW`. A tag without a script otherwise keeps its exact, underscore and
+bare-language forms. Bokmål (`nb`) additionally reads `no` after `nb`, because Apple's Norwegian
+loctables use that key; an explicit `nb.lproj` still wins. Other languages, including Nynorsk (`nn`),
+gain no alias.
 
 The user's own language wins the **display name**, so a row reads the way Finder reads it. The rest,
 English included, ride along as alternate titles, matched as typed and never transliterated.
@@ -245,8 +264,8 @@ from its own Info.plist.
 
 A renamed bundle is the other half. A Finder rename never touches `CFBundleDisplayName`, so the
 on-disk basename is indexed as an alternate title — rename `Slack.app` to `Work Chat.app` and both find
-it. Duplicate copies dedupe by bundle id, and the losing copy lends its file name to the winner
-rather than being dropped whole.
+it. Each installed copy keeps its own names and URL; a renamed copy never lends its name to a
+different installation.
 
 ### Subtitles
 
@@ -304,6 +323,15 @@ would then carry.
 
 The row prints `AppEntry.subtitle` beside its name — the one field for an entry whose name alone
 can't say what it acts on.
+
+### Files
+
+With File Search on and its **Show in launcher** switch set, a query of three characters or more adds a
+**Files** section of up to five hits between the ranked results and the fallbacks. Like a fallback it is
+query-driven and not an `AppEntry`: `LauncherScreen.Row.file` carries the `FileSearchResult`, and
+`LauncherList.FileSection` draws it. Nothing about a file row is learned, pinned, aliased or hidden, and it
+adds no `Kind` or `VisibilityStore` category; the switch is its only gate. See
+[file-search.md](file-search.md#in-the-launcher).
 
 ### Fallbacks
 
@@ -437,7 +465,7 @@ only while the score is above 1 and the entry was opened in the last 17 days, wh
 stale habit stop overriding the alignment.
 
 Every pick through `LauncherCoordinator.launch` is a visit, with the query as it was typed: a list
-click, a result, a favorite by ⌘-digit or from the compact bar, the ⌘K Open row. A global shortcut
+click, a result, a favorite by ⌘-digit, the ⌘K Open row. A global shortcut
 is not a visit, and neither is a fallback or a query-driven row. A category listing records the visit
 and not the word. `rank` reads the store once per pass through `snapshot()` — one clock read, not one
 per candidate — and the memos key on the ranking, alias, visibility, favorites and shortcut revisions
@@ -516,8 +544,10 @@ Volume slider all render through `DialogController` rather than an `NSAlert`
 `arrow.clockwise`, Empty Trash `trash.slash` — so the dialog is recognizably about the row that
 opened it. Output volume and mute actions also show Tinycast's transient volume HUD, since macOS only draws
 its own for real media keys. Volume Up/Down walk a 5% grid (`VolumeLevel.stepped`, covered by
-`Tests/volume-test.swift`): an off-grid level snaps to the next line rather than past it, so from 37%
-up lands on 40% and down on 35%, and repeated presses stay on round numbers.
+`Tests/volume-test.swift`): each press moves one line from the level's nearest line, so from 37% up
+lands on 40% and down on 30%, and repeated presses stay on round numbers. Stepping from the nearest
+line matters for devices that store a level slightly off the one set (45.1% for 45%): stepping from
+the read-back level alone would aim at the same line again and never move.
 
 An action whose effect is invisible reports back through a pill (`MessageHUDController`, the same one
 Custom Commands and Snippets confirm through) rather than finishing silently:
@@ -659,8 +689,9 @@ value — so a command may be moved between owners without migrating anything.
 
 ## Navigation commands
 
-`CommandID.switchWindows` opens every running app's windows as a palette screen, and
-`CommandID.searchMenuItems` does the same for the front app's menu bar. Both are plain command
+`CommandID.switchWindows` opens every running app's windows as a palette screen,
+`CommandID.switchWindowsBackwards` opens the same screen and steps it the other way, and
+`CommandID.searchMenuItems` does the same for the front app's menu bar. All three are plain command
 entries — no new `AppEntry.Kind` and no `VisibilityStore` category — owned by Settings › Navigation
 through `SettingsTab.ownedCommands`, so `navigationEnabled` is their switch. Their invariants and
 internals live in [navigation.md](navigation.md) and [menu-search.md](menu-search.md).
@@ -672,7 +703,7 @@ internals live in [navigation.md](navigation.md) and [menu-search.md](menu-searc
 The ranking harness covers the frecency curve, search-term retention and its 17-day gate, pruning,
 persistence and both reset paths; see the command in `development.md`.
 
-Launcher rows and compact favorites ask for the point size they actually draw at, scaled by the
+Launcher rows ask for the point size they actually draw at, scaled by the
 view's `displayScale`: 24/26/29pt becomes 48/52/58px at 2×. `IconCache` still rasterizes through its
 96px canvas first — AppKit picks the representation and the drop shadow from that size — and then
 keeps only the row-sized bitmap, in an 8 MB cost-capped row cache separate from the 32 MB one.
@@ -727,10 +758,9 @@ that screen; the eleventh favorite is still listed and reorderable, and simply h
 
 Both palette sizes serve the chords from the same prefix, because `paletteIsCollapsed` already
 requires an empty query: **compact implies empty implies `favoriteCount` is the pinned prefix**. That
-is why `LauncherScreen.pinnedFavorites` feeds the strip, the chords and the numbered rows alike,
-rather than the compact bar re-deriving an empty-query order of its own. In compact the strip draws
-the first five; ⌘6–⌘0 still launch favorites it has no room for, and the "…" is a button after them
-rather than a slot, so no favorite loses its digit to the overflow.
+is why `LauncherScreen.pinnedFavorites` feeds the chords and the numbered rows alike, rather than
+the compact bar re-deriving an empty-query order of its own. The compact bar draws no favorites, yet
+every slot still launches one.
 
 Holding ⌘ swaps each numbered row's kind label for its chord. `PalettePanel` publishes the modifier
 into `PaletteState.commandHeld` from `.flagsChanged` and clears it in `resignKey` — not in `prepare`,
@@ -798,27 +828,28 @@ and the lead card keep SwiftUI's own gesture. The operation is **copy only**, as
 [clipboard.md](clipboard.md#dragging-out) explains: on the boot volume a file-URL drag would default
 to a move, and moving an app out of `/Applications` is never what a launcher should do. The image is
 the shared icon bitmap when it is warm and `NSWorkspace`'s otherwise, never a decode, and a landed
-drop hides the palette through `PaletteCoordinator.dragLanded()`. Compact mode's favorite buttons do
-not drag.
+drop hides the palette through `PaletteCoordinator.dragLanded()`.
 
 ## Quitting and restarting apps
 
-`RunningAppsMonitor` (live from `NSWorkspace` launch/terminate notifications) drives both the row's
-running dot and the availability of the running-only actions:
+`RunningAppsMonitor` (live from a KVO observation of `NSWorkspace.runningApplications`) drives both the
+row's running dot and the availability of the running-only actions. It observes the list rather than
+`didTerminateApplicationNotification`, which arrives while the list still holds the quitting app, so
+reading the list there left the dot on until some later launch or quit:
 
 - **Quit Application** — a row of an app's ⌘K Actions menu, shown only while that app is
   running, also bound to **⌃⇧Q** on the selected row. The chord guard mirrors the menu row's
   condition (an `.application` entry that `RunningAppsMonitor` reports running) so the key never
   swallows a press it won't act on, and it's skipped in the compact bar, which shows no selection.
-  `AppLauncher.quit(bundleID:)` terminates every instance of the bundle and reports whether
+  `AppLauncher.quit(bundleID:url:)` terminates instances at the selected path and reports whether
   anything was running; the palette only dismisses when something was, and it restores focus unless
   the app it just quit _was_ `previousApp`.
 - **Force Quit Application** — the row below it and **⌃⌥⇧Q**, on the same guard and
-  the same dismissal. `AppLauncher.quit(bundleID:force:)` sends `forceTerminate()` instead, so the
+  the same dismissal. `AppLauncher.quit(bundleID:url:force:)` sends `forceTerminate()` instead, so the
   app gets no chance to save or refuse.
 - **Restart Application** — the row above Quit and **⌘R**, on the same guard: all three chords resolve
   their target through `LauncherScreen.runningApplication(at:)`, the single place that condition
-  lives. `AppLauncher.restart(bundleID:url:)` snapshots the running instances, subscribes to
+  lives. `AppLauncher.restart(bundleID:url:)` snapshots instances at the selected path, subscribes to
   `NSWorkspace.DidTerminateApplicationMessage` _before_ terminating so an instance that exits at
   once can't outrun the wait, then reopens the bundle once every snapshotted PID has gone. The wait
   is bounded by a five-second grace: a quit an app refuses, or one sitting behind a save sheet the

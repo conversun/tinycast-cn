@@ -11,6 +11,9 @@ struct PathFacts: Hashable, Sendable {
     var isSystemRestricted = false
     /// `UF_IMMUTABLE` — Finder's "Locked" checkbox, which the user can clear themselves.
     var isUserImmutable = false
+    var isDirectory = false
+    /// Only decides anything for a directory — see `classify`.
+    var isWritable = true
     /// Only decides anything under a sticky parent — see `classify`.
     var isOwnedByCurrentUser = true
     var parentIsWritable = true
@@ -32,6 +35,7 @@ enum UninstallProtection: String, Hashable, Sendable, CaseIterable {
     case notOwned
     case needsFullDiskAccess
     case parentNotWritable
+    case notWritable
     case missing
 
     var isRemovable: Bool { self == .removable }
@@ -46,11 +50,26 @@ enum UninstallProtection: String, Hashable, Sendable, CaseIterable {
         case .userLocked:
             return String(localized: "Locked in Finder. Unlock it in Get Info, then try again.")
         case .notOwned:
-            return String(localized: "Owned by another user, in a folder that only lets owners remove things.")
+            return String(
+                localized: "Owned by another user, in a folder that only lets owners remove things.")
         case .needsFullDiskAccess:
-            return String(localized: "Needs Full Disk Access, which Tinycast doesn’t request. Grant it in System Settings › Privacy & Security to include this item.")
+            return String(
+                localized: """
+                    Needs Full Disk Access, which Tinycast doesn’t request. \
+                    Grant it in System Settings › Privacy & Security to include this item.
+                    """)
         case .parentNotWritable:
-            return String(localized: "Its enclosing folder isn’t writable by you, and Tinycast never asks for an administrator password.")
+            return String(
+                localized: """
+                    Its enclosing folder isn’t writable by you, and Tinycast never asks for an \
+                    administrator password.
+                    """)
+        case .notWritable:
+            return String(
+                localized: """
+                    Only an administrator can move it, as with App Store apps. \
+                    Drag it to the Trash in Finder instead.
+                    """)
         case .missing:
             return String(localized: "No longer on disk.")
         }
@@ -68,10 +87,12 @@ enum UninstallProtectionRules {
         {
             return .needsFullDiskAccess
         }
-        // Trashing renames out of the parent, so its write bit decides, not the item's owner.
+        // Trashing renames out of the parent, so its write bit counts, not the item's owner.
         if !facts.parentIsWritable { return .parentNotWritable }
         // The one case where ownership does decide: a sticky parent lets only an owner unlink.
         if facts.parentIsSticky, !facts.isOwnedByCurrentUser { return .notOwned }
+        // Moving a directory to a new parent rewrites its `..`, so its own write bit counts too.
+        if facts.isDirectory, !facts.isWritable { return .notWritable }
         return .removable
     }
 
@@ -100,6 +121,7 @@ enum UninstallProtectionRules {
         "Library/Application Support/AddressBook",
         "Library/Application Support/CallHistoryDB",
         "Library/Application Support/com.apple.TCC",
-        "Library/Application Support/MobileSync"
+        "Library/Application Support/MobileSync",
+        "Library/Application Support/com.apple.sharedfilelist/"
     ]
 }

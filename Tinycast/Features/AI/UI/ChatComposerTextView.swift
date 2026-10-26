@@ -57,7 +57,7 @@ struct ChatComposerTextView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.string = text
-        textView.setAccessibilityLabel("Message")
+        textView.setAccessibilityLabel(String(localized: "Message"))
         return scroll
     }
 
@@ -169,7 +169,6 @@ final class ComposerTextView: NSTextView, InjectableTextView {
     }
 }
 
-/// How a control beside the field reaches the text view the representable made.
 @MainActor
 final class ComposerTextViewHandle {
     weak var textView: ComposerTextView?

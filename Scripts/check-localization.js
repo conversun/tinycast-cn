@@ -6,10 +6,10 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
-const tablePath = "Tinycast/zh-Hans.lproj/Localizable.strings";
+const tablePath = "Tinycast/Resources/Localizable.xcstrings";
 const args = process.argv.slice(2);
 if (args.includes("--help")) {
-  console.log("Usage: node Scripts/check-localization.js [--extracted <Xcode source Localizable.strings>]");
+  console.log("Usage: node Scripts/check-localization.js [--extracted <Localizable.strings or Localizable.xcstrings>]");
   console.log("Checks duplicate keys, format arguments, dynamic title coverage and computed Text properties.");
   process.exit(0);
 }
@@ -25,29 +25,41 @@ function plist(file) {
     encoding: "utf8",
   }));
 }
-const table = plist(tablePath);
 const problems = [];
-const seen = new Set();
-for (const match of read(tablePath).matchAll(/^\s*("(?:[^"\\]|\\.)*")\s*=/gm)) {
-  const key = JSON.parse(match[1]);
-  if (seen.has(key)) problems.push(`Duplicate key: ${key}`);
-  seen.add(key);
-}
-function formats(value) {
-  const result = [];
-  let next = 1;
-  for (const match of value.matchAll(/%%|%(?:(\d+)\$)?[-+#0 ]*(?:\d+)?(?:\.\d+)?(lld|llu|ld|lu|zd|zu|@|d|u|f|g|s)/g)) {
-    if (match[0] === "%%") continue;
-    result.push(`${match[1] ?? next++}:${match[2]}`);
+const resources = ["Localizable", "InfoPlist"];
+for (const name of resources) {
+  const file = `Tinycast/Resources/${name}.xcstrings`;
+  const seen = new Set();
+  for (const match of read(file).matchAll(/^    ("(?:[^"\\]|\\.)*")\s*:/gm)) {
+    const key = JSON.parse(match[1]);
+    if (seen.has(key)) problems.push(`${file}: Duplicate key: ${key}`);
+    seen.add(key);
   }
-  return result.sort().join(",");
+  for (const [key, entry] of Object.entries(JSON.parse(read(file)).strings)) {
+    const translation = entry.localizations?.["zh-Hans"];
+    if (key && translation && /"value"\s*:\s*""/.test(JSON.stringify(translation))) {
+      problems.push(`${file}: Empty translation: ${key}`);
+    }
+  }
+  if (fs.existsSync(path.join(root, `Tinycast/zh-Hans.lproj/${name}.strings`))) {
+    problems.push(`${name}: obsolete zh-Hans.lproj input duplicates compiled catalog output`);
+  }
 }
-for (const [key, value] of Object.entries(table)) {
-  if (key && !value) problems.push(`Empty translation: ${key}`);
-  if (formats(key) !== formats(value)) problems.push(`Format arguments differ: ${key}`);
+try {
+  execFileSync(process.execPath, [path.join(root, "Scripts/check-localizations.js")], { encoding: "utf8", stdio: "pipe" });
+} catch (error) {
+  if (!(error instanceof Error) || !("status" in error)) throw error;
+  problems.push(String(error.stderr));
 }
+const catalog = JSON.parse(read(tablePath));
+const table = Object.fromEntries(Object.entries(catalog.strings).map(([key, entry]) => [
+  key, entry.localizations?.["zh-Hans"]?.stringUnit?.value
+    ?? entry.localizations?.["zh-Hans"]?.variations?.plural?.other?.stringUnit?.value,
+]));
 function requireKey(key, source) {
-  if (key && !Object.hasOwn(table, key)) problems.push(`${source}: missing “${key}”`);
+  if (/\p{L}/u.test(key) && !table[key] && catalog.strings[key]?.shouldTranslate !== false) {
+    problems.push(`${source}: missing “${key}”`);
+  }
 }
 const catalogs = [
   "Tinycast/Features/Settings/EscapeKeyBehavior.swift",
@@ -58,7 +70,7 @@ const catalogs = [
   "Tinycast/Features/Launcher/Model/CommandID.swift",
 ];
 for (const file of catalogs) {
-  for (const match of read(file).matchAll(/case\s+[^\n]+:\s*(?:return\s+)?"([^"\\]*)"/g)) {
+  for (const match of read(file).matchAll(/case\s+[^\n]+:\s*(?:return\s+)?(?:String\(localized:\s*)?"([^"\\]*)"/g)) {
     const key = match[1];
     if (!/[A-Z]/.test(key) || key.includes(":")) continue;
     requireKey(key, file);
@@ -68,7 +80,7 @@ for (const file of [
   "Tinycast/Features/Settings/SettingsAnchor.swift",
   "Tinycast/Features/Backup/Model/BackupCategory.swift",
 ]) {
-  for (const match of read(file).matchAll(/(?:title|label|countNoun):\s*"([^"\\]+)"/g)) {
+  for (const match of read(file).matchAll(/(?:title|label|countNoun):\s*(?:String\(localized:\s*)?"([^"\\]+)"/g)) {
     requireKey(match[1], file);
   }
 }
@@ -100,9 +112,7 @@ for (const file of swiftFiles(path.join(root, "Tinycast"))) {
       if (/localized\s*$/.test(body.slice(0, literal.index))) continue;
       let key;
       try { key = JSON.parse(literal[1]); } catch { continue; }
-      const tail = body.slice(literal.index + literal[0].length);
-      if (/^\s*\)?\.localizedUI/.test(tail)) continue;
-      if (Object.hasOwn(table, key) && table[key] !== key) {
+      if (table[key] && table[key] !== key) {
         problems.push(path.relative(root, file) + ": Text(" + name + ") receives untranslated literal “" + key + "”");
       }
     }
@@ -110,7 +120,7 @@ for (const file of swiftFiles(path.join(root, "Tinycast"))) {
 }
 let extractedCount = 0;
 if (args.length) {
-  const extracted = plist(args[1]);
+  const extracted = args[1].endsWith(".xcstrings") ? JSON.parse(read(args[1])).strings : plist(args[1]);
   for (const key of Object.keys(extracted)) requireKey(key, args[1]);
   extractedCount = Object.keys(extracted).length;
 }
@@ -118,5 +128,5 @@ if (problems.length) {
   console.error(problems.map((problem) => `FAIL: ${problem}`).join("\n"));
   process.exit(1);
 }
-console.log(`Localization checks passed: ${seen.size} keys, ${catalogs.length + 2} catalogs, ${checkedProperties} computed Text properties${extractedCount ? `, ${extractedCount} extracted keys` : ""}.`);
+console.log(`Localization checks passed: ${Object.keys(table).length} keys, ${catalogs.length + 2} source catalogs, ${checkedProperties} computed Text properties${extractedCount ? `, ${extractedCount} extracted keys` : ""}.`);
 console.log("Dynamic user content and unregistered rendering paths still require native UI inspection.");

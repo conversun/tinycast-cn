@@ -6,7 +6,7 @@ import { SupporterCount } from "../../components/support/supporter-count";
 import { supportHero } from "../../data/support";
 
 const description =
-  "Enjoying Tinycast? Buy a premium wallpaper pack with an included Discord role. Tinycast remains free and open source.";
+  "Enjoying Tinycast? Support it with Bitcoin, Ethereum, Solana, Base or BNB, or buy a wallpaper pack with a Discord role. Tinycast remains free and open source.";
 
 export const metadata: Metadata = {
   title: "Enjoying Tinycast?",

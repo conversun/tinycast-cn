@@ -429,7 +429,7 @@ enum SnippetTemplateEngine {
         guard token.hasOnly(["offset", "format", "locale"]) else { return nil }
         let format = token.parameters["format"]
         let localeIdentifier = token.parameters["locale"]
-        // Raycast documents these as mutually exclusive; a template asking for both is ambiguous.
+        // These are mutually exclusive; a template asking for both is ambiguous.
         if format != nil, localeIdentifier != nil { return nil }
         if let format, format.isEmpty { return nil }
         if let localeIdentifier, localeIdentifier.isEmpty { return nil }
@@ -479,7 +479,7 @@ enum SnippetTemplateEngine {
 
     private static func parseArgument(_ token: ParsedToken) -> ArgumentToken? {
         guard token.hasOnly(["name", "default", "options"]) else { return nil }
-        let name = token.parameters["name"]?.trimmingCharacters(in: .whitespaces) ?? String(localized: "Argument")
+        let name = token.parameters["name"]?.trimmingCharacters(in: .whitespaces) ?? "Argument"
         guard !name.isEmpty else { return nil }
         let options = (token.parameters["options"] ?? "")
             .split(separator: ",")
@@ -608,7 +608,7 @@ enum SnippetTemplateEngine {
         return ParsedToken(command: String(command).lowercased(), parameters: parameters)
     }
 
-    /// Runs to the next `key=`, so an unquoted `format=MMM d, yyyy` keeps the spaces Raycast writes.
+    /// Runs to the next `key=`, so an unquoted `format=MMM d, yyyy` keeps its spaces.
     private static func takeBareValue(_ remainder: inout Substring) -> String? {
         var index = remainder.startIndex
         var end = remainder.startIndex
@@ -633,7 +633,6 @@ enum SnippetTemplateEngine {
         return text.dropFirst(key.count).drop(while: \Character.isWhitespace).first == "="
     }
 
-    /// Consumes a quoted value from `remainder`, leaving it positioned after the closing quote.
     private static func decodeQuoted(_ remainder: inout Substring) -> String? {
         var decoded = ""
         var escaped = false

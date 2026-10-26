@@ -13,6 +13,7 @@ struct HyperKeyTest {
         modifierKeysPreferences()
         karabinerConfig()
         remapperLifecycle()
+        instanceLock()
         print(failures == 0 ? "All hyper key checks passed" : "\(failures) hyper key check(s) failed")
         if failures > 0 { exit(1) }
     }
@@ -28,6 +29,7 @@ struct HyperKeyTest {
 
     static let toF18 = HIDKeyMapping.capsLockToF18
     static let toRightControl = HIDKeyMapping.capsLockToRightControl
+    static let toF20 = HIDKeyMapping.dictationKeyToF20
     static let otherTool = HIDKeyMapping(source: 0x7_0000_0029, destination: 0x7_0000_0035)
 
     static func keyMappingReconcile() {
@@ -84,8 +86,9 @@ struct HyperKeyTest {
             HyperKeyConflictPolicy.severity(ofBundleID: "com.knollsoft.Hyperkey") == .blocking
                 && HyperKeyConflictPolicy.severity(ofBundleID: "com.knollsoft.Superkey") == .blocking)
         check(
-            "BetterTouchTool is only a warning",
-            HyperKeyConflictPolicy.severity(ofBundleID: "com.hegenberg.BetterTouchTool") == .warning)
+            "BetterTouchTool and Raycast are only warnings",
+            HyperKeyConflictPolicy.severity(ofBundleID: "com.hegenberg.BetterTouchTool") == .warning
+                && HyperKeyConflictPolicy.severity(ofBundleID: "com.raycast.macos") == .warning)
         check(
             "an unknown app is no conflict",
             HyperKeyConflictPolicy.severity(ofBundleID: "com.apple.Safari") == nil)
@@ -140,10 +143,16 @@ struct HyperKeyTest {
             )
             HIDEventSystem.connect(2)
             check("hot plug remaps new keyboards", HIDEventSystem.mappings[2] == [toF18])
+            check("no keyboard is taken over while ours", remapper.overriddenKeyboardNames.isEmpty)
+            HIDEventSystem.mappings[2] = [
+                HIDKeyMapping(source: HIDKeyMapping.capsLock, destination: 0x7_0000_006F)
+            ]
+            check("another app's mapping is a takeover", remapper.overriddenKeyboardNames == ["External"])
             HIDEventSystem.mappings[2] = []
             check(
-                "repair restores a lost mapping", remapper.repair() && HIDEventSystem.mappings[2] == [toF18])
-            check("repair avoids writes when correct", !remapper.repair())
+                "repair restores a lost mapping",
+                remapper.repair().changed && HIDEventSystem.mappings[2] == [toF18])
+            check("repair avoids writes when correct", !remapper.repair().changed)
             check("route switching succeeds", remapper.apply(toRightControl))
             check(
                 "route switching reaches both keyboards",
@@ -155,6 +164,17 @@ struct HyperKeyTest {
                 "cleanup preserves unrelated mappings",
                 HIDEventSystem.mappings[1] == [otherTool] && HIDEventSystem.mappings[2] == [])
             check("completed cleanup removes recovery", defaults.data(forKey: recoveryKey) == nil)
+        }
+        fixture { remapper, _ in
+            remapper.apply(toF18)
+            HIDEventSystem.mappings[1] = []
+            HIDEventSystem.rejectedKeyboards = [1]
+            check("a lost mapping that cannot be repaired reports failure", !remapper.repair().succeeded)
+            HIDEventSystem.rejectedKeyboards = []
+            check(
+                "a lost mapping can recover later",
+                remapper.repair().succeeded
+                    && HIDEventSystem.mappings[1] == [toF18])
         }
         fixture { remapper, _ in
             HIDEventSystem.rejectedKeyboards = [1]
@@ -268,6 +288,24 @@ struct HyperKeyTest {
             HIDEventSystem.available = false
             check("missing HID SPI reports failure", !remapper.apply(toF18))
         }
+        fixture { remapper, defaults in
+            let dictationKey = "dictationKeyKeyboardMappings"
+            let dictation = KeyboardRemapper(defaults: defaults, recoveryKey: dictationKey)
+            HIDEventSystem.mappings[1] = [otherTool]
+            remapper.apply(toF18)
+            dictation.apply(toF20)
+            check(
+                "Caps Lock and 🎤 remaps share a keyboard",
+                HIDEventSystem.mappings[1] == [otherTool, toF18, toF20])
+            check(
+                "each remapper keeps its own recovery journal",
+                defaults.data(forKey: recoveryKey) != nil && defaults.data(forKey: dictationKey) != nil)
+            dictation.apply(nil)
+            check("removing 🎤 keeps Caps Lock", HIDEventSystem.mappings[1] == [otherTool, toF18])
+            dictation.apply(toF20)
+            remapper.apply(nil)
+            check("removing Caps Lock keeps 🎤", HIDEventSystem.mappings[1] == [otherTool, toF20])
+        }
         fixture { remapper, _ in
             HIDEventSystem.devices = []
             check("no keyboard yet still succeeds", remapper.apply(toF18))
@@ -325,5 +363,19 @@ struct HyperKeyTest {
         check(
             "an unreadable config is not a conflict",
             !HyperKeyConflictPolicy.karabinerRemaps("capsLock", config: Data("{".utf8)))
+    }
+
+    static func instanceLock() {
+        let url = FileManager.default.temporaryDirectory.appending(path: "hyper-key-test.\(UUID()).lock")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let first = HyperKeyInstanceLock(url: url)
+        let second = HyperKeyInstanceLock(url: url)
+        check("the first process takes the Hyper Key", first.acquire())
+        check("taking it again is a no-op", first.acquire())
+        check("a second process is refused", !second.acquire())
+        check("the refused process learns the holder", second.holder() == getpid())
+        first.release()
+        check("release hands the Hyper Key over", second.acquire())
+        check("the old holder is refused in turn", !first.acquire())
     }
 }

@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// The editor's left column: one display drawn to scale, its entries over it, and the tabs.
 struct WindowLayoutPreview: View {
     let draft: WindowLayoutDraft
     /// Resolved once by the panel: an AX read per render would cost a round trip per keystroke.
@@ -41,14 +40,15 @@ struct WindowLayoutPreview: View {
         guard let uuid = draft.selectedDisplayUUID,
             let display = tabs.first(where: { $0.uuid == uuid })
         else { return String(localized: "No display selected") }
-        guard let screen = selectedScreen else { return String(localized: "\(display.name) · not connected") }
+        guard let screen = selectedScreen else {
+            return String(localized: "\(display.name) · not connected")
+        }
         // Points, not pixels: nothing in this feature touches `backingScaleFactor`.
         let size = screen.screen.frame.size
         return "\(display.name) · \(Int(size.width)) × \(Int(size.height))"
     }
 }
 
-/// One display to scale with a rounded rect per entry on it. Draws; decides nothing.
 struct WindowLayoutPreviewCanvas: View {
     let draft: WindowLayoutDraft
     let screen: WindowLayoutScreen?
@@ -139,9 +139,8 @@ struct WindowLayoutPreviewCanvas: View {
     }
 
     private var accessibilityDescription: String {
-        guard let screen else { return "Preview, display not connected" }
+        guard let screen else { return String(localized: "Preview, display not connected") }
         let count = draft.entries(onDisplay: screen.display.uuid).count
-        let windows = count == 1 ? "1 window" : "\(count) windows"
-        return "Preview of \(screen.display.name), \(windows)"
+        return String(localized: "Preview of \(screen.display.name), \(count) windows")
     }
 }

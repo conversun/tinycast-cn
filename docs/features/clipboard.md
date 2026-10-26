@@ -19,6 +19,9 @@
   plain-text default pastes it as it is, and ⌃⌘↵ on it falls back to ⌘↵ as on every other screen.
 - **Clipboard writes stamp a private `internalType` marker** so the poller skips Tinycast's own writes.
   If the writer and the poller ever disagree, the app re-captures its own pastes in a loop.
+- **Edit Entry rewrites a text entry in place and never adds one.** The id, pin and source app
+  stay; saving then copies it as Copy to Clipboard does, marker included, so the poller does not
+  record the edit a second time.
 - **Paste Sequentially never promotes, and its walk is frozen at the first press.** `PasteSequence`
   keeps every entry's id, newest first, and resolves each against the live history, so a promotion
   cannot repeat or skip an entry and a deleted one is passed over rather than pasted.
@@ -107,7 +110,20 @@ in-memory history).
 
 Image capture (TIFF→PNG re-encode + blob write) runs off the main actor via detached tasks; row
 inserts, original-text search, and pruning stay on the main actor.
-Image copy uses Foundation’s `mappedIfSafe` hint before publishing the original PNG and marker.
+Image copy uses Foundation’s `mappedIfSafe` hint before publishing the original PNG, its file URL
+and marker. The file URL is what a terminal pastes, as the path, since it ignores image data; there
+is deliberately no `.string`, which a rich text field would take over the image.
+
+**Tiles and previews decode a copy, not the blob.** A PNG can't decode partially, so a 64px tile of a
+6K screenshot cost its full bitmap. The first draw of an owned image has `ClipboardTextHelper` write
+the `ImageDerivative` copy it needs, 256px for a row or 1080px for the preview, to
+`images/.thumbnails/` (excluded from backup); later draws decode those. Without a readable copy, from a
+failed or timed-out helper or a size past 1080px, the original is decoded in the app as before.
+Copies are made and deleted on one serial `ImageDerivative.queue`, so a copy's delete waits out the
+copy in flight; the blob itself is still deleted at once. The helper's wait runs on that queue, off
+the cooperative pool, with a 10 s deadline and the caller's cancellation. `load` sweeps copies whose
+blob is gone, which a quit before the queue ran can leave. Copies are keyed by the blob's whole file
+name. An image outside `images/`, such as a Raycast import, never gets copies.
 
 **A backup reads the whole table, not `items`.** `forEachStoredItem(inDatabaseAt:)` is `nonisolated`
 and opens a second connection, because the resident window stops at 1000 rows while the table is
@@ -234,6 +250,31 @@ The bounds are the indexer's, stated precisely: the helper truncates its output 
 bytes, so a text-dense scan can copy *partial* text under a success HUD, and an input over 32 MB
 extracts as empty and lands in **No text found**. The source row is not promoted — a copy is not a
 paste.
+
+## Edit an entry
+
+**Edit Entry** (⌘E, or its ⌘K row) opens a `.text` entry in a Tinycast dialog over the dimmed
+palette. A file entry never offers it, because its text is a path and rewriting it would repoint
+the row. `ClipboardEditField` is the dialog's accessory: a code-mode `FormTextArea`, since smart
+quotes or autocorrect would corrupt a token, at a fixed height that scrolls rather than grows the
+panel. ↵ starts a new line as in any editor, so ⌘↵ saves and Esc cancels —
+`DialogAccessory.acceptsLineBreaks` is what hands ↵ to the field. An input method's ↵ always commits
+its marked text, in every dialog.
+
+`ClipboardStore.updateText(_:of:)` rewrites the row's `text` under the same id, so the `items_au`
+trigger reindexes FTS and nothing else changes. `Paster.copy` then writes it marked and promotes it
+unless pinned, and the palette stays up with the row selected and scrolled into view, so ⌘V pastes
+the edit and so does ↵ on the row. A query or type filter that hides the edit is cleared; matching
+ones stay. The palette preserves the row through its query and filter observers, including a pin
+past the first row. An empty edit changes nothing. An entry deleted while open — by
+retention, say — is not brought back: `updateText` answers nil and the text goes on the pasteboard
+**unmarked**, entering history as a new copy rather than being lost. A row found by FTS past the
+resident window has no in-memory copy to replace, so the store drops its search memo instead.
+Database write failures throw instead of taking the deleted-entry path: the HUD reports the failure,
+and neither the clipboard nor the selection changes.
+An edit is held to `ClipboardStore.maxTextLength`, the same 32,000 characters capture records, so a
+longer one is refused with a HUD and nothing changes; past that, every later paste of the entry
+would reindex it on the main actor.
 
 ## Type filter
 

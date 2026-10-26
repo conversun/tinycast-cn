@@ -24,6 +24,40 @@ enum DictationTextFormatter {
         }
     }
 
+    static func stripEcho(_ text: String, after previous: String) -> String {
+        guard !text.isEmpty, !previous.isEmpty else { return text }
+        let tail = Array(previous.split(separator: " ").suffix(8))
+        let head = Array(text.split(separator: " "))
+        let plain = { (word: Substring) in
+            word.lowercased().trimmingCharacters(in: .alphanumerics.inverted)
+        }
+        var drop = 0
+        for skip in 0..<min(3, head.count) {
+            let minimum = skip == 0 ? 1 : skip + 1
+            var run = min(tail.count, head.count - skip)
+            while run >= minimum {
+                guard
+                    (0..<run).allSatisfy({ plain(head[skip + $0]) == plain(tail[tail.count - run + $0]) })
+                else {
+                    run -= 1
+                    continue
+                }
+                drop = max(drop, skip + run)
+                break
+            }
+        }
+        guard drop > 0 else { return text }
+        var index = text.startIndex
+        for _ in 0..<drop {
+            while index < text.endIndex, text[index].isWhitespace { index = text.index(after: index) }
+            while index < text.endIndex, !text[index].isWhitespace {
+                index = text.index(after: index)
+            }
+        }
+        let rest = String(text[index...])
+        return rest.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : rest
+    }
+
     static func format(_ transcription: String, context: Context?, adaptCapitalization: Bool = true) -> String
     {
         var text = transcription.trimmingCharacters(in: .whitespacesAndNewlines)

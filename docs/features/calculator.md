@@ -181,11 +181,18 @@ quantity, so `(20 sgd to usd) * 30` converts then multiplies. Percentages keep r
 for addition (`10kg + 20%` → `12 kg`) and act as fractional scalars for multiplication and division
 (`10kg * 3%` → `0.3 kg`, `10kg / 25%` → `40 kg`).
 
-A conversion may also appear **mid-expression, but only where `+` or `-` follows it**:
-`10kg to lb + 3lb` converts and then adds, without needing the parentheses it used to. The
-restriction is the whole point. `20 eur to usd * 30` has two honest readings — convert then scale,
-or convert into a scaled unit — so it stays silent and keeps asking for `(20 eur to usd) * 30`,
-while `+` and `-` carry no such ambiguity because a conversion target is never an addend.
+A conversion may also appear **mid-expression before an operator, `)` or `,`**:
+`1000 usd in eur / 12` converts the amount into euros and then divides by twelve;
+`10kg to lb + 3lb` converts and then adds; `round(1000 usd in eur)` and
+`10 kg to lb > 20 lb` work inside a function call or a comparison. The conversion binds looser
+than `*`, `/` and a composite, and tighter than `+` and `-`: `2 * 500 usd in eur` converts the
+product and `5 ft 3 in in cm / 2` the whole height, while `10kg + 2lb to kg - 1kg` converts only
+the `2lb`. Parentheses make a larger source explicit, as in `(10kg + 500g) to lb / 2`.
+Compound targets consume their unit factors before arithmetic resumes, so
+`100km/h in m/s / 2` converts into meters per second and then halves the speed.
+Numeric factors follow the existing arithmetic precedence, including parentheses and percentages:
+`1000 usd in eur / (2 + 3)` divides by five, and `1000 usd in eur * 3%` takes three percent.
+Mid-expression after a bare number, prefer `to`: `1000 usd / 4 in eur / 2` reads `4 in` as inches.
 A **trailing** `to` is untouched by this and still converts the whole expression, so
 `10kg + 500g to lb` remains the sum in pounds rather than `10kg + (500g to lb)`.
 
@@ -214,6 +221,9 @@ subtracts them, and powers multiply them. `CalcUnits.baseUnits` resolves support
 ordinary units, so conversions and addition need no second representation. Derived results use base
 units unless a trailing conversion names another: `5m * 4m` → `20 m²`,
 `100km / 2h to km/h` → `50 km/h`, `90km/h * 20min to km` → `30 km`.
+A bare unit after `/` is one of that unit, as `(s)` is: `100 / s` → `100 Hz`, `1000 / (3/s)` →
+`333.3333333 s`. Only `/` does this, so `m s` stays a unit pair. A function name still wins, so
+`100 / sec` (the secant) stays silent.
 Area, volume, volume flow, speed, acceleration, force, pressure, energy, power, frequency, data rates
 and electrical and pixel units compose through this same path. `CalcUnitExpression` composes other
 dimensions from existing units, retaining their factors and symbols: `2kg / 4m3` → `0.5 kg/m³`,
@@ -222,6 +232,9 @@ dimensions from existing units, retaining their factors and symbols: `2kg / 4m3`
 All factors share composable bases: cubic meters for volume and bytes per second for data rates.
 To add a dimension, declare its signature on `UnitCategory`, add records to `CalcUnitCatalog`, and register
 one output in `baseUnits`. A new unit within a category only needs a table entry.
+Fuel economy (`mpg`, `km/L`) and fuel consumption (`L/100km`) register no base unit, so
+`100 km / 7 l` keeps the units typed. No rule converts one into the other: `6.5 l/100km to mpg` is a
+category error, while `1 / 36 mpg to l/100km` works through ordinary division.
 `m²` / `m2` and `m³` / `m3` name units; `(2m)^2` squares the entire quantity.
 `CalcUnits.productUnit` selects Wh/kWh for power multiplied by a minutes-or-larger time unit,
 and Ah/mAh for current multiplied by one; other derived products retain their base unit.
@@ -594,6 +607,9 @@ newer numbers. Age is measured from the persisted `fetchedAt`, not from launch, 
 Tinycast never re-fetches a snapshot that is still fresh — a cold start with a same-day cache makes
 zero requests. Offline, the last snapshot keeps answering; with no snapshot at all the card says so
 rather than guessing, and a currency the feed doesn't quote reports `No exchange rate for <CODE>.`
+A money answer sets `CalcResult.isCurrency`, so its card shows when the snapshot was fetched and a
+small refresh button. `CurrencyRateStore.refresh()` fetches at once without touching the pump, which
+re-measures age from `completedAt` whenever it wakes.
 The store hands `CalcEngine.evaluate` a finished `CurrencyRates` value — the engine never fetches,
 which is what keeps it Foundation-only and testable. `CalcMemo` keys its memo on the snapshot's
 `fetchedAt` and the region currency, so either changing re-evaluates without diffing every rate.

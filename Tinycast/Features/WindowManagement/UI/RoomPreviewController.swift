@@ -66,7 +66,8 @@ final class RoomPreviewController {
         panels = NSScreen.screens.map { screen in
             let frame = geometry.flip(screen.frame)
             let host = NSHostingView(
-                rootView: RoomPreviewView(model: model, origin: frame.origin, size: frame.size))
+                rootView: RoomPreviewView(model: model, origin: frame.origin, size: frame.size)
+                    .motionScope())
             // The controller owns the frame; without this the hosting view would size the window.
             host.sizingOptions = []
             let panel = RoomPreviewPanel()

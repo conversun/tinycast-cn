@@ -99,12 +99,23 @@ struct AppNameTest {
             "a Simplified Chinese Mac looks up the zh_CN Apple actually keys by",
             codes(["zh-Hans-CN"]).contains("zh_CN"))
         check(
-            "a script-bearing tag also reads the zh-Hans folder most apps ship, before its region",
+            "a script-bearing tag reads the zh-Hans folder, its own region, then the script's zh_CN",
             codes(["zh-Hans-US"])
                 == [
-                    "zh-Hans-US", "zh_Hans_US", "zh-Hans", "zh_Hans", "zh-US", "zh_US",
-                    "zh-CN", "zh_CN", "zh", "en"
+                    "zh-Hans-US", "zh_Hans_US", "zh-Hans", "zh_Hans", "zh-US", "zh_US", "zh-CN",
+                    "zh_CN", "zh", "en"
                 ])
+        check(
+            "Hong Kong Traditional Chinese reads zh_HK, then Taiwan's zh_TW, never zh_CN",
+            codes(["zh-Hant-HK"])
+                == [
+                    "zh-Hant-HK", "zh_Hant_HK", "zh-Hant", "zh_Hant", "zh-HK", "zh_HK", "zh-TW",
+                    "zh_TW", "zh", "en"
+                ])
+        check(
+            "a region written in the other script is skipped",
+            !codes(["zh-Hans-HK"]).contains("zh_HK") && codes(["zh-Hans-HK"]).contains("zh_CN")
+                && !codes(["zh-Hant-CN"]).contains("zh_CN") && codes(["zh-Hant-CN"]).contains("zh_TW"))
         check(
             "a script-only tag maximizes to reach the same key",
             codes(["zh-Hans"]).contains("zh_CN"))

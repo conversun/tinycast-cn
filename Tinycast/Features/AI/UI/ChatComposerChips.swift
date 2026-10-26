@@ -21,12 +21,11 @@ struct ComposerChip: View {
             .padding(.horizontal, metrics.spacing.sm)
             .padding(.vertical, metrics.spacing.xxs)
             .background(Capsule().fill(Theme.Colors.controlSurface))
-            .tooltip("Offers only \(label)'s tools", edge: .bottom)
+            .tooltip(String(localized: "Offers only \(label)'s tools"), edge: .bottom)
             .accessibilityLabel("Addressed to \(label)")
     }
 }
 
-/// The window composer's staged file: an image shows itself, a document its name, both an ✕.
 struct AttachmentChip: View {
     @Environment(\.metrics) private var metrics
     let attachment: ChatAttachment

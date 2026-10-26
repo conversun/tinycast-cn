@@ -32,6 +32,10 @@ no appcast: GitHub's release feed is the updater's feed.
   on the expanded copy before `replaceItemAt` runs, and the running app survives any failure untouched.
 - **Relaunching goes through `NSApp.terminate`, never `exit`.** That is what flushes a pending note
   draft and hands back the Hyper Key's HID-level caps remap, which outlives the process.
+  Relaunch schedules termination through the main run loop, outside any Swift task or dispatch
+  callback, so AppKit's nested termination loop can run the main-actor cleanup. The delegate returns
+  `terminateLater` and replies when cleanup finishes, preserving system logout and shutdown requests.
+  A reopen is scheduled once, only when termination is committed, and waits for the old process to exit.
 - **An automatic prompt defers to whatever the user is doing, and is never spent unshown.**
   `UpdateReadiness` withholds it while a snippet is expanding, an extension command is running, an
   uninstall is trashing, a shortcut is being recorded, a prompt or dialog is up, or the palette is
@@ -94,7 +98,8 @@ self-rescheduling pump, and one atomic JSON file.
 ~/Library/Caches/<bundle-id>/update-check.json
 ```
 
-It holds `lastCheckedAt`, the newest release seen, and the version the user dismissed. Freshness is
+It holds `lastCheckedAt`, the newest release seen, the version the user dismissed, and the version
+just installed. Freshness is
 measured from `lastCheckedAt`, so relaunching never re-asks GitHub; the interval is 24 h, dropping to
 2 h after a failed attempt, and the first check waits 30 s so it never lands in the login rush. The
 request carries a `User-Agent`, which the GitHub API rejects requests without.
@@ -122,6 +127,11 @@ One route, whatever the install came from:
 6. Offer Relaunch, which spawns a detached waiter that reopens the app once this process exits —
    `open` on a bundle id that is still running would only re-activate the instance on its way out.
 
+A successful install records its version as `installedVersion`. The first launch running that
+version takes it and shows an "Updated to Tinycast <version>" HUD, whether it came from Relaunch or a
+later quit and reopen. A launch of any other version only clears it, so a brew or DMG install never
+reports.
+
 Nothing here touches `~/Library/Preferences`, `~/Library/Caches` or `Application Support`, so no
 setting, clipboard entry, note or snippet is affected by an update, by `brew upgrade`, or by both.
 
@@ -129,7 +139,7 @@ setting, clipboard entry, note or snippet is affected by an update, by `brew upg
 
 `.github/workflows/release-cn.yml` publishes `Tinycast-CN-<version>.dmg` for manual/Homebrew installs
 and `Tinycast-CN-Universal-<version>.zip` for the updater, from the same signed Universal build.
-CI expands the ZIP and checks its signatures and both slices in the app and both helpers before
+CI expands the ZIP and checks its signatures and both slices in the app and all three helpers before
 publishing it or enabling Homebrew's `auto_updates`.
 The zip is made with
 

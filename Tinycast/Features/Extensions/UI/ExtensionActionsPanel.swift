@@ -39,7 +39,7 @@ private struct Metrics {
 struct ExtensionActionItem {
     let title: String
     let icon: ExtensionImage.Resolved
-    var shortcut: String?
+    var shortcutCaps: [String] = []
     var isDestructive = false
     var startsSection = false
 }
@@ -77,7 +77,7 @@ struct ExtensionActionsPanel: View {
                 .frame(height: hairline)
                 .accessibilityHidden(true)
             ExtensionMenuSearchField(
-                placeholder: "Search for actions…".localizedUI, height: panel.rowHeight,
+                placeholder: String(localized: "Search for actions…"), height: panel.rowHeight,
                 verticalOffset: -metrics.spacing.xxs / 2)
         }
         // The panel holds focus while open, so the screen's own shortcut keys never see these.
@@ -208,11 +208,9 @@ private struct ExtensionActionRow: View {
                     .foregroundStyle(item.isDestructive ? Color.red : Color.primary)
                     .lineLimit(1)
                 Spacer(minLength: metrics.spacing.sm)
-                if let shortcut = item.shortcut {
-                    HStack(spacing: metrics.spacing.xxs) {
-                        ForEach(Array(shortcut.enumerated()), id: \.offset) { _, glyph in
-                            KeyCapChip(text: String(glyph), style: .outline)
-                        }
+                HStack(spacing: metrics.spacing.xxs) {
+                    ForEach(Array(item.shortcutCaps.enumerated()), id: \.offset) { _, cap in
+                        KeyCapChip(text: cap, style: .outline)
                     }
                 }
             }

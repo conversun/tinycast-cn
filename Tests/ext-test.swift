@@ -442,7 +442,6 @@ struct ExtensionTests {
             picked?["bundleId"] as? String == "com.apple.Terminal", String(describing: picked))
         check("an unset app picker is absent", prefs["browser"]?.runtimeValue(nil) == nil)
 
-        // A manifest with no commands isn't an extension Tinycast can run.
         check("rejects a manifest with no commands", ExtensionManifest(json: ["name": "x"]) == nil)
         check(
             "rejects a Windows-only manifest",
@@ -1129,7 +1128,6 @@ struct ExtensionTests {
             return
         }
 
-        // A synthetic command exercising React state, the node shims, timers and host calls.
         let command = """
             "use strict";
             const { List, ActionPanel, Action, Icon, showToast, Toast } = require("@raycast/api");
@@ -1286,7 +1284,6 @@ struct ExtensionTests {
                 == "function,false,undefined,red,n=2,true,function",
             String(describing: screen.items.first?.node.array("accessories").last))
 
-        // Dispatch the row's action and confirm the re-render.
         let actions = ExtensionScreen.actions(in: screen.actionPanel(forItemAt: 0))
         check("action is dispatchable", actions.first?.handler != nil)
         if let handler = actions.first?.handler {
@@ -1391,7 +1388,6 @@ struct ExtensionTests {
         await runtime.stop(session: "s1b")
         runtime.setDelegate(recorder)
 
-        // A no-view command runs headless and reports completion.
         let (headless, headlessHost, headlessRecorder) = makeRuntime()
         try? await headless.boot(
             config: .current(supportDirectory: FileManager.default.temporaryDirectory))
@@ -1574,7 +1570,10 @@ struct ExtensionTests {
                 () => "none", (error) => error.code), "EEXIST");
               fs.mkdirSync(listing + "/folder", { recursive: true });
               fs.utimesSync(listing, new Date(1000000), new Date(2000005));
-              assert.equal(fs.statSync(listing).mtime.getTime(), 2000005);
+              const stamped = fs.statSync(listing);
+              assert.equal(stamped.atime.getTime(), 1000000);
+              assert.equal(stamped.mtime.getTime(), 2000005);
+              assert.equal(stamped.mode & 0o170000, 0o040000);
               await call("utimes", listing, 3000, 4000.25);
               assert.equal(fs.statSync(listing).mtime.getTime(), 4000250);
               await fs.promises.utimes(listing, "5000", "6000.125");

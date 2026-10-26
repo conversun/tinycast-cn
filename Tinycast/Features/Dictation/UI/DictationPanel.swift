@@ -74,7 +74,7 @@ private struct DictationPanelView: View {
     }
 }
 
-private final class DictationPanel: NSPanel {
+private final class DictationPanel: NSPanel, AnimatedPanel {
     var onAccept: (() -> Void)?
     var onCancel: (() -> Void)?
 
@@ -90,7 +90,7 @@ private final class DictationPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
-        animationBehavior = .none
+        followMotion()
     }
 
     override var canBecomeKey: Bool { true }
@@ -119,7 +119,9 @@ final class DictationPanelController {
         let screen = NSScreen.main ?? NSScreen.screens.first
         guard let frame = screen?.visibleFrame else { return }
         let panel =
-            panel ?? DictationPanel(content: NSHostingView(rootView: DictationPanelView(state: state)))
+            panel
+            ?? DictationPanel(
+                content: NSHostingView(rootView: DictationPanelView(state: state).motionScope()))
         panel.onAccept = onAccept
         panel.onCancel = onCancel
         self.panel = panel

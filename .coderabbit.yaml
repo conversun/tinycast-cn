@@ -4,11 +4,11 @@
 language: en-US
 
 tone_instructions: >-
-  Senior Swift and macOS engineer. Direct and terse. Name the problem, the fix and why it matters.
-  No praise, no recaps, no formatting nits.
+  Senior Swift and macOS engineer. Direct and terse. Raise only issues that would block a merge.
+  Name the problem, the fix and why it matters. No praise, no recaps, no nits.
 
 reviews:
-  profile: assertive
+  profile: quiet
 
   high_level_summary: false
   changed_files_summary: false
@@ -46,8 +46,15 @@ reviews:
         and CI; state any SDK or compiler requirement with a suggested replacement.
         Use direct availability checks where macOS 27+ APIs require them to preserve macOS 26 support.
 
-        Comment only when the change makes the code wrong, slower, harder to change, or older than
-        it needs to be. A few strong findings beat many weak ones. Always give the concrete fix.
+        Report only issues that would block a merge:
+        - a bug, regression, crash or trap;
+        - data loss, corruption or inconsistent persisted state;
+        - a security or privacy hole, or a secret or PII in a log;
+        - a data race, a deadlock, or a task or observer with no owner or teardown;
+        - blocking IO on the main actor, a leak, or a clear memory or speed regression;
+        - a deprecated API, or a break of an AGENTS.md non-negotiable.
+        The lists below say where to look, not what to report: skip a style, naming or smell finding
+        unless it causes one of the issues above. No finding beats a weak one. Always give the fix.
 
         Review the changed Swift code and affected call sites directly for bugs, regressions,
         code smells and better modern implementations. Check bounds, optional handling, state

@@ -121,9 +121,9 @@ enum ClipboardDefaultAction: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .paste: return "Paste"
-        case .copy: return "Copy to Clipboard"
-        case .pastePlainText: return "Paste as Plain Text"
+        case .paste: return String(localized: "Paste")
+        case .copy: return String(localized: "Copy to Clipboard")
+        case .pastePlainText: return String(localized: "Paste as Plain Text")
         }
     }
 
@@ -167,10 +167,11 @@ enum ClipboardChord: CaseIterable, Sendable {
     }
 }
 
-/// SQLite-backed clipboard history. See docs/features/clipboard.md#store.
 @MainActor
 @Observable
 final class ClipboardStore {
+    enum UpdateError: Error { case tooLong, writeFailed }
+
     /// Newest-first with pins in place, every pin resident. docs/features/clipboard.md
     private(set) var items: [ClipboardItem] = [] {
         didSet {
@@ -205,6 +206,8 @@ final class ClipboardStore {
     /// Same memo for the empty query, so the pinned split runs once per mutation.
     @ObservationIgnored private var orderedCache: [ClipboardItem]?
 
+    /// Longest text history holds; a longer copy is skipped, since truncation would lose the tail.
+    nonisolated static let maxTextLength = 32_000
     nonisolated private static let memoryWindow = 1000
     /// The most unpinned rows any one query answers with, ordinary and OCR-only alike.
     nonisolated private static let searchLimit = 200
@@ -336,11 +339,11 @@ final class ClipboardStore {
         sqlite3_reset(stmt)
         sqlite3_clear_bindings(stmt)
         items = loaded
+        ImageDerivative.removeOrphans(in: imagesDir)
         // Age passes while the app isn't running; insert-time pruning alone can't catch that.
         enforceLimits()
     }
 
-    /// Called on load and when the retention setting changes.
     func enforceLimits() {
         prune()
     }
@@ -369,8 +372,8 @@ final class ClipboardStore {
             let item = ClipboardItem(filePath: path, sourceBundleID: sourceBundleID)
             if let stmt = insertStmt { Self.bindAndInsert(stmt, item) }
             items.insert(item, at: 0)
+            trimWindow()
         }
-        trimWindow()
         prune()
     }
 
@@ -394,7 +397,6 @@ final class ClipboardStore {
         return inserted
     }
 
-    /// Move an item to the top; pasting or copying it from the palette re-recencies it.
     func promote(_ item: ClipboardItem) {
         // A pinned row holds its place, so re-recencying it would rewrite for no change.
         guard !item.isPinned, items.first?.id != item.id else { return }
@@ -403,6 +405,32 @@ final class ClipboardStore {
 
     func togglePinned(_ item: ClipboardItem) {
         if item.isPinned { unpin(item) } else { pin(item) }
+    }
+
+    func updateText(_ text: String, of item: ClipboardItem) throws(UpdateError) -> ClipboardItem? {
+        guard item.kind == .text else { return nil }
+        guard text.count <= Self.maxTextLength else { throw .tooLong }
+        guard let stmt = prepare("UPDATE items SET text = ?1 WHERE id = ?2") else {
+            throw .writeFailed
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, text, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 2, item.id.uuidString, -1, SQLITE_TRANSIENT)
+        guard sqlite3_step(stmt) == SQLITE_DONE else { throw .writeFailed }
+        guard sqlite3_changes(db) > 0 else { return nil }
+        let index = items.firstIndex { $0.id == item.id }
+        let current = index.map { items[$0] } ?? item
+        let edited = ClipboardItem(
+            id: current.id, kind: .text, text: text, imagePath: nil, createdAt: current.createdAt,
+            sourceBundleID: current.sourceBundleID, pinnedAt: current.pinnedAt)
+        if let index {
+            items[index] = edited
+        } else {
+            // An FTS hit past the memory window: only the memo still holds the old text.
+            invalidateSearch()
+            searchRevision += 1
+        }
+        return edited
     }
 
     func remove(_ item: ClipboardItem) {
@@ -432,7 +460,7 @@ final class ClipboardStore {
             sqlite3_finalize(stmt)
             if !orphaned.isEmpty {
                 Task.detached(priority: .utility) {
-                    for path in orphaned { try? FileManager.default.removeItem(atPath: path) }
+                    for path in orphaned { Self.removeBlob(atPath: path) }
                 }
             }
         }
@@ -525,6 +553,11 @@ final class ClipboardStore {
         invalidateSearch(preservingMatches: true)
         searchRevision += 1
         return true
+    }
+
+    /// Only an owned blob is immutable and ours, so only it may grow downscaled copies.
+    func ownsImage(of item: ClipboardItem) -> Bool {
+        item.imagePath.map(owns) ?? false
     }
 
     func imageURL(for item: ClipboardItem) -> URL? {
@@ -869,9 +902,7 @@ final class ClipboardStore {
             // A retention cut can strand hundreds of files, so delete them off the main actor.
             if !staleOwnedPaths.isEmpty {
                 Task.detached(priority: .utility) {
-                    for path in staleOwnedPaths {
-                        try? FileManager.default.removeItem(atPath: path)
-                    }
+                    for path in staleOwnedPaths { Self.removeBlob(atPath: path) }
                 }
             }
         }
@@ -883,7 +914,13 @@ final class ClipboardStore {
 
     private func deleteBlob(_ item: ClipboardItem) {
         guard let path = item.imagePath, owns(path) else { return }
-        try? FileManager.default.removeItem(atPath: path)
+        Self.removeBlob(atPath: path)
+    }
+
+    nonisolated private static func removeBlob(atPath path: String) {
+        let url = URL(fileURLWithPath: path)
+        try? FileManager.default.removeItem(at: url)
+        ImageDerivative.removeCopies(of: url)
     }
 
     private func openDatabase() -> Bool {
@@ -951,8 +988,7 @@ final class ClipboardStore {
         db = nil
     }
 
-    /// Streams an import into the file off-main; a staged blob moves into `imagesDirectory`,
-    /// which is what makes `owns` true and lets retention reclaim it later.
+    /// A staged blob moves into `imagesDirectory`, making `owns` true so retention reclaims it.
     nonisolated static func importStoredItems(
         inDatabaseAt url: URL, adoptingImagesInto imagesDirectory: URL? = nil,
         _ items: some Sequence<ClipboardItem>
@@ -1000,8 +1036,7 @@ final class ClipboardStore {
         return hasher.finalize()
     }
 
-    /// Keeps the staged blob's name, so importing one backup twice lands on the same path — and
-    /// the row dedupes on it rather than minting a second copy of every image.
+    /// Keeps the staged name, so a backup imported twice dedupes rather than copying every image.
     nonisolated private static func adoptionTarget(
         _ item: ClipboardItem, in directory: URL?
     ) -> ClipboardItem {

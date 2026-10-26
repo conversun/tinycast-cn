@@ -1,22 +1,4 @@
-import QuartzCore
 import SwiftUI
-
-/// Restated here so launcher motion can change without moving an extension surface.
-@MainActor private enum ExtensionMenuMotion {
-    private static let entryScale: CGFloat = 0.94
-    private static let exitScaleDelta: CGFloat = 0.04
-
-    static let panel = MenuPanelMotion(
-        entryScale: entryScale,
-        maximumScale: 1.003,
-        exitScaleDelta: exitScaleDelta,
-        expansionDuration: 0.10,
-        settleDuration: 0.05,
-        exitDuration: 0.18,
-        expansionTiming: CAMediaTimingFunction(controlPoints: 0.2, 0.7, 0.2, 1),
-        settleTiming: CAMediaTimingFunction(controlPoints: 0.42, 0, 0.58, 1),
-        exitTiming: CAMediaTimingFunction(controlPoints: 0.4, 0, 1, 1))
-}
 
 /// `ExtensionScreen` decides the row order; this maps `selection` 1:1 onto visible rows.
 struct ExtensionCommandScreen: PaletteScreen {
@@ -71,7 +53,6 @@ struct ExtensionCommandScreen: PaletteScreen {
         }
     }
 
-    /// The primary action is the panel's first `Action`.
     private func primaryAction(at selection: Int) -> ExtensionAction? {
         ExtensionScreen.actions(in: screen.actionPanel(forItemAt: selection)).first
     }
@@ -79,7 +60,7 @@ struct ExtensionCommandScreen: PaletteScreen {
     /// A submenu reached first is a grouping device, so its title stands in for the leaf's.
     var primaryActionTitle: String {
         let primary = primaryAction(at: vm.selection)
-        return primary?.enclosingSubmenuTitle ?? primary?.title ?? "Run"
+        return primary?.enclosingSubmenuTitle ?? primary?.title ?? String(localized: "Run")
     }
 
     func hasPrimaryAction(at selection: Int) -> Bool { primaryAction(at: selection) != nil }
@@ -145,8 +126,7 @@ struct ExtensionCommandScreen: PaletteScreen {
                     topTrailingRadius: metrics.radius.menuPanel,
                     style: .continuous
                 ).path(in: bounds).cgPath
-            },
-            motion: ExtensionMenuMotion.panel)
+            })
     }
 
     func activate(at selection: Int) {
@@ -206,7 +186,7 @@ struct ExtensionCommandScreen: PaletteScreen {
                         items: items, selection: menuSelection.wrappedValue,
                         chosen: chosen, assetsPath: assetsPath,
                         width: ExtensionSearchAccessoryButton.listWidth,
-                        searchPlaceholder: "Search…".localizedUI, onSelect: onActivate,
+                        searchPlaceholder: String(localized: "Search…"), onSelect: onActivate,
                         onHighlight: { menuSelection.wrappedValue = $0 }))
             },
             activate: { index in
@@ -215,8 +195,7 @@ struct ExtensionCommandScreen: PaletteScreen {
             clipPath: { bounds, metrics, _ in
                 RoundedRectangle(cornerRadius: metrics.radius.menuPanel, style: .continuous)
                     .path(in: bounds).cgPath
-            },
-            motion: ExtensionMenuMotion.panel)
+            })
     }
 
     func body(selection: Int, scroll: ScrollIntent) -> AnyView {

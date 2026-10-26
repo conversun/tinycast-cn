@@ -2,7 +2,7 @@ import SwiftUI
 
 private enum TooltipLabel {
     case text(String)
-    case keyCap(String)
+    case keyCaps([String])
 }
 
 /// A hover label in Tinycast's own vocabulary, replacing a system `.help()` tooltip.
@@ -63,13 +63,15 @@ private struct TooltipModifier: ViewModifier {
     @ViewBuilder private func chip(_ label: TooltipLabel) -> some View {
         switch label {
         case .text(let text):
-            Text(text.localizedUI)
+            Text(text)
                 .font(metrics.typography.keyCap)
                 .foregroundStyle(Theme.Colors.textSecondary)
                 .padding(.horizontal, metrics.spacing.xs)
                 .frame(minHeight: metrics.size.keyCap)
-        case .keyCap(let cap):
-            KeyCapChip(text: cap, style: .outline)
+        case .keyCaps(let caps):
+            HStack(spacing: metrics.spacing.xxs) {
+                ForEach(caps, id: \.self) { KeyCapChip(text: $0, style: .outline) }
+            }
         }
     }
 }
@@ -86,8 +88,9 @@ extension View {
                 dismissOnPress: dismissOnPress))
     }
 
-    func tooltip(keyCap: String?) -> some View {
+    func tooltip(keyCaps: [String]) -> some View {
         modifier(
-            TooltipModifier(label: keyCap.map(TooltipLabel.keyCap), alignment: .center, edge: .top))
+            TooltipModifier(
+                label: keyCaps.isEmpty ? nil : .keyCaps(keyCaps), alignment: .center, edge: .top))
     }
 }

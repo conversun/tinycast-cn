@@ -89,7 +89,7 @@ struct NotesRepository: Sendable {
         }
     }
 
-    func create(title: String = String(localized: "Untitled")) throws(Failure) -> NoteDocument {
+    func create(title: String = "Untitled") throws(Failure) -> NoteDocument {
         try mappedError(at: notesDirectory) {
             let url = try claimUniqueURL(base: try validatedTitle(title)) {
                 try writeNewFileAtomically(Data(), to: $0)

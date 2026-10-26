@@ -1,6 +1,5 @@
 import Foundation
 
-/// Fetches a release archive, proves it is ours, and swaps it in. docs/features/updates.md
 struct UpdateInstaller: Sendable {
     enum Phase: Sendable, Equatable {
         case downloading(received: Int64, expected: Int64)
@@ -93,7 +92,7 @@ struct UpdateInstaller: Sendable {
         let found = info?["CFBundleShortVersionString"] as? String
         guard found == release.version.description else {
             throw UpdateFailure.versionMismatch(
-                expected: release.version.description, found: found ?? "unknown")
+                expected: release.version.description, found: found ?? String(localized: "unknown"))
         }
         guard BundleSignature.isTrusted(staged) else { throw UpdateFailure.identityMismatch }
     }

@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 
 /// A camera surface's panel; keys go through `sendEvent`, so ↵ and Esc need no focused subview.
-final class CameraPanel: NSPanel {
+final class CameraPanel: NSPanel, AnimatedPanel {
     enum Action {
         case primary
         case cancel
@@ -28,8 +28,7 @@ final class CameraPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        // Suppresses AppKit's own window animation; `fadeIn`/`fadeOut` replace it.
-        animationBehavior = .none
+        followMotion()
         isReleasedWhenClosed = false
         isRestorable = false
         contentView = content

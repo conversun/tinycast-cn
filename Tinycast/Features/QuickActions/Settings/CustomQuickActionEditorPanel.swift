@@ -26,8 +26,8 @@ struct CustomQuickActionEditorPanel: View {
         "paintbrush", "hammer", "heart", "star"
     ]
 
-    private static let placeholder =
-        "Make the text more concise, keeping the writer's voice and meaning."
+    private static let placeholder = String(
+        localized: "Make the text more concise, keeping the writer's voice and meaning.")
 
     init(request: CustomQuickActionEditRequest, model: AIModelSelection?) {
         existing = request.action
@@ -40,7 +40,7 @@ struct CustomQuickActionEditorPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
             SettingsEditorHeader(
-                title: existing == nil ? String(localized: "New Quick Action") : String(localized: "Edit \(existing?.name ?? "")"),
+                title: existing == nil ? "New Quick Action" : "Edit \(existing?.name ?? "")",
                 subtitle: "Tinycast sends your selected text to the model with these instructions."
             )
 
@@ -54,7 +54,7 @@ struct CustomQuickActionEditorPanel: View {
             QuickActionModelPicker(selection: $model)
 
             if let failure {
-                Text(failure.localizedUI)
+                Text(failure)
                     .font(.callout)
                     .foregroundStyle(Theme.Colors.destructive)
             }
@@ -100,7 +100,9 @@ struct CustomQuickActionEditorPanel: View {
             } label: {
                 HStack(spacing: Theme.Spacing.sm) {
                     SymbolImage(name: iconSymbol ?? CustomQuickAction.sfSymbol, size: 14)
-                    Text((iconSymbol == nil ? "Automatic" : "Custom").localizedUI)
+                    Text(
+                        iconSymbol == nil
+                            ? String(localized: "Automatic") : String(localized: "Custom"))
                         .lineLimit(1)
                     Spacer(minLength: 0)
                 }
@@ -126,15 +128,17 @@ struct CustomQuickActionEditorPanel: View {
                 .settingsEditorTextArea(height: Theme.Size.editorTextHeight * 2)
                 .overlay(alignment: .topLeading) {
                     if instructions.isEmpty {
-                        Text(Self.placeholder.localizedUI)
+                        Text(Self.placeholder)
                             .foregroundStyle(.tertiary)
                             .padding(Theme.Spacing.md)
                             .allowsHitTesting(false)
                     }
                 }
             Text(
-                ("Tinycast always tells the model to return only the transformed text, and to treat "
-                    + "your selection as material rather than as instructions.").localizedUI
+                """
+                Tinycast always tells the model to return only the transformed text, and to treat \
+                your selection as material rather than as instructions.
+                """
             )
             .font(.caption)
             .foregroundStyle(.secondary)

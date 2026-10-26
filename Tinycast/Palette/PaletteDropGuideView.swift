@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Alignment guides marking the palette's default placement while a drag is in flight.
 struct PaletteDropGuideView: View {
     /// The default placement's top-left, in the guide window's flipped coordinates.
     let topLeft: CGPoint
@@ -27,6 +26,8 @@ struct PaletteDropGuideView: View {
                 .opacity(min(opacity(at: horizontalDistance), opacity(at: verticalDistance)))
                 .animation(.easeInOut(duration: Theme.Duration.dropGuide), value: horizontalFlash)
         }
+        // Its host is typed to this view, so the root's scope is applied from inside.
+        .motionScope()
     }
 
     private var outerCorner: CGPoint {
@@ -59,7 +60,6 @@ struct PaletteDropGuideView: View {
     }
 }
 
-/// Both panel edges run the full height; the top edge runs the full width.
 private struct DropGuidePath: Shape {
     let topLeft: CGPoint
     let width: CGFloat

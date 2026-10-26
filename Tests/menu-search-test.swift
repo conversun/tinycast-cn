@@ -423,8 +423,8 @@ struct MenuSearchTests {
             "a control scalar renders as its keycap glyph, never as a blank chip")
         expect(
             MenuSearchShortcut.commandEquivalent(character: "\u{1B}", modifiers: 0b011)?
-                .displayString == "⌥⇧⌘⎋",
-            "Escape renders as ⎋ rather than an unrenderable control scalar")
+                .displayString == "⌥⇧⌘esc",
+            "Escape renders as esc rather than an unrenderable control scalar")
         expect(
             MenuSearchShortcut(
                 character: "x", hasCommand: true, hasShift: true, hasOption: true,

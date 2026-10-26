@@ -49,7 +49,7 @@ struct SettingsSectionHeader<Label: View>: View {
 extension SettingsSectionHeader where Label == Text {
     /// The title comes from the anchor, so a section's name and its search breadcrumb are one string.
     init(_ anchor: SettingsAnchor) {
-        self.init(anchor: anchor) { Text(anchor.title.localizedUI) }
+        self.init(anchor: anchor) { Text(anchor.title) }
     }
 }
 
@@ -59,14 +59,17 @@ struct SettingsRowTitle: View {
     let anchor: SettingsAnchor
     let title: String
 
-    init(_ anchor: SettingsAnchor, _ title: String) {
+    init(_ anchor: SettingsAnchor, _ title: LocalizedStringResource) {
+        self.init(anchor, verbatim: title.resolved())
+    }
+
+    init(_ anchor: SettingsAnchor, verbatim title: String) {
         self.anchor = anchor
         self.title = title
     }
 
     var body: some View {
-        // The pill keys off the untranslated title, which is what the catalog indexes.
-        Text(title.localizedUI).modifier(SearchPill(target: .row(anchor, title)))
+        Text(title).modifier(SearchPill(target: .row(anchor, title)))
     }
 }
 

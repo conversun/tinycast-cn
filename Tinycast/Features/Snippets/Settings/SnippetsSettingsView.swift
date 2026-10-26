@@ -74,7 +74,9 @@ struct SnippetsSettingsView: View {
 
             LabeledContent {
                 if settings.snippetsFolder != nil {
-                    Button("Use Default", action: coordinator.resetSnippetsFolder)
+                    Button(
+                        String(localized: "snippets-use-default-folder", defaultValue: "Use Default"),
+                        action: coordinator.resetSnippetsFolder)
                 }
                 Button("Choose…", action: coordinator.chooseSnippetsFolder)
                 Button("Open Folder", action: coordinator.revealSnippetsInFinder)
@@ -93,13 +95,13 @@ struct SnippetsSettingsView: View {
         if case .failed(let message) = snippetsStore.state {
             noticeSection(
                 String(localized: "Couldn’t load the snippet library"), message, tint: .orange,
-                retryHint: "Tries to load the snippet library again.")
+                retryHint: String(localized: "Tries to load the snippet library again."))
         }
 
         if !snippetsStore.issues.isEmpty {
             noticeSection(
                 snippetIssueTitle, snippetIssueMessage, tint: .orange,
-                retryHint: "Reloads snippet files after you fix them on disk.")
+                retryHint: String(localized: "Reloads snippet files after you fix them on disk."))
         }
 
         if let operationError = snippetsStore.operationError {
@@ -134,20 +136,17 @@ struct SnippetsSettingsView: View {
     }
 
     private var snippetIssueTitle: String {
-        let count = snippetsStore.issues.count
-        return count == 1
-            ? String(localized: "1 snippet file couldn’t be loaded")
-            : String(localized: "\(count) snippet files couldn’t be loaded")
+        String(localized: "\(snippetsStore.issues.count) snippet files couldn’t be loaded")
     }
 
     private var snippetIssueMessage: String {
         let first = snippetsStore.issues[0]
-        let filename = first.fileURL.lastPathComponent
         if snippetsStore.issues.count == 1 {
-            return String(localized: "\(filename): \(first.message)")
+            return "\(first.fileURL.lastPathComponent): \(first.message)"
         }
+        let remaining = snippetsStore.issues.count - 1
         return String(
-            localized: "\(filename): \(first.message) Plus \(snippetsStore.issues.count - 1) more.")
+            localized: "\(first.fileURL.lastPathComponent): \(first.message) Plus \(remaining) more.")
     }
 }
 

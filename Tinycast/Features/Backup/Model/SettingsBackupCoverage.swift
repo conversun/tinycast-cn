@@ -2,7 +2,6 @@ import Foundation
 
 /// What `SettingsBackup.SettingsData` carries, written out so a new setting has to be considered.
 enum SettingsBackupCoverage {
-    /// Each `SettingsData` field paired with the `AppSettings` key it mirrors.
     static let mirrored: [String: AppSettingsKey] = [
         "clipboardEnabled": .clipboardEnabled,
         "clipboardRetentionDays": .clipboardRetention,
@@ -19,18 +18,22 @@ enum SettingsBackupCoverage {
         "popToRootSeconds": .popToRootTimeout,
         "escapeKeyBehavior": .escapeKeyBehavior,
         "appearance": .appearance,
+        "language": .language,
         "calcNumberStyle": .calcNumberStyle,
         "interfaceSize": .interfaceSize,
         "compactMode": .compactMode,
-        "showFavoritesInCompactMode": .showFavoritesInCompactMode,
+        "compactBarCommands": .compactBarCommands,
         "searchScopes": .searchScopes,
         "launcherShowsSuggestions": .launcherShowsSuggestions,
         "rootSearchSensitivity": .rootSearchSensitivity,
         "openOnCursorScreen": .openOnCursorScreen,
         "paletteDraggable": .paletteDraggable,
+        "animationsEnabled": .animationsEnabled,
         "fileSearchEnabled": .fileSearchEnabled,
         "fileSearchScopes": .fileSearchScopes,
         "fileSearchIgnorePatterns": .fileSearchIgnorePatterns,
+        "fileSearchRemovedDefaultPatterns": .fileSearchRemovedDefaultPatterns,
+        "fileSearchShowInLauncher": .fileSearchShowInLauncher,
         "notesEnabled": .notesEnabled,
         "notesRendersMarkdown": .notesRendersMarkdown,
         "notesShowsFormattingBar": .notesShowsFormattingBar,
@@ -85,6 +88,10 @@ enum SettingsBackupCoverage {
             "An import must not change where dictated text is sent.",
         AppSettingsKey.dictationAdaptsCapitalization.rawValue:
             "Dictation preferences stay local until backup supports them.",
+        AppSettingsKey.dictationLiveInsertion.rawValue:
+            "Dictation preferences stay local until backup supports them.",
+        AppSettingsKey.dictationPlaysSounds.rawValue:
+            "Dictation preferences stay local until backup supports them.",
         AppSettingsKey.dictationIdleRelease.rawValue:
             "Dictation memory use stays a device-local preference.",
         AppSettingsKey.clipboardTextSearchEnabled.rawValue:
@@ -124,6 +131,8 @@ enum SettingsBackupCoverage {
             "The default model names an external AI destination; importing must not choose one.",
         AppSettingsKey.aiWebSearch.rawValue:
             "Whether prompts may reach a search engine is a choice each Mac makes for itself.",
+        AppSettingsKey.aiChoices.rawValue:
+            "Changes the instructions every turn carries, and no other AI setting travels.",
         AppSettingsKey.aiSystemPrompt.rawValue:
             "Standing instructions to a model are the one AI setting that changes every answer; an "
             + "import must not carry them onto another Mac unseen.",

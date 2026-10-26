@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 
 /// One dialog's panel; keys go through `sendEvent`, so Esc/↵ need no focused subview.
-final class DialogPanel: NSPanel {
+final class DialogPanel: NSPanel, AnimatedPanel {
     /// What the panel saw, not what it means: how far a step moves is the caller's business.
     enum Key {
         case cancel
@@ -14,6 +14,7 @@ final class DialogPanel: NSPanel {
     var onKey: ((Key) -> Void)?
     /// Arrows are a control's keys, not the panel's; a text field needs them for its caret.
     var handlesArrowKeys = false
+    var acceptsLineBreaks = false
 
     init(content: NSView, cornerRadius: CGFloat) {
         super.init(
@@ -31,8 +32,7 @@ final class DialogPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        // Suppresses AppKit's own window animation; `fadeIn`/`fadeOut` replace it.
-        animationBehavior = .none
+        followMotion()
         isReleasedWhenClosed = false
         content.wantsLayer = true
         content.layer?.cornerRadius = cornerRadius
@@ -49,6 +49,8 @@ final class DialogPanel: NSPanel {
         switch Int(event.keyCode) {
         case kVK_Escape:
             onKey(.cancel)
+        case kVK_Return where returnBelongsToText(event):
+            super.sendEvent(event)
         case kVK_Return, kVK_ANSI_KeypadEnter:
             onKey(.confirm)
         case kVK_LeftArrow where handlesArrowKeys,
@@ -62,6 +64,12 @@ final class DialogPanel: NSPanel {
         }
     }
 
+    /// An input method commits its marked text on ↵, so that press is never a confirm.
+    private func returnBelongsToText(_ event: NSEvent) -> Bool {
+        if (firstResponder as? NSTextView)?.hasMarkedText() == true { return true }
+        return acceptsLineBreaks && !event.modifierFlags.contains(.command)
+    }
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
@@ -72,8 +80,9 @@ final class DialogPanel: NSPanel {
         makeFirstResponder(field)
     }
 
-    private static func firstTextField(in view: NSView) -> NSTextField? {
+    private static func firstTextField(in view: NSView) -> NSView? {
         if let field = view as? NSTextField, field.isEditable { return field }
+        if let text = view as? NSTextView, text.isEditable { return text }
         return view.subviews.lazy.compactMap(firstTextField(in:)).first
     }
 }

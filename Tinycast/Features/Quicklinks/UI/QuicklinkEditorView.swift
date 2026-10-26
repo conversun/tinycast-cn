@@ -19,16 +19,18 @@ struct QuicklinkEditorView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: metrics.spacing.xxl) {
-                FormRow(String(localized: "Link"), alignment: .top) { linkEditor }
-                FormRow(String(localized: "Name & Icon")) { nameField }
-                FormRow(String(localized: "Open With")) { applicationMenu }
-                FormRow("") {
+                FormRow("Link", alignment: .top) { linkEditor }
+                FormRow("Name & Icon") { nameField }
+                FormRow("Open With") { applicationMenu }
+                FormRow {
                     VStack(alignment: .leading, spacing: metrics.spacing.lg) {
                         option(
-                            "Show in root search", detail: "List this quicklink alongside apps and commands.",
+                            String(localized: "Show in root search"),
+                            detail: String(localized: "List this quicklink alongside apps and commands."),
                             value: $editor.showsInRootSearch, focus: .rootSearch)
                         option(
-                            "Pin to top", detail: "Keep it above the other quicklinks.",
+                            String(localized: "Pin to top"),
+                            detail: String(localized: "Keep it above the other quicklinks."),
                             value: $editor.isPinned, focus: .pin)
                         if let errorMessage = editor.errorMessage {
                             Text(errorMessage)
@@ -72,10 +74,11 @@ struct QuicklinkEditorView: View {
             VStack(spacing: metrics.spacing.xs) {
                 FormTextArea(
                     text: $editor.link, selection: $editor.selection, focused: focusBinding(.link),
-                    minimumHeight: metrics.size.headerHeight * 2 + metrics.spacing.xl
+                    minimumHeight: metrics.size.textAreaUnit * 2 + metrics.spacing.xl
                         - metrics.spacing.md * 2 - metrics.spacing.xs
                         - metrics.typography.textNSFont(.body).boundingRectForFont.height,
-                    label: String(localized: "Quicklink link"), allowsLineBreaks: false, moveFocus: editor.advanceFocus
+                    label: String(localized: "Quicklink link"), allowsLineBreaks: false,
+                    moveFocus: editor.advanceFocus
                 )
                 HStack {
                     Spacer()
@@ -117,14 +120,14 @@ struct QuicklinkEditorView: View {
     private var insertMenu: some View {
         Button("Insert…") {
             let items = [
-                placeholder("Argument", "{argument}"),
-                placeholder("Named Argument", "{argument name=\"Query\"}"),
-                placeholder("Clipboard", "{clipboard}", startsSection: true),
-                placeholder("Selected Text", "{selection}"),
-                placeholder("Date", "{date}", startsSection: true),
-                placeholder("Time", "{time}"),
-                placeholder("Date & Time", "{datetime}"),
-                placeholder("Custom Date Format", "{date format=\"yyyy-MM-dd\"}"),
+                placeholder(String(localized: "Argument"), "{argument}"),
+                placeholder(String(localized: "Named Argument"), "{argument name=\"Query\"}"),
+                placeholder(String(localized: "Clipboard"), "{clipboard}", startsSection: true),
+                placeholder(String(localized: "Selected Text"), "{selection}"),
+                placeholder(String(localized: "Date"), "{date}", startsSection: true),
+                placeholder(String(localized: "Time"), "{time}"),
+                placeholder(String(localized: "Date & Time"), "{datetime}"),
+                placeholder(String(localized: "Custom Date Format"), "{date format=\"yyyy-MM-dd\"}"),
                 placeholder("UUID", "{uuid}", startsSection: true)
             ]
             openInputMenu(PopoverMenuContent(items: items), .belowControl(insertMenuFrame), 0)
@@ -136,7 +139,10 @@ struct QuicklinkEditorView: View {
         } action: {
             insertMenuFrame = $0
         }
-        .tooltip("Insert a dynamic placeholder", alignment: .trailing, dismissOnPress: true)
+        .tooltip(
+            String(localized: "Insert a dynamic placeholder"), alignment: .trailing,
+            dismissOnPress: true
+        )
         .accessibilityLabel("Insert a placeholder")
     }
 
@@ -154,7 +160,8 @@ struct QuicklinkEditorView: View {
     private var nameField: some View {
         HStack(spacing: 0) {
             FormTextInput(
-                text: $editor.name, focused: focusBinding(.name), placeholder: String(localized: "Search GitHub"),
+                text: $editor.name, focused: focusBinding(.name),
+                placeholder: String(localized: "Search GitHub"),
                 label: String(localized: "Quicklink name"), moveFocus: editor.advanceFocus
             )
             Rectangle()
@@ -198,7 +205,7 @@ struct QuicklinkEditorView: View {
         } action: {
             iconMenuFrame = $0
         }
-        .tooltip("Choose an icon", alignment: .trailing, dismissOnPress: true)
+        .tooltip(String(localized: "Choose an icon"), alignment: .trailing, dismissOnPress: true)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Quicklink icon")
         .accessibilityAddTraits(.isButton)
@@ -208,7 +215,7 @@ struct QuicklinkEditorView: View {
     private func showIconMenu() {
         let items =
             [
-                PopoverMenuItem(title: "Automatic", systemImage: Quicklink.sfSymbol) {
+                PopoverMenuItem(title: String(localized: "Automatic"), systemImage: Quicklink.sfSymbol) {
                     editor.iconSymbol = nil
                 }
             ]
@@ -271,7 +278,9 @@ struct QuicklinkEditorView: View {
         let applications = appIndex.apps.filter { $0.kind == .application && $0.bundleID != nil }
         let items =
             [
-                PopoverMenuItem(title: "Default app", icon: .blank) { editor.openWithBundleID = nil }
+                PopoverMenuItem(title: String(localized: "Default app"), icon: .blank) {
+                    editor.openWithBundleID = nil
+                }
             ]
             + applications.enumerated().map { index, app in
                 PopoverMenuItem(title: app.name, icon: .file(path: app.url.path), startsSection: index == 0) {
@@ -295,8 +304,8 @@ struct QuicklinkEditorView: View {
     ) -> some View {
         Toggle(isOn: value) {
             VStack(alignment: .leading, spacing: metrics.spacing.xxs) {
-                Text(LocalizedStringKey(title))
-                Text(LocalizedStringKey(detail)).font(metrics.typography.rowTrailing)
+                Text(title)
+                Text(detail).font(metrics.typography.rowTrailing)
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

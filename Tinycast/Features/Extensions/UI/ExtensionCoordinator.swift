@@ -50,16 +50,13 @@ final class ExtensionCoordinator {
                 await core.confirm(
                     title: String(localized: "Enable extensions?"),
                     message: String(
-                        localized:
-                            """
+                        localized: """
                             Extensions are third-party JavaScript, run on this Mac. A running command \
                             holds a JavaScript engine in memory until you leave it — expect Tinycast \
                             to use noticeably more RAM while one is open.
-                            """
-                    ),
+                            """),
                     symbol: "puzzlepiece.extension", confirmTitle: String(localized: "Enable"),
-                    tone: .neutral,
-                    confirmRole: .standard)
+                    tone: .neutral, confirmRole: .standard)
             else { return }
 
             settings.extensionsEnabled = true
@@ -89,11 +86,13 @@ final class ExtensionCoordinator {
     /// A `raycast://extensions/…` link: the same command the launcher would run, by slug.
     func runDeepLink(_ link: ExtensionDeepLink) {
         guard settings.extensionsEnabled else {
-            core.showMessage("Extensions are disabled — enable them in Settings", tone: .danger)
+            core.showMessage(
+                String(localized: "Extensions are disabled — enable them in Settings"), tone: .danger)
             return
         }
         guard let (owner, command) = extensions.resolve(link) else {
-            core.showMessage("No installed extension provides '\(link.commandName)'", tone: .danger)
+            core.showMessage(
+                String(localized: "No installed extension provides '\(link.commandName)'"), tone: .danger)
             return
         }
         run(
@@ -108,11 +107,11 @@ final class ExtensionCoordinator {
         if settings.extensionsEnabled { core.pendingExtensionStoreInstall = install }
         settingsCoordinator.showSettings(tab: .extensions)
         if !settings.extensionsEnabled {
-            core.showMessage("Extensions are disabled — enable them in Settings", tone: .danger)
+            core.showMessage(
+                String(localized: "Extensions are disabled — enable them in Settings"), tone: .danger)
         }
     }
 
-    /// Opens Settings on the extension a launcher row belongs to.
     func showExtensionSettings(for app: AppEntry) {
         guard let (owner, _) = extensions.resolve(app) else { return }
         showExtensionSettings(for: owner)
@@ -132,12 +131,10 @@ final class ExtensionCoordinator {
                 await core.confirm(
                     title: String(localized: "Uninstall \(owner.title)?"),
                     message: String(
-                        localized:
-                            """
-                            Removes the extension and everything it stored — its preferences, its \
-                            cache and its own files. Its commands leave the launcher.
-                            """
-                    ),
+                        localized: """
+                            Removes the extension and everything it stored — its preferences, its cache \
+                            and its own files. Its commands leave the launcher.
+                            """),
                     symbol: "trash", confirmTitle: String(localized: "Uninstall"))
             else { return }
             await extensions.uninstall(owner)
@@ -152,12 +149,10 @@ final class ExtensionCoordinator {
             await core.confirm(
                 title: String(localized: "Clean up \(size)?"),
                 message: String(
-                    localized:
-                        """
+                    localized: """
                         Removes build files left by an interrupted install, and the storage of \
                         extensions that are no longer installed. Installed extensions are untouched.
-                        """
-                ),
+                        """),
                 symbol: "trash", confirmTitle: String(localized: "Clean Up"))
         else { return }
 
@@ -169,8 +164,7 @@ final class ExtensionCoordinator {
         core.showMessage(
             freed.isEmpty
                 ? String(localized: "Nothing to clean up")
-                : String(
-                    localized: "Reclaimed \(ExtensionCleanup.formatted(bytes: freed.bytes))"))
+                : String(localized: "Reclaimed \(ExtensionCleanup.formatted(bytes: freed.bytes))"))
     }
 
     /// What no index prunes: left behind, these key a shortcut or a rank to a vanished command.
@@ -231,7 +225,6 @@ final class ExtensionCoordinator {
         extensions.setMenuBarEnabled(enabled, reference: reference)
     }
 
-    /// The arguments a row declares, or nil — what decides whether the header shows inline fields.
     func commandArguments(for entry: AppEntry?) -> [ExtensionCommandArgument]? {
         guard let entry, entry.kind == .extensionCommand,
             let (_, command) = extensions.resolve(entry), !command.arguments.isEmpty

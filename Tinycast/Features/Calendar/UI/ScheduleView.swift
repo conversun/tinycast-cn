@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The My Schedule list, bucketed by day.
 struct ScheduleList: View {
     @Environment(\.metrics) private var metrics
     let results: [MeetingEvent]
@@ -107,7 +106,7 @@ private struct MeetingRow: View {
     private var accessibilityText: String {
         let parts = [
             meeting.title, MeetingTimeFormat.range(of: meeting),
-            UpcomingWindow.rowPill(for: meeting, now: now, calendar: .current)?.text,
+            UpcomingWindow.rowPill(for: meeting, now: now, calendar: .current, locale: .current)?.text,
             meeting.calendarName
         ]
         return parts.compactMap(\.self).joined(separator: ", ")

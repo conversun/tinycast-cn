@@ -4,35 +4,38 @@ enum UnitCategory: String, CaseIterable, Sendable {
     case length, weight, temperature, time, area, volume, digitalStorage
     case angle, speed, pressure, dataRate, acceleration, force, energy, power, frequency
     case electricCurrent, voltage, resistance, electricCharge, volumeFlow
+    case fuelEconomy, fuelConsumption
     case pixels, pixelArea, pixelDensity, compound
 
     var displayName: String {
         switch self {
-        case .length: return "Length"
-        case .weight: return "Weight"
-        case .temperature: return "Temperature"
-        case .time: return "Time"
-        case .area: return "Area"
-        case .volume: return "Volume"
-        case .digitalStorage: return "Digital Storage"
-        case .angle: return "Angle"
-        case .speed: return "Speed"
-        case .pressure: return "Pressure"
-        case .dataRate: return "Data Transfer Rate"
-        case .acceleration: return "Acceleration"
-        case .force: return "Force"
-        case .energy: return "Energy"
-        case .power: return "Power"
-        case .frequency: return "Frequency"
-        case .electricCurrent: return "Electric Current"
-        case .voltage: return "Voltage"
-        case .resistance: return "Resistance"
-        case .electricCharge: return "Electric Charge"
-        case .volumeFlow: return "Volume Flow Rate"
-        case .compound: return "Compound Units"
-        case .pixels: return "Pixels"
-        case .pixelArea: return "Pixel Area"
-        case .pixelDensity: return "Pixel Density"
+        case .length: return String(localized: "Length")
+        case .weight: return String(localized: "Weight")
+        case .temperature: return String(localized: "Temperature")
+        case .time: return String(localized: "unit-category-time", defaultValue: "Time")
+        case .area: return String(localized: "Area")
+        case .volume: return String(localized: "Volume")
+        case .digitalStorage: return String(localized: "Digital Storage")
+        case .angle: return String(localized: "Angle")
+        case .speed: return String(localized: "Speed")
+        case .pressure: return String(localized: "Pressure")
+        case .dataRate: return String(localized: "Data Transfer Rate")
+        case .acceleration: return String(localized: "Acceleration")
+        case .force: return String(localized: "Force")
+        case .energy: return String(localized: "Energy")
+        case .power: return String(localized: "Power")
+        case .frequency: return String(localized: "Frequency")
+        case .electricCurrent: return String(localized: "Electric Current")
+        case .voltage: return String(localized: "Voltage")
+        case .resistance: return String(localized: "Resistance")
+        case .electricCharge: return String(localized: "Electric Charge")
+        case .volumeFlow: return String(localized: "Volume Flow Rate")
+        case .fuelEconomy: return String(localized: "Fuel Economy")
+        case .fuelConsumption: return String(localized: "Fuel Consumption")
+        case .compound: return String(localized: "Compound Units")
+        case .pixels: return String(localized: "Pixels")
+        case .pixelArea: return String(localized: "Pixel Area")
+        case .pixelDensity: return String(localized: "Pixel Density")
         }
     }
 
@@ -57,6 +60,8 @@ enum UnitCategory: String, CaseIterable, Sendable {
         case .resistance: return CalcDimension(length: 2, mass: 1, time: -3, electricCurrent: -2)
         case .electricCharge: return CalcDimension(time: 1, electricCurrent: 1)
         case .volumeFlow: return CalcDimension(length: 3, time: -1)
+        case .fuelEconomy: return CalcDimension(length: -2)
+        case .fuelConsumption: return CalcDimension(length: 2)
         case .pixels: return CalcDimension(pixels: 1)
         case .pixelArea: return CalcDimension(pixels: 2)
         case .pixelDensity: return CalcDimension(length: -1, pixels: 1)

@@ -3,8 +3,24 @@ import Foundation
 @main
 struct LocalizationTests {
     static func main() throws {
-        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        let url = root.appendingPathComponent("Tinycast/zh-Hans.lproj")
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tinycast-localization-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for name in ["Localizable", "InfoPlist"] {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+            process.arguments = [
+                "xcstringstool", "compile", "Tinycast/Resources/\(name).xcstrings",
+                "--output-directory", root.path
+            ]
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                fatalError("\(name) catalog failed to compile")
+            }
+        }
+        let url = root.appendingPathComponent("zh-Hans.lproj")
         guard let bundle = Bundle(url: url) else {
             fatalError("Chinese localization bundle is missing")
         }
@@ -14,24 +30,23 @@ struct LocalizationTests {
             "Settings & Shortcuts",
             "Snippets",
             "Launcher Learning",
-            "List, detail, form, grid and no-view commands, plus preferences, storage and OAuth.",
-            "Menu-bar commands, Raycast's OAuth proxy, and its AI, browser and window services.",
+            "List, detail, form, grid, no-view and menu-bar commands, preferences, storage and OAuth.",
+            "Raycast's AI, browser and window services.",
             "Create Window Layout",
             "No external providers ready",
             "Turn on Apple Intelligence, or add a provider above.",
             "Save an arrangement, then restore it with one shortcut.",
-            "Clipboard changes from these apps won't be recorded.",
-            "Triggering a half again re-applies the same frame.",
+            "Copies from these apps aren't recorded.",
+            "Repeating a half keeps the same frame.",
             "Hyper Key",
             "Connecting…",
             "Stopped",
-            "Tools from every enabled server are offered to the model; type @slug to address "
-                + "one directly. The first call of a chat asks before it runs. Credentials "
-                + "stay in your login Keychain.",
-            "Conversations stay on this Mac. Nothing here is carried in a settings backup — which "
-                + "chats a Mac keeps is that Mac's business.",
-            "Your text is sent ahead of every message in every chat, after what Tinycast "
-                + "already tells the model about itself. Both are billed again on each turn.",
+            "Type @slug to address one server. A chat asks before its first tool call.",
+            "Conversations stay on this Mac, outside settings backups.",
+            "Sent before every message, after Tinycast's own. Both are billed each turn.",
+            "Battery",
+            "Headphones",
+            "No extension command is running.",
         ]
         var failures = 0
         for key in keys {
@@ -53,11 +68,23 @@ struct LocalizationTests {
             }
         }
         let format = bundle.localizedString(forKey: "%lld API connections", value: nil, table: nil)
-        if String(format: format, 3) != "3 个 API 连接" {
+        if String.localizedStringWithFormat(format, 3) != "3 个 API 连接" {
             print("FAIL: localized API connection count")
             failures += 1
         }
-        print("Localization: \(keys.count + formats.count + 1) checks, \(failures) failures")
+        for key in [
+            "NSAppleEventsUsageDescription", "NSBluetoothAlwaysUsageDescription",
+            "NSCalendarsFullAccessUsageDescription", "NSCameraUsageDescription",
+            "NSMicrophoneUsageDescription", "NSRemindersFullAccessUsageDescription",
+            "Tinycast Backup",
+        ] {
+            let translated = bundle.localizedString(forKey: key, value: key, table: "InfoPlist")
+            if translated == key {
+                print("FAIL: missing Chinese privacy translation for \(key)")
+                failures += 1
+            }
+        }
+        print("Localization: \(keys.count + formats.count + 8) checks, \(failures) failures")
         if failures > 0 { exit(1) }
     }
 }

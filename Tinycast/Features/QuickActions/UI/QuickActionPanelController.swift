@@ -36,7 +36,7 @@ final class QuickActionPanelController: NSObject, NSWindowDelegate {
                 onRetranslate: { [weak self] in self?.onRetranslate?($0) },
                 onOpenLanguageSettings: { [weak self] in self?.openLanguageSettings() },
                 onHeight: { [weak self] in self?.resize(toHeight: $0) }
-            ).environment(\.metrics, metrics))
+            ).environment(\.metrics, metrics).motionScope())
         // The controller owns the frame; without this the top edge drifts as the reply grows.
         hosting.sizingOptions = []
         // Its tallest, so the first frame is never short; the view reports the real height at once.
@@ -56,10 +56,8 @@ final class QuickActionPanelController: NSObject, NSWindowDelegate {
         self.panel = panel
         placeAtCursor(panel)
         // Non-activating like the palette: key focus without pulling the reader out of their app.
-        panel.fadeIn(duration: Theme.Duration.enter) {
-            panel.makeKeyAndOrderFront(nil)
-            panel.orderFrontRegardless()
-        }
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
     }
 
     func dismiss() {
@@ -70,7 +68,7 @@ final class QuickActionPanelController: NSObject, NSWindowDelegate {
         onRetranslate = nil
         closing.delegate = nil
         closing.onKey = nil
-        closing.fadeOut(duration: Theme.Duration.exit)
+        closing.orderOut(nil)
     }
 
     private func copyOutput() {

@@ -2,7 +2,6 @@ import SwiftUI
 
 // Onboarding's own card look: the Settings panes are stock `Form` sections, this window is not.
 
-/// A rounded, hairline-bordered group of onboarding rows.
 struct OnboardingCard<Content: View>: View {
     @ViewBuilder var content: Content
 
@@ -46,10 +45,10 @@ struct OnboardingRow<Trailing: View>: View {
                     .frame(width: Theme.Size.settingsRowIcon)
             }
             VStack(alignment: .leading, spacing: Theme.Spacing.xs / 2) {
-                Text(title.localizedUI)
+                Text(title)
                     .font(.body)
                 if let subtitle {
-                    Text(subtitle.localizedUI)
+                    Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

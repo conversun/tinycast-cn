@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The camera's action row, in the same button language a dialog's footer speaks.
 struct CameraButton: View {
     /// Secondary also reads as "off": the mirror toggle dims rather than growing a second style.
     enum Emphasis {
@@ -9,14 +8,14 @@ struct CameraButton: View {
     }
 
     let title: String
-    var keyCap: String?
+    var keyCaps: [String] = []
     var emphasis: Emphasis = .primary
     let onActivate: () -> Void
 
     var body: some View {
-        Button(title.localizedUI, action: onActivate)
+        Button(title, action: onActivate)
             .buttonStyle(.modalAction(role, fillsWidth: false))
-            .tooltip(keyCap: keyCap)
+            .tooltip(keyCaps: keyCaps)
     }
 
     private var role: ModalActionButtonStyle.Role {

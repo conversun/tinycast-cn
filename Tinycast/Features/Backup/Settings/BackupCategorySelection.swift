@@ -23,10 +23,8 @@ struct BackupCategorySelection: View {
     }
 
     private func subtitle(_ category: BackupCategory) -> String? {
-        guard let noun = category.descriptor.countNoun, let count = available?[category] else {
-            return nil
-        }
-        return "\(count) \(noun.localizedUI)"
+        guard let count = available?[category] else { return nil }
+        return category.countText(count)
     }
 
     var body: some View {
@@ -38,7 +36,7 @@ struct BackupCategorySelection: View {
                             Image(systemName: category.descriptor.symbol)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 16)
-                            Text(category.descriptor.label.localizedUI).lineLimit(1)
+                            Text(category.descriptor.label).lineLimit(1)
                             if let subtitle = subtitle(category) {
                                 Text(subtitle)
                                     .foregroundStyle(.secondary)

@@ -1,13 +1,13 @@
 # Navigation
 
-Two commands that move you somewhere rather than changing something, behind one switch:
-**Switch Windows** raises any open window of any running app, and **Search Menu Bar Items** presses
-any item in the front app's menu bar. The second has its own page —
+Commands that move you somewhere rather than changing something, behind one switch:
+**Switch Windows** raises any open window of any running app, **Switch Windows Backwards** walks the
+same list the other way, and **Search Menu Bar Items** presses any item in the front app's menu bar. The second has its own page —
 [menu-search.md](menu-search.md) — because its internals are a menu walk; this page owns the
 switcher and the pane the two share.
 
-Ships **off**. Settings › Navigation is the switch, and while it is off neither command is in the
-launcher and a still-recorded shortcut for either does nothing.
+Ships **off**. Settings › Navigation is the switch, and while it is off none of them is in the
+launcher and a still-recorded shortcut for any does nothing.
 
 ## Invariants
 
@@ -31,8 +31,9 @@ launcher and a still-recorded shortcut for either does nothing.
   `load()`, because a restore reaches `load()` alone.
 - **Activation hides with `restoreFocus: false`.** Restoring focus reactivates the displaced app,
   which races the raise and can land on the wrong window — the same reason a Space command does it.
-- **`AXWindowAccess` stays the one AX window layer.** `unminimize` and `focus` live there rather
-  than in a second AX shim, and Window Layouts brings its frontmost window forward through `focus`.
+- **`AXWindowAccess` stays the one AX window layer.** `minimize`, `unminimize` and `focus` live
+  there rather than in a second AX shim, and Window Layouts brings its frontmost window forward
+  through `focus`.
 
 ## How it is put together
 
@@ -40,12 +41,13 @@ launcher and a still-recorded shortcut for either does nothing.
 | --- | --- |
 | `Model/WindowSwitchEntry.swift` | one row: handle, app, title, minimized, rank, search fields |
 | `Model/WindowSwitchOrder.swift` | the MRU sort, pure and total |
+| `Model/WindowSwitchPolicy.swift` | which windows the sweep offers, pure |
 | `Model/WindowSwitchQuery.swift` | ranking over `SearchRelevance`, capped at 200 rows |
 | `Service/WindowZOrder.swift` | the one `CGWindowList` call: per-pid front rank |
 | `Service/WindowSwitchSweep.swift` | the AX sweep, and the live element table it hands back |
-| `Service/WindowSwitchSession.swift` | the observable state — snapshot, filtered rows, elements |
-| `UI/WindowSwitchCoordinator.swift` | show, activate, the switch, the failure reports |
-| `UI/WindowSwitchScreen.swift` | the `PaletteScreen` conformance and the two empty states |
+| `Service/WindowSwitchSession.swift` | the observable state — snapshot, filtered rows, elements, exits |
+| `UI/WindowSwitchCoordinator.swift` | show, activate, the ⌘K actions, the switch, the failure reports |
+| `UI/WindowSwitchScreen.swift` | the `PaletteScreen` conformance, the ⌘K menu, the two empty states |
 | `UI/WindowSwitchList.swift` | the list and its row: app icon, title, app name |
 
 ## Recency without a private symbol
@@ -70,10 +72,17 @@ rather than after the user has switched apps once.
 ## The sweep
 
 `WindowSwitchSweep` walks `WindowInventory.candidates()` — regular-policy, non-terminated, not us —
-and takes every window whose subrole is `AXStandardWindow`. That is looser than
+and takes every window `WindowSwitchPolicy` accepts: a standard-subrole one, or a minimized one that
+still has a minimize button. That is looser than
 `WindowInventory.eligibleFrame` in two ways that both matter here: a **minimized** window is exactly
 what a switcher is for, and a window on another Space reports no frame until it is raised, so
 requiring one would hide it.
+
+**A minimized window changes subrole.** Finder and Transmission report their minimized windows as
+`AXDialog`, not `AXStandardWindow`, and back to `AXStandardWindow` when restored, so a subrole test
+alone drops exactly the rows a switcher exists for. A sheet cannot minimize, so the minimize button
+is what still tells a minimized window from a real dialog. The policy is Foundation-only, so the
+harness covers the rule rather than the attribute reads.
 
 Each element gets a 0.2 s messaging timeout, the same as the layout inventory and the menu walk, so
 one hung app cannot stall the summon.
@@ -85,9 +94,11 @@ contributes.
 ## Stepping with the shortcut
 
 Pressed again while the switcher is open, its shortcut steps the selection down the list instead of
-closing the palette; the first step lands on the window behind the current one. A step made with
-the chord's modifiers still held arms one `flagsChanged` local monitor, and letting go switches to
-the selection, as ⌘Tab does. A single press never arms it, so pressing once and typing still
+closing the palette; the first step lands on the window behind the current one. Switch Windows
+Backwards opens the same list and steps up it, wrapping to the last window, so the two interleave
+like ⌘Tab and ⌘⇧Tab. A step made with the chord's modifiers still held arms one `flagsChanged`
+local monitor, and letting go switches to the selection, as ⌘Tab does. The first armed step's
+modifiers are the ones that count, so letting go of ⇧ alone mid-walk switches nothing. A single press never arms it, so pressing once and typing still
 searches; Escape hides the palette, and the next modifier change finds it gone and switches
 nothing.
 
@@ -102,18 +113,40 @@ so the switcher needs no Space handling of its own.
 Every step is allowed to fail quietly. What is reported is only the case the user can act on: the
 window's app quit between the sweep and the ↵.
 
+## The ⌘K menu
+
+| Row | Does | Palette |
+| --- | --- | --- |
+| Switch to Window (↵) | `activate`, as above | hides |
+| Minimize Window (⌃⇧M) | sets `kAXMinimized`; absent on a minimized row | stays; the row joins the minimized run |
+| Hide Application (⌃⇧H) | `NSRunningApplication.hide()`, then `kAXHidden` if refused | hides |
+| Quit Application (⌃⇧Q) | `NSRunningApplication.terminate()` | stays; the app's rows leave on exit |
+
+- **Minimize marks the row instead of sweeping again.** `kAXMinimized` can still read false while
+  the Dock animation runs, so a fresh sweep could leave the row where it was. A full-screen window cannot
+  minimize and is skipped, so its row never claims to be minimized.
+- **Quit removes rows on the app's exit, not on the request.** While rows are shown the session
+  observes `DidTerminateApplicationMessage` and drops that pid's rows; `reset()` removes the
+  observer. A quit refused by a save sheet therefore keeps its rows, and an app quit from anywhere
+  else leaves the list too.
+- **The chords are ⌃⇧, not ⌘M and ⌘H.** The app menu's Minimize and Hide take those before the
+  palette sees them.
+- **Hide closes the palette without restoring focus.** Restoring focus activates the app that was in
+  front, and activating a hidden app unhides it.
+
 ## Wiring
 
-- **`CommandID.switchWindows`** (`command:switch-windows`) and `CommandID.searchMenuItems` are both
-  named by `SettingsTab.navigation.ownedCommands`, which is the whole of what moves the second out of
+- **`CommandID.switchWindows`** (`command:switch-windows`), `CommandID.switchWindowsBackwards`
+  (`command:switch-windows-backwards`) and `CommandID.searchMenuItems` are all named by
+  `SettingsTab.navigation.ownedCommands`, which is the whole of what moves them out of
   Settings › Commands: `LauncherItemsSection` filters on `settingsOwner == nil`, and `VisibilityStore`
-  skips the `Enable Commands` category gate for a pane-owned command. Neither adds an
+  skips the `Enable Commands` category gate for a pane-owned command. None adds an
   `AppEntry.Kind`, a `HotKeyAction` case or a `VisibilityStore` category — they are plain `.command`
   entries.
 - **`navigationEnabled`** (off) is the switch. `AppCore.observeFeatureSwitches` tracks it once and
-  reprojects into both coordinators; each owns only its own command and its own palette mode, so
-  neither knows about the other. `AppIndex.isCommandEnabled` feeds `hotKeys.allowsAction`, so both
-  shortcuts go dead with the switch, and each `show()` re-guards the flag anyway.
+  reprojects into both coordinators; each owns only its own commands and its own palette mode, so
+  neither knows about the other. `AppIndex.isCommandEnabled` feeds `hotKeys.allowsAction`, so every
+  shortcut goes dead with the switch, and each `show()` re-guards the flag anyway.
 - **`menuSearchDisabledApps`** (empty) is the exclusion list. It ships with no seeded entries, unlike
   the clipboard's: a menu read only ever happens because the user asked for one.
 - **`menuSearchShowsAppleMenu`** (off) lists the Apple menu's own items. Off by default because that
@@ -136,13 +169,17 @@ window's app quit between the sweep and the ↵.
 
 `Tests/window-switch-test.swift` covers the pure half: the handle-derived id, the untitled-window
 fallback, the name/owner split in the search fields, the MRU order and its totality under a shuffled
-sweep, the minimized run at the end, ranking, and the 200-row cap under both an empty and a
-matching query.
+sweep, the minimized run at the end, which windows the sweep offers, ranking, and the 200-row cap
+under both an empty and a matching query.
 
 `WindowZOrder` and `WindowSwitchSweep` are not compiled into the harness and have no automated
 coverage — the AX and `CGWindowList` paths need manual verification, particularly:
 
-1. A minimized window is listed last and ↵ un-minimizes it rather than doing nothing.
+1. A minimized window is listed last and ↵ un-minimizes it rather than doing nothing — for Finder
+   and Transmission too, whose minimized windows read `AXDialog`.
 2. A window on another Space is listed, and ↵ pulls that Space forward.
 3. An app with several windows lists them in its own front-to-back order, under one app rank.
 4. An app quit between the summon and the ↵ reports rather than failing silently.
+5. Minimize moves the row into the minimized run; on a full-screen window it does nothing.
+6. Hide hides the frontmost app as well as a background one, and Escape does not bring it back.
+7. ⌃⇧Q on an app with unsaved work keeps its rows until the save sheet lets it exit.

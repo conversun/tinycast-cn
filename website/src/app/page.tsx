@@ -9,6 +9,7 @@ import { Nav } from "../components/nav";
 import { Privacy } from "../components/privacy";
 import { Support } from "../components/support";
 import { Switch } from "../components/switch";
+import { RevealOnScroll } from "../components/ui/reveal-on-scroll";
 import { ScrollTop } from "../components/ui/scroll-top";
 
 export default function HomePage() {
@@ -34,6 +35,7 @@ export default function HomePage() {
       </main>
       <Footer />
       <ScrollTop />
+      <RevealOnScroll />
     </>
   );
 }

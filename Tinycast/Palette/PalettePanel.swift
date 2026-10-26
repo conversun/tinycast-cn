@@ -2,8 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
-/// Borderless floating panel that hosts the SwiftUI command palette.
-final class PalettePanel: NSPanel {
+final class PalettePanel: NSPanel, AnimatedPanel {
     enum HeaderFieldBoundary {
         case leading
         case trailing
@@ -11,7 +10,7 @@ final class PalettePanel: NSPanel {
 
     /// Bare backspace, which the field editor swallows before `onKeyPress` could see it.
     var onBareBackspace: (() -> Bool)?
-    /// Escape, which an `AVPlayerView` in the preview answers before `onKeyPress` could see it.
+    /// Escape, which a focused form field answers before `onKeyPress` could see it.
     var onEscape: (() -> Bool)?
     /// Command chords the field editor swallows, plus the ones no main menu handles.
     var onCommandShortcut: ((NSEvent) -> Bool)?
@@ -45,7 +44,7 @@ final class PalettePanel: NSPanel {
     /// Nil while a selection can still collapse normally, or when the caret is not at an edge.
     private func headerFieldBoundary(for event: NSEvent) -> HeaderFieldBoundary? {
         guard event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
-            let editor = fieldEditor, editor.selectedRange().length == 0
+            let editor = fieldEditor, !editor.hasMarkedText(), editor.selectedRange().length == 0
         else { return nil }
         switch Int(event.keyCode) {
         case kVK_LeftArrow where editor.selectedRange().location == 0: return .leading
@@ -272,7 +271,7 @@ final class PalettePanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        animationBehavior = .none
+        followMotion()
         isReleasedWhenClosed = false
 
         let hosting = NSHostingView(rootView: rootView)
@@ -286,6 +285,15 @@ final class PalettePanel: NSPanel {
     override func resignKey() {
         super.resignKey()
         paletteState?.noteCommandHeld(false)
+    }
+
+    /// A child hidden with its parent skips its next open animation.
+    override func orderOut(_ sender: Any?) {
+        for child in childWindows ?? [] {
+            removeChildWindow(child)
+            child.orderOut(nil)
+        }
+        super.orderOut(sender)
     }
 
     override var canBecomeKey: Bool { true }

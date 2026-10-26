@@ -52,7 +52,13 @@ struct SettingsBackupTest {
         check(
             "user ignore patterns ride the settings backup",
             mirrored["fileSearchIgnorePatterns"] == .fileSearchIgnorePatterns)
+        check(
+            "removed default ignore patterns ride the settings backup",
+            mirrored["fileSearchRemovedDefaultPatterns"] == .fileSearchRemovedDefaultPatterns)
         check("notes enablement rides the settings backup", mirrored["notesEnabled"] == .notesEnabled)
+        check(
+            "compact shortcuts ride the settings backup",
+            mirrored["compactBarCommands"] == .compactBarCommands)
         check(
             "Markdown rendering rides the settings backup",
             mirrored["notesRendersMarkdown"] == .notesRendersMarkdown)

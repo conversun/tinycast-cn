@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// `Form.DatePicker`: presets plus an expression, typed into the control itself.
 struct ExtensionDateField: View {
     private var form: ExtensionFormMetrics { ExtensionFormMetrics(scale: metrics.scale) }
     @Environment(\.metrics) private var metrics
@@ -20,13 +19,12 @@ struct ExtensionDateField: View {
     /// Told while the list is up, so the palette leaves every navigation key to it.
     @Environment(PaletteState.self) private var palette
 
-    /// A `date` picker holds a day; anything else holds a time as well.
     private var includesTime: Bool { node.string("type") != "date" }
     private var value: Date? { node.date("value") }
     private var isFocused: Bool { focus == index }
 
     private var label: String {
-        guard let value else { return "No Date" }
+        guard let value else { return String(localized: "No Date") }
         return ExtensionDateExpression.detail(
             for: value, calendar: .current, includesTime: includesTime)
     }
@@ -36,9 +34,8 @@ struct ExtensionDateField: View {
             query: query, now: Date(), calendar: .current, includesTime: includesTime)
     }
 
-    /// What the control does, then whatever the extension explains about the field.
     private var hint: String {
-        let state = open ? "Showing dates" : "Opens a list of dates"
+        let state = open ? String(localized: "Showing dates") : String(localized: "Opens a list of dates")
         let parts = [node.string("error"), node.string("info")]
             .compactMap { $0 }.filter { !$0.isEmpty }
         return ([state] + parts).joined(separator: ". ")
@@ -109,7 +106,6 @@ struct ExtensionDateField: View {
             Image(systemName: "calendar")
                 .font(metrics.typography.rowTrailing)
                 .foregroundStyle(Theme.Colors.textSecondary)
-            // While the list is open the control is the expression field, caret and all.
             if open {
                 ExtensionQueryText(query: query, prompt: "tomorrow at 10am", phase: typedAt)
             } else {
@@ -126,7 +122,7 @@ struct ExtensionDateField: View {
         .extensionFieldChrome(focused: isFocused, open: open)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(node.string("title") ?? "Date"))
+        .accessibilityLabel(Text(node.string("title") ?? String(localized: "Date")))
         // While open the control is an expression field, so it announces what is typed.
         .accessibilityValue(Text(open && !query.isEmpty ? query : label))
         .accessibilityHint(Text(hint))

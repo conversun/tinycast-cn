@@ -31,7 +31,7 @@ enum ModifierKey: String, CaseIterable, Codable, Sendable {
     var doubleBinding: HotKeyBinding { self == .globe ? .doubleGlobe : .doubleModifier(self) }
 
     // Device masks identify both keys even when their shared, generic modifier bit stays set.
-    private var deviceMask: UInt64 {
+    var deviceMask: UInt64 {
         switch self {
         case .leftControl: 0x0001
         case .rightControl: 0x2000
@@ -52,4 +52,8 @@ enum ModifierKey: String, CaseIterable, Codable, Sendable {
     }
 
     func isHeld(in flags: UInt64) -> Bool { deviceMask & flags != 0 }
+
+    func otherSideIsHeld(in flags: UInt64) -> Bool {
+        Self.allCases.contains { $0 != self && $0.modifier == modifier && $0.isHeld(in: flags) }
+    }
 }

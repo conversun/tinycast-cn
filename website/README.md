@@ -68,6 +68,10 @@ still renders, with checkout disabled. To try it against Polar's sandbox, copy `
 to `.dev.vars` (gitignored), fill it in, and run `npm run preview` (http://localhost:8787).
 `npm run check:worker` type-checks the Worker; its types are generated on install.
 
+The crypto addresses live in `src/data/support.ts`. Each one has a mark and a QR code in
+`public/wallets/`, and the root README shows the same codes. A code encodes its address verbatim,
+so changing an address means replacing its codes and scanning them before you commit.
+
 ## Media
 
 Videos and files over 25 MiB never enter git. Put them in `media/` (gitignored), run

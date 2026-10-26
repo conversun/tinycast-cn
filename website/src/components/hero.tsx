@@ -1,10 +1,12 @@
 import { ArrowRight, Download } from "lucide-react";
 import { brewInstallCommand, brewTrustCommand, hero, site } from "../data/site";
 import { latestVersion } from "../lib/version";
+import { Badges } from "./badges";
 import { HeroPalette } from "./hero-palette";
 import { Button } from "./ui/button";
 import { CommandLine } from "./ui/command-line";
 import { Link } from "./ui/link";
+import { SwapWords } from "./ui/swap-words";
 
 export async function Hero() {
   const version = await latestVersion();
@@ -17,7 +19,7 @@ export async function Hero() {
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-40 right-[-10%] h-[520px] w-[720px] rounded-full opacity-35 blur-3xl"
+        className="pointer-events-none absolute -top-40 right-[-10%] h-130 w-180 rounded-full opacity-35 blur-3xl"
         style={{
           background:
             "radial-gradient(closest-side, color-mix(in srgb, var(--color-violet) 55%, transparent), transparent)",
@@ -26,7 +28,7 @@ export async function Hero() {
 
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-14 sm:px-10 lg:grid-cols-[1.15fr_1fr] lg:pb-28 lg:pt-20">
         <div className="min-w-0">
-          <p className="rise inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 font-mono text-micro uppercase text-fg-muted">
+          <p className="blur-in inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 font-mono text-micro uppercase text-fg-muted">
             <span
               aria-hidden="true"
               className="size-1.5 rounded-full bg-violet"
@@ -35,30 +37,35 @@ export async function Hero() {
           </p>
 
           <h1
-            className="rise mt-6 text-display"
+            className="blur-in @container mt-6 text-display"
             style={{ animationDelay: "60ms" }}
           >
-            {hero.headlineLines.map((line, index) => (
-              <span key={line} className="block">
-                {line}
-                {index === hero.headlineLines.length - 1 && (
-                  <span aria-hidden="true" className="text-violet">
-                    _
-                  </span>
-                )}
-              </span>
-            ))}
+            <span className="sr-only">
+              {`${hero.headline.swap[0]} ${hero.headline.rest} ${hero.headline.second}`}
+            </span>
+            {/* 10.6em fits the widest swap plus the rest, so no swap can ever rewrap the line. */}
+            <span
+              aria-hidden="true"
+              className="block @min-[10.6em]:whitespace-nowrap"
+            >
+              <SwapWords words={hero.headline.swap} />
+              <span className="@max-[10.6em]:block"> {hero.headline.rest}</span>
+            </span>
+            <span aria-hidden="true" className="block">
+              {hero.headline.second}
+              <span className="text-violet">_</span>
+            </span>
           </h1>
 
           <p
-            className="rise mt-6 max-w-lg text-pretty text-body-lg text-fg-muted sm:text-subheading"
+            className="blur-in mt-6 max-w-lg text-pretty text-body-lg text-fg-muted sm:text-subheading"
             style={{ animationDelay: "120ms" }}
           >
             {hero.sub}
           </p>
 
           <div
-            className="rise mt-8 max-w-xl space-y-2"
+            className="blur-in mt-8 max-w-xl space-y-2"
             style={{ animationDelay: "180ms" }}
           >
             <CommandLine command={brewTrustCommand} />
@@ -66,7 +73,7 @@ export async function Hero() {
           </div>
 
           <div
-            className="rise mt-6 flex flex-wrap items-center gap-3"
+            className="blur-in mt-6 flex flex-wrap items-center gap-3"
             style={{ animationDelay: "240ms" }}
           >
             <Button
@@ -87,19 +94,23 @@ export async function Hero() {
           </div>
 
           <ul
-            className="rise mt-8 flex flex-wrap gap-x-5 gap-y-2 font-mono text-micro uppercase text-fg-subtle"
+            className="blur-in mt-8 flex flex-wrap gap-x-5 gap-y-2 font-mono text-micro uppercase text-fg-subtle"
             style={{ animationDelay: "300ms" }}
           >
             {hero.facts.map((fact) => (
               <li key={fact}>{fact}</li>
             ))}
           </ul>
+
+          <div className="blur-in mt-8" style={{ animationDelay: "360ms" }}>
+            <Badges />
+          </div>
         </div>
 
         {/* Tilted, never floating: the palette is a backdrop-filter surface, and
             animating its transform repaints the blur on every frame. */}
         <div
-          className="rise min-w-0 lg:rotate-[-1deg]"
+          className="rise min-w-0 lg:-rotate-1"
           style={{ animationDelay: "120ms" }}
         >
           <HeroPalette />

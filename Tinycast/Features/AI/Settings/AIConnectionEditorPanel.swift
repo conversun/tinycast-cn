@@ -3,17 +3,20 @@ import SwiftUI
 struct AIConnectionEditorTarget: Identifiable {
     let connection: AIConnection
     let hasStoredKey: Bool
+    let headers: [String: String]
     let isNew: Bool
     var id: UUID { connection.id }
 }
 
 struct AIConnectionEditorPanel: View {
     let target: AIConnectionEditorTarget
-    let onSave: (AIConnection, String, Bool) -> String?
+    let onSave: (AIConnection, String, [String: String], Bool) -> String?
     let onCancel: () -> Void
 
     @State private var connection: AIConnection
     @State private var key = ""
+    @State private var headers: [HeaderDraft]
+    @FocusState private var focusedHeader: UUID?
     @State private var modelQuery = ""
     @State private var discovery: ModelDiscoveryState = .waitingForKey
     @State private var discoveryRevision = 0
@@ -21,15 +24,25 @@ struct AIConnectionEditorPanel: View {
 
     private let modelDiscovery = AIModelDiscoveryService()
 
+    private struct HeaderDraft: Identifiable, Equatable {
+        let id = UUID()
+        var name = ""
+        var value = ""
+    }
+
     init(
         target: AIConnectionEditorTarget,
-        onSave: @escaping (AIConnection, String, Bool) -> String?,
+        onSave: @escaping (AIConnection, String, [String: String], Bool) -> String?,
         onCancel: @escaping () -> Void
     ) {
         self.target = target
         self.onSave = onSave
         self.onCancel = onCancel
         _connection = State(initialValue: target.connection)
+        _headers = State(
+            initialValue: target.headers.sorted { $0.key < $1.key }.map {
+                HeaderDraft(name: $0.key, value: $0.value)
+            })
     }
 
     var body: some View {
@@ -53,7 +66,7 @@ struct AIConnectionEditorPanel: View {
                     editorField("Provider") {
                         Picker("Provider", selection: $connection.provider) {
                             ForEach(AIProviderKind.allCases) { provider in
-                                Text(provider.title.localizedUI).tag(provider)
+                                Text(provider.title).tag(provider)
                             }
                         }
                         .labelsHidden()
@@ -67,7 +80,8 @@ struct AIConnectionEditorPanel: View {
                     }
                     editorField("API Key") {
                         RevealableSecureField(
-                            title: "API Key", text: $key, prompt: Text(apiKeyPlaceholder.localizedUI)
+                            title: String(localized: "API Key"), text: $key,
+                            prompt: Text(apiKeyPlaceholder)
                         )
                         .settingsEditorTextField()
                     }
@@ -77,17 +91,21 @@ struct AIConnectionEditorPanel: View {
                             .foregroundStyle(.secondary)
                     } else if target.hasStoredKey {
                         Label(
-                            ("The saved key stays with the endpoint it was saved for. "
-                                + "Enter a key for this one.").localizedUI,
+                            """
+                            The saved key stays with the endpoint it was saved for. Enter a key for \
+                            this one.
+                            """,
                             systemImage: "exclamationmark.triangle"
                         )
                         .font(.caption)
                         .foregroundStyle(.orange)
                     }
                     if let error {
-                        Text(error.localizedUI).foregroundStyle(.orange)
+                        Text(error).foregroundStyle(.orange)
                     }
                 }
+
+                headersSection
 
                 Section {
                     modelDiscoveryContent
@@ -104,8 +122,10 @@ struct AIConnectionEditorPanel: View {
                     }
                 } footer: {
                     Text(
-                        ("Search the models available to this key and add one or more. Exact model "
-                            + "IDs remain available when discovery is unsupported.").localizedUI
+                        """
+                        Search the models available to this key and add one or more. Exact model \
+                        IDs remain available when discovery is unsupported.
+                        """
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -133,13 +153,54 @@ struct AIConnectionEditorPanel: View {
             await discoverModels()
         }
         .onChange(of: key) { discoveryRevision += 1 }
-        .onChange(of: connection.baseURL) { discoveryRevision += 1 }
+        .onChange(of: headers) { discoveryRevision += 1 }
+        .onChange(of: connection.baseURL) {
+            connection.dropDeclaredLevels()
+            discoveryRevision += 1
+        }
         .onChange(of: connection.provider) { oldProvider, newProvider in
             if connection.baseURL.isEmpty || connection.baseURL == oldProvider.defaultBaseURL {
                 connection.baseURL = newProvider.defaultBaseURL
             }
             connection.reasoningOptions = nil
             discoveryRevision += 1
+        }
+    }
+
+    private var headersSection: some View {
+        Section {
+            LabeledContent {
+                Button("Add Header", action: addHeader)
+                    .fixedSize()
+            } label: {
+                Text("Request Headers")
+                Text("Sent with every request, replacing a default header of the same name.")
+            }
+            ForEach($headers) { $header in
+                HStack(spacing: Theme.Spacing.sm) {
+                    TextField("Name", text: $header.name, prompt: Text("Name"))
+                        .labelsHidden()
+                        .font(.callout.monospaced())
+                        .autocorrectionDisabled()
+                        .frame(width: Theme.Size.aiVariableName)
+                        .focused($focusedHeader, equals: header.id)
+                    RevealableSecureField(
+                        title: String(localized: "Value of \(header.name)"), text: $header.value,
+                        prompt: Text("Value")
+                    )
+                    .labelsHidden()
+                    .font(.callout.monospaced())
+                    Button {
+                        headers.removeAll { $0.id == header.id }
+                    } label: {
+                        Image(systemName: "minus.circle")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove")
+                    .accessibilityLabel("Remove \(header.name)")
+                }
+            }
         }
     }
 
@@ -171,7 +232,7 @@ struct AIConnectionEditorPanel: View {
                 editorField("Find a model") {
                     TextField(
                         "Find a model", text: $modelQuery,
-                        prompt: Text(modelSearchPlaceholder.localizedUI)
+                        prompt: Text(modelSearchPlaceholder)
                     )
                     .settingsEditorTextField()
                     .onSubmit { addExactMatch(from: models) }
@@ -182,7 +243,7 @@ struct AIConnectionEditorPanel: View {
             LabeledContent {
                 Button("Try Again") { discoveryRevision += 1 }
             } label: {
-                Label(message.localizedUI, systemImage: "exclamationmark.triangle")
+                Label(message, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             }
             ForEach(connection.models, id: \.self) { model in
@@ -196,80 +257,118 @@ struct AIConnectionEditorPanel: View {
     private func modelSearchResults(_ models: [AIModelDiscovery.Model]) -> some View {
         let query = modelQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let matches = matchingModels(in: models)
+        let isQueryAdded = connection.models.contains {
+            $0.caseInsensitiveCompare(query) == .orderedSame
+        }
+        // A gateway can list dated builds but accept a short alias that a listed ID contains.
+        let offersTypedID =
+            !query.isEmpty && !isQueryAdded
+            && AIModelDiscovery.exactMatch(models, query: query) == nil
         if query.isEmpty {
             Text("Type a model or company name. \(models.count) models available.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        } else if matches.isEmpty && isQueryAdded {
+            Label("This model is already added.", systemImage: "checkmark.circle")
+                .foregroundStyle(.secondary)
         } else if matches.isEmpty {
-            if connection.models.contains(where: { $0.caseInsensitiveCompare(query) == .orderedSame }) {
-                Label("This model is already added.", systemImage: "checkmark.circle")
-                    .foregroundStyle(.secondary)
-            } else {
-                Label("No available model matches this key.", systemImage: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                if connection.provider == .openAICompatible {
-                    Button("Use “\(query)” anyway") { addModel(query) }
-                }
-            }
-        } else {
-            ForEach(matches) { model in
-                Button {
-                    addModel(model)
-                } label: {
-                    HStack(spacing: Theme.Spacing.md) {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                            Text(model.name)
-                            if model.name != model.id {
-                                Text(model.id)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+            Label("No available model matches this key.", systemImage: "magnifyingglass")
+                .foregroundStyle(.secondary)
+        }
+        ForEach(matches) { model in
+            Button {
+                addModel(model)
+            } label: {
+                HStack(spacing: Theme.Spacing.md) {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                        Text(model.name)
+                        if model.name != model.id {
+                            Text(model.id)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Image(systemName: "plus.circle")
-                            .foregroundStyle(.secondary)
                     }
-                    .contentShape(Rectangle())
+                    Spacer()
+                    Image(systemName: "plus.circle")
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Add \(model.name)")
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add \(model.name)")
+        }
+        if offersTypedID {
+            Button("Use “\(query)” anyway") { addModel(query) }
         }
     }
 
     private var manualModelField: some View {
         editorField("Model ID") {
-            TextField("Model ID", text: $modelQuery, prompt: Text(modelPlaceholder.localizedUI))
+            TextField("Model ID", text: $modelQuery, prompt: Text(modelPlaceholder))
                 .settingsEditorTextField()
                 .onSubmit(addManualModel)
         }
     }
 
     private func editorField<Content: View>(
-        _ title: String, @ViewBuilder content: () -> Content
+        _ title: LocalizedStringResource, @ViewBuilder content: () -> Content
     ) -> some View {
         SettingsEditorField(title, labelFont: .callout.weight(.medium), content: content)
     }
 
     private func selectedModelRow(_ model: String) -> some View {
         LabeledContent(model) {
-            Button {
-                removeModel(model)
-            } label: {
-                Image(systemName: "minus.circle").foregroundStyle(.red)
+            HStack(spacing: Theme.Spacing.md) {
+                if connection.takesDeclaredLevels { reasoningLevelsMenu(model) }
+                Button {
+                    removeModel(model)
+                } label: {
+                    Image(systemName: "minus.circle").foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove \(model)")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove \(model)")
+        }
+    }
+
+    private func reasoningLevelsMenu(_ model: String) -> some View {
+        let declared = connection.declaredLevels(for: model)
+        return Menu {
+            ForEach(AIConnection.ReasoningOptions.ladder, id: \.self) { level in
+                Toggle(
+                    ChatGPTSubscription.Effort(id: level, detail: nil).title,
+                    isOn: Binding(
+                        get: { declared.contains(level) },
+                        set: { isOn in
+                            var levels = declared
+                            if isOn { levels.insert(level) } else { levels.remove(level) }
+                            connection.declareLevels(levels, for: model)
+                        }))
+            }
+        } label: {
+            Text(declaredLevelsTitle(declared)).font(.caption)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .accessibilityLabel("Reasoning levels for \(model)")
+    }
+
+    private func declaredLevelsTitle(_ declared: Set<String>) -> String {
+        switch declared.count {
+        case 0: return String(localized: "Reasoning levels")
+        default: return String(localized: "\(declared.count) levels")
         }
     }
 
     private var modelPlaceholder: String {
+        let example: String
         switch connection.provider {
-        case .openAI, .openAICompatible: return "Model ID (e.g. gpt-5.4-mini)"
-        case .anthropic: return "Model ID (e.g. claude-sonnet-4-6)"
-        case .gemini: return "Model ID (e.g. gemini-3.7-flash)"
-        case .openRouter: return "Model ID (e.g. openai/gpt-5.4-mini)"
+        case .openAI, .openAICompatible: example = "gpt-5.4-mini"
+        case .anthropic: example = "claude-sonnet-4-6"
+        case .gemini: example = "gemini-3.7-flash"
+        case .openRouter: example = "openai/gpt-5.4-mini"
         }
+        return String(localized: "Model ID (e.g. \(example))")
     }
 
     /// Discovery honours the Save rule: a retarget asks for a key rather than reuse the old host's.
@@ -278,14 +377,17 @@ struct AIConnectionEditorPanel: View {
     }
 
     private var apiKeyPlaceholder: String {
-        if storedKeyMatchesTarget { return "Leave blank to keep saved key" }
-        if AIEndpointPolicy.isLoopback(connection.baseURL) { return "Optional for local endpoint" }
-        return "Paste API key"
+        if storedKeyMatchesTarget { return String(localized: "Leave blank to keep saved key") }
+        if !headers.isEmpty { return String(localized: "Optional with request headers") }
+        if AIEndpointPolicy.isLoopback(connection.baseURL) {
+            return String(localized: "Optional for local endpoint")
+        }
+        return String(localized: "Paste API key")
     }
 
     private var modelSearchPlaceholder: String {
         connection.provider == .openRouter
-            ? "Search by model or company" : "Search available models"
+            ? String(localized: "Search by model or company") : String(localized: "Search available models")
     }
 
     private func matchingModels(
@@ -296,13 +398,7 @@ struct AIConnectionEditorPanel: View {
     }
 
     private func addExactMatch(from models: [AIModelDiscovery.Model]) {
-        let query = modelQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard
-            let match = models.first(where: {
-                $0.id.caseInsensitiveCompare(query) == .orderedSame
-                    || $0.name.caseInsensitiveCompare(query) == .orderedSame
-            })
-        else { return }
+        guard let match = AIModelDiscovery.exactMatch(models, query: modelQuery) else { return }
         addModel(match)
     }
 
@@ -313,6 +409,13 @@ struct AIConnectionEditorPanel: View {
     }
 
     private func discoverModels() async {
+        let requestHeaders: [String: String]
+        do {
+            requestHeaders = try validatedHeaders()
+        } catch {
+            discovery = .failed(error.localizedDescription, allowsManualEntry: false)
+            return
+        }
         let enteredKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
         let apiKey: String
         if !enteredKey.isEmpty {
@@ -322,10 +425,11 @@ struct AIConnectionEditorPanel: View {
                 apiKey = try KeychainSecretStore.aiAPIKeys.secret(for: connection.id) ?? ""
             } catch {
                 discovery = .failed(
-                    "The saved key could not be read from Keychain.", allowsManualEntry: false)
+                    String(localized: "The saved key could not be read from Keychain."),
+                    allowsManualEntry: false)
                 return
             }
-        } else if AIEndpointPolicy.isLoopback(connection.baseURL) {
+        } else if AIEndpointPolicy.isLoopback(connection.baseURL) || !requestHeaders.isEmpty {
             apiKey = ""
         } else {
             discovery = .waitingForKey
@@ -338,14 +442,15 @@ struct AIConnectionEditorPanel: View {
         } catch {
             discovery = .failed(
                 (error as? LocalizedError)?.errorDescription
-                    ?? "Enter a valid provider base URL.",
+                    ?? String(localized: "Enter a valid provider base URL."),
                 allowsManualEntry: false)
             return
         }
         discovery = .loading
         do {
             let models = try await modelDiscovery.models(
-                provider: connection.provider, baseURL: baseURL, apiKey: apiKey)
+                provider: connection.provider, baseURL: baseURL, apiKey: apiKey,
+                headers: requestHeaders)
             guard !Task.isCancelled else { return }
             discovery = .loaded(models)
         } catch is CancellationError {
@@ -355,9 +460,19 @@ struct AIConnectionEditorPanel: View {
             let catalogError = error as? AIModelDiscovery.DiscoveryError
             discovery = .failed(
                 catalogError?.errorDescription
-                    ?? "The provider could not load models. Enter one manually.",
+                    ?? String(localized: "The provider could not load models. Enter one manually."),
                 allowsManualEntry: catalogError != .rejectedKey)
         }
+    }
+
+    private func validatedHeaders() throws -> [String: String] {
+        try AIRequestHeaders.validated(headers.map { ($0.name, $0.value) })
+    }
+
+    private func addHeader() {
+        let draft = HeaderDraft()
+        headers.append(draft)
+        focusedHeader = draft.id
     }
 
     private func addManualModel() {
@@ -390,12 +505,19 @@ struct AIConnectionEditorPanel: View {
     }
 
     private func save() {
+        let requestHeaders: [String: String]
+        do {
+            requestHeaders = try validatedHeaders()
+        } catch {
+            self.error = error.localizedDescription
+            return
+        }
         if case .failed(_, let allowsManualEntry) = discovery, !allowsManualEntry {
-            error = "Resolve the API key or endpoint error before saving."
+            error = String(localized: "Resolve the API key or endpoint error before saving.")
             return
         }
         guard !connection.models.isEmpty else {
-            error = "Select or add at least one model."
+            error = String(localized: "Select or add at least one model.")
             return
         }
         do {
@@ -403,10 +525,10 @@ struct AIConnectionEditorPanel: View {
         } catch {
             self.error =
                 (error as? LocalizedError)?.errorDescription
-                ?? "Enter a valid provider base URL."
+                ?? String(localized: "Enter a valid provider base URL.")
             return
         }
-        error = onSave(connection, key, target.isNew)
+        error = onSave(connection, key, requestHeaders, target.isNew)
     }
 }
 

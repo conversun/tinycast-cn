@@ -1,7 +1,6 @@
 import Carbon.HIToolbox
 import Foundation
 
-/// A binding as a person types it into settings.json. See docs/features/settings-file.md.
 struct HotKeySpelling: Sendable {
     /// The Hyper chord in Carbon bits while a Hyper key is set, so it spells as `hyper` again.
     let hyperModifiers: Int?
@@ -165,8 +164,16 @@ struct HotKeySpelling: Sendable {
     }
 
     private static func name(of key: ModifierKey) -> String {
-        guard let side = key.side, let modifier = key.modifier else { return "globe" }
-        return side.lowercased() + " " + name(of: modifier)
+        guard let side = Self.side(of: key), let modifier = key.modifier else { return "globe" }
+        return side + " " + name(of: modifier)
+    }
+
+    private static func side(of key: ModifierKey) -> String? {
+        switch key {
+        case .leftControl, .leftOption, .leftShift, .leftCommand: "left"
+        case .rightControl, .rightOption, .rightShift, .rightCommand: "right"
+        case .globe: nil
+        }
     }
 
     private static func modifierKey(named name: String) -> ModifierKey? {
@@ -175,7 +182,7 @@ struct HotKeySpelling: Sendable {
             return nil
         }
         return ModifierKey.allCases.first {
-            $0.side?.lowercased() == String(parts[0]) && $0.modifier == modifier
+            side(of: $0) == String(parts[0]) && $0.modifier == modifier
         }
     }
 

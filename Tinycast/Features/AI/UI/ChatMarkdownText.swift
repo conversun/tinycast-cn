@@ -8,7 +8,7 @@ struct ChatMarkdownText: View {
     @Environment(\.chatCitations) private var citations
     @Environment(\.chatFindPath) private var path
     let blocks: [MarkdownBlock]
-    var failed = false
+    var failedFrom: Int?
 
     /// Where the current find match sits in this text, so the transcript can scroll to it.
     @State private var currentMatch: CGRect?
@@ -22,7 +22,7 @@ struct ChatMarkdownText: View {
         ChatTextRepresentable(
             source: ChatMarkdownSource(
                 blocks: blocks, highlight: highlight, citations: citations, prefix: path,
-                failed: failed, metrics: metrics)
+                failedFrom: failedFrom, metrics: metrics)
         ) { rect in
             if rect != currentMatch { currentMatch = rect }
         }
@@ -63,6 +63,7 @@ final class ChatSelectableTextView: NSTextView {
     private var source: ChatMarkdownSource?
     private var rendered: ChatRenderedText?
     private var headers: [ChatCodeHeader] = []
+    private var codeBoxes: [CGRect] = []
     private var reportedMatch: CGRect?
     /// A second layout of the same storage, so SwiftUI's size probes never re-wrap the drawn one.
     private let measurer = NSLayoutManager()
@@ -93,7 +94,6 @@ final class ChatSelectableTextView: NSTextView {
         linkTextAttributes = [.foregroundColor: NSColor.linkColor, .cursor: NSCursor.pointingHand]
     }
 
-    /// AppKit's own designated initializer; `NSTextView(frame:)` routes through it.
     override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
         super.init(frame: frameRect, textContainer: container)
     }
@@ -168,13 +168,62 @@ final class ChatSelectableTextView: NSTextView {
         layoutOverlays()
     }
 
-    /// The code headers and find's anchor sit on the drawn layout, which tracks the frame.
+    override func mouseMoved(with event: NSEvent) {
+        guard ownsPointer() else {
+            NSCursor.arrow.set()
+            return
+        }
+        super.mouseMoved(with: event)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        guard ownsPointer() else {
+            NSCursor.arrow.set()
+            return
+        }
+        super.cursorUpdate(with: event)
+    }
+
+    /// The tracking area hears the pointer under a code header or anything floated over the text.
+    private func ownsPointer() -> Bool {
+        guard let window, let hit = window.contentView?.hitTest(window.mouseLocationOutsideOfEventStream)
+        else { return false }
+        return hit === self
+            || (hit.isDescendant(of: self) && !headers.contains { hit.isDescendant(of: $0) })
+    }
+
+    /// A text block paints only around drawn glyphs, so a redraw of its header strip skipped it.
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard let metrics = source?.metrics, let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
+        let line = Theme.Size.hairline
+        for box in codeBoxes where box.intersects(rect) {
+            let path = RoundedRectangle(cornerRadius: metrics.radius.codeBlock, style: .continuous)
+                .path(in: box.insetBy(dx: line / 2, dy: line / 2)).cgPath
+            context.addPath(path)
+            context.setFillColor(NSColor(Theme.Colors.cardFill).cgColor)
+            context.fillPath()
+            context.addPath(path)
+            context.setStrokeColor(NSColor(Theme.Colors.cardStroke).cgColor)
+            context.setLineWidth(line)
+            context.strokePath()
+        }
+    }
+
+    /// Code boxes, headers and find's anchor sit on the drawn layout, which tracks the frame.
     private func layoutOverlays() {
         guard frame.width > 0, let layout = layoutManager, let container = textContainer else {
             return
         }
         layout.ensureLayout(for: container)
-        placeHeaders(in: layout)
+        let boxes = (rendered?.codeBlocks ?? []).map { Self.box(of: $0, in: layout) }
+        if boxes != codeBoxes {
+            codeBoxes = boxes
+            needsDisplay = true
+        }
+        placeHeaders()
         let match = rendered?.current.map { range in
             layout.boundingRect(
                 forGlyphRange: layout.glyphRange(forCharacterRange: range, actualCharacterRange: nil),
@@ -187,7 +236,18 @@ final class ChatSelectableTextView: NSTextView {
         Task { @MainActor in report?(match) }
     }
 
-    private func placeHeaders(in layout: NSLayoutManager) {
+    /// A block's bounds take in its margin, which is the indent of the list or quote it sits in.
+    private static func box(of code: ChatRenderedText.CodeBlock, in layout: NSLayoutManager) -> CGRect {
+        let glyphs = layout.glyphRange(forCharacterRange: code.range, actualCharacterRange: nil)
+        let bounds = layout.boundsRect(for: code.block, glyphRange: glyphs)
+        let margin = { code.block.width(for: .margin, edge: $0) }
+        return CGRect(
+            x: bounds.minX + margin(.minX), y: bounds.minY + margin(.minY),
+            width: bounds.width - margin(.minX) - margin(.maxX),
+            height: bounds.height - margin(.minY) - margin(.maxY))
+    }
+
+    private func placeHeaders() {
         let blocks = rendered?.codeBlocks ?? []
         while headers.count > blocks.count { headers.removeLast().removeFromSuperview() }
         while headers.count < blocks.count {
@@ -196,10 +256,8 @@ final class ChatSelectableTextView: NSTextView {
             headers.append(header)
         }
         guard let metrics = source?.metrics else { return }
-        for (header, block) in zip(headers, blocks) {
+        for (header, (block, box)) in zip(headers, zip(blocks, codeBoxes)) {
             header.show(code: block.code, language: block.language, metrics: metrics)
-            let glyphs = layout.glyphRange(forCharacterRange: block.range, actualCharacterRange: nil)
-            let box = layout.boundsRect(for: block.block, glyphRange: glyphs)
             let inset = metrics.spacing.xl
             header.frame = CGRect(
                 x: box.minX + inset, y: box.minY + metrics.spacing.md,
@@ -208,7 +266,6 @@ final class ChatSelectableTextView: NSTextView {
     }
 }
 
-/// A code block's language and its own Copy, in the strip its text block leaves above the code.
 private final class ChatCodeHeader: NSView {
     static var height: CGFloat { ChatMarkdownRenderer.codeHeaderHeight }
 
@@ -236,6 +293,10 @@ private final class ChatCodeHeader: NSView {
 
     override var isFlipped: Bool { true }
 
+    override func resetCursorRects() {
+        addCursorRect(visibleRect, cursor: .arrow)
+    }
+
     func show(code: String, language: String?, metrics: InterfaceMetrics) {
         self.code = code
         label.stringValue = language ?? ""
@@ -250,14 +311,16 @@ private final class ChatCodeHeader: NSView {
     }
 
     private func showIdle() {
-        button.image = NSImage(systemSymbolName: "square.on.square", accessibilityDescription: "Copy Code")
-        button.setAccessibilityLabel("Copy Code")
+        let title = String(localized: "Copy Code")
+        button.image = NSImage(systemSymbolName: "square.on.square", accessibilityDescription: title)
+        button.setAccessibilityLabel(title)
     }
 
     @objc private func copyCode() {
         Paster.copyPlainText(code)
-        button.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Copied")
-        button.setAccessibilityLabel("Copied")
+        let title = String(localized: "Copied")
+        button.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: title)
+        button.setAccessibilityLabel(title)
         reset?.cancel()
         reset = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Theme.Duration.copyFeedback))

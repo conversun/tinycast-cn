@@ -10,20 +10,25 @@ enum AIConnectionKeyPolicy {
     }
 
     static func resolve(
-        enteredKey: String, connection: AIConnection, saved: AIConnection?, hasStoredKey: Bool
+        enteredKey: String, connection: AIConnection, saved: AIConnection?, hasStoredKey: Bool,
+        hasHeaders: Bool
     ) -> Outcome {
         let key = enteredKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if !key.isEmpty { return .store(key) }
-        let isLoopback = AIEndpointPolicy.isLoopback(connection.baseURL)
+        let keyIsOptional = hasHeaders || AIEndpointPolicy.isLoopback(connection.baseURL)
         let retargeted =
             hasStoredKey && saved.map { !AIEndpointPolicy.sameDestination(connection, $0) } == true
         if retargeted {
-            return isLoopback
+            return keyIsOptional
                 ? .removeStored
-                : .reject("Enter an API key for this endpoint — the saved key stays with the old one.")
+                : .reject(
+                    String(
+                        localized: """
+                            Enter an API key for this endpoint — the saved key stays with the old one.
+                            """))
         }
-        guard isLoopback || hasStoredKey else {
-            return .reject("Enter an API key for this remote provider.")
+        guard keyIsOptional || hasStoredKey else {
+            return .reject(String(localized: "Enter an API key for this remote provider."))
         }
         return .keep
     }

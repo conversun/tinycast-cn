@@ -25,7 +25,6 @@ enum PaletteMode: String, CaseIterable, Identifiable {
     case snippets
     case snippetEditor
     case dictionary
-    /// A Raycast extension command rendering into the palette.
     case extensionCommand
 
     var id: String { rawValue }
@@ -65,7 +64,8 @@ enum PaletteMode: String, CaseIterable, Identifiable {
         case .clipboard: return String(localized: "Type to filter entries…")
         case .ai: return String(localized: "Ask anything…")
         case .aiHistory: return String(localized: "Search chats…")
-        case .calculatorHistory: return String(localized: "Do math, convert units, or search your past calculations…")
+        case .calculatorHistory:
+            return String(localized: "Do math, convert units, or search your past calculations…")
         case .emoji: return String(localized: "Search emoji and symbols…")
         case .fileSearch: return String(localized: "Search files and folders…")
         case .menuSearch: return String(localized: "Search menu bar items…")

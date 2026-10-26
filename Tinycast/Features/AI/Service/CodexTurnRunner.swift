@@ -6,6 +6,12 @@ final class CodexTurnRunner {
         You are providing text generation inside Tinycast. Never execute commands, read local files, \
         inspect the environment, or modify files.
         """
+    /// The shell tool is off by flag, so this must not forbid what an armed MCP tool does.
+    private static let toolSafetyInstructions = """
+        You are providing text generation inside Tinycast. You may use the MCP tools supplied with \
+        this request for anything they offer. Never execute commands, read local files, inspect the \
+        environment, or modify files except through them.
+        """
     private static let webSearchInstructions = """
         You may use web search when the answer depends on current or external information. For a \
         follow-up, use the sources already in this conversation and search again when more detail \
@@ -166,7 +172,7 @@ final class CodexTurnRunner {
                 continuation.finish(
                     throwing: AIProviderError.responseFailed(
                         completed["error"]?.objectValue?["message"]?.stringValue
-                            ?? "Codex could not finish the response."))
+                            ?? String(localized: "Codex could not finish the response.")))
             default:
                 continuation.finish(
                     throwing: AIProviderError.responseFailed(
@@ -178,7 +184,7 @@ final class CodexTurnRunner {
             continuation.finish(
                 throwing: AIProviderError.responseFailed(
                     params["error"]?.objectValue?["message"]?.stringValue
-                        ?? "Codex returned an error."))
+                        ?? String(localized: "Codex returned an error.")))
             clear(key)
         default:
             break
@@ -201,7 +207,7 @@ final class CodexTurnRunner {
         // Finished before the interrupt, whose own cleanup would otherwise name a different reason.
         turn.continuation.finish(
             throwing: AIProviderError.responseFailed(
-                "Stopped after \(roundCap) rounds of tool calls."))
+                String(localized: "Stopped after \(roundCap) rounds of tool calls.")))
         interrupt(turn, key: key)
     }
 
@@ -222,7 +228,7 @@ final class CodexTurnRunner {
         for (key, turn) in turns where turn.threadID != nil {
             turn.continuation.finish(
                 throwing: AIProviderError.responseFailed(
-                    "Codex restarted to change the tools another chat can use."))
+                    String(localized: "Codex restarted to change the tools another chat can use.")))
             clear(key)
         }
     }
@@ -272,12 +278,13 @@ final class CodexTurnRunner {
             try Task.checkCancellation()
             guard !model.isEmpty else {
                 throw AIProviderError.unavailable(
-                    "No Codex model is available for this account.")
+                    String(localized: "No Codex model is available for this account."))
             }
             if let id = request.conversationID,
                 turns.values.contains(where: { $0.conversationID == id })
             {
-                throw AIProviderError.unavailable("A reply is already running for this chat.")
+                throw AIProviderError.unavailable(
+                    String(localized: "A reply is already running for this chat."))
             }
             let turn = Turn(
                 continuation: continuation, servers: servers, session: toolServers,
@@ -400,7 +407,8 @@ final class CodexTurnRunner {
             ? "Never invoke tools or access external resources. Use only the request content supplied by Tinycast."
             : "The only tools you may use are \(allowedTools.joined(separator: " and "))."
         let search = request.webSearch ? Self.webSearchInstructions : Self.noWebSearchInstructions
-        return ([Self.safetyInstructions, tools, search] + requestInstructions).joined(separator: "\n\n")
+        let safety = hasTools ? Self.toolSafetyInstructions : Self.safetyInstructions
+        return ([safety, tools, search] + requestInstructions).joined(separator: "\n\n")
     }
 
     private func turnInput(for message: AIMessage) -> [[String: Any]] {
@@ -453,7 +461,8 @@ final class CodexTurnRunner {
     private func clear(_ key: ObjectIdentifier) {
         guard let turn = turns.removeValue(forKey: key) else { return }
         turn.continuation.finish(
-            throwing: AIProviderError.responseFailed("The Codex connection was interrupted."))
+            throwing: AIProviderError.responseFailed(
+                String(localized: "The Codex connection was interrupted.")))
         if let threadID = turn.threadID { client.cancelElicitations(threadID: threadID) }
         if turns.isEmpty { onTurnEnded?() }
     }

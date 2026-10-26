@@ -14,8 +14,8 @@ controller and footer are all that stay in [calendar.md](calendar.md).
 - **The camera settles before the panel opens, and stops after it closes.** `start()` resolves access
   and blocks on `startRunning` first, then hands a settled `Feed` up — so the first frame is live
   video rather than a stage swapped out from under the user, and the TCC prompt never takes key from
-  a panel already up. `stop()` runs from the fade-out's completion, so the camera light never
-  outlives the panel but is never torn down under a visible one either. It also drops the
+  a panel already up. `stop()` runs once AppKit's close animation has left the screen, so the camera
+  light never outlives the panel but is never torn down under a visible one either. It also drops the
   `AVCaptureSession`, so every open builds its own: a reused session with no output of its own — the
   preview's — restarts to a black stage.
 - **Escape, click-away and the shot all end the same way.** Every route goes through

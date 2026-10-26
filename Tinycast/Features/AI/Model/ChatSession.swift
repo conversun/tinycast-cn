@@ -128,14 +128,18 @@ struct ChatSession: Equatable, Sendable {
         return true
     }
 
-    /// What Copy Chat puts on the pasteboard: each turn under its speaker, attachments by name.
     func markdownTranscript(title: String) -> String {
         var parts = ["# \(title)"]
         for message in messages
         where !message.text.isEmpty || !message.documents.isEmpty || !message.images.isEmpty {
-            var turn = message.role == .user ? "**You**" : "**AI**"
-            let names = message.documents.map(\.name) + message.images.map { _ in "Image" }
-            if !names.isEmpty { turn += " _(attached: \(names.joined(separator: ", ")))_" }
+            let speaker = message.role == .user ? String(localized: "You") : String(localized: "AI")
+            var turn = "**\(speaker)**"
+            let names =
+                message.documents.map(\.name) + message.images.map { _ in String(localized: "Image") }
+            if !names.isEmpty {
+                let attached = String(localized: "attached: \(names.joined(separator: ", "))")
+                turn += " _(\(attached))_"
+            }
             // The choices fence drew buttons; in a pasted transcript it is only markup.
             let text = message.role == .assistant ? ChatChoices.split(message.text).text : message.text
             parts.append(turn + "\n\n" + text)

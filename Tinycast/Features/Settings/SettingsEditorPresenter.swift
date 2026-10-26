@@ -101,7 +101,7 @@ final class SettingsEditorPresenter: NSObject {
         }
     }
 
-    private final class Panel: NSPanel {
+    private final class Panel: NSPanel, AnimatedPanel {
         var cancelHandler: (() -> Void)?
 
         init(content: NSView, cornerRadius: CGFloat) {
@@ -116,7 +116,7 @@ final class SettingsEditorPresenter: NSObject {
             isOpaque = false
             backgroundColor = .clear
             hasShadow = true
-            animationBehavior = .none
+            followMotion()
             isMovableByWindowBackground = false
             isReleasedWhenClosed = false
             content.wantsLayer = true
@@ -137,28 +137,6 @@ final class SettingsEditorPresenter: NSObject {
         /// The fallback: a panel whose content declares `.cancelAction` handles Escape itself.
         override func cancelOperation(_ sender: Any?) {
             cancelHandler?()
-        }
-
-        func animateEntrance(offset: CGFloat, startingOpacity: CGFloat, duration: TimeInterval) {
-            guard let layer = contentView?.layer else { return }
-
-            let movement = CABasicAnimation(keyPath: "transform.translation.y")
-            movement.fromValue = -offset
-            movement.toValue = 0
-            movement.duration = duration
-
-            let opacity = CABasicAnimation(keyPath: "opacity")
-            opacity.fromValue = startingOpacity
-            opacity.toValue = 1
-            opacity.duration = duration
-
-            let entrance = CAAnimationGroup()
-            entrance.animations = [movement, opacity]
-            entrance.duration = duration
-            entrance.timingFunction = CAMediaTimingFunction(name: .easeOut)
-
-            layer.add(entrance, forKey: "settingsEditorEntrance")
-            alphaValue = 1
         }
 
         func focusFirstControl() {
@@ -183,7 +161,8 @@ final class SettingsEditorPresenter: NSObject {
             contentView = NSHostingView(
                 rootView: Theme.Colors.dialogDimming
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .ignoresSafeArea())
+                    .ignoresSafeArea()
+                    .motionScope())
         }
 
         override var canBecomeKey: Bool { false }
@@ -295,38 +274,20 @@ final class SettingsEditorPresenter: NSObject {
         // Its own resize too: the content sizes the panel, so a growing form must re-centre it.
         observeResize(of: panel)
         layout(presentation)
-        panel.alphaValue = 0
         parent.addChildWindow(blocker, ordered: .above)
         parent.addChildWindow(panel, ordered: .above)
         blocker.fadeIn(duration: Theme.Duration.dialogEnter) { blocker.orderFront(nil) }
         panel.makeKeyAndOrderFront(nil)
-        prepareEntrance(panel: panel)
+        focusAfterLayout(panel: panel)
     }
 
-    private func prepareEntrance(panel: Panel) {
+    private func focusAfterLayout(panel: Panel) {
         Task { @MainActor [weak self, weak panel] in
             await Task.yield()
             guard let self, let panel,
                 self.presentations.contains(where: { $0.panel === panel })
             else { return }
             panel.focusFirstControl()
-            await Task.yield()
-            guard self.presentations.contains(where: { $0.panel === panel }) else { return }
-            animateEntrance(panel: panel)
-        }
-    }
-
-    private func animateEntrance(panel: Panel) {
-        panel.animateEntrance(
-            offset: Theme.DialogMotion.offset,
-            startingOpacity: Theme.DialogMotion.initialOpacity,
-            duration: Theme.Duration.dialogEnter)
-        Task { @MainActor [weak self, weak panel] in
-            try? await Task.sleep(for: .seconds(Theme.Duration.dialogEnter))
-            guard let self, let panel,
-                self.presentations.contains(where: { $0.panel === panel })
-            else { return }
-            panel.animationBehavior = .utilityWindow
         }
     }
 
@@ -435,5 +396,6 @@ extension View {
             .environment(core.chatGPTSubscription)
             .environment(core.installedAI)
             .scrollContentBackground(.hidden)
+            .motionScope()
     }
 }

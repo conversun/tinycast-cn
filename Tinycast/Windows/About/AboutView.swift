@@ -7,7 +7,7 @@ struct AboutView: View {
     private static var version: String {
         let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
-        return String(format: "Version %@ (%@)".localizedUI, short, build)
+        return String(localized: "Version \(short) (\(build))")
     }
 
     // Cached, and read from the bundle: the app icon is generic until LaunchServices registers.
@@ -59,6 +59,7 @@ struct AboutView: View {
                 Text(Self.version)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.vertical, Theme.Spacing.xs / 2)
                     .background(
@@ -128,7 +129,6 @@ struct AboutView: View {
     }
 }
 
-/// One external destination in the About "Links" card.
 private struct AboutLink: Identifiable {
     enum Glyph {
         case symbol(String)
@@ -144,7 +144,7 @@ private struct AboutLink: Identifiable {
 
     static let all: [AboutLink] = [
         AboutLink(
-            id: "website", glyph: .symbol("globe"), title: "Website",
+            id: "website", glyph: .symbol("globe"), title: String(localized: "Website"),
             detail: "tinycast.dev",
             url: URL(string: "https://tinycast.dev/")!),
         AboutLink(
@@ -153,18 +153,17 @@ private struct AboutLink: Identifiable {
             url: URL(string: "https://github.com/abue-ammar/tinycast")!),
         AboutLink(
             id: "discord", glyph: .brand("BrandDiscord"), title: "Discord",
-            detail: "Join the Tinycast community",
+            detail: String(localized: "Join the Tinycast community"),
             url: URL(string: "https://discord.gg/v2Eeb4QQy3")!),
         AboutLink(
             id: "x", glyph: .brand("BrandX"), title: "X", detail: "@abue_ammar",
             url: URL(string: "https://x.com/abue_ammar")!),
         AboutLink(
-            id: "email", glyph: .symbol("envelope"), title: "Email",
+            id: "email", glyph: .symbol("envelope"), title: String(localized: "Email"),
             detail: "iabueammar@gmail.com", url: URL(string: "mailto:iabueammar@gmail.com")!)
     ]
 }
 
-/// A row in the About "Links" card: glyph, title, destination and the arrow.
 private struct AboutLinkRow: View {
     let link: AboutLink
 
@@ -176,7 +175,7 @@ private struct AboutLinkRow: View {
         } label: {
             LabeledContent {
                 HStack(spacing: Theme.Spacing.sm) {
-                    Text(link.detail.localizedUI)
+                    Text(link.detail)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                     Image(systemName: "arrow.up.right")
@@ -185,7 +184,7 @@ private struct AboutLinkRow: View {
                 }
             } label: {
                 Label {
-                    Text(link.title.localizedUI)
+                    Text(link.title)
                 } icon: {
                     glyph
                 }

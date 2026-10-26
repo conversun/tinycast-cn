@@ -85,23 +85,11 @@ enum PalettePlacement {
     }
 }
 
-/// The anchors a menu window can follow.
 enum MenuPanelCorner: Equatable {
     case bottomLeading
     case bottomTrailing
     case belowHeaderTrailing
     case belowControl(CGRect, trailing: Bool = true)
-
-    /// The edge a menu grows from: an input menu flipped above its control grows up from it.
-    func layerAnchor(for frame: CGRect, parentFrame: CGRect) -> CGPoint {
-        switch self {
-        case .bottomLeading: CGPoint(x: 0, y: 0)
-        case .bottomTrailing: CGPoint(x: 1, y: 0)
-        case .belowHeaderTrailing: CGPoint(x: 1, y: 1)
-        case .belowControl(let control, let trailing):
-            CGPoint(x: trailing ? 1 : 0, y: frame.minY >= parentFrame.maxY - control.minY ? 0 : 1)
-        }
-    }
 
     func frame(
         contentSize: CGSize, parentFrame: CGRect, visibleFrame: CGRect,
@@ -142,14 +130,5 @@ enum MenuPanelCorner: Equatable {
                     bounds.minX),
                 bounds.maxX - contentSize.width),
             y: min(max(y, bounds.minY), bounds.maxY - contentSize.height))
-    }
-
-    func scaledFrame(_ frame: CGRect, by scale: CGFloat, parentFrame: CGRect) -> CGRect {
-        let size = CGSize(width: frame.width * scale, height: frame.height * scale)
-        let anchor = layerAnchor(for: frame, parentFrame: parentFrame)
-        let origin = CGPoint(
-            x: frame.minX - (size.width - frame.width) * anchor.x,
-            y: frame.minY - (size.height - frame.height) * anchor.y)
-        return CGRect(origin: origin, size: size)
     }
 }

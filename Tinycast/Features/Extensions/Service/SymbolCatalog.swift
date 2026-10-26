@@ -5,8 +5,8 @@ struct SymbolCategory: Identifiable, Hashable, Sendable {
     let id: String
     let title: String
 
-    static let suggested = SymbolCategory(id: "tinycast.suggested", title: "Suggested")
-    static let all = SymbolCategory(id: "tinycast.all", title: "All Symbols")
+    static let suggested = SymbolCategory(id: "tinycast.suggested", title: String(localized: "Suggested"))
+    static let all = SymbolCategory(id: "tinycast.all", title: String(localized: "All Symbols"))
     static let bundled = SymbolCategory(id: "tinycast.bundled", title: "Tinycast")
 }
 
@@ -34,32 +34,22 @@ struct SymbolCatalog: Sendable {
     /// What the picker opens on: scrolling eight thousand icons is not a way to choose one.
     static let suggested =
         bundledGlyphs + [
-            // Status & power
             "bolt.fill", "cup.and.saucer.fill", "moon.fill", "sun.max.fill", "power", "battery.100",
             "eye.fill", "bell.fill", "sparkles", "wand.and.stars",
-            // Time
             "calendar", "clock.fill", "timer", "hourglass", "alarm.fill",
-            // Text & documents
             "doc.text.fill", "text.alignleft", "checklist", "list.bullet", "note.text",
             "folder.fill", "tray.full.fill", "archivebox.fill", "book.fill", "bookmark.fill",
-            // Communication
             "envelope.fill", "message.fill", "paperplane.fill", "phone.fill", "video.fill",
             "person.2.fill", "bubble.left.and.bubble.right.fill",
-            // Media
             "music.note", "speaker.wave.2.fill", "headphones", "photo.fill", "camera.fill",
             "play.fill", "pause.fill", "paintbrush.fill", "theatermasks.fill",
-            // Developer
             "terminal.fill", "chevron.left.forwardslash.chevron.right", "hammer.fill",
             "wrench.and.screwdriver.fill", "ant.fill", "cpu", "memorychip", "externaldrive.fill",
             "server.rack", "shippingbox.fill",
-            // System & network
             "gearshape.fill", "slider.horizontal.3", "network", "globe", "link", "wifi",
             "display", "keyboard", "cursorarrow.rays", "square.grid.2x2.fill",
-            // Security & money
             "lock.fill", "key.fill", "shield.fill", "creditcard.fill", "cart.fill", "banknote.fill",
-            // Data
             "chart.bar.fill", "chart.pie.fill", "function", "number", "brain",
-            // Places & things
             "star.fill", "heart.fill", "flag.fill", "tag.fill", "map.fill", "location.fill",
             "airplane", "car.fill", "leaf.fill", "flame.fill", "drop.fill", "snowflake",
             "cloud.fill", "gift.fill", "trash.fill", "arrow.triangle.2.circlepath"
@@ -156,15 +146,19 @@ struct SymbolCatalog: Sendable {
 
     /// Anything absent is a rendering-mode bucket, not a browsable subject.
     private nonisolated static let categoryTitles: [String: String] = [
-        "communication": "Communication", "weather": "Weather", "maps": "Maps",
-        "objectsandtools": "Objects & Tools", "devices": "Devices",
-        "cameraandphotos": "Camera & Photos", "gaming": "Gaming",
-        "connectivity": "Connectivity", "transportation": "Transportation",
-        "automotive": "Automotive", "accessibility": "Accessibility",
-        "privacyandsecurity": "Privacy & Security", "human": "People", "home": "Home",
-        "fitness": "Fitness", "nature": "Nature", "editing": "Editing",
-        "textformatting": "Text Formatting", "media": "Media", "keyboard": "Keyboard",
-        "commerce": "Commerce", "time": "Time", "health": "Health", "shapes": "Shapes",
-        "arrows": "Arrows", "indices": "Indices", "math": "Math"
+        "communication": String(localized: "Communication"), "weather": String(localized: "Weather"),
+        "maps": String(localized: "Maps"), "objectsandtools": String(localized: "Objects & Tools"),
+        "devices": String(localized: "Devices"), "cameraandphotos": String(localized: "Camera & Photos"),
+        "gaming": String(localized: "Gaming"), "connectivity": String(localized: "Connectivity"),
+        "transportation": String(localized: "Transportation"),
+        "automotive": String(localized: "Automotive"), "accessibility": String(localized: "Accessibility"),
+        "privacyandsecurity": String(localized: "Privacy & Security"), "human": String(localized: "People"),
+        "home": String(localized: "Home"), "fitness": String(localized: "Fitness"),
+        "nature": String(localized: "Nature"), "editing": String(localized: "Editing"),
+        "textformatting": String(localized: "Text Formatting"), "media": String(localized: "Media"),
+        "keyboard": String(localized: "Keyboard"), "commerce": String(localized: "Commerce"),
+        "time": String(localized: "Time"), "health": String(localized: "Health"),
+        "shapes": String(localized: "Shapes"), "arrows": String(localized: "Arrows"),
+        "indices": String(localized: "Indices"), "math": String(localized: "Math")
     ]
 }

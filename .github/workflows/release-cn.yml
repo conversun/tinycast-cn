@@ -114,6 +114,7 @@ jobs:
             build
           APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app"
           for BIN in "$APP/Contents/MacOS/Tinycast" "$APP/Contents/Helpers/ClipboardTextHelper" \
+            "$APP/Contents/Helpers/FileIndexHelper" \
             "$APP/Contents/Helpers/Tinycast Dictation.app/Contents/MacOS/Tinycast Dictation"; do
             ARCHS_BUILT="$(lipo -archs "$BIN")"
             for WANT in arm64 x86_64; do
@@ -152,6 +153,7 @@ jobs:
           "${TMPDIR:-/tmp}/tinycast-harness/updates-test" "$EXPANDED_APP"
           for BIN in "$EXPANDED_APP/Contents/MacOS/Tinycast" \
             "$EXPANDED_APP/Contents/Helpers/ClipboardTextHelper" \
+            "$EXPANDED_APP/Contents/Helpers/FileIndexHelper" \
             "$EXPANDED_APP/Contents/Helpers/Tinycast Dictation.app/Contents/MacOS/Tinycast Dictation"; do
             ARCHS_BUILT="$(lipo -archs "$BIN")"
             for WANT in arm64 x86_64; do

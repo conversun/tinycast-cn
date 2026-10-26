@@ -108,7 +108,9 @@ private struct RoomPickerRowView: View {
         .armedHover($hovered)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
-        .accessibilityValue(place.map { "\(trailing), number \($0) in the room" } ?? trailing)
+        .accessibilityValue(
+            place.map { String(localized: "\(trailing), number \($0) in the room") } ?? trailing
+        )
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -118,7 +120,7 @@ private struct RoomPickerRowView: View {
                 .strokeBorder(place == nil ? Theme.Colors.cardStroke : .clear, lineWidth: 1)
                 .background(Circle().fill(place == nil ? .clear : Theme.Colors.roomCardStroke))
             if let place {
-                Text("\(place)")
+                Text(place, format: .number)
                     .font(metrics.typography.rowTrailing.weight(.semibold))
                     .foregroundStyle(.white)
             }

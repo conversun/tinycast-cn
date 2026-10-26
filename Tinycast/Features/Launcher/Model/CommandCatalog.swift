@@ -29,7 +29,7 @@ enum CommandCatalog {
     /// The row a typed web address earns; unlike a catalog entry, its URL is the real destination.
     static func openInBrowser(for query: String) -> AppEntry? {
         guard case .web(let url)? = QuicklinkDestination.detect(query) else { return nil }
-        return makeEntry(.openInBrowser, url: url, subtitle: "URL")
+        return makeEntry(.openInBrowser, url: url, subtitle: String(localized: "URL"))
     }
 
     /// A command's row, built rather than looked up — `all` holds none of the query-driven ones.
@@ -39,7 +39,7 @@ enum CommandCatalog {
         AppEntry(
             id: id.rawValue, name: id.name, url: url ?? placeholderURL(id), bundleID: nil,
             kind: id.entryKind, settingsOwner: id.owner, subtitle: subtitle,
-            alternateTitles: [id.untranslatedName])
+            alternateTitles: [id.englishName])
     }
 
     nonisolated private static func placeholderURL(_ id: CommandID) -> URL {
@@ -59,7 +59,7 @@ extension SettingsTab {
         case .fileSearch: [.searchFiles]
         case .notes: [.showNotes, .createNote, .searchNotes]
         case .snippets: [.searchSnippets, .createSnippet]
-        case .navigation: [.switchWindows, .searchMenuItems]
+        case .navigation: [.switchWindows, .switchWindowsBackwards, .searchMenuItems]
         case .windowManagement:
             [.createWindowLayout, .captureWindowLayout, .switchRoom, .createRoom]
         case .clipboard: [.clipboardHistory, .pasteSequentially]

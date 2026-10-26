@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
+import { reveal } from "../../lib/reveal";
+import { RevealWords } from "./reveal-words";
 
 type SectionProps = {
   id: string;
   /** Position on the page, shown as "01". Sections are read top to bottom. */
   index: number;
   label: string;
-  title: ReactNode;
+  title: string;
   intro?: ReactNode;
   children: ReactNode;
 };
@@ -18,7 +20,10 @@ export function SectionLabel({
   label: string;
 }) {
   return (
-    <p className="flex items-baseline gap-2.5 font-mono text-eyebrow uppercase">
+    <p
+      className="flex items-baseline gap-2.5 font-mono text-eyebrow uppercase"
+      {...reveal("text")}
+    >
       <span className="text-violet-bright">
         {String(index).padStart(2, "0")}
       </span>
@@ -38,9 +43,14 @@ export function Section({
   const header = (
     <div className="max-w-2xl">
       <SectionLabel index={index} label={label} />
-      <h2 className="mt-4 text-heading">{title}</h2>
+      <h2 className="mt-4 text-heading" {...reveal("words", 1)}>
+        <RevealWords text={title} />
+      </h2>
       {intro && (
-        <p className="mt-4 max-w-xl text-pretty text-body-lg text-fg-muted">
+        <p
+          className="mt-4 max-w-xl text-pretty text-body-lg text-fg-muted"
+          {...reveal("text", 2)}
+        >
           {intro}
         </p>
       )}
@@ -51,7 +61,9 @@ export function Section({
     <section id={id} className="relative">
       <div className="px-4 py-20 sm:px-10 sm:py-24">
         {header}
-        <div className="mt-12">{children}</div>
+        <div className="mt-12" {...reveal("content", 3)}>
+          {children}
+        </div>
       </div>
     </section>
   );

@@ -2,6 +2,7 @@
 
 import { Action, ActionPanel, Detail, Form, Grid, List, MenuBarExtra, Navigation, setActionEffects, useNavigation } from "./components.js";
 import * as enums from "./enums.generated.js";
+import { OAuth } from "./oauth.js";
 import * as system from "./system.js";
 
 const { nestedEnums, ...flatEnums } = enums;
@@ -81,7 +82,7 @@ function rejectingNamespace(name, members) {
 }
 
 const AI = {
-  ...rejectingNamespace("AI", ["ask"]),
+  ...rejectingNamespace("AI", ["ask", "experimental_decide", "refreshModels"]),
   Model: Object.freeze({}),
   Creativity: Object.freeze({}),
 };
@@ -143,6 +144,7 @@ export const raycastApi = {
   captureException: system.captureException,
   launchCommand: system.launchCommand,
   updateCommandMetadata: system.updateCommandMetadata,
+  OAuth,
 
   // Unimplemented namespaces
   AI,

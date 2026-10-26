@@ -43,14 +43,13 @@ enum Fallback: Hashable, Sendable {
         }
     }
 
-    /// The footer pill's verb: what ↵ does, in the destination's own words.
     var openVerb: String {
         switch self {
-        case .builtin(.quickAI): return "Ask Quick AI"
-        case .builtin(.searchFiles): return "Search Files"
-        case .builtin(.runShellCommand): return "Run Shell Command"
-        case .builtin(.define): return "Define Word"
-        case .quicklink: return "Open Quicklink"
+        case .builtin(.quickAI): return String(localized: "Ask Quick AI")
+        case .builtin(.searchFiles): return String(localized: "Search Files")
+        case .builtin(.runShellCommand): return String(localized: "Run Shell Command")
+        case .builtin(.define): return String(localized: "Define Word")
+        case .quicklink: return String(localized: "Open Quicklink")
         }
     }
 
@@ -63,10 +62,8 @@ enum Fallback: Hashable, Sendable {
 
     /// The section header. A long query is elided in the middle, so “with…” always survives.
     static func sectionTitle(query: String, limit: Int = 72) -> String {
-        // One key for both branches: the ellipsis is applied to the query, never to the sentence.
-        let shown =
-            query.count > limit
-            ? "\(query.prefix(limit / 2))…\(query.suffix(limit - limit / 2 - 1))" : query
-        return String(localized: "Use “\(shown)” with…")
+        guard query.count > limit else { return String(localized: "Use “\(query)” with…") }
+        let elided = "\(query.prefix(limit / 2))…\(query.suffix(limit - limit / 2 - 1))"
+        return String(localized: "Use “\(elided)” with…")
     }
 }

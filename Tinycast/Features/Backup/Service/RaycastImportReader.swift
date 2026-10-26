@@ -1,7 +1,6 @@
 import AppKit
 import Foundation
 
-/// Maps a decrypted Raycast payload onto Tinycast's fields. See docs/features/raycast-import.md.
 enum RaycastImportReader {
     static func read(file: URL, passphrase: String) throws -> RaycastImport.Result {
         try map(RaycastDecoder.decrypt(try Data(contentsOf: file), passphrase: passphrase))
@@ -76,14 +75,9 @@ enum RaycastImportReader {
             data.compactMode = (mode == "compact")
             mapped = true
         }
-        if let showFavorites = general?["showFavoritesInCompactMode"] as? Bool {
-            data.showFavoritesInCompactMode = showFavorites
-            mapped = true
-        }
         return mapped ? data : nil
     }
 
-    /// Every Raycast hotkey, in one shape. See docs/features/raycast-import.md.
     private static func mapHotkeys(_ json: [String: Any]) -> SettingsBackup.HotkeyBackup? {
         let settings = json["settings"] as? [String: Any]
         var hotkeys = SettingsBackup.HotkeyBackup()
@@ -200,7 +194,6 @@ enum RaycastImportReader {
 
     // MARK: - Helpers
 
-    /// First value stored under `key` anywhere in a nested JSON object/array tree.
     private static func firstValue(forKey key: String, in object: Any) -> Any? {
         if let dict = object as? [String: Any] {
             if let hit = dict[key] { return hit }

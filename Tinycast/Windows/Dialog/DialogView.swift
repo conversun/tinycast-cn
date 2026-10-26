@@ -34,10 +34,10 @@ struct DialogView: View {
                 }
 
                 VStack(alignment: .leading, spacing: metrics.spacing.sm) {
-                    Text(request.title.localizedUI)
+                    Text(request.title)
                         .font(metrics.typography.panelTitle)
                     if let message = request.message {
-                        Text(message.localizedUI)
+                        Text(message)
                             .font(metrics.typography.rowTitle)
                             .foregroundStyle(Theme.Colors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -47,6 +47,7 @@ struct DialogView: View {
                 switch request.accessory {
                 case .volume(let volume): VolumeSlider(state: volume)
                 case .snippetArguments(let arguments): SnippetArgumentFields(state: arguments)
+                case .clipboardText(let state): ClipboardEditField(state: state)
                 case nil: EmptyView()
                 }
             }
@@ -84,7 +85,7 @@ struct DialogView: View {
             DialogButton(
                 action: request.actions[index],
                 isDefault: index == request.defaultIndex,
-                keyCap: keyCap(for: index),
+                keyCaps: keyCaps(for: index),
                 singleLine: singleLine,
                 onActivate: { onChoose(index) }
             )
@@ -101,11 +102,13 @@ struct DialogView: View {
         request.actions[index].role == .cancel ? 0 : 1
     }
 
-    /// Only the two keys the panel handles are advertised, so a tooltip can't drift.
-    private func keyCap(for index: Int) -> String? {
-        if index == request.defaultIndex { return "↵" }
-        if index == request.cancelIndex { return "⎋" }
-        return nil
+    /// Only the keys the panel handles are advertised, so a tooltip can't drift.
+    private func keyCaps(for index: Int) -> [String] {
+        if index == request.defaultIndex {
+            return request.accessory?.acceptsLineBreaks == true ? ["⌘", "↵"] : ["↵"]
+        }
+        if index == request.cancelIndex { return ["esc"] }
+        return []
     }
 }
 
@@ -135,18 +138,18 @@ private struct DialogSymbol: View {
 private struct DialogButton: View {
     let action: DialogAction
     let isDefault: Bool
-    let keyCap: String?
+    let keyCaps: [String]
     var singleLine = false
     let onActivate: () -> Void
 
     var body: some View {
         Button(action: onActivate) {
-            Text(action.title.localizedUI)
+            Text(action.title)
                 .fixedSize(horizontal: singleLine, vertical: false)
                 .multilineTextAlignment(.center)
         }
         .buttonStyle(.modalAction(role))
-        .tooltip(keyCap: keyCap)
+        .tooltip(keyCaps: keyCaps)
     }
 
     private var role: ModalActionButtonStyle.Role {

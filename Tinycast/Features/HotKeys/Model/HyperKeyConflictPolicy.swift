@@ -24,8 +24,12 @@ enum HyperKeyConflictPolicy {
     static let knownApps: [KnownApp] = [
         KnownApp(bundleID: "com.hegenberg.BetterTouchTool", severity: .warning),
         KnownApp(bundleID: "com.knollsoft.Hyperkey", severity: .blocking),
-        KnownApp(bundleID: "com.knollsoft.Superkey", severity: .blocking)
+        KnownApp(bundleID: "com.knollsoft.Superkey", severity: .blocking),
+        KnownApp(bundleID: "com.raycast.macos", severity: .warning)
     ]
+
+    /// Average time another app's keyboard tap holds each event before typing visibly lags.
+    static let slowTapMicroseconds: Float = 50_000
 
     static let secureInputSuspects: Set<String> = [
         "com.1password.1password", "com.agilebits.onepassword7", "com.agilebits.onepassword",

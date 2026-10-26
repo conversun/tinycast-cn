@@ -20,12 +20,12 @@ final class NotesStore {
     private(set) var isSearching = false
     /// Derived from the live draft, not the last listing, so an unnamed note titles itself as typed.
     var activeTitle: String {
-        guard let activeID else { return "Notes" }
+        guard let activeID else { return String(localized: "Notes") }
         let title =
             summaries.first(where: { $0.id == activeID })?.title
             ?? URL(fileURLWithPath: activeID.rawValue).deletingPathExtension().lastPathComponent
         guard NoteTitle.isUnnamed(title) else { return title }
-        return NoteTitle.firstLine(of: source) ?? title
+        return NoteTitle.firstLine(of: source) ?? NoteTitle.displayName(title)
     }
     var activeFileURL: URL? { activeID.map(repository.fileURL(for:)) }
     private(set) var notesDirectory: URL

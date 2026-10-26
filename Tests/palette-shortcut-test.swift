@@ -1,6 +1,5 @@
 import Foundation
 
-/// Every row chord resolves to exactly the shortcut the old per-chord handlers answered.
 @main
 @MainActor
 struct PaletteShortcutTests {
@@ -58,7 +57,7 @@ struct PaletteShortcutTests {
         expect(
             resolve("t", command: true, shift: true, option: true), .copyText,
             "an extra Option still reads ⇧⌘T")
-        expect(resolve("y", command: true), .quickLook, "⌘Y toggles Quick Look")
+        expect(resolve("y", command: true), .quickLook, "⌘Y is the Quick Look chord")
         expect(resolve("y", command: true, shift: true), .quickLook, "an extra Shift still reads ⌘Y")
         expect(resolve("o", command: true), .openInApp, "⌘O opens the row in its own app")
         expect(resolve("o", command: true, shift: true), nil, "⇧⌘O is not the open chord")
@@ -82,6 +81,9 @@ struct PaletteShortcutTests {
         expect(
             resolve("q", shift: true, option: true, control: true), .forceQuit,
             "⌃⌥⇧Q force quits the app")
+        expect(resolve("m", shift: true, control: true), .minimizeWindow, "⌃⇧M minimizes the window")
+        expect(resolve("m", command: true), nil, "⌘M stays the app menu's Minimize")
+        expect(resolve("h", shift: true, control: true), .hideApp, "⌃⇧H hides the app")
         expect(resolve("r", command: true), .restart, "⌘R restarts the app")
         expect(resolve("r", command: true, shift: true), .restart, "an extra Shift still reads ⌘R")
 
@@ -104,8 +106,8 @@ struct PaletteShortcutTests {
 
         let expanded: [PaletteShortcut] = [
             .copyFile, .copyName, .copyPath, .copyText, .pasteFile, .quickLook, .openInApp,
-            .showDetails, .toggleFavorite, .hideFromSearch, .quit, .forceQuit, .restart, .edit,
-            .duplicate, .showInFinder
+            .showDetails, .toggleFavorite, .hideFromSearch, .quit, .forceQuit, .minimizeWindow,
+            .hideApp, .restart, .edit, .duplicate, .showInFinder
         ]
         let anywhere: [PaletteShortcut] = [
             .commandDelete, .delete, .deleteAll, .pin, .favoriteSlot(0), .continueInChat, .newItem,
@@ -120,11 +122,11 @@ struct PaletteShortcutTests {
 
         let closing: [PaletteShortcut] = [
             .delete, .deleteAll, .copyFile, .copyName, .copyPath, .copyText, .copyCalculation,
-            .quickLook, .openInApp, .showDetails, .toggleFavorite, .hideFromSearch, .newItem, .settings,
-            .edit, .duplicate, .showInFinder
+            .quickLook, .openInApp, .showDetails, .toggleFavorite, .hideFromSearch, .minimizeWindow,
+            .newItem, .settings, .edit, .duplicate, .showInFinder
         ]
         let leaving: [PaletteShortcut] = [
-            .commandDelete, .pasteFile, .quit, .forceQuit, .restart, .pin, .favoriteSlot(0),
+            .commandDelete, .pasteFile, .quit, .forceQuit, .hideApp, .restart, .pin, .favoriteSlot(0),
             .continueInChat
         ]
         for shortcut in closing {

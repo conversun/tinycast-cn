@@ -2,7 +2,6 @@ import Foundation
 
 /// The day a meeting falls on, counted from today, so My Schedule and the menu bar head it alike.
 struct MeetingDay: Hashable, Sendable {
-    /// The midnight that starts the day.
     let start: Date
     /// Whole days after today; a meeting still running from before midnight is happening today.
     let offset: Int
@@ -17,14 +16,13 @@ struct MeetingDay: Hashable, Sendable {
     func title(calendar: Calendar) -> String {
         let date = calendar.formatStyle.month(.abbreviated).day()
         switch offset {
-        case 0: return "Today, \(start.formatted(date))"
-        case 1: return "Tomorrow, \(start.formatted(date))"
+        case 0: return String(localized: "Today, \(start.formatted(date))")
+        case 1: return String(localized: "Tomorrow, \(start.formatted(date))")
         default: return start.formatted(date.weekday(.wide))
         }
     }
 }
 
-/// One day's meetings in start order: a header and the rows beneath it.
 struct MeetingDayGroup: Identifiable, Sendable {
     let day: MeetingDay
     private(set) var meetings: [MeetingEvent]

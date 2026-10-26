@@ -20,6 +20,7 @@ struct FormInputTests {
             testSingleLine()
             testCapAlignment()
             testTextArea()
+            testTextAreaKeepsItsFloor()
             testCodeFont()
         }
         if failures > 0 { exit(1) }
@@ -240,6 +241,22 @@ struct FormInputTests {
         let result = CFRunLoopRunInMode(.defaultMode, 5, false)
         CFRunLoopRemoveObserver(runLoop, observer, .defaultMode)
         expect(result == .stopped, "UI updates reach the run-loop boundary")
+    }
+
+    /// A scroll view lays out once, so a text view that shrank would stay at the bottom.
+    static func testTextAreaKeepsItsFloor() {
+        let draft = Draft()
+        draft.text = "One line"
+        let hosting = NSHostingView(rootView: ScrollView { TextAreaFixture(draft: draft) }.frame(height: 120))
+        let window = window(content: hosting, height: 120)
+        defer { window.close() }
+        guard let input = find(FormTextArea.InputView.self, in: hosting) else {
+            expect(false, "textarea mounts in a scroll view")
+            return
+        }
+        window.makeFirstResponder(input)
+        input.sizeToFit()
+        expect(input.frame.height >= 120, "short text never shrinks the textarea below its minimum")
     }
 
     static func testCodeFont() {

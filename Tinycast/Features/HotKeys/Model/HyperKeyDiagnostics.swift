@@ -6,6 +6,16 @@ struct HyperKeyDiagnostics: Equatable, Sendable {
         let severity: HyperKeyConflictPolicy.Severity
     }
 
+    struct Takeover: Equatable, Sendable {
+        let keyboards: [String]
+        let likelyApps: [String]
+    }
+
+    struct KeyboardTap: Equatable, Sendable {
+        let appName: String
+        let isSlow: Bool
+    }
+
     struct SecureInput: Equatable, Sendable {
         let reportedOwner: String?
         let ownerIsLoginWindow: Bool
@@ -22,6 +32,8 @@ struct HyperKeyDiagnostics: Equatable, Sendable {
     let karabinerVirtualKeyboards: [String]
     let karabinerConflict: Bool
     let capsLockMappingConflicts: [String]
+    let takeover: Takeover?
+    let keyboardTaps: [KeyboardTap]
     let secureInputCompatibilityActive: Bool
     /// Nil while Secure Input is off.
     let secureInput: SecureInput?

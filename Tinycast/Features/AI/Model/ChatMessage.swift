@@ -60,7 +60,6 @@ struct ChatMessage: Identifiable, Equatable, Sendable {
     /// The next search or call's place among the reply's: with no text between, offsets tie.
     var nextSequence: Int { searches.count + toolUses.count }
 
-    /// Every block joined, for find and for a transcript copied out whole.
     var reasoningText: String {
         reasoning.map(\.text).joined(separator: "\n\n")
     }
@@ -125,8 +124,9 @@ struct ChatToolUse: Equatable, Hashable, Sendable {
     let sequence: Int
 
     var label: String {
-        let verb = state == .running ? "Calling" : "Called"
-        return origin.isEmpty ? "\(verb) \(title)" : "\(verb) \(origin) · \(title)"
+        let target = origin.isEmpty ? title : "\(origin) · \(title)"
+        return state == .running
+            ? String(localized: "Calling \(target)") : String(localized: "Called \(target)")
     }
 }
 
@@ -136,9 +136,9 @@ extension Array where Element == ChatToolUse {
     var failedCount: Int { count { $0.state == .failed } }
 
     var completedLabel: String {
-        let label = "Called \(count) tools"
         let failures = failedCount
-        return failures == 0 ? label : "\(label) · \(failures) failed"
+        guard failures > 0 else { return String(localized: "Called \(count) tools") }
+        return String(localized: "Called \(count) tools · \(failures) failed")
     }
 }
 
@@ -149,6 +149,11 @@ struct ChatReasoning: Equatable, Hashable, Sendable {
     let textOffset: Int
     /// Until the answer resumed, or the reply ended; nil while it is still thinking.
     var duration: TimeInterval?
+
+    var displayText: String {
+        guard let last = text.lastIndex(where: { !$0.isWhitespace }) else { return "" }
+        return String(text[...last])
+    }
 }
 
 enum ChatSegment: Equatable, Hashable {

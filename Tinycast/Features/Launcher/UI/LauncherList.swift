@@ -20,6 +20,7 @@ struct LauncherList: View {
     let onActivate: (AppEntry) -> Void
     let onActions: (AppEntry) -> Void
     let onDropped: () -> Void
+    var files: FileSection?
     /// The `Use "…" with` section, always last; nil when nothing is typed.
     var fallbacks: FallbackSection?
     @Environment(RunningAppsMonitor.self) private var runningApps
@@ -33,6 +34,12 @@ struct LauncherList: View {
         let onConfigure: () -> Void
     }
 
+    struct FileSection {
+        let results: [FileSearchResult]
+        let onActivate: (Int) -> Void
+        let onActions: (Int) -> Void
+    }
+
     /// Calc answers a typed query and the card an empty one, so only one ever leads.
     enum LeadCard: Equatable {
         case calc(CalcResult)
@@ -41,9 +48,9 @@ struct LauncherList: View {
 
         var sectionTitle: String {
             switch self {
-            case .calc: return "Calculator"
-            case .meeting: return "Meeting"
-            case .color: return "Color"
+            case .calc: return String(localized: "Calculator")
+            case .meeting: return String(localized: "Meeting")
+            case .color: return String(localized: "Color")
             }
         }
 
@@ -63,6 +70,7 @@ struct LauncherList: View {
         case card(LeadCard)
         /// `slot` is the row's ⌘-digit, carried from the section build rather than searched.
         case app(AppEntry, slot: Character?)
+        case file(FileSearchResult, index: Int)
         case fallback(AppEntry, index: Int)
         var id: String {
             switch self {
@@ -70,14 +78,20 @@ struct LauncherList: View {
             case .fallbackHeader: return "fallback-header"
             case .card(let card): return card.rowID
             case .app(let app, _): return app.id
+            case .file(let result, _): return "file-" + result.id
             case .fallback(let app, _): return "fallback-" + app.id
             }
         }
     }
 
-    /// Whether the selection sits on flat index 0: the card, else the first result.
     private var firstRowSelected: Bool {
         card != nil ? cardSelected : selectedRowID != nil && selectedRowID == results.first?.id
+    }
+
+    private var fileRows: [Row] {
+        guard let files else { return [] }
+        return [.header(String(localized: "Files"))]
+            + files.results.enumerated().map { Row.file($1, index: $0) }
     }
 
     /// Every row the fallback section contributes, always after the results.
@@ -99,22 +113,22 @@ struct LauncherList: View {
         var grouped: [AppEntry.Kind: [AppEntry]] = [:]
         for app in rest { grouped[app.kind, default: []].append(app) }
         if !favorites.isEmpty {
-            rows.append(.header("Favorites"))
+            rows.append(.header(String(localized: "Favorites")))
             rows.append(
                 contentsOf: favorites.enumerated().map {
                     .app($1, slot: FavoriteSlots.digit(at: $0))
                 })
         }
         if !meetings.isEmpty {
-            rows.append(.header(AppEntry.Kind.meeting.descriptor.sectionTitle))
+            rows.append(.header(AppEntry.Kind.meeting.descriptor.sectionTitle.resolved()))
             rows.append(contentsOf: meetings.map { .app($0, slot: nil) })
         }
         if !suggestions.isEmpty {
-            rows.append(.header("Suggestions"))
+            rows.append(.header(String(localized: "Suggestions")))
             rows.append(contentsOf: suggestions.map { .app($0, slot: nil) })
         }
         if !matches.isEmpty {
-            rows.append(.header("Results"))
+            rows.append(.header(String(localized: "Results")))
             rows.append(contentsOf: matches.map { .app($0, slot: nil) })
         }
         // Publication order, so rows match the flat index.
@@ -125,7 +139,7 @@ struct LauncherList: View {
         ]
         for kind in kinds {
             guard let group = grouped[kind], !group.isEmpty else { continue }
-            rows.append(.header(kind.descriptor.sectionTitle))
+            rows.append(.header(kind.descriptor.sectionTitle.resolved()))
             rows.append(contentsOf: group.map { .app($0, slot: nil) })
         }
         // A missing kind would make every later row activate its neighbour: assert instead.
@@ -133,14 +147,14 @@ struct LauncherList: View {
             grouped.keys.allSatisfy(kinds.contains),
             "kind missing from the launcher's section order: "
                 + grouped.keys.filter { !kinds.contains($0) }.map(\.rawValue).joined(separator: ", "))
-        return rows + fallbackRows
+        return rows + fileRows + fallbackRows
     }
 
     var body: some View {
         let rows = rows
         return Group {
-            if results.isEmpty && card == nil && fallbacks == nil {
-                EmptyResults(text: "No apps found")
+            if results.isEmpty && card == nil && files == nil && fallbacks == nil {
+                EmptyResults(text: String(localized: "No apps found"))
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -153,7 +167,7 @@ struct LauncherList: View {
                                     SectionHeader(
                                         title: title, isFirst: row.id == rows.first?.id,
                                         configure: fallbacks?.onConfigure,
-                                        configureHelp: "Configure Fallbacks…")
+                                        configureHelp: String(localized: "Configure Fallbacks…"))
                                 case .card(let card):
                                     LeadCardView(card: card, selected: cardSelected)
                                         .contentShape(Rectangle())
@@ -172,6 +186,17 @@ struct LauncherList: View {
                                     .onRowTap(drag: drag(for: app)) { onActivate(app) }
                                     .onRightClick { onActions(app) }
                                     .selectionFrame(app.id == selectedRowID)
+                                case .file(let result, let index):
+                                    FileSearchRow(
+                                        result: result, selected: row.id == selectedRowID,
+                                        showsLocation: true
+                                    )
+                                    .contentShape(Rectangle())
+                                    .onRowTap(drag: result.rowDrag(dropped: onDropped)) {
+                                        files?.onActivate(index)
+                                    }
+                                    .onRightClick { files?.onActions(index) }
+                                    .selectionFrame(row.id == selectedRowID)
                                 case .fallback(let app, let index):
                                     AppRow(
                                         app: app, selected: row.id == selectedRowID, running: false,
@@ -249,7 +274,6 @@ private struct AppRow: View {
         return .clear
     }
 
-    /// Keycaps for this entry's hotkey, or `nil` if none is bound.
     private var shortcutCaps: [String]? {
         guard let action = app.hotKeyAction else { return nil }
         return hotKeys.binding(for: action)?.keycaps
@@ -304,7 +328,6 @@ private struct AppRow: View {
                 ExtensionRefreshIndicator(state: refresh)
                     .font(metrics.typography.rowTrailing)
             }
-            // Holding ⌘ turns the trailing label into the chord that launches this row.
             if let slot, palette.commandHeld {
                 HStack(spacing: metrics.spacing.xxs) {
                     KeyCapChip(text: "⌘", style: .outline)
@@ -313,7 +336,7 @@ private struct AppRow: View {
             } else if app.kind == .meeting {
                 MeetingEntryContent(entryID: app.id) { MeetingTiming(meeting: $0, now: $1) }
             } else {
-                Text(app.kindLabel.localizedUI)
+                Text(app.kindLabel)
                     .font(metrics.typography.rowTrailing)
                     .foregroundStyle(.secondary)
             }

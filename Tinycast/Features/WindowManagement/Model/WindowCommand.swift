@@ -41,7 +41,6 @@ struct WindowCommand: Identifiable, Hashable, Sendable {
 
     /// What the mover has to do, so its dispatch stays exhaustive over the catalog.
     enum Kind: String, Sendable {
-        /// Resolve a target frame from the screen and write it.
         case geometry
         /// Geometry too, but sourced from the recorded pre-action frame rather than computed.
         case restore
@@ -78,10 +77,10 @@ struct WindowCommand: Identifiable, Hashable, Sendable {
 
     let id: ID
     let name: String
+    let englishName: String
     let sfSymbol: String
     let kind: Kind
     let group: Group
-    /// Only the four halves honour `WindowCycle`; the rest ignore the step they are handed.
     let cyclesOnRepeat: Bool
     /// False for the nudges, so the mover never writes `kAXSizeAttribute` for them.
     let resizes: Bool
@@ -91,9 +90,10 @@ struct WindowCommand: Identifiable, Hashable, Sendable {
 
 enum WindowCommandCatalog {
     static let all: [WindowCommand] = WindowCommand.ID.allCases.map { id in
-        WindowCommand(
-            id: id, name: name(for: id), sfSymbol: symbol(for: id), kind: kind(for: id),
-            group: group(for: id), cyclesOnRepeat: cyclesOnRepeat.contains(id),
+        let name = name(for: id)
+        return WindowCommand(
+            id: id, name: name.resolved(), englishName: name.key, sfSymbol: symbol(for: id),
+            kind: kind(for: id), group: group(for: id), cyclesOnRepeat: cyclesOnRepeat.contains(id),
             resizes: !movesOnly.contains(id))
     }
 
@@ -116,46 +116,45 @@ enum WindowCommandCatalog {
         .leftHalf, .rightHalf, .topHalf, .bottomHalf, .centerHalf
     ]
 
-    /// Nudges reposition without ever touching the size.
     static let movesOnly: Set<WindowCommand.ID> = [.moveLeft, .moveRight, .moveUp, .moveDown]
 
-    private static func name(for id: WindowCommand.ID) -> String {
+    private static func name(for id: WindowCommand.ID) -> LocalizedStringResource {
         switch id {
-        case .leftHalf: return String(localized: "Left Half")
-        case .rightHalf: return String(localized: "Right Half")
-        case .topHalf: return String(localized: "Top Half")
-        case .bottomHalf: return String(localized: "Bottom Half")
-        case .topLeftQuarter: return String(localized: "Top Left Quarter")
-        case .topRightQuarter: return String(localized: "Top Right Quarter")
-        case .bottomLeftQuarter: return String(localized: "Bottom Left Quarter")
-        case .bottomRightQuarter: return String(localized: "Bottom Right Quarter")
-        case .firstThreeFourths: return String(localized: "First Three Fourths")
-        case .lastThreeFourths: return String(localized: "Last Three Fourths")
-        case .firstThird: return String(localized: "First Third")
-        case .centerThird: return String(localized: "Center Third")
-        case .lastThird: return String(localized: "Last Third")
-        case .firstTwoThirds: return String(localized: "First Two Thirds")
-        case .lastTwoThirds: return String(localized: "Last Two Thirds")
-        case .maximize: return String(localized: "Maximize")
-        case .almostMaximize: return String(localized: "Almost Maximize")
-        case .reasonableSize: return String(localized: "Reasonable Size")
-        case .maximizeHeight: return String(localized: "Maximize Height")
-        case .maximizeWidth: return String(localized: "Maximize Width")
-        case .center: return String(localized: "Center")
-        case .centerHalf: return String(localized: "Center Half")
-        case .centerTwoThirds: return String(localized: "Center Two Thirds")
-        case .makeLarger: return String(localized: "Make Larger")
-        case .makeSmaller: return String(localized: "Make Smaller")
-        case .restore: return String(localized: "Restore Window")
-        case .moveLeft: return String(localized: "Move Left")
-        case .moveRight: return String(localized: "Move Right")
-        case .moveUp: return String(localized: "Move Up")
-        case .moveDown: return String(localized: "Move Down")
-        case .nextDisplay: return String(localized: "Move to Next Display")
-        case .previousDisplay: return String(localized: "Move to Previous Display")
-        case .toggleFullscreen: return String(localized: "Toggle Fullscreen")
-        case .previousSpace: return String(localized: "Switch to Previous Space")
-        case .nextSpace: return String(localized: "Switch to Next Space")
+        case .leftHalf: return "Left Half"
+        case .rightHalf: return "Right Half"
+        case .topHalf: return "Top Half"
+        case .bottomHalf: return "Bottom Half"
+        case .topLeftQuarter: return "Top Left Quarter"
+        case .topRightQuarter: return "Top Right Quarter"
+        case .bottomLeftQuarter: return "Bottom Left Quarter"
+        case .bottomRightQuarter: return "Bottom Right Quarter"
+        case .firstThreeFourths: return "First Three Fourths"
+        case .lastThreeFourths: return "Last Three Fourths"
+        case .firstThird: return "First Third"
+        case .centerThird: return "Center Third"
+        case .lastThird: return "Last Third"
+        case .firstTwoThirds: return "First Two Thirds"
+        case .lastTwoThirds: return "Last Two Thirds"
+        case .maximize: return "Maximize"
+        case .almostMaximize: return "Almost Maximize"
+        case .reasonableSize: return "Reasonable Size"
+        case .maximizeHeight: return "Maximize Height"
+        case .maximizeWidth: return "Maximize Width"
+        case .center: return "Center"
+        case .centerHalf: return "Center Half"
+        case .centerTwoThirds: return "Center Two Thirds"
+        case .makeLarger: return "Make Larger"
+        case .makeSmaller: return "Make Smaller"
+        case .restore: return "Restore Window"
+        case .moveLeft: return "Move Left"
+        case .moveRight: return "Move Right"
+        case .moveUp: return "Move Up"
+        case .moveDown: return "Move Down"
+        case .nextDisplay: return "Move to Next Display"
+        case .previousDisplay: return "Move to Previous Display"
+        case .toggleFullscreen: return "Toggle Fullscreen"
+        case .previousSpace: return "Switch to Previous Space"
+        case .nextSpace: return "Switch to Next Space"
         }
     }
 

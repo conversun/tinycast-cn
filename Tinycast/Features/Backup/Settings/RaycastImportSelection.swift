@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The category picker shared by the Backup pane and onboarding.
 struct RaycastImportSelection: View {
     @Binding var selection: RaycastImportOptions
+    @Environment(\.colorScheme) private var colorScheme
 
     private struct Category: Identifiable {
         let option: RaycastImportOptions
@@ -12,21 +12,31 @@ struct RaycastImportSelection: View {
     }
 
     private static let categories: [Category] = [
-        .init(option: .shortcuts, symbol: "command", label: "Shortcuts"),
-        .init(option: .favorites, symbol: "star", label: "Favorites"),
-        .init(option: .aliases, symbol: "character.cursor.ibeam", label: "Aliases"),
-        .init(option: .emojiSkinTone, symbol: "face.smiling", label: "Emoji skin tone"),
-        .init(option: .launchAtLogin, symbol: "power", label: "Launch at login"),
-        .init(option: .menuBarVisibility, symbol: "menubar.rectangle", label: "Menu-bar icon"),
-        .init(option: .clipboardHistory, symbol: "doc.on.clipboard", label: "Clipboard history"),
-        .init(option: .snippets, symbol: "curlybraces", label: "Snippets"),
-        .init(option: .quicklinks, symbol: Quicklink.sfSymbol, label: "Quicklinks"),
-        .init(option: .popToRoot, symbol: "arrow.uturn.backward", label: "Pop to root"),
-        .init(option: .compactMode, symbol: "macwindow", label: "Compact mode")
+        .init(option: .shortcuts, symbol: "command", label: String(localized: "Shortcuts")),
+        .init(option: .favorites, symbol: "star", label: String(localized: "Favorites")),
+        .init(
+            option: .aliases, symbol: "character.cursor.ibeam", label: String(localized: "Aliases")),
+        .init(
+            option: .emojiSkinTone, symbol: "face.smiling",
+            label: String(localized: "Emoji skin tone")),
+        .init(option: .launchAtLogin, symbol: "power", label: String(localized: "Launch at login")),
+        .init(
+            option: .menuBarVisibility, symbol: "menubar.rectangle",
+            label: String(localized: "Menu-bar icon")),
+        .init(
+            option: .clipboardHistory, symbol: "doc.on.clipboard",
+            label: String(localized: "Clipboard history")),
+        .init(option: .snippets, symbol: "curlybraces", label: String(localized: "Snippets")),
+        .init(
+            option: .quicklinks, symbol: Quicklink.sfSymbol, label: String(localized: "Quicklinks")),
+        .init(
+            option: .popToRoot, symbol: "arrow.uturn.backward",
+            label: String(localized: "Pop to root")),
+        .init(option: .compactMode, symbol: "macwindow", label: String(localized: "Compact mode"))
     ]
 
     private static let columns = Array(
-        repeating: GridItem(.flexible(), spacing: Theme.Spacing.md, alignment: .leading), count: 3)
+        repeating: GridItem(.flexible(), spacing: Theme.Spacing.md, alignment: .leading), count: 2)
 
     private func included(_ option: RaycastImportOptions) -> Binding<Bool> {
         Binding(
@@ -40,16 +50,19 @@ struct RaycastImportSelection: View {
                 ForEach(Self.categories) { category in
                     Toggle(isOn: included(category.option)) {
                         HStack(spacing: Theme.Spacing.sm) {
-                            Image(systemName: category.symbol)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 16)
-                            Text(category.label.localizedUI).lineLimit(1)
+                            Image(
+                                systemName: SystemSymbolName.resolve(
+                                    category.symbol, isDark: colorScheme == .dark)
+                            )
+                            .foregroundStyle(.secondary)
+                            .frame(width: 16)
+                            Text(category.label).lineLimit(1)
                         }
                     }
                     .toggleStyle(.checkbox)
                 }
             }
-            Button((selection == .all ? "Deselect All" : "Select All").localizedUI) {
+            Button(selection == .all ? "Deselect All" : "Select All") {
                 selection = selection == .all ? [] : .all
             }
             .buttonStyle(.link)

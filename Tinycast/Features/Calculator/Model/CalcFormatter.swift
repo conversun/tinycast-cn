@@ -43,12 +43,12 @@ enum CalcFormatter {
         let magnitude = abs(feet)
         let wholeFeet = magnitude.rounded(.towardZero)
         let inches = (magnitude - wholeFeet) * 12
-        let footNoun = wholeFeet == 1 ? String(localized: "foot") : String(localized: "feet")
-        let feetPart = wholeFeet == 0 ? "" : "\(sign)\(display(wholeFeet)) \(footNoun)"
+        let feetPart =
+            wholeFeet == 0 ? "" : "\(sign)\(display(wholeFeet)) \(wholeFeet == 1 ? "foot" : "feet")"
         let inchText = display(inches)
-        let inchPart = "\(inchText) \(inchText == "1" ? String(localized: "inch") : String(localized: "inches"))"
-        if feetPart.isEmpty { return String(localized: "\(sign)\(inchPart)") }
-        return String(localized: "\(feetPart) \(inchPart)")
+        let inchPart = "\(inchText) \(inchText == "1" ? "inch" : "inches")"
+        if feetPart.isEmpty { return "\(sign)\(inchPart)" }
+        return "\(feetPart) \(inchPart)"
     }
 
     /// Seconds as the largest units that fit: `8,700` → `2 hr 25 min`.

@@ -33,7 +33,6 @@ enum CalcMemo {
     }
 }
 
-/// The inline answer card above the app results; selectable like a row, Enter copies.
 struct CalculatorCard: View {
     @Environment(\.metrics) private var metrics
     @Environment(AppCore.self) private var core
@@ -61,7 +60,7 @@ struct CalculatorCard: View {
                 HStack(spacing: metrics.spacing.md) {
                     Image(systemName: "exclamationmark.triangle")
                         .symbolRenderingMode(.hierarchical)
-                    Text(message.localizedUI)
+                    Text(message)
                         .lineLimit(1)
                 }
                 .font(.body)
@@ -71,8 +70,47 @@ struct CalculatorCard: View {
         }
         .padding(.horizontal, metrics.spacing.xl)
         .padding(.vertical, metrics.spacing.xxxl)
+        .overlay(alignment: .bottomTrailing) {
+            if result.isCurrency { RatesFreshness() }
+        }
         .leadCard(selected: selected)
     }
+}
+
+private struct RatesFreshness: View {
+    @Environment(\.metrics) private var metrics
+    @Environment(CurrencyRateStore.self) private var currencyRates
+    @State private var hovered = false
+
+    var body: some View {
+        if let fetchedAt = currencyRates.rates?.fetchedAt {
+            HStack(spacing: metrics.spacing.xs) {
+                Text("Updated \(fetchedAt, formatter: Self.formatter)")
+                Button(
+                    "Refresh Exchange Rates", systemImage: "arrow.clockwise", action: currencyRates.refresh
+                )
+                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .symbolEffect(.rotate, options: .repeat(.continuous), isActive: currencyRates.isRefreshing)
+                .foregroundStyle(hovered ? .secondary : .tertiary)
+                .onHover { hovered = $0 }
+                .help("Refresh Exchange Rates")
+            }
+            .font(metrics.typography.compactKeyCap)
+            .foregroundStyle(.tertiary)
+            .padding(.trailing, metrics.spacing.lg)
+            .padding(.bottom, metrics.spacing.md)
+        }
+    }
+
+    @MainActor private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        formatter.doesRelativeDateFormatting = true
+        formatter.formattingContext = .middleOfSentence
+        return formatter
+    }()
 }
 
 /// Dims the words that join an expression, so the values they join read first.
@@ -115,21 +153,25 @@ private enum CalcSyntax {
 enum CalcActionsMenu {
     static func content(result: CalcResult, core: AppCore) -> PopoverMenuContent {
         var items = [
-            PopoverMenuItem(title: "Copy Answer", systemImage: "doc.on.doc", shortcut: "↵") {
+            PopoverMenuItem(
+                title: String(localized: "Copy Answer"), systemImage: "doc.on.doc", shortcut: "↵"
+            ) {
                 core.calculatorCoordinator.copyCalculatorResult(result)
             }
         ]
         if result.canChain {
             items.append(
                 PopoverMenuItem(
-                    title: "Put Answer in Search Bar", systemImage: "text.cursor", shortcut: "⌘↵"
+                    title: String(localized: "Put Answer in Search Bar"), systemImage: "text.cursor",
+                    shortcut: "⌘↵"
                 ) {
                     core.calculatorCoordinator.putAnswerInSearchBar(result)
                 })
         }
         items.append(
             PopoverMenuItem(
-                title: "Copy Calculation", systemImage: "doc.on.doc.fill", shortcut: "⇧⌘↵"
+                title: String(localized: "Copy Calculation"), systemImage: "doc.on.doc.fill",
+                shortcut: "⇧⌘↵"
             ) {
                 core.calculatorCoordinator.copyCalculationWithExpression(result)
             })

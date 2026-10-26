@@ -74,6 +74,8 @@ Shortcuts follow key positions, so they work the same on any keyboard layout or 
 | <kbd>⌥</kbd><kbd>return</kbd>                       | Paste and Keep Window Open |
 | <kbd>⌘</kbd><kbd>P</kbd>                            | Filter by type             |
 | <kbd>⌘</kbd><kbd>.</kbd>                            | Pin / Unpin Entry          |
+| <kbd>⌘</kbd><kbd>E</kbd>                            | Edit Entry                 |
+| <kbd>⌘</kbd><kbd>F</kbd>                            | Show in Finder             |
 | <kbd>⌘</kbd><kbd>1</kbd> … <kbd>⌘</kbd><kbd>0</kbd> | Paste pinned entry 1 to 10 |
 | <kbd>⌃</kbd><kbd>X</kbd>                            | Delete Entry               |
 | <kbd>⌃</kbd><kbd>⇧</kbd><kbd>X</kbd>                | Delete All Entries         |

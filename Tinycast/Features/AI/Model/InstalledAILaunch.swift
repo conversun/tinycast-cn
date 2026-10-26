@@ -1,6 +1,5 @@
 import Foundation
 
-/// What the reader set for one installed tool: where its command is and what it is launched with.
 struct InstalledAIOverride: Codable, Equatable, Sendable {
     /// Empty leaves finding the command to `ExecutableLocator`.
     var commandPath = ""
@@ -22,7 +21,6 @@ struct InstalledAIEnvironmentStore: Sendable {
     var values: @Sendable (InstalledAIKind) throws -> [String: String]
     var save: @Sendable ([String: String], InstalledAIKind) throws -> Void
 
-    /// Holds nothing and keeps nothing, for a store built without one.
     static let none = InstalledAIEnvironmentStore(values: { _ in [:] }, save: { _, _ in })
 }
 
@@ -69,7 +67,7 @@ struct InstalledAILaunch: Equatable, Sendable {
     }
 
     static func missingCommandMessage(_ path: String) -> String {
-        "Nothing can be run at \(path). Check the command path."
+        String(localized: "Nothing can be run at \(path). Check the command path.")
     }
 
     nonisolated static func isVariableName(_ name: String) -> Bool {
@@ -87,11 +85,7 @@ extension InstalledAIKind {
         case .claude:
             return ["CLAUDE_CODE_SKIP_PROMPT_HISTORY": "1", "ENABLE_CLAUDEAI_MCP_SERVERS": "false"]
         case .openCode:
-            return [
-                "OPENCODE_CONFIG_CONTENT": Self.openCodeConfiguration,
-                "OPENCODE_AUTO_SHARE": "false",
-                "OPENCODE_DISABLE_AUTOUPDATE": "true"
-            ]
+            return ["OPENCODE_CONFIG_CONTENT": Self.openCodeConfiguration]
         case .grok:
             return ["GROK_DISABLE_AUTOUPDATER": "1", "GROK_AGENT_DASHBOARD": "0"]
         case .cursor, .codex:
@@ -104,8 +98,12 @@ extension InstalledAIKind {
         name == "NO_COLOR" || name.hasPrefix("TC_MCP_") || managedEnvironment[name] != nil
     }
 
+    static let openCodeAgent = "tinycast"
+
+    /// A trailing `*` deny drops every tool from the request, not just refuses the call.
     private static let openCodeConfiguration = """
-        {"permission":"deny","share":"disabled","agent":{"build":{"permission":"deny"},\
-        "plan":{"permission":"deny"}}}
+        {"share":"disabled","snapshots":false,"agents":{"\(openCodeAgent)":{"system":\
+        "You are generating text inside Tinycast. Use only the conversation in this request.",\
+        "permissions":[{"action":"*","resource":"*","effect":"deny"}]}}}
         """
 }

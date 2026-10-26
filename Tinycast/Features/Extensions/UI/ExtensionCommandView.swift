@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The palette's extension screen: whichever root component the running command rendered.
 struct ExtensionCommandView: View {
     let screen: ExtensionScreen
     let state: ExtensionSessionState
@@ -21,11 +20,11 @@ struct ExtensionCommandView: View {
     private var content: some View {
         switch state {
         case .launching where screen.root == nil:
-            EmptyResults(text: "Starting…")
+            EmptyResults(text: String(localized: "Starting…"))
         case .failed(let message):
             ExtensionFailureView(message: message)
         case .finished:
-            EmptyResults(text: "Done")
+            EmptyResults(text: String(localized: "Done"))
         default:
             switch screen.kind {
             case .list, .grid:
@@ -46,14 +45,14 @@ struct ExtensionCommandView: View {
             case .unsupported(let type):
                 if type.isEmpty {
                     // A commit rendered null; "Starting…" here would look like a hang.
-                    EmptyResults(text: "Nothing to show")
+                    EmptyResults(text: String(localized: "Nothing to show"))
                 } else {
                     ExtensionFailureView(
                         message: String(
-                            localized:
-                                "This command renders \(type), which Tinycast doesn't support yet. See docs/extensions.md."
-                        )
-                    )
+                            localized: """
+                                This command renders \(type), which Tinycast doesn't support yet. See \
+                                docs/extensions.md.
+                                """))
                 }
             }
         }
@@ -228,7 +227,6 @@ struct ExtensionToastPill: View {
     }
 }
 
-/// The ⌘K panel's content for the running command's current selection.
 @MainActor
 enum ExtensionActionsMenu {
     /// What the panel belongs to: the selected row, or the screen when the selection has outrun it.
@@ -250,7 +248,7 @@ enum ExtensionActionsMenu {
                     // Read rather than injected: a panel is rebuilt each time it opens.
                     isDark: NSApp.effectiveAppearance.isDark,
                     isDestructive: action.isDestructive),
-                shortcut: action.shortcutCaps?.joined(),
+                shortcutCaps: action.shortcutCaps ?? [],
                 isDestructive: action.isDestructive,
                 startsSection: action.startsSection)
         }

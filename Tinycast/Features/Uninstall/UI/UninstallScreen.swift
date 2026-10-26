@@ -1,13 +1,11 @@
 import SwiftUI
 
-/// The leftover files found for one app, each selectable for the Trash.
 struct UninstallScreen: PaletteScreen {
     let session: UninstallSession
     let core: AppCore
     let vm: PaletteState
     let openActions: () -> Void
 
-    /// The search field filters files by name or location on this screen.
     var rows: [UninstallCandidate] {
         let query = vm.query.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return session.candidates }
@@ -17,7 +15,7 @@ struct UninstallScreen: PaletteScreen {
         }
     }
 
-    var primaryActionTitle: String { "Uninstall Application" }
+    var primaryActionTitle: String { String(localized: "Uninstall Application") }
 
     /// Stands in for the section headers the other lists use.
     private var summary: String {
@@ -64,7 +62,8 @@ struct UninstallScreen: PaletteScreen {
             if rows.isEmpty {
                 EmptyResults(
                     text: vm.query.trimmingCharacters(in: .whitespaces).isEmpty
-                        ? "Nothing left to remove" : "No matching files")
+                        ? String(localized: "Nothing left to remove")
+                        : String(localized: "No matching files"))
             } else {
                 UninstallList(
                     results: rows,
@@ -85,7 +84,6 @@ struct UninstallScreen: PaletteScreen {
     }
 }
 
-/// Actions menu for a row on the Uninstall screen.
 @MainActor
 enum UninstallActionsMenu {
     static func content(
@@ -95,7 +93,8 @@ enum UninstallActionsMenu {
         if session.canConfirm {
             items.append(
                 PopoverMenuItem(
-                    title: "Uninstall Application", systemImage: "trash", shortcut: "↵",
+                    title: String(localized: "Uninstall Application"), systemImage: "trash",
+                    shortcut: "↵",
                     isDestructive: true
                 ) { core.uninstallCoordinator.performUninstall() })
         }
@@ -103,23 +102,29 @@ enum UninstallActionsMenu {
             let checked = session.selection?.isChecked(candidate.id) ?? false
             items.append(
                 PopoverMenuItem(
-                    title: checked ? "Unselect File" : "Select File",
+                    title: checked ? String(localized: "Unselect File") : String(localized: "Select File"),
                     systemImage: checked ? "circle" : "checkmark.circle", startsSection: true,
                     shortcut: "⌘↵"
                 ) { session.toggle(candidate.id) })
         }
         items.append(
             PopoverMenuItem(
-                title: "Copy Path", systemImage: "doc.on.clipboard", startsSection: true, shortcut: "⌥⌘C"
+                title: String(localized: "Copy Path"), systemImage: "doc.on.clipboard",
+                startsSection: true, shortcut: "⌥⌘C"
             ) {
                 core.uninstallCoordinator.copyUninstallPath(candidate)
             })
         items.append(
-            PopoverMenuItem(title: "Show in Finder", systemImage: "folder", shortcut: "⇧⌘O") {
+            PopoverMenuItem(
+                title: String(localized: "Show in Finder"), systemImage: "folder", shortcut: "⇧⌘O"
+            ) {
                 core.uninstallCoordinator.showUninstallItemInFinder(candidate)
             })
         items.append(
-            PopoverMenuItem(title: "Show Info in Finder", systemImage: "info.circle", shortcut: "⇧⌘I") {
+            PopoverMenuItem(
+                title: String(localized: "Show Info in Finder"), systemImage: "info.circle",
+                shortcut: "⇧⌘I"
+            ) {
                 core.uninstallCoordinator.showUninstallItemInfo(candidate)
             })
         return PopoverMenuContent(header: session.app?.name ?? candidate.name, items: items)

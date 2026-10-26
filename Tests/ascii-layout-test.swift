@@ -35,7 +35,7 @@ struct ASCIILayoutTests {
         ("↩", .return, "\u{d}"),
         ("⌫", .delete, "\u{8}"),
         ("⇥", .tab, "\u{9}"),
-        ("⎋", .escape, "\u{1b}"),
+        ("esc", .escape, "\u{1b}"),
         ("space", .space, " ")
     ]
 

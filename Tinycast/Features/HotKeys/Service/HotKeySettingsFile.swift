@@ -46,7 +46,7 @@ final class HotKeySettingsFile {
             })
     }
 
-    /// Clears changed bindings now and leaves setting them to `commit`, so a moved chord never collides.
+    /// Clears changed bindings now and sets them in `commit`, so a moved chord never collides.
     func apply(_ wanted: [Wanted], key: SettingsFileKey) -> [SettingsFileIssue] {
         let spelling = self.spelling
         var issues: [SettingsFileIssue] = []
@@ -59,7 +59,8 @@ final class HotKeySettingsFile {
             guard let binding = spelling.binding(from: text) else {
                 issues.append(
                     .invalidEntry(
-                        key, String(localized: "\(item.label.localizedUI): “\(text)” isn't a shortcut Tinycast can bind")))
+                        key,
+                        String(localized: "\(item.label): “\(text)” isn't a shortcut Tinycast can bind")))
                 continue
             }
             guard binding != current else { continue }
@@ -85,7 +86,7 @@ final class HotKeySettingsFile {
             issues.append(
                 .invalidEntry(
                     change.key,
-                    String(localized: "\(change.label.localizedUI): “\(change.text)” already runs \(owner.localizedUI)")))
+                    String(localized: "\(change.label): “\(change.text)” already runs \(owner)")))
             if let previous = change.previous,
                 hotKeys.conflictOwner(of: previous, excluding: change.action) == nil
             {

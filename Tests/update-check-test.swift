@@ -11,6 +11,7 @@ struct UpdateCheckTests {
         try await stopsBeforeFirstCheck()
         try await cancelsAndRestarts()
         try await checksCNRevisionAndReopensCache()
+        try reportsInstalledVersionOnce()
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
     }
@@ -128,6 +129,29 @@ struct UpdateCheckTests {
         expect(latest?["version"] as? String == "1.3.0-cn.2", "the cache encodes the CN version")
         expect(latest?["tag"] as? String == "v1.3.0-cn.2", "the cache preserves the CN release tag")
         expect(fixture.requests == 1, "reopening the CN cache makes no additional request")
+    }
+
+    static func reportsInstalledVersionOnce() throws {
+        let file = makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        try seedCache(at: file)
+        let fixture = FetchFixture()
+        guard let installed = AppVersion("1.1.0-cn.1") else { fatalError("the fixture version must parse") }
+
+        makeStore(file: file, fixture: fixture).recordInstall(of: installed)
+        let relaunched = makeStore(file: file, fixture: fixture, runningVersion: installed)
+        expect(relaunched.latest?.version == installed, "recording an install keeps the cached release")
+        expect(
+            relaunched.takeInstalledVersion() == installed, "the installed version's first launch reports it")
+        expect(relaunched.takeInstalledVersion() == nil, "the report is taken once")
+        let later = makeStore(file: file, fixture: fixture, runningVersion: installed)
+        expect(later.takeInstalledVersion() == nil, "a later launch reports nothing")
+
+        makeStore(file: file, fixture: fixture).recordInstall(of: installed)
+        let unchanged = makeStore(file: file, fixture: fixture)
+        expect(unchanged.takeInstalledVersion() == nil, "a launch of another version reports nothing")
+        let afterwards = makeStore(file: file, fixture: fixture, runningVersion: installed)
+        expect(afterwards.takeInstalledVersion() == nil, "and clears the record")
     }
 
     static func seedCache(at file: URL) throws {

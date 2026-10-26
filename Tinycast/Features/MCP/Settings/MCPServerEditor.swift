@@ -18,7 +18,7 @@ struct MCPServerEditor: View {
         case stdio
 
         var id: String { rawValue }
-        var title: String { self == .http ? "HTTP" : "Command" }
+        var title: String { self == .http ? "HTTP" : String(localized: "Command") }
     }
 
     private enum Probe: Equatable {
@@ -97,28 +97,28 @@ struct MCPServerEditor: View {
             Form {
                 Section {
                     field("Name") {
-                        TextField("Name", text: $name, prompt: Text("GitHub"))
+                        TextField("Name", text: $name, prompt: Text(verbatim: "GitHub"))
                             .settingsEditorTextField()
                     }
                     field("Handle") {
-                        Text("@\(MCPSlug.normalize(name.isEmpty ? target.server.slug : name))")
+                        Text(verbatim: "@\(MCPSlug.normalize(name.isEmpty ? target.server.slug : name))")
                             .foregroundStyle(.secondary)
                     }
                     field("Connection") {
                         SteadySegmentedPicker(
-                            title: "Connection",
-                            options: Kind.allCases.map { .init(value: $0, title: $0.title.localizedUI) },
+                            title: String(localized: "Connection"),
+                            options: Kind.allCases.map { .init(value: $0, title: $0.title) },
                             selection: $kind)
                     }
                     if kind == .http {
                         field("URL") {
-                            TextField("URL", text: $url, prompt: Text("https://example.com/mcp"))
+                            TextField("URL", text: $url, prompt: Text(verbatim: "https://example.com/mcp"))
                                 .settingsEditorTextField()
                         }
                         field("Authentication") {
                             Picker("Authentication", selection: $usesOAuth) {
                                 Text("Header").tag(false)
-                                Text("OAuth").tag(true)
+                                Text(verbatim: "OAuth").tag(true)
                             }
                             .labelsHidden()
                         }
@@ -126,32 +126,35 @@ struct MCPServerEditor: View {
                             oauthFields
                         } else {
                             field("Header") {
-                                TextField("Header", text: $headerName, prompt: Text("Authorization"))
-                                    .settingsEditorTextField()
+                                TextField(
+                                    "Header", text: $headerName, prompt: Text(verbatim: "Authorization")
+                                )
+                                .settingsEditorTextField()
                             }
                             field("Value") {
                                 RevealableSecureField(
-                                    title: "Value", text: $headerValue, prompt: Text("Bearer …")
+                                    title: String(localized: "Value"), text: $headerValue,
+                                    prompt: Text(verbatim: "Bearer …")
                                 )
                                 .settingsEditorTextField()
                             }
                         }
                     } else {
                         field("Command") {
-                            TextField("Command", text: $command, prompt: Text("npx"))
+                            TextField("Command", text: $command, prompt: Text(verbatim: "npx"))
                                 .settingsEditorTextField()
                         }
                         field("Arguments") {
                             TextField(
                                 "Arguments", text: $argumentText,
-                                prompt: Text("-y @modelcontextprotocol/server-filesystem ~/Desktop")
+                                prompt: Text(verbatim: "-y @modelcontextprotocol/server-filesystem ~/Desktop")
                             )
                             .settingsEditorTextField()
                         }
                         field("Environment") {
                             TextField(
                                 "Environment", text: $environmentText,
-                                prompt: Text("GITHUB_TOKEN=…"), axis: .vertical
+                                prompt: Text(verbatim: "GITHUB_TOKEN=…"), axis: .vertical
                             )
                             .textFieldStyle(.plain)
                             .lineLimit(2...5)
@@ -160,11 +163,15 @@ struct MCPServerEditor: View {
                     }
                 } footer: {
                     Text(
-                        (kind == .http
-                            ? "Remote endpoints must use HTTPS. Credentials are stored in your "
-                                + "login Keychain, never in preferences."
-                            : "The command runs on this Mac with your own account. One "
-                                + "NAME=value per line; values are stored in your login Keychain.").localizedUI
+                        kind == .http
+                            ? """
+                            Remote endpoints must use HTTPS. Credentials are stored in your login \
+                            Keychain, never in preferences.
+                            """
+                            : """
+                            The command runs on this Mac with your own account. One NAME=value per \
+                            line; values are stored in your login Keychain.
+                            """
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -174,7 +181,7 @@ struct MCPServerEditor: View {
                     Toggle("Offer this server's tools", isOn: $isEnabled)
                     field("Trust") {
                         Picker("Trust", selection: $trust) {
-                            ForEach(MCPTrust.allCases) { Text($0.title.localizedUI).tag($0) }
+                            ForEach(MCPTrust.allCases) { Text($0.title).tag($0) }
                         }
                         .labelsHidden()
                     }
@@ -188,8 +195,10 @@ struct MCPServerEditor: View {
                     }
                 } footer: {
                     Text(
-                        ("Ask Each Chat puts the first tool call of every conversation through a "
-                            + "confirmation. Never Allow withholds the server without removing it.").localizedUI
+                        """
+                        Ask Each Chat puts the first tool call of every conversation through a \
+                        confirmation. Never Allow withholds the server without removing it.
+                        """
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -231,8 +240,11 @@ struct MCPServerEditor: View {
                     .settingsEditorTextField()
             }
             field("Client secret") {
-                RevealableSecureField(title: "Client secret", text: $clientSecret, prompt: Text("Optional"))
-                    .settingsEditorTextField()
+                RevealableSecureField(
+                    title: String(localized: "Client secret"), text: $clientSecret,
+                    prompt: Text("Optional")
+                )
+                .settingsEditorTextField()
             }
             field("Sign-in") {
                 HStack(spacing: Theme.Spacing.lg) {
@@ -291,7 +303,9 @@ struct MCPServerEditor: View {
             storedOAuth?.token = nil
             probe = .idle
             error = nil
-        } catch { self.error = "The credentials could not be removed from your login Keychain." }
+        } catch {
+            self.error = String(localized: "The credentials could not be removed from your login Keychain.")
+        }
     }
 
     private func cancelOperation() {
@@ -307,9 +321,7 @@ struct MCPServerEditor: View {
         case .running:
             ProgressView().controlSize(.small)
         case .found(let count):
-            Label(
-                count == 1 ? String(localized: "1 tool") : String(localized: "\(count) tools"),
-                systemImage: "checkmark.circle")
+            Label("\(count) tools", systemImage: "checkmark.circle")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .failed(let message):
@@ -320,9 +332,9 @@ struct MCPServerEditor: View {
     }
 
     private func field<Content: View>(
-        _ label: String, @ViewBuilder content: () -> Content
+        _ label: LocalizedStringResource, @ViewBuilder content: () -> Content
     ) -> some View {
-        SettingsEditorField(label.localizedUI, content: content)
+        SettingsEditorField(label, content: content)
     }
 
     private var draft: (server: MCPServer, secrets: MCPSecretStore.Secrets) {
@@ -380,8 +392,8 @@ struct MCPServerEditor: View {
             switch status {
             case .ready(let tools): probe = .found(tools)
             case .failed(let message): probe = .failed(message)
-            case .signInRequired: probe = .failed("Sign-in required")
-            default: probe = .failed("The server did not answer.")
+            case .signInRequired: probe = .failed(String(localized: "Sign-in required"))
+            default: probe = .failed(String(localized: "The server did not answer."))
             }
         }
     }
@@ -404,7 +416,7 @@ struct MCPServerEditor: View {
                 return error.localizedDescription
             }
         case .stdio where command.trimmingCharacters(in: .whitespaces).isEmpty:
-            return "Enter the command that starts this server."
+            return String(localized: "Enter the command that starts this server.")
         case .stdio:
             break
         }

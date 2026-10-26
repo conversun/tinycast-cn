@@ -1,8 +1,6 @@
 import Foundation
 
-/// Recognizes a double-tapped lone modifier. See docs/features/hotkeys.md#double-tap-modifiers.
 struct DoubleTapDetector {
-    /// Longest a press may last and still be a tap; matches `HyperKeyTap.quickPressWindow`.
     static let maxHold: TimeInterval = 0.25
     /// Longest gap between the first tap's release and the second tap's press.
     static let maxGap: TimeInterval = 0.30

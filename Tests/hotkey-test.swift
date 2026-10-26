@@ -336,6 +336,9 @@ struct DoubleTapDetectorTests {
 
     static func commandActions() {
         expect(
+            CommandID.createCustomCommand.englishName == "Create Custom Command",
+            "launcher search keeps the explicit English command name")
+        expect(
             HotKeyAction.systemAction(id: .toggleMicrophoneMute).defaultsKey
                 == "hotkey.systemAction.toggle-microphone-mute",
             "microphone mute persists under its own global hotkey key")
@@ -381,7 +384,6 @@ struct DoubleTapDetectorTests {
 
     // MARK: - The Hyper chord
 
-    /// A combo on the G key, spelled in Carbon like the on-disk shape.
     private static func combo(_ flags: NSEvent.ModifierFlags) -> KeyShortcut {
         KeyShortcut(
             carbonKeyCode: kVK_ANSI_G, carbonModifiers: KeyShortcut.carbonModifiers(from: flags))

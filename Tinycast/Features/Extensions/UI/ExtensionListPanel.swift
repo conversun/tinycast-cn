@@ -78,7 +78,6 @@ final class ExtensionListPanelController {
     }
 }
 
-/// Where a list lands on screen, and which way it opened for the chevron that reports it.
 struct ExtensionListPlacement: Equatable {
     let frame: NSRect
     let flipped: Bool
@@ -178,7 +177,8 @@ private struct ExtensionListPanelModifier<List: View, Revision: Equatable>: View
         }
         if flipped != placement.flipped { flipped = placement.flipped }
         // Forwarded, not re-derived: a child window must never disagree with its parent.
-        let root = AnyView(list().environment(palette).environment(\.metrics, metrics))
+        let root = AnyView(
+            list().environment(palette).environment(\.metrics, metrics).motionScope())
         controller.present(root, frame: placement.frame, parent: host, palette: palette)
     }
 }

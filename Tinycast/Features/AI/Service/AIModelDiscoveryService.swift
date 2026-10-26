@@ -11,11 +11,11 @@ final class AIModelDiscoveryService: Sendable {
     }()
 
     func models(
-        provider: AIProviderKind, baseURL: URL, apiKey: String
+        provider: AIProviderKind, baseURL: URL, apiKey: String, headers: [String: String]
     ) async throws -> [AIModelDiscovery.Model] {
         let query = try AIModelDiscovery.query(
             provider: provider, baseURL: baseURL, apiKey: apiKey,
-            appTitle: Bundle.main.appDisplayName)
+            appTitle: Bundle.main.appDisplayName, headers: headers)
         let (data, response) = try await Self.session.data(for: query.request)
         try Task.checkCancellation()
         guard let response = response as? HTTPURLResponse else {

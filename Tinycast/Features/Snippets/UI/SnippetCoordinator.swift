@@ -1,6 +1,5 @@
 import AppKit
 
-/// Owns the snippet flow: listener, browser, editor handoff, delivery, presence.
 @MainActor
 @Observable
 final class SnippetCoordinator {
@@ -55,7 +54,7 @@ final class SnippetCoordinator {
     func chooseSnippetsFolder() {
         guard
             let url = FolderPicker.choose(
-                message: "Choose the folder your snippets are kept in.",
+                message: String(localized: "Choose the folder your snippets are kept in."),
                 startingAt: store.snippetsDirectory)
         else { return }
         settings.snippetsFolder = AppPaths.contentFolderSetting(for: url, named: "Snippets")
@@ -79,9 +78,10 @@ final class SnippetCoordinator {
                 await core.confirm(
                     title: String(localized: "Enable snippets?"),
                     message: String(
-                        localized:
-                            "Keyword expansion requires the Accessibility permission. Keystrokes stay on this Mac."
-                    ),
+                        localized: """
+                            Keyword expansion requires the Accessibility permission. Keystrokes stay on \
+                            this Mac.
+                            """),
                     symbol: "curlybraces", confirmTitle: String(localized: "Continue"), tone: .neutral,
                     confirmRole: .standard)
             else { return }
@@ -189,8 +189,7 @@ final class SnippetCoordinator {
         } catch {
             await core.showNotice(
                 title: String(localized: "Couldn’t Delete “\(record.snippet.name)”"),
-                message: error.localizedDescription,
-                symbol: "doc.text", tone: .danger)
+                message: error.localizedDescription, symbol: "doc.text", tone: .danger)
         }
     }
 
@@ -248,7 +247,7 @@ final class SnippetCoordinator {
         }
         // A window of ours that isn't an editor, such as Settings, has no caret to type at.
         guard let target = InjectionTarget.current() else {
-            showMessage("Click into a text field first", .neutral)
+            showMessage(String(localized: "Click into a text field first"), .neutral)
             return
         }
         expandSnippet(id: id, target: target)
@@ -321,8 +320,8 @@ final class SnippetCoordinator {
         keywordLength: Int,
         automaticGeneration: UInt?
     ) {
-        let confirmation = record.snippet.showsConfirmation
-            ? String(localized: "Inserted \(record.snippet.name)") : nil
+        let confirmation =
+            record.snippet.showsConfirmation ? String(localized: "Inserted \(record.snippet.name)") : nil
         if !result.missingArguments.isEmpty {
             promptSnippetArguments(
                 record: record,

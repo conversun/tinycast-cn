@@ -1,6 +1,6 @@
 import Foundation
 
-/// What summoning Quick AI lands on, decided at open time rather than when the palette hides.
+/// What opening Quick AI or the AI Chat window lands on, decided at open time, not on hide.
 enum AIOpensTo: Int, CaseIterable, Identifiable, Sendable {
     case recent = 0
     case newConversation = 1
@@ -9,8 +9,8 @@ enum AIOpensTo: Int, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .recent: return "Recent Conversation"
-        case .newConversation: return "A New Conversation"
+        case .recent: return String(localized: "Recent Conversation")
+        case .newConversation: return String(localized: "A New Conversation")
         }
     }
 }

@@ -13,12 +13,21 @@ case "${1:-}" in
     xcodebuild -exportLocalizations -project Tinycast.xcodeproj \
       -localizationPath "$location" -exportLanguage zh-Hans SWIFT_EMIT_LOC_STRINGS=YES \
       > "$location/export.log" 2>&1 || { cat "$location/export.log"; exit 1; }
-    verify --extracted \
-      "$location/zh-Hans.xcloc/Source Contents/Tinycast/en.lproj/Localizable.strings"
+    found=false
+    while IFS= read -r table; do
+      found=true
+      node Scripts/check-localization.js --extracted "$table"
+    done < <(find "$location/zh-Hans.xcloc/Source Contents" -type f \
+      \( -name Localizable.strings -o -name Localizable.xcstrings \))
+    if [[ "$found" != true ]]; then
+      echo 'No extracted Localizable table found in Xcode export.' >&2
+      exit 1
+    fi
+    verify
     ;;
   --help)
     echo 'Usage: ./Scripts/check-localization.sh [--extract]'
-    echo 'Default: fast table, dynamic catalog and rendering checks. --extract: also build and compare Xcode extraction.'
+    echo 'Default: shipped catalogs, all languages, dynamic titles and rendering checks. --extract: also build and compare Xcode extraction.'
     ;;
   *) echo 'Unknown option; use --help.' >&2; exit 2 ;;
 esac

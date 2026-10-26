@@ -1,6 +1,5 @@
 import AppKit
 
-/// Owns the uninstall flow: the scan hand-off, the one confirmation funnel, the reference cleanup.
 @MainActor
 final class UninstallCoordinator {
     private let session: UninstallSession
@@ -61,20 +60,30 @@ final class UninstallCoordinator {
         Task {
             let running = plan.isTargetRunning || runningApps.isRunning(app)
             let size = MeasuredSize(bytes: items.reduce(0) { $0 + ($1.size?.bytes ?? 0) }).formatted
-            let count = items.count == 1
-                ? String(localized: "1 item") : String(localized: "\(items.count) items")
+            var message = String(
+                localized: """
+                    \(items.count) items (\(size)) will be moved to the Trash, where you can put them \
+                    back.
+                    """)
+            if running { message += " " + String(localized: "\(app.name) will quit first.") }
             guard
                 await core.confirm(
-                    title: String(localized: "Uninstall “\(app.name)”?"),
-                    message: String(
-                        localized:
-                            "\(count) (\(size)) will be moved to the Trash, where you can put them back."
-                    ) + (running ? " " + String(localized: "\(app.name) will quit first.") : ""),
+                    title: String(localized: "Uninstall “\(app.name)”?"), message: message,
                     symbol: "trash", confirmTitle: String(localized: "Move to Trash"))
             else { return }
 
-            if running, let bundleID = app.bundleID { _ = AppLauncher.quit(bundleID: bundleID) }
             session.setTrashing(true)
+            // An app still quitting rewrites its saved state and preferences behind the trash.
+            if let bundleID = app.bundleID,
+                await !AppLauncher.quitAwaitingExit(bundleID: bundleID, url: app.url)
+            {
+                session.setTrashing(false)
+                await core.showNotice(
+                    title: String(localized: "Nothing Was Moved"),
+                    message: String(localized: "\(app.name) didn’t quit. Quit it, then try again."),
+                    symbol: "trash", tone: .danger)
+                return
+            }
             let report = await UninstallRunner.moveToTrash(items)
             session.setTrashing(false)
 
@@ -105,9 +114,10 @@ final class UninstallCoordinator {
             await core.showNotice(
                 title: String(localized: "Couldn’t Open Get Info"),
                 message: String(
-                    localized:
-                        "Allow Tinycast to control Finder in System Settings › Privacy & Security › Automation, then try again."
-                ),
+                    localized: """
+                        Allow Tinycast to control Finder in System Settings › Privacy & Security \
+                        › Automation, then try again.
+                        """),
                 symbol: "info.circle", tone: .danger)
         }
     }
@@ -126,19 +136,15 @@ final class UninstallCoordinator {
     private func presentUninstallReport(_ report: UninstallReport) async {
         guard report.hasFailures else {
             guard report.trashedCount > 0 else { return }
-            let count = report.trashedCount == 1
-                ? String(localized: "1 item")
-                : String(localized: "\(report.trashedCount) items")
             let freed = MeasuredSize(bytes: report.freedBytes).formatted
-            core.showMessage(String(localized: "Moved \(count) to the Trash · \(freed)"))
+            core.showMessage(String(localized: "Moved \(report.trashedCount) items to the Trash · \(freed)"))
             return
         }
         let listed = report.failed.prefix(5).map { "\($0.name) — \($0.reason)" }
         let remaining = report.failed.count - listed.count
         await core.showNotice(
             title: report.trashedCount > 0
-                ? String(localized: "Some Items Weren’t Moved")
-                : String(localized: "Nothing Was Moved"),
+                ? String(localized: "Some Items Weren’t Moved") : String(localized: "Nothing Was Moved"),
             message: listed.joined(separator: "\n")
                 + (remaining > 0 ? "\n" + String(localized: "and \(remaining) more.") : ""),
             symbol: "trash", tone: .danger)

@@ -50,8 +50,8 @@ struct WindowLayoutNumberField: View {
                 .frame(width: Theme.Size.layoutFieldUnit, alignment: .leading)
         }
         .layoutFieldChrome(isFocused: isFocused)
-        .accessibilityLabel(name.localizedUI)
-        .accessibilityValue("\(value) \(suffix)")
+        .accessibilityLabel(name)
+        .accessibilityValue(Text(verbatim: "\(value) \(suffix)"))
     }
 
     /// Live, so the preview tracks typing and ⌘↵ cannot save behind a value still in the field.

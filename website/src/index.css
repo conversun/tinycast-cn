@@ -539,6 +539,17 @@
   .tc-key + .tc-key {
     margin-inline-start: 0.25em;
   }
+
+  /* Keyed to next-themes' .dark class: Tailwind's dark: variant follows the OS
+     instead, so it would disagree with the theme toggle. */
+  .dark .light-only,
+  html:not(.dark) .dark-only {
+    display: none;
+  }
+
+  .dark .invert-in-dark {
+    filter: invert(1);
+  }
 }
 
 /* Point Fumadocs' own palette at the Tinycast tokens, so the docs and the
@@ -599,6 +610,103 @@
 @keyframes caret-blink {
   50% {
     opacity: 0;
+  }
+}
+
+/* ── Text motion ───────────────────────────────────────────────────────────
+   Words that swap letter by letter, and blocks that rise out of a blur as they
+   scroll into view. Every animation sits behind no-preference, so reduced
+   motion gets the finished page with nothing hidden. */
+:root {
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-swap: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes blur-rise {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    translate: 0 var(--rise, 12px);
+  }
+}
+
+/* Hidden words are zero wide, so the line holds the shown word's width before
+   any script runs. */
+.swap-words {
+  display: inline-grid;
+  white-space: nowrap;
+}
+
+.swap-word {
+  grid-area: 1 / 1;
+  justify-self: start;
+
+  & > span {
+    display: inline-block;
+    white-space: pre;
+  }
+
+  &:not([data-state="in"]) {
+    width: 0;
+
+    & > span {
+      opacity: 0;
+      filter: blur(0.1em);
+      translate: 0 -0.3em;
+      scale: 0.7;
+    }
+  }
+
+  &[data-state="out"] > span {
+    translate: 0 0.3em;
+  }
+}
+
+.reveal-word {
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .blur-in {
+    animation: blur-rise 0.8s var(--ease-settle) both;
+  }
+
+  .swap-words {
+    transition: width 0.6s var(--ease-swap);
+  }
+
+  .swap-word[data-state] > span {
+    transition:
+      opacity 0.45s var(--ease-swap),
+      filter 0.45s var(--ease-swap),
+      translate 0.55s var(--ease-pop),
+      scale 0.4s var(--ease-settle);
+    transition-delay: calc(var(--c) * 35ms);
+  }
+
+  :root[data-reveal-ready] {
+    & [data-reveal="text"]:not([data-revealed]),
+    & [data-reveal="content"]:not([data-revealed]),
+    & [data-reveal="words"]:not([data-revealed]) .reveal-word {
+      opacity: 0;
+    }
+  }
+
+  [data-reveal="text"][data-revealed] {
+    animation: blur-rise 0.8s var(--ease-settle) both;
+    animation-delay: calc(var(--i) * 90ms);
+  }
+
+  [data-reveal="content"][data-revealed] {
+    animation: rise 0.8s var(--ease-settle) both;
+    animation-delay: calc(var(--i) * 90ms);
+  }
+
+  [data-reveal="words"][data-revealed] .reveal-word {
+    --rise: 0.35em;
+    animation: blur-rise 0.7s var(--ease-settle) both;
+    animation-delay: calc(var(--i) * 90ms + var(--w) * 45ms);
   }
 }
 

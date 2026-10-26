@@ -43,12 +43,9 @@ struct SymbolTint: Hashable, Sendable {
 }
 
 enum SystemSymbolName {
-    // This pair renders opposite to its name on the target SF Symbols runtime, in both appearances.
-    static func resolve(_ name: String) -> String {
-        switch name {
-        case "face.smiling": "face.smiling.inverse"
-        default: name
-        }
+    // This pair swaps glyphs in Dark, so there the outline is the inverse.
+    static func resolve(_ name: String, isDark: Bool) -> String {
+        name == "face.smiling" && isDark ? "face.smiling.inverse" : name
     }
 }
 
@@ -249,7 +246,6 @@ enum IconCache {
         return (image, rep.bytesPerRow * rep.pixelsHigh)
     }
 
-    /// A symbol on an app-icon-shaped tile; a tint fills it and brightens the glyph to white.
     static func symbolIcon(named name: String, tint: SymbolTint? = nil) -> NSImage {
         let key = symbolKey(name, tint)
         if let cached = cache.object(forKey: key) { return cached }
@@ -265,13 +261,15 @@ enum IconCache {
 
             // A tinted tile keeps white ink in both appearances; the tint carries the contrast.
             let ink = tint == nil ? NSColor.srgbInk(plainInk, alpha: 0.85) : .white
-            guard let symbol = glyph(named: name, tint: ink)
-            else { return true }
-            let size = symbol.size
-            symbol.draw(
-                in: NSRect(
-                    x: (side - size.width) / 2, y: (side - size.height) / 2,
-                    width: size.width, height: size.height))
+            // A symbol picks its glyph by the drawing appearance, which off-main isn't the surface's.
+            NSAppearance(named: isDark ? .darkAqua : .aqua)?.performAsCurrentDrawingAppearance {
+                guard let symbol = glyph(named: name, tint: ink, isDark: isDark) else { return }
+                let size = symbol.size
+                symbol.draw(
+                    in: NSRect(
+                        x: (side - size.width) / 2, y: (side - size.height) / 2,
+                        width: size.width, height: size.height))
+            }
             return true
         }
         let (icon, cost) = downsampled(image)
@@ -279,12 +277,12 @@ enum IconCache {
         return icon
     }
 
-    /// Symbols where they exist; the names SF Symbols lacks fall back to template assets.
-    private static func glyph(named name: String, tint: NSColor) -> NSImage? {
+    private static func glyph(named name: String, tint: NSColor, isDark: Bool) -> NSImage? {
         let config = NSImage.SymbolConfiguration(pointSize: 21, weight: .medium)
             .applying(.init(paletteColors: [tint]))
         if let symbol = NSImage(
-            systemSymbolName: SystemSymbolName.resolve(name), accessibilityDescription: nil
+            systemSymbolName: SystemSymbolName.resolve(name, isDark: isDark),
+            accessibilityDescription: nil
         )?
         .withSymbolConfiguration(config) {
             return symbol
@@ -437,7 +435,6 @@ enum IconCache {
         return Decoded(image: icon, cost: cost)
     }
 
-    /// Paints the share an app icon does, leaving a real app icon untouched.
     private static func fittedToArtwork(_ source: NSImage) -> (NSImage, Int) {
         fitted(source, to: appIconExtent)
     }
@@ -478,13 +475,11 @@ enum IconCache {
         return CGFloat(side) / CGFloat(pixels)
     }
 
-    /// Rasterize the multi-rep icon into one square bitmap, with its decoded byte cost.
     private static func downsampled(_ source: NSImage) -> (NSImage, Int) {
         rasterized(
             source, into: NSRect(origin: .zero, size: NSSize(width: displayPixel, height: displayPixel)))
     }
 
-    /// Draws `source` into `frame` on a `displayPixel`-square canvas.
     private static func rasterized(_ source: NSImage, into frame: NSRect) -> (NSImage, Int) {
         // Fixed 2×, `NSScreen.main` being main-thread-only, so a detached decode works.
         let pixels = Int(displayPixel * 2)

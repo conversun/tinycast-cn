@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The quicklink library plus the behaviour that applies to all of them.
 struct QuicklinksSettingsView: View {
     @Environment(QuicklinkStore.self) private var store
     @Environment(QuicklinkCoordinator.self) private var coordinator
@@ -53,8 +52,8 @@ struct QuicklinksSettingsView: View {
             if results.isEmpty {
                 Text(
                     store.quicklinks.isEmpty
-                        ? String(localized: "No quicklinks yet.")
-                        : String(localized: "No quicklink matches “\(query)”.")
+                        ? "No quicklinks yet."
+                        : "No quicklink matches “\(query)”."
                 )
                 .foregroundStyle(.secondary)
             } else {

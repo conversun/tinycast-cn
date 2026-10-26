@@ -27,9 +27,15 @@ export const site = {
 
 // The hero, in as few words as possible — headline plus one punchy line.
 export const hero = {
-  // One entry per line: the break falls between the two sentences at every
-  // width. The last line ends bare, because the hero draws a caret after it.
-  headlineLines: ["Everything on your Mac.", "One keystroke away"],
+  // Two lines, the break between the two sentences at every width. The first
+  // line opens on each of `swap` in turn, once, and settles on the first, so it
+  // ends as written; none is wider than "Everything", so the line never rewraps.
+  // The second line ends bare, because the hero draws a caret after it.
+  headline: {
+    swap: ["Everything", "Every app", "Every file", "Every clip", "Every note"],
+    rest: "on your Mac.",
+    second: "One keystroke away",
+  },
   sub: "A small, native launcher for your apps, clipboard, snippets and windows. Free and open source, with no account and no telemetry.",
   // The mono line under the buttons. Each fact is stated in the docs.
   facts: ["Under 100 MB of memory", "Zero dependencies", "Free & open source"],
@@ -69,3 +75,43 @@ export const companies = [
 ] as const;
 
 export type Company = (typeof companies)[number];
+
+export type Badge = {
+  href: string;
+  alt: string;
+  src: string;
+  darkSrc?: string;
+  width: number;
+  height: number;
+  isInvertedInDark?: boolean;
+};
+
+// The images are copies in public/badges, never hotlinks, so the page still
+// makes no request to a third party.
+export const badges: Badge[] = [
+  {
+    href: "https://www.star-history.com/abue-ammar/tinycast",
+    alt: "GitHub Trending Repository of the Day",
+    src: "/badges/trending-light.svg",
+    darkSrc: "/badges/trending-dark.svg",
+    width: 270,
+    height: 64,
+  },
+  {
+    href: "https://usefulshelf.co/apps/tinycast?utm_source=tinycast.dev&utm_medium=referral&utm_campaign=badge&utm_content=light",
+    alt: "Featured on UsefulShelf",
+    src: "/badges/usefulshelf.svg",
+    darkSrc: "/badges/usefulshelf-lime.svg",
+    width: 248,
+    height: 66,
+  },
+  {
+    href: "https://www.trymacapps.com",
+    alt: "Featured on TryMacApps",
+    src: "/badges/trymacapps.png",
+    width: 200,
+    height: 67,
+    // Dark ink on a transparent ground, so it would vanish on the dark canvas.
+    isInvertedInDark: true,
+  },
+];

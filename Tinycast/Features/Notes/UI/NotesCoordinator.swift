@@ -69,8 +69,7 @@ final class NotesCoordinator {
     var hasActiveNote: Bool { store.activeID != nil }
     /// UTF-16 units, straight off the text storage: the only length TextKit hands back in O(1).
     var characterCountLabel: String {
-        characterCount == 1
-            ? String(localized: "1 character") : String(localized: "\(characterCount) characters")
+        String(localized: "\(characterCount) characters")
     }
 
     var searchQueryBinding: Binding<String> {
@@ -121,7 +120,6 @@ final class NotesCoordinator {
         await store.flush()
     }
 
-    /// The command is a toggle, like every other surface: a second press puts the panel away.
     func toggle() {
         if windowController.isVisible {
             hide()
@@ -305,7 +303,7 @@ final class NotesCoordinator {
     func chooseNotesFolder() {
         guard
             let url = FolderPicker.choose(
-                message: "Choose the folder your notes are kept in.",
+                message: String(localized: "Choose the folder your notes are kept in."),
                 startingAt: store.notesDirectory)
         else { return }
         settings.notesFolder = AppPaths.contentFolderSetting(for: url, named: "Notes")

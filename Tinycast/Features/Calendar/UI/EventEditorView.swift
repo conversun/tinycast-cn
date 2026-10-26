@@ -16,26 +16,31 @@ struct EventEditorView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: metrics.spacing.xxl) {
-                FormRow(String(localized: "Title")) {
+                FormRow("Title") {
                     FormTextInput(
-                        text: $editor.draft.title, focused: titleFocused, placeholder: String(localized: "Event title"),
+                        text: $editor.draft.title, focused: titleFocused,
+                        placeholder: String(localized: "Event title"),
                         label: String(localized: "Event title"), moveFocus: editor.advanceFocus
                     )
                     .frame(height: metrics.size.dialogButtonHeight)
                     .formFieldChrome(focused: focusedField == .title)
                 }
-                FormRow(String(localized: "Start")) {
+                FormRow("Start") {
                     choice(
-                        "Start", field: .start, selection: $editor.draft.startOffsetMinutes,
-                        values: EventDraft.startOffsets, label: EventDraft.label(startOffset:))
+                        String(localized: "Start"), field: .start,
+                        selection: $editor.draft.startOffsetMinutes,
+                        values: EventDraft.startOffsets,
+                        label: { EventDraft.label(startOffset: $0, locale: .current) })
                 }
-                FormRow(String(localized: "Duration")) {
+                FormRow("Duration") {
                     choice(
-                        "Duration", field: .duration, selection: $editor.draft.durationMinutes,
-                        values: EventDraft.durations, label: EventDraft.label(duration:))
+                        String(localized: "Duration"), field: .duration,
+                        selection: $editor.draft.durationMinutes,
+                        values: EventDraft.durations,
+                        label: { EventDraft.label(duration: $0, locale: .current) })
                 }
-                FormRow("") {
-                    Text("It goes on the calendar new events go to.")
+                FormRow {
+                    Text("The event will be added to your default calendar.")
                         .font(metrics.typography.rowTrailing)
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -118,7 +123,7 @@ struct EventEditorView: View {
         }
         .formFieldChrome(focused: focusedField == field)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(LocalizedStringKey(title))
+        .accessibilityLabel(title)
         .accessibilityValue(label(selection.wrappedValue))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { open() }

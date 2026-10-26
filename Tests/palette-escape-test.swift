@@ -30,14 +30,30 @@ struct PaletteEscapeTests {
     static func resolve(
         menuOpen: Bool = false, menuQuery: String = "", argumentFocused: Bool = false,
         query: String = "", mode: PaletteMode = .launcher, canGoBack: Bool = false,
-        behavior: EscapeKeyBehavior = .navigateBackOrClose
+        behavior: EscapeKeyBehavior = .navigateBackOrClose, compactRootExpanded: Bool = false
     ) -> PaletteEscapeAction {
         PaletteEscapeAction.resolve(
             menuOpen: menuOpen, menuQuery: menuQuery, argumentFocused: argumentFocused,
-            query: query, mode: mode, canGoBack: canGoBack, behavior: behavior)
+            query: query, mode: mode, canGoBack: canGoBack, behavior: behavior,
+            compactRootExpanded: compactRootExpanded)
     }
 
     static func main() {
+        for behavior in EscapeKeyBehavior.allCases {
+            expect(
+                resolve(query: "notes", behavior: behavior, compactRootExpanded: true),
+                .clearQuery, "compact root clears text before collapsing under either preference")
+            expect(
+                resolve(behavior: behavior, compactRootExpanded: true),
+                .collapsePalette, "empty expanded compact root collapses under either preference")
+            expect(resolve(behavior: behavior), .hidePalette, "collapsed root closes on the next Escape")
+            expect(
+                resolve(menuOpen: true, behavior: behavior, compactRootExpanded: true),
+                .closeMenu, "menus still outrank root collapse")
+            expect(
+                resolve(argumentFocused: true, behavior: behavior, compactRootExpanded: true),
+                .leaveArgumentField, "argument focus still outranks root collapse")
+        }
         expect(
             resolve(menuOpen: true, menuQuery: "paste"),
             .clearMenuQuery,
@@ -130,17 +146,17 @@ struct PaletteEscapeTests {
             .closeMenu,
             "a menu still outranks the argument field beneath it")
 
-        // ⌘⎋ never reaches the responder chain, so what counts as the chord is decided in the tap.
+        // ⌘esc never reaches the responder chain, so the tap decides what counts as the chord.
         expectChord(
             CommandEscapeTap.isChord(keyCode: Int64(kVK_Escape), flags: [.maskCommand]),
-            true, "a bare ⌘⎋ is the root-search chord")
+            true, "a bare ⌘esc is the root-search chord")
         expectChord(
             CommandEscapeTap.isChord(keyCode: Int64(kVK_Escape), flags: []),
             false, "an unmodified Escape belongs to the palette's own handler")
         expectChord(
             CommandEscapeTap.isChord(
                 keyCode: Int64(kVK_Escape), flags: [.maskCommand, .maskAlternate]),
-            false, "⌥⌘⎋ is Force Quit and must pass straight through")
+            false, "⌥⌘esc is Force Quit and must pass straight through")
         expectChord(
             CommandEscapeTap.isChord(
                 keyCode: Int64(kVK_Escape), flags: [.maskCommand, .maskShift]),

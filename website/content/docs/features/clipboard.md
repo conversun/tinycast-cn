@@ -28,6 +28,8 @@ The footer shows where a paste will go, like "Paste to Notes".
 | Paste and Keep Window Open | <kbd>⌥</kbd><kbd>return</kbd>                       |
 | Filter by type             | <kbd>⌘</kbd><kbd>P</kbd>                            |
 | Pin / Unpin Entry          | <kbd>⌘</kbd><kbd>.</kbd>                            |
+| Edit Entry                 | <kbd>⌘</kbd><kbd>E</kbd>                            |
+| Show in Finder             | <kbd>⌘</kbd><kbd>F</kbd>                            |
 | Paste a pinned entry       | <kbd>⌘</kbd><kbd>1</kbd> … <kbd>⌘</kbd><kbd>0</kbd> |
 | Delete Entry               | <kbd>⌃</kbd><kbd>X</kbd>                            |
 | Delete All Entries         | <kbd>⌃</kbd><kbd>⇧</kbd><kbd>X</kbd>                |
@@ -36,6 +38,10 @@ The **Default action** setting swaps <kbd>return</kbd> and <kbd>⌘</kbd><kbd>re
 it to **Copy to Clipboard**, <kbd>return</kbd> copies and <kbd>⌘</kbd><kbd>return</kbd> pastes.
 Double-clicking and the number shortcuts follow the same setting. <kbd>⌥</kbd><kbd>return</kbd>
 always pastes.
+
+**Edit Entry** opens a text entry for editing. <kbd>⌘</kbd><kbd>return</kbd> saves the change to
+the same entry and puts it on the clipboard. <kbd>return</kbd> starts a new line, and <kbd>esc</kbd>
+cancels.
 
 Pasting needs the [Accessibility permission](/docs/permissions).
 

@@ -38,7 +38,7 @@ struct ClipboardList: View {
         var currentTitle: String?
         var pinnedSlot = 0
         for item in results {
-            let title = item.isPinned ? "Pinned" : DateBucket(for: item.createdAt).title
+            let title = item.isPinned ? String(localized: "Pinned") : DateBucket(for: item.createdAt).title
             if title != currentTitle {
                 rows.append(.header(title))
                 currentTitle = title
@@ -62,7 +62,8 @@ struct ClipboardList: View {
                         case .item(let item, let slot):
                             ClipboardRow(
                                 item: item, selected: item.id == selectedID,
-                                imageURL: store.imageURL(for: item), slot: slot
+                                imageURL: store.imageURL(for: item),
+                                ownsImage: store.ownsImage(of: item), slot: slot
                             )
                             .selectionFrame(item.id == selectedID)
                             .contentShape(Rectangle())
@@ -95,17 +96,16 @@ struct ClipboardList: View {
     }
 }
 
-/// Coarse date buckets for sectioning, ordered newest-first by raw value.
 enum DateBucket: Int {
     case today, yesterday, thisWeek, thisMonth, earlier
 
     var title: String {
         switch self {
-        case .today: return "Today"
-        case .yesterday: return "Yesterday"
-        case .thisWeek: return "This Week"
-        case .thisMonth: return "This Month"
-        case .earlier: return "Earlier"
+        case .today: return String(localized: "Today")
+        case .yesterday: return String(localized: "Yesterday")
+        case .thisWeek: return String(localized: "This Week")
+        case .thisMonth: return String(localized: "This Month")
+        case .earlier: return String(localized: "Earlier")
         }
     }
 
@@ -130,6 +130,7 @@ private struct ClipboardRow: View {
     let item: ClipboardItem
     let selected: Bool
     let imageURL: URL?
+    let ownsImage: Bool
     /// This row's ⌘-digit, or nil when it is not among the first ten visible pins.
     let slot: Character?
     @Environment(PaletteState.self) private var palette
@@ -194,7 +195,7 @@ private struct ClipboardRow: View {
                 Image(nsImage: IconCache.symbolIcon(named: "doc.text")).resizable()
             }
         case .image:
-            AsyncThumbnail(url: imageURL, maxPixel: 64) { image in
+            AsyncThumbnail(url: imageURL, maxPixel: 64, source: .image(derived: ownsImage)) { image in
                 image
                     .resizable()
                     .scaledToFill()
@@ -232,7 +233,8 @@ private struct ClipboardRow: View {
 
 /// ImageIO for a blob we hold; QuickLook for a referenced file, which may be any type.
 private enum ThumbnailSource {
-    case image
+    /// `derived` only for a blob we hold, so no copy is ever written beside someone else's file.
+    case image(derived: Bool)
     case file
 
     func cached(_ url: URL, maxPixel: CGFloat) -> NSImage? {
@@ -244,7 +246,9 @@ private enum ThumbnailSource {
 
     func loadAsync(_ url: URL, maxPixel: CGFloat) async -> NSImage? {
         switch self {
-        case .image: return await ImageThumbnail.loadAsync(url, maxPixel: maxPixel)
+        case .image(let derived):
+            return await ImageThumbnail.loadAsync(
+                url, maxPixel: maxPixel, copyingWith: derived ? ClipboardTextWorker.executable : nil)
         case .file: return await FilePreviewThumbnail.loadAsync(url, maxPixel: maxPixel)
         }
     }
@@ -255,7 +259,7 @@ private struct AsyncThumbnail<Content: View, Placeholder: View>: View {
     let url: URL?
     let maxPixel: CGFloat
     /// Not nested here: the off-main decode would carry this view's isolated `View` conformances.
-    var source: ThumbnailSource = .image
+    var source: ThumbnailSource = .image(derived: false)
     @ViewBuilder let content: (Image) -> Content
     @ViewBuilder let placeholder: () -> Placeholder
 
@@ -318,8 +322,10 @@ struct ClipboardPreview: View {
                 }
             }
         case .image:
-            AsyncThumbnail(url: store.imageURL(for: item), maxPixel: metrics.size.clipboardPreviewPixel) {
-                image in
+            AsyncThumbnail(
+                url: store.imageURL(for: item), maxPixel: metrics.size.clipboardPreviewPixel,
+                source: .image(derived: store.ownsImage(of: item))
+            ) { image in
                 image
                     .resizable()
                     .scaledToFit()
@@ -382,14 +388,14 @@ private struct ClipboardInfoSection: View {
                 ForEach(rows) { row in
                     if row.id != rows.first?.id { Divider() }
                     HStack(spacing: metrics.spacing.sm) {
-                        Text(row.label.localizedUI).foregroundStyle(.secondary)
+                        Text(row.label).foregroundStyle(.secondary)
                         Spacer(minLength: metrics.spacing.lg)
                         if let icon = row.icon {
                             Image(nsImage: icon)
                                 .resizable()
                                 .frame(width: 20, height: 20)
                         }
-                        Text(row.value.localizedUI).lineLimit(1).truncationMode(.middle)
+                        Text(row.value).lineLimit(1).truncationMode(.middle)
                     }
                     .font(.callout)
                     .padding(.vertical, metrics.spacing.sm)
@@ -403,52 +409,63 @@ private struct ClipboardInfoSection: View {
     private var rows: [InfoRow] {
         var rows: [InfoRow] = []
         if let source {
-            rows.append(InfoRow(label: "Source".localizedUI, value: source.name, icon: source.icon))
+            rows.append(InfoRow(label: String(localized: "Source"), value: source.name, icon: source.icon))
         }
         switch item.kind {
         case .text:
-            // What the entry *is*, which is what the type filter files it under.
             let isColor = item.colorValue != nil
-            rows.append(InfoRow(label: "Type", value: isColor ? "Color" : "Text"))
+            rows.append(
+                InfoRow(
+                    label: String(localized: "Type"),
+                    value: isColor ? String(localized: "Color") : String(localized: "Text")))
             // A colour's own notations are the pane above; its length is not what you came for.
             if !isColor {
                 if let characters = details.characters {
-                    rows.append(InfoRow(label: "Characters", value: characters.formatted()))
+                    rows.append(
+                        InfoRow(label: String(localized: "Characters"), value: characters.formatted()))
                 }
                 if let words = details.words {
-                    rows.append(InfoRow(label: "Words", value: words.formatted()))
+                    rows.append(InfoRow(label: String(localized: "Words"), value: words.formatted()))
                 }
             }
         case .image:
-            rows.append(InfoRow(label: "Type".localizedUI, value: "Image".localizedUI))
+            rows.append(InfoRow(label: String(localized: "Type"), value: String(localized: "Image")))
             if let size = details.pixelSize {
                 rows.append(
-                    InfoRow(label: "Dimensions".localizedUI, value: "\(Int(size.width))×\(Int(size.height))"))
+                    InfoRow(
+                        label: String(localized: "Dimensions"),
+                        value: "\(Int(size.width))×\(Int(size.height))"))
             }
             if let bytes = details.fileBytes {
                 rows.append(
                     InfoRow(
-                        label: "Size".localizedUI, value: Int64(bytes).formatted(.byteCount(style: .file))))
+                        label: String(localized: "Size"),
+                        value: Int64(bytes).formatted(.byteCount(style: .file))))
             }
         case .file:
             let path = item.filePath ?? ""
             rows.append(
                 InfoRow(
-                    label: "Type",
+                    label: String(localized: "Type"),
                     value: details.typeName ?? ClipboardFileKind.of(path: path).title))
-            rows.append(InfoRow(label: "Path", value: (path as NSString).abbreviatingWithTildeInPath))
+            rows.append(
+                InfoRow(
+                    label: String(localized: "Path"),
+                    value: (path as NSString).abbreviatingWithTildeInPath))
             if let bytes = details.fileBytes {
                 rows.append(
                     InfoRow(
-                        label: "Size", value: Int64(bytes).formatted(.byteCount(style: .file))))
+                        label: String(localized: "Size"),
+                        value: Int64(bytes).formatted(.byteCount(style: .file))))
             }
         }
         rows.append(
-            InfoRow(label: "Copied".localizedUI, value: Self.copiedFormatter.string(from: item.createdAt)))
+            InfoRow(
+                label: String(localized: "Copied"),
+                value: Self.copiedFormatter.string(from: item.createdAt)))
         return rows
     }
 
-    /// Name and icon from the recorded bundle ID, via Launch Services and `IconCache`.
     private var source: (name: String, icon: NSImage)? {
         IconCache.observeStyle()
         guard let bundleID = item.sourceBundleID,

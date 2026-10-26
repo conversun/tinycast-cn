@@ -3,15 +3,15 @@ import SwiftUI
 
 // The few pieces more than one Settings pane or editor needs; everything else stays feature-owned.
 
-/// The Settings sidebar tile, shared with the matching feature switches.
 struct SettingsTabIcon: View {
     let systemImage: String
     let tint: Color
     var size = Theme.Size.settingsSidebarGlyph + Theme.Spacing.xs * 2
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let scale = size / (Theme.Size.settingsSidebarGlyph + Theme.Spacing.xs * 2)
-        Image(systemName: systemImage)
+        Image(systemName: SystemSymbolName.resolve(systemImage, isDark: colorScheme == .dark))
             .resizable()
             .scaledToFit()
             .frame(
@@ -29,8 +29,8 @@ struct SettingsTabIcon: View {
 
 struct SettingsFeatureToggleLabel: View {
     let anchor: SettingsAnchor
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringResource
+    let subtitle: LocalizedStringResource
 
     var body: some View {
         HStack(spacing: Theme.Spacing.lg) {
@@ -40,7 +40,7 @@ struct SettingsFeatureToggleLabel: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                 SettingsRowTitle(anchor, title)
                     .fontWeight(.semibold)
-                Text(subtitle.localizedUI)
+                Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -66,20 +66,20 @@ struct SettingsRow<Icon: View, Trailing: View>: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                 Group {
                     if let anchor {
-                        SettingsRowTitle(anchor, title)
+                        SettingsRowTitle(anchor, verbatim: title)
                     } else {
-                        Text(title.localizedUI)
+                        Text(title)
                     }
                 }
                 .lineLimit(1)
                 if let subtitle {
-                    Text(subtitle.localizedUI)
+                    Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(subtitleLineLimit)
                         .fixedSize(horizontal: false, vertical: true)
                         .truncationMode(.middle)
-                        .help(subtitle.localizedUI)
+                        .help(subtitle)
                 }
             }
             .opacity(labelOpacity)
@@ -96,15 +96,25 @@ enum SettingsListMetrics {
 extension SettingsRow where Icon == EmptyView {
     init(
         title: String, subtitle: String? = nil, subtitleLineLimit: Int = 1,
-        alignment: VerticalAlignment = .center,
-        labelOpacity: Double = 1, anchor: SettingsAnchor? = nil,
+        alignment: VerticalAlignment = .center, labelOpacity: Double = 1,
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.init(
             title: title, subtitle: subtitle, subtitleLineLimit: subtitleLineLimit,
-            alignment: alignment, labelOpacity: labelOpacity,
-            anchor: anchor, icon: { EmptyView() },
+            alignment: alignment, labelOpacity: labelOpacity, icon: { EmptyView() },
             trailing: trailing)
+    }
+
+    /// A fixed row a search result lands on, so its title is always Tinycast's own text.
+    init(
+        title: LocalizedStringResource, subtitle: String? = nil, subtitleLineLimit: Int = 1,
+        alignment: VerticalAlignment = .center, anchor: SettingsAnchor,
+        @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.init(
+            title: title.resolved(), subtitle: subtitle,
+            subtitleLineLimit: subtitleLineLimit, alignment: alignment, anchor: anchor,
+            icon: { EmptyView() }, trailing: trailing)
     }
 }
 
@@ -197,15 +207,15 @@ extension View {
 }
 
 struct SettingsEditorHeader: View {
-    let title: String
-    var subtitle: String?
+    let title: LocalizedStringResource
+    var subtitle: LocalizedStringResource?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text(title.localizedUI)
+            Text(title)
                 .font(Theme.Typography.panelTitle)
             if let subtitle {
-                Text(subtitle.localizedUI)
+                Text(subtitle)
                     .font(Theme.Typography.rowTitle)
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -215,12 +225,12 @@ struct SettingsEditorHeader: View {
 }
 
 struct SettingsEditorField<Content: View>: View {
-    let title: String
+    let title: LocalizedStringResource
     var labelFont: Font?
     @ViewBuilder var content: Content
 
     init(
-        _ title: String, labelFont: Font? = nil,
+        _ title: LocalizedStringResource, labelFont: Font? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -235,7 +245,7 @@ struct SettingsEditorField<Content: View>: View {
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         } label: {
-            Text(title.localizedUI).font(labelFont)
+            Text(title).font(labelFont)
         }
     }
 }
@@ -286,11 +296,10 @@ private struct SettingsEditorPanelSurface: ViewModifier {
     }
 }
 
-/// A feature pane's opening section: the master switch, then its launcher-visibility companion.
 struct FeatureSwitchSection: View {
     let anchor: SettingsAnchor
-    let enableTitle: String
-    var enableSubtitle: String?
+    let enableTitle: LocalizedStringResource
+    var enableSubtitle: LocalizedStringResource?
     @Binding var isEnabled: Bool
     @Binding var showsInLauncher: Bool
     var showsIcon = false
@@ -312,7 +321,7 @@ struct FeatureSwitchSection: View {
                         anchor: anchor, title: enableTitle, subtitle: enableSubtitle)
                 } else {
                     SettingsRowTitle(anchor, enableTitle)
-                    if let enableSubtitle { Text(enableSubtitle.localizedUI) }
+                    if let enableSubtitle { Text(enableSubtitle) }
                 }
             }
             Toggle("Show in launcher", isOn: $showsInLauncher)
@@ -326,7 +335,7 @@ struct FeatureSwitchSection: View {
 
 /// The filter row above a long list, shaped like a search field rather than a form text field.
 struct SettingsFilterField: View {
-    let prompt: String
+    let prompt: LocalizedStringResource
     @Binding var query: String
     /// The plain field has no bezel: without this only the glyphs are a target.
     @FocusState private var focused: Bool
@@ -336,7 +345,7 @@ struct SettingsFilterField: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
             // `prompt:` + `labelsHidden`, or the form makes the placeholder a left-column heading.
-            TextField("", text: $query, prompt: Text(prompt.localizedUI))
+            TextField("", text: $query, prompt: Text(prompt))
                 .textFieldStyle(.plain)
                 .labelsHidden()
                 .focused($focused)

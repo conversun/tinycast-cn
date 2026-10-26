@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// A dictionary page: headword, then numbered senses hung off a shared gutter, then its sections.
 struct DictionaryEntryView: View {
     @Environment(\.metrics) private var metrics
     let entry: DictionaryEntry
@@ -49,7 +48,7 @@ private struct DictionaryBlockView: View {
                     }
                 }
                 if let pronunciation {
-                    Text("| \(pronunciation) |")
+                    Text(verbatim: "| \(pronunciation) |")
                         .font(metrics.typography.rowTitle)
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
@@ -71,7 +70,7 @@ private struct DictionaryBlockView: View {
             }
         case .subsense(let runs):
             HStack(alignment: .firstTextBaseline, spacing: metrics.spacing.sm) {
-                Text("•")
+                Text(verbatim: "•")
                     .foregroundStyle(Theme.Colors.textTertiary)
                 Text(runs.attributed())
             }

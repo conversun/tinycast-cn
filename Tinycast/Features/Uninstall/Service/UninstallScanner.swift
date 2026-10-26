@@ -15,7 +15,7 @@ enum UninstallScanner {
         var errorDescription: String? {
             switch self {
             case .refused:
-                return "Tinycast can’t uninstall this app."
+                return String(localized: "Tinycast can’t uninstall this app.")
             }
         }
     }
@@ -28,7 +28,7 @@ enum UninstallScanner {
         try await Signposts.interval("UninstallScanner.discover") {
             let home = NSHomeDirectory()
             let environment = UninstallEnvironment(
-                home: home, hasFullDiskAccess: detectFullDiskAccess(home: home))
+                home: home, hasFullDiskAccess: Permissions.hasFullDiskAccess())
             guard
                 let identity = UninstallIdentity.make(
                     target: target, otherAppNames: otherAppNames, otherBundleIDs: otherBundleIDs,
@@ -163,14 +163,14 @@ enum UninstallScanner {
         let protection = UninstallProtectionRules.classify(scanned.facts, environment: environment)
         guard protection != .missing else { return nil }
         // A symlink is trashed as the link, so it never costs more than its own bytes.
-        let walkable = scanned.isDirectory && !scanned.facts.isSymbolicLink
+        let walkable = scanned.facts.isDirectory && !scanned.facts.isSymbolicLink
         return UninstallCandidate(
             path: path,
             name: displayName ?? (path as NSString).lastPathComponent,
             locationLabel: UninstallRules.abbreviate(
                 (path as NSString).deletingLastPathComponent, home: environment.home),
             evidence: evidence,
-            isDirectory: scanned.isDirectory,
+            isDirectory: scanned.facts.isDirectory,
             size: walkable ? nil : MeasuredSize(bytes: scanned.byteSize),
             protection: protection)
     }
@@ -179,7 +179,7 @@ enum UninstallScanner {
     private static func inspect(
         _ path: String, parent: ParentFacts?
     )
-        -> (facts: PathFacts, isDirectory: Bool, byteSize: Int64)?
+        -> (facts: PathFacts, byteSize: Int64)?
     {
         var info = stat()
         guard lstat(path, &info) == 0 else { return nil }
@@ -193,11 +193,13 @@ enum UninstallScanner {
             volumeIsReadOnly: volumeIsReadOnly,
             isSystemRestricted: info.st_flags & UInt32(SF_RESTRICTED | SF_IMMUTABLE) != 0,
             isUserImmutable: info.st_flags & UInt32(UF_IMMUTABLE) != 0,
+            isDirectory: (info.st_mode & S_IFMT) == S_IFDIR,
+            isWritable: FileManager.default.isWritableFile(atPath: path),
             isOwnedByCurrentUser: info.st_uid == geteuid(),
             parentIsWritable: parent.isWritable,
             parentIsSticky: parent.isSticky)
         // `st_size`, not `st_blocks`: a 593-byte plist occupies a block and must not read as 4 kB.
-        return (facts, (info.st_mode & S_IFMT) == S_IFDIR, Int64(info.st_size))
+        return (facts, Int64(info.st_size))
     }
 
     /// The permission that actually governs a trash, resolved once per root.
@@ -216,7 +218,7 @@ enum UninstallScanner {
     /// Logical bytes, like Finder; an unreadable subtree is skipped, not abandoned.
     private static func directorySize(of path: String, budget: SizeBudget) throws -> MeasuredSize {
         let url = URL(fileURLWithPath: path)
-        // Not the allocated keys: Xcode ships decmpfs-compressed, and blocks read 4.19 GB of 9.45.
+        // Not the allocated keys: blocks badly undercount a decmpfs-compressed bundle.
         let keys: [URLResourceKey] = [.totalFileSizeKey, .fileSizeKey]
         guard
             let enumerator = FileManager.default.enumerator(
@@ -224,7 +226,7 @@ enum UninstallScanner {
                 errorHandler: { _, _ in true })
         else { return .zero }
 
-        // Hoisted: the loop runs up to `maxEntries` times, and this allocated a `Set` on each one.
+        // Hoisted: the loop runs up to `maxEntries` times.
         let keySet = Set(keys)
         var size = MeasuredSize()
         var entries = 0
@@ -240,13 +242,5 @@ enum UninstallScanner {
             size.bytes += Int64(values?.totalFileSize ?? values?.fileSize ?? 0)
         }
         return size
-    }
-
-    /// Detected, never requested: TCC denies silently, and under-reporting only locks a row.
-    private static func detectFullDiskAccess(home: String) -> Bool {
-        let descriptor = open(home + "/Library/Application Support/com.apple.TCC/TCC.db", O_RDONLY)
-        guard descriptor >= 0 else { return false }
-        close(descriptor)
-        return true
     }
 }

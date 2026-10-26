@@ -67,7 +67,8 @@ private struct RoomRowView: View {
             let apps = room.windows.map(\.appName).reduce(into: [String]()) { names, name in
                 if !names.contains(name) { names.append(name) }
             }
-            return ([isCurrent ? String(localized: "Current") : nil, room.summary] + [apps.joined(separator: ", ")])
+            let current = isCurrent ? String(localized: "Current") : nil
+            return ([current, room.summary] + [apps.joined(separator: ", ")])
                 .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         case .edit, .create:
             return String(localized: "Pick the open windows that belong in it")
@@ -98,7 +99,7 @@ private struct RoomRowView: View {
             Spacer(minLength: metrics.spacing.md)
             if let layout {
                 HStack(spacing: metrics.spacing.sm) {
-                    Text(layout.title.localizedUI)
+                    Text(layout.title)
                         .font(metrics.typography.rowTrailing)
                         .foregroundStyle(.secondary)
                     // Tab changes the selected room's layout, so only that row advertises it.
@@ -114,7 +115,9 @@ private struct RoomRowView: View {
         .armedHover($hovered)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
-        .accessibilityValue(layout.map { "\(subtitle), \($0.title) layout" } ?? subtitle)
+        .accessibilityValue(
+            layout.map { String(localized: "\(subtitle), \($0.title) layout") } ?? subtitle
+        )
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

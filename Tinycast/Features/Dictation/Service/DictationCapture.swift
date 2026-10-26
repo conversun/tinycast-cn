@@ -12,7 +12,8 @@ final class DictationCapture {
         var errorDescription: String? {
             switch self {
             case .microphoneUnavailable: String(localized: "No microphone is available.")
-            case .microphoneDenied: String(localized: "Allow Tinycast to use the microphone in System Settings.")
+            case .microphoneDenied:
+                String(localized: "Allow Tinycast to use the microphone in System Settings.")
             case .captureUnavailable: String(localized: "Couldn't start recording from this microphone.")
             }
         }
@@ -27,6 +28,7 @@ final class DictationCapture {
     var onLevels: (([Float]) -> Void)?
     var onLimit: (() -> Void)?
 
+    private(set) var isBluetooth = false
     private var session: AVCaptureSession?
     private var output: AVCaptureAudioDataOutput?
     private var collector: AudioCollector?
@@ -44,6 +46,8 @@ final class DictationCapture {
             microphoneID.map { id in Self.microphones.first { $0.uniqueID == id } }
             ?? AVCaptureDevice.default(for: .audio)
         guard let device else { throw Failure.microphoneUnavailable }
+        isBluetooth = [kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE]
+            .contains(UInt32(bitPattern: device.transportType))
         guard let input = try? AVCaptureDeviceInput(device: device) else {
             throw Failure.captureUnavailable
         }
@@ -92,6 +96,11 @@ final class DictationCapture {
         let samples = collector?.finish() ?? []
         collector = nil
         return samples
+    }
+
+    func snapshot() -> [Float] {
+        guard session != nil else { return [] }
+        return collector?.snapshot() ?? []
     }
 }
 
@@ -159,4 +168,6 @@ private final class AudioCollector: NSObject, AVCaptureAudioDataOutputSampleBuff
     }
 
     func finish() -> [Float] { queue.sync { samples } }
+
+    func snapshot() -> [Float] { queue.sync { samples } }
 }

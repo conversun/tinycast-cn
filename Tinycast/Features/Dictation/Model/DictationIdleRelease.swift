@@ -12,12 +12,12 @@ enum DictationIdleRelease: Int, CaseIterable, Identifiable, Sendable {
     case oneHour = 60
 
     var id: Self { self }
-    var title: String {
+    func title(locale: Locale) -> String {
         switch self {
-        case .never: String(localized: "Never")
-        case .oneMinute: String(localized: "1 minute")
-        case .oneHour: String(localized: "1 hour")
-        default: String(localized: "\(rawValue) minutes")
+        case .never: String(localized: "Never", locale: locale)
+        default:
+            Duration.seconds(rawValue * 60).formatted(
+                .units(allowed: [.hours, .minutes], width: .wide).locale(locale))
         }
     }
 }

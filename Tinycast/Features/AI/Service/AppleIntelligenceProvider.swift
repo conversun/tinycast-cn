@@ -30,8 +30,7 @@ struct AppleIntelligenceProvider: AIProvider {
                     }
                     let turn = Self.turn(for: request)
                     guard let prompt = turn.prompt else {
-                        throw AIProviderError.responseFailed(
-                            String(localized: "There was nothing to send."))
+                        throw AIProviderError.responseFailed(String(localized: "There was nothing to send."))
                     }
                     let session = LanguageModelSession(
                         model: SystemLanguageModel(guardrails: guardrails),
@@ -95,21 +94,18 @@ struct AppleIntelligenceProvider: AIProvider {
         case .exceededContextWindowSize:
             return .responseFailed(
                 String(
-                    localized:
-                        "This conversation is longer than the on-device model can hold. Start a new chat."
-                ))
+                    localized: """
+                        This conversation is longer than the on-device model can hold. Start a new chat.
+                        """))
         case .guardrailViolation, .refusal:
-            return .responseFailed(
-                String(localized: "Apple Intelligence declined to answer that."))
+            return .responseFailed(String(localized: "Apple Intelligence declined to answer that."))
         case .unsupportedLanguageOrLocale:
             return .responseFailed(
                 String(localized: "Apple Intelligence does not support this language yet."))
         case .assetsUnavailable:
-            return .unavailable(
-                String(localized: "Apple Intelligence is still downloading its model."))
+            return .unavailable(String(localized: "Apple Intelligence is still downloading its model."))
         case .rateLimited:
-            return .responseFailed(
-                String(localized: "Apple Intelligence is busy. Try again shortly."))
+            return .responseFailed(String(localized: "Apple Intelligence is busy. Try again shortly."))
         case .concurrentRequests:
             return .responseFailed(
                 String(localized: "Apple Intelligence is already answering. Try again shortly."))

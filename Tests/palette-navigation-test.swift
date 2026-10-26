@@ -17,7 +17,6 @@ struct PaletteNavigationTests {
         }
     }
 
-    /// A launcher with a search typed into it, which is what a back step has to bring back.
     static func searchingLauncher() -> PaletteState {
         let vm = PaletteState()
         vm.prepare(mode: .launcher)
@@ -111,6 +110,25 @@ struct PaletteNavigationTests {
         editing.prepare(mode: .snippets)
         expect(editing.restoredSelection == nil, "a fresh summon releases the restored selection")
         expect(vm.restoredSelection == nil, "other screens keep their existing navigation behaviour")
+
+        let clipboard = PaletteState()
+        clipboard.prepare(mode: .clipboard)
+        clipboard.query = "draft"
+        clipboard.clipboardFilter = .text
+        clipboard.query = ""
+        clipboard.clipboardFilter = .all
+        clipboard.selection = 2
+        clipboard.preserveSelection()
+        clipboard.clipboardFilter = .all
+        expect(
+            clipboard.selection == 2 && clipboard.restoredSelection == 2,
+            "a programmatic query and filter change keeps its chosen row through the observers")
+        clipboard.clipboardFilter = .link
+        expect(clipboard.restoredSelection == nil, "a new type filter releases the preserved selection")
+        clipboard.selection = 1
+        clipboard.preserveSelection()
+        clipboard.query = "another"
+        expect(clipboard.restoredSelection == nil, "a new query releases the preserved selection")
 
         let quicklink = searchingLauncher()
         quicklink.push(mode: .quicklinks)
@@ -244,7 +262,6 @@ struct PaletteNavigationTests {
         return state
     }
 
-    /// Moves the pointer far enough to count, which is how every armed case below gets armed.
     static func armed() -> PaletteState {
         let state = shown()
         state.notePointerMoved(to: CGPoint(x: rest.x + 40, y: rest.y))

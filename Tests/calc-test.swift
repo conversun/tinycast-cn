@@ -1,4 +1,3 @@
-// Standalone test for the calculator engine, compiling the real Foundation-only sources.
 import Foundation
 
 @main
@@ -8,7 +7,6 @@ struct CalcTests {
     static var passes = 0
 
     static func main() {
-        // Arithmetic & precedence
         expectDisplay("2+2", "4")
         expectDisplay("5*7", "35")
         expectDisplay("100/4", "25")
@@ -35,7 +33,7 @@ struct CalcTests {
         expectDisplay("2m / 2m to hex", "0x1")
         expectDisplay(String(repeating: "1+", count: 100) + "1", "101")
         expectNil(String(repeating: "1+", count: 128) + "1")
-        expectDisplay("2**2", "4")  // "**" is an alias for "^" (Python/JS/shell spelling)
+        expectDisplay("2**2", "4")
         expectDisplay("2**10", "1,024")
         expectDisplay("2**3**2", "512")  // right-associative, same as "^"
         expectDisplay("(5+2)*3", "21")
@@ -46,7 +44,7 @@ struct CalcTests {
         expectDisplay("10/4", "2.5")
         expectDisplay("1/3", "0.3333333333")
         expectDisplay("2.5 * 4", "10")
-        expectDisplay("1,000 + 234", "1,234")  // grouping commas accepted in input
+        expectDisplay("1,000 + 234", "1,234")
 
         // Compact thousands suffix — attached `k` is a number suffix; spaced `k` remains Kelvin
         expectDisplay("10k", "10,000")
@@ -76,14 +74,13 @@ struct CalcTests {
         expectDisplay("10 milliseconds to s", "0.01 s")
         expectLocalized("1,5 million", "1.500.000", italian)
 
-        // Scientific notation input
         expectDisplay("1e6 + 1", "1,000,001")
         expectDisplay("1.5e-3 * 2", "0.003")
         expectDisplay("2.5e8 / 2", "125,000,000")
-        expectDisplay("1E6 + 1", "1,000,001")  // uppercase E
+        expectDisplay("1E6 + 1", "1,000,001")
         expectDisplay("1e6", "1,000,000")  // a lone shorthand literal cards like "10k"
         expectDisplay("10em", "160 px")  // partial "e" isn't an exponent, so `em` stays a unit
-        expectDisplay("1e3k + 1", "1,000,001")  // exponent then compact suffix, both applied
+        expectDisplay("1e3k + 1", "1,000,001")
 
         // Exact up to 2^53, past the old 1e15 cutoff — truncating these lost real digits on copy
         expectDisplay("2^49", "562,949,953,421,312")
@@ -93,7 +90,6 @@ struct CalcTests {
         // Beyond 2^53 the precision is genuinely gone, so exponent form is the honest answer
         expectDisplay("123456789 * 123456789", "1.524157875e+16")
 
-        // Functions
         expectDisplay("sqrt(64)", "8")
         expectDisplay("sqrt 64", "8")
         expectDisplay("sqrt 64 + 36", "44")  // bare arg is one operand: sqrt(64) + 36
@@ -107,14 +103,12 @@ struct CalcTests {
         expectDisplay("floor(2.7)", "2")
         expectDisplay("ceil(2.1)", "3")
         expectDisplay("round(2.5)", "3")
-        expectDisplay("SQRT(64)", "8")  // case-insensitive
+        expectDisplay("SQRT(64)", "8")
 
-        // Constants
         expectDisplay("2*pi", "6.283185307")
         expectDisplay("π*2", "6.283185307")
         expectDisplay("e^2", "7.389056099")
 
-        // Implicit multiplication
         expectDisplay("4(2+3)", "20")
         expectDisplay("(2+3)(2+3)", "25")
         expectDisplay("2pi", "6.283185307")
@@ -162,7 +156,6 @@ struct CalcTests {
         expectDisplay("1e305k", "1e+308")
         expectNil("1e5e5")
 
-        // Percent
         expectDisplay("20% of 450", "90")
         expectDisplay("450 + 20%", "540")
         expectDisplay("450 - 15%", "382.5")
@@ -178,7 +171,6 @@ struct CalcTests {
         expectNil("10 % 3")  // "%" stays percent, whatever follows it
         expectDisplay("450 + 20% - 5", "535")
 
-        // Unit conversion — length / weight / temperature / time / area / volume / storage
         expectDisplay("10km to mi", "6.213711922 mi")
         expectDisplay("10 km in miles", "6.213711922 mi")
         expectDisplay("5ft in cm", "152.4 cm")
@@ -219,9 +211,8 @@ struct CalcTests {
         expectDisplay("1 GiB to MB", "1,073.741824 MB")
         expectDisplay("1 GB to MiB", "953.6743164 MiB")
         expectDisplay("8 bit to byte", "1 B")
-        expectDisplay("2*5 km to mi", "6.213711922 mi")  // expression on the left side
+        expectDisplay("2*5 km to mi", "6.213711922 mi")
 
-        // Number bases
         expectBadges("0b1010", source: "Binary", target: "Decimal")
         expectBadges("0o17", source: "Octal", target: "Decimal")
         expectBadges("0B1010 +", source: "Binary", target: "Decimal")
@@ -238,13 +229,11 @@ struct CalcTests {
         expectDisplay("255 to octal", "0o377")
         expectDisplay("0xff", "255")  // bare radix literal echoes decimal
 
-        // Friendly category errors
         expectError("10kg to sec", "Cannot convert Weight to Time.")
         expectError("100 mL to km", "Cannot convert Volume to Length.")
         expectError("1 GB to hr", "Cannot convert Digital Storage to Time.")
         expectError("1 year to kg", "Cannot convert Time to Weight.")
 
-        // Non-calculator input → no card
         expectNil("safari")
         expectNil("1password")
         expectNil("45")
@@ -296,21 +285,17 @@ struct CalcTests {
         expectNil("-(1 == 1)")
         expectNil("sqrt(1 == 1)")
 
-        // Formatting: display grouped, copyText plain
         expectDisplay("1234567*1", "1,234,567")
         expectCopy("1234567*1", "1234567")
         expectCopy("10km to mi", "6.213711922 mi")
         expectDisplay("-1234.5-0.25", "-1,234.75")
 
-        // Card expression echo
         expectExpression("3*3", "3×3")
         expectExpression("10km to mi", "10 km")
 
-        // Badges on explicit conversions
         expectBadges("10km to mi", source: "Kilometers", target: "Miles")
         expectBadges("100 C to F", source: "Celsius", target: "Fahrenheit")
 
-        // Bare-unit auto-conversion (no connector)
         expectDisplay("1m", "3 feet 3.37007874 inches")
         expectExpression("1m", "1 m")
         expectBadges("1m", source: "Meters", target: "Feet")
@@ -371,7 +356,6 @@ struct CalcTests {
         expectDisplay("1bar + 10psi", "24.50377377 psi")
         expectDisplay("1Gbps + 500Mbps", "1,500 Mbps")
 
-        // Unit-expression precedence, parentheses, scalar operations, and cancellation
         expectDisplay("10kg + 2 * 5kg", "20 kg")
         expectDisplay("(10kg + 5kg) * 2", "30 kg")
         expectDisplay("2 * (3kg + 500g)", "7,000 g")
@@ -390,7 +374,6 @@ struct CalcTests {
         expectDisplay("(2kg + 500g) * 4", "10,000 g")
         expectDisplay("(20kg - 5kg) / 3", "5 kg")
 
-        // Percentages carry through quantity arithmetic
         expectDisplay("10kg + 20%", "12 kg")
         expectDisplay("10kg - 20%", "8 kg")
         expectDisplay("10kg * 20%", "2 kg")
@@ -644,6 +627,11 @@ struct CalcTests {
         expectDisplay("10m/s / 2s", "5 m/s²")
         expectDisplay("2kg * 3m/s²", "6 N")
         expectDisplay("1 / 20ms to hz", "50 Hz")
+        expectDisplay("100 / s to hz", "100 Hz")
+        expectDisplay("1000 / (3/s)", "333.3333333 s")
+        expectDisplay("65535 / (100/s) to minutes", "10.9225 min")
+        expectDisplay("1000 / 3 / s", "333.3333333 Hz")
+        expectNil("100 / sec")  // the secant function claims `sec` first
         expectDisplay("(1hr + 30min) to timespan", "1 hr 30 min")
         expectDisplay("100km / 40km/h to duration", "2 hr 30 min")
         expectNil("1m / 0s")
@@ -672,7 +660,7 @@ struct CalcTests {
         expectBadgesAt(
             "days till july", source: "Friday, 24 July", target: "Thursday, 1 July, 2027")
         expectDisplayAt("days until tomorrow", "1 day")
-        expectDisplayAt("weeks till 9april", "37 weeks")  // 259 / 7
+        expectDisplayAt("weeks till 9april", "37 weeks")
         expectDisplayAt("today + 3 weeks", "14 August")
         expectDisplayAt("now + 90 min", "24 July at 1:48 AM")
         expectDisplayAt("jul 4 - today", "345 days")
@@ -702,7 +690,6 @@ struct CalcTests {
         expectNilAt("todays")
         expectNilAt("times")
 
-        // Angle units (deg is a real unit now, not just a trig postfix)
         expectDisplay("1 deg", "0.01745329252 rad")
         expectExpression("1 deg", "1 deg")
         expectBadges("1 deg", source: "Degrees", target: "Radians")
@@ -723,13 +710,20 @@ struct CalcTests {
         expectDisplay("hr min", "60 min")
         expectNil("m s")  // different categories → no card, no error
 
-        // Extra unit categories: speed / pressure / data rate
         expectDisplay("100 kmh to mph", "62.13711922 mph")
         expectDisplay("60 mph to kmh", "96.56064 km/h")
         expectDisplay("100 mbps to kbps", "100,000 Kbps")
         expectBadges("100 kmh to mph", source: "Kilometers per Hour", target: "Miles per Hour")
 
-        // Bare-unit auto-conversion gaps: same category, same treatment.
+        // Fuel economy and consumption: no reciprocal rule joins the two
+        expectDisplay("36 mpg", "15.30517347 km/L")
+        expectBadges("36 mpg", source: "Miles per Gallon", target: "Kilometers per Liter")
+        expectDisplay("15 km/l to mpg", "35.2821875 mpg")
+        expectDisplay("100 mi / 4 gal to mpg", "25 mpg")
+        expectDisplay("24.5 l / 350 km to l/100km", "7 L/100km")
+        expectDisplay("1 / 36 mpg to l/100km", "6.533738426 L/100km")
+        expectError("6.5 l/100km to mpg", "Cannot convert Fuel Consumption to Fuel Economy.")
+
         expectDisplay("5 mbar", "0.07251886887 psi")
         expectDisplay("5 kPa", "0.7251886887 psi")
         expectDisplay("5 hPa", "0.07251886887 psi")
@@ -738,21 +732,17 @@ struct CalcTests {
         expectDisplay("100 bps", "0.1 Kbps")
         expectDisplay("1 Tbps", "1,000 Gbps")
 
-        // Base conversion accepts an expression on the value side, as unit conversion does.
         expectDisplay("2*128 to hex", "0x100")
         expectDisplay("10*5 to hex", "0x32")
 
-        // Percentage phrasings
         expectDisplay("20% off 500", "400")
         expectDisplay("50 as % of 200", "25%")
 
-        // Badges on paths that previously had none
         expectBadges("255 to hex", source: "Decimal", target: "Hexadecimal")
         expectBadges("0xff to decimal", source: "Hexadecimal", target: "Decimal")
         expectBadges("3*3", source: "Expression", target: "Result")
         expectBadges("20% off 500", source: "Expression", target: "Discounted")
 
-        // days since — past elapsed, against the fixed clock (Fri 2026-07-24)
         expectDisplayAt("days since 9jul", "15 days")
         expectBadgesAt("days since 9jul", source: "Thursday, 9 July", target: "Friday, 24 July")
         expectDisplayAt("weeks since 3jul", "3 weeks")
@@ -767,10 +757,9 @@ struct CalcTests {
         expectDisplay("50 GBP in euros", "58.23 EUR")
         expectDisplay("100 dollars to yen", "15,700.00 JPY")
         expectDisplay("100 usd -> eur", "92.00 EUR")
-        expectDisplay("2*50 usd to eur", "92.00 EUR")  // expression on the value side
+        expectDisplay("2*50 usd to eur", "92.00 EUR")
         expectDisplay("eur to usd", "1.09 USD")  // implied amount of 1
         expectCopy("100 dollars to yen", "15700.00 JPY")
-        // Currency signs, prefixed and suffixed
         expectDisplay("€20 to GBP", "17.17 GBP")
         expectDisplay("20€ to GBP", "17.17 GBP")
         expectDisplay("USD1K to EUR", "920.00 EUR")
@@ -806,7 +795,6 @@ struct CalcTests {
         expectDisplay("10 pounds", "4.5359237 kg")
         expectDisplay("10 pounds to euros", "11.65 EUR")
         expectBadges("10 pounds to euros", source: "British Pound", target: "Euro")
-        // Currency ↔ unit is a friendly category error, like Weight ↔ Time
         expectError("10 usd to kg", "Cannot convert Currency to Weight.")
         expectError("10 kg to usd", "Cannot convert Weight to Currency.")
         // A known currency the snapshot doesn't quote, and no snapshot at all
@@ -861,7 +849,6 @@ struct CalcTests {
         // CUP (Cuban peso) is a generated code that collides with a unit; volume still wins
         expectDisplay("1 cup to ml", "236.5882365 mL")
 
-        // Currency expressions — still pure and deterministic against the injected rate table
         expectDisplay("10$", "10.00 USD")
         expectExpression("10$", "10 USD")
         expectBadges("10$", source: "Expression", target: "US Dollar")
@@ -869,7 +856,6 @@ struct CalcTests {
         expectDisplay("10$ + 5$", "15.00 USD")
         expectDisplay("$10 + €5", "14.20 EUR")
         expectDisplay("€5 + $10", "15.43 USD")
-        // Sign-first money echoes amount-first, like every other quantity
         expectExpression("$10 + €5", "10 USD + 5 EUR")
         expectExpression("10$ + 5€", "10 USD + 5 EUR")
         expectDisplay("$10 * 2", "20.00 USD")
@@ -898,10 +884,79 @@ struct CalcTests {
         // A trailing suffix reports through the same conversion the group uses.
         expectError("($10 + $5) to npr", "No exchange rate for NPR.")
         expectError("(1kg + 500g) to usd", "Cannot convert Weight to Currency.")
-        // A mid-expression `to` converts before it adds; `* 30` stays ambiguous, so it needs parens
-        expectNil("20 eur to usd * 30")
-        expectNil("20 eur to usd / 2")
+        expectDisplay("20 eur to usd * 30", "652.17 USD")
+        expectDisplay("20 eur to usd / 2", "10.87 USD")
         expectDisplay("20 eur to usd + 5 usd", "26.74 USD")
+        expectDisplay("1000 usd in eur/12", "76.67 EUR")
+        expectCopy("1000 usd in eur/12", "76.67 EUR")
+        expectExpression("1000 usd in eur/12", "1000 USD in EUR ÷ 12")
+        expectBadges("1000 usd in eur/12", source: "Expression", target: "Euro")
+        expectDisplay("1000USD in EUR/12", "76.67 EUR")
+        expectDisplay("$1000 in €/12", "76.67 EUR")
+        expectDisplay("1000 usd to eur * 2", "1,840.00 EUR")
+        expectDisplay("1000 usd → eur / 4", "230.00 EUR")
+        expectDisplay("1000 usd -> eur / 4", "230.00 EUR")
+        expectDisplay("1000 usd in eur + 20", "940.00 EUR")
+        expectDisplay("1000 usd in eur - 20", "900.00 EUR")
+        expectDisplay("1000 usd in eur * 3%", "27.60 EUR")
+        expectDisplay("1000 usd in eur / 25%", "3,680.00 EUR")
+        expectDisplay("1000 usd in eur / (2 + 3)", "184.00 EUR")
+        expectDisplay("1000 usd in eur / -2", "-460.00 EUR")
+        expectDisplay("1000 usd in eur / 2^3", "115.00 EUR")
+        expectDisplay("1000 usd in eur / 2 * 3 + 5", "1,385.00 EUR")
+        expectDisplay("(1000 usd in eur / 12) * 3", "230.00 EUR")
+        expectDisplay("1000 usd in eur / 12 +", "76.67 EUR")
+        expectDisplay("1000 usd in eur /", "920.00 EUR")
+        expectDisplay("1 btc in usd / 12", "5,000.00 USD")
+        expectDisplay("1200 xof in eur / 2", "0.91 EUR")
+        expectDisplay("10km to m / 4", "2,500 m")
+        expectDisplay("10in in cm / 2", "12.7 cm")
+        expectDisplay("20 pounds to kg / 2", "4.5359237 kg")
+        expectDisplay("500 Mbps in MBps / 2", "31.25 MBps")
+        expectDisplay("1hr to min * 2", "120 min")
+        expectDisplay("20 celsius to fahrenheit / 2", "34 °F")
+        expectDisplay("10 celsius + 20 fahrenheit in celsius + 5 celsius", "8.333333333 °C")
+        expectDisplay("100km/h in m/s / 2", "13.88888889 m/s")
+        expectDisplay("25 USD/hr in EUR/min * 2", "0.7666666667 EUR/min")
+        expectDisplay("2m2 in cm^2 / 2", "10,000 cm²")
+        expectDisplay("1kg/m3 in g/cm3 * 2", "0.002 g/cm³")
+        expectDisplay("100km/h in m/s + 2m/s", "29.77777778 m/s")
+        expectDisplay("1000 usd / 12 in eur", "76.67 EUR")
+        expectDisplay("1000 usd + 200 usd in eur", "1,104.00 EUR")
+        // A mid-expression conversion takes the whole term before it, never part of a composite
+        expectDisplay("2 * 500 usd in eur / 4", "230.00 EUR")
+        expectDisplay("1000 usd / 4 to eur / 2", "115.00 EUR")
+        expectDisplay("1000 usd in eur / 2 to gbp + 1 gbp", "396.00 GBP")
+        expectDisplay("5 ft 3 in in cm / 2", "80.01 cm")
+        expectDisplay("5 ft 3 in in cm + 1 cm", "161.02 cm")
+        expectDisplay("100 km / 2 h in m/s / 2", "6.944444444 m/s")
+        expectDisplay("2m * 3m to cm2 + 1 cm2", "60,001 cm²")
+        expectDisplay("round(1000 usd in eur)", "920.00 EUR")
+        expectDisplay("max(1000 usd in eur, 900 eur)", "920.00 EUR")
+        expectDisplay("min(10 kg to lb, 30 lb)", "22.04622622 lb")
+        expectLocalized("max(1.000 usd in eur; 900 eur)", "920,00 EUR", italian)
+        expectDisplay("1000 usd in eur > 900 eur", "true")
+        expectDisplay("10 kg to lb == 10 kg", "true")
+        expectNil("1000 usd in eur & 3")
+        expectNil("1000 usd in eur)")
+        expectNil("10 kg to lb to oz")
+        expectLocalized("1.000 usd in eur / 12", "76,67 EUR", italian)
+        expectNil("1000 usd in eur / 0")
+        expectNil("1000 usd in eur / 0%")
+        expectNil("1000 usd in eur / (2 - 2)")
+        expectNil("1000 usd in eur / nonsense")
+        expectNil("1000 usd in eur / (2 +)")
+        expectNil("1000 usd in eur / 2 nonsense")
+        expectNil("1000 usd in eur nonsense / 2")
+        expectNil("1000 usd in eur / 1e-999")
+        expectNil("1000 usd in eur / 1e308 * 1e308 * 1e308")
+        expectNil("100km/h in m/s nonsense / 2")
+        expectNil("100km/h in m/s / (2 +)")
+        expectError("1000 usd in npr / 12", "No exchange rate for NPR.")
+        expectErrorWithoutRates(
+            "1000 usd in eur / 12", "Exchange rates unavailable — check your connection.")
+        expectError("10kg in usd / 2", "Cannot convert Weight to Currency.")
+        expectError("100km/h in kg/s / 2", "Cannot convert Speed to Compound Units.")
         expectDisplay("$10 +", "10.00 USD")
         expectBadges("$10 +", source: "Expression", target: "US Dollar")
         // Juxtaposition multiplies on either side of the amount, same as an explicit "*"
@@ -962,7 +1017,6 @@ struct CalcTests {
         expectNil("usd", region: "INR")
         expectNil("btc", region: "INR")
 
-        // The feed decoding, exercised the way the store hands it over
         expectSnapshot(
             "fiat only", fiat: fiatJSON, crypto: nil,
             expected: "USD=1 EUR=0.9 BTC=nil complete=false")
@@ -1005,7 +1059,6 @@ struct CalcTests {
         expectDisplay("2 businessdays to hours", "16 hr")
         expectBadges("55h in workdays", source: "Hours", target: "Workdays")
 
-        // The rest of the trig set, plus the constants that come with it
         expectDisplay("cot(1)", "0.6420926159")
         expectDisplay("sec(1)", "1.850815718")
         expectDisplay("csc(1)", "1.188395106")
@@ -1025,7 +1078,6 @@ struct CalcTests {
         expectDisplay("10 sec to min", "0.1666666667 min")
         expectDisplay("30 sec + 1 min", "1.5 min")
 
-        // Percentage and ratio phrasings
         expectDisplay("15% tip on 42", "6.3")
         expectDisplay("20% tip of 80", "16")
         expectDisplay("50 is what % of 200", "25%")
@@ -1049,7 +1101,6 @@ struct CalcTests {
         expectNil("average of 5")
         expectNil("10,5")
 
-        // Timespans break a duration into the units that fit it
         expectDisplay("145 mins to timespan", "2 hr 25 min")
         expectDisplay("1 month to timespan", "4 wk 2 day 10 hr 29 min 6 s")
         expectDisplay("8700 s to timespan", "2 hr 25 min")
@@ -1273,14 +1324,12 @@ struct CalcTests {
         expectNil("monday in 3 kg")
         expectDisplay("10 in in cm", "25.4 cm")
 
-        // A zone's offset from the Mac's own
         expectDisplayAt("diff paris", "2:18 AM (+2h)")
         expectDisplayAt("time diff tokyo", "9:18 AM (+9h)")
         expectDisplayAt("diff kolkata", "5:48 AM (+5h 30m)")
         expectBadgesAt("diff paris", source: "UTC", target: "Paris")
         expectNil("diff xyzzy")
 
-        // A duration where a zone would go, and both at once
         expectDisplayAt("time in 4 hours", "4:18 AM")
         expectDisplayAt("time in 90 min", "1:48 AM")
         expectDisplayAt("time in 4 hours in san francisco", "9:18 PM (yesterday)")
@@ -1563,7 +1612,6 @@ struct CalcTests {
         let springNow = clock.calendar.date(from: DateComponents(year: 2026, month: 3, day: 29))!
         expectNilAt("2:30am vienna in london", now: springNow, calendar: vienna)
 
-        // Spoken function and operator names
         expectDisplay("square root of 625", "25")
         expectDisplay("square root of 64", "8")
         expectDisplay("cube root of 27", "3")
@@ -1588,7 +1636,6 @@ struct CalcTests {
         expectDisplayAt("2 weeks ago", "10 July")
         expectDisplayAt("3 days ago", "21 July")
         expectBadgesAt("5 weekdays from now", source: "Friday, 24 July", target: "Friday")
-        // A month name with both a day and a year
         expectDisplayAt("august 26 2026 + 15 workdays", "16 September")
         expectDisplayAt("august 26 2026 + 15 days", "10 September")
         expectDisplayAt("26 august 2026 + 1 day", "27 August")
@@ -1598,7 +1645,6 @@ struct CalcTests {
         expectDisplay("3 workdays in hours", "24 hr")
         expectNil("5 from 10")
 
-        // A conversion mid-expression, which used to need parentheses
         expectDisplay("10kg to lb + 3lb", "25.04622622 lb")
         expectDisplay("10kg to lb - 1lb", "21.04622622 lb")
         expectDisplay("100 km/h to mph + 3mph", "65.13711922 mph")
@@ -1627,7 +1673,6 @@ struct CalcTests {
     static let ungrouped = CalcNumberFormat(decimalSeparator: ",", groupingSeparator: nil)!
 
     static func localeTests() {
-        // Resolving a format from the Mac's separators
         check(
             "format [en separators]", expected: "true",
             got: "\(CalcNumberFormat(decimalSeparator: ".", groupingSeparator: ",") == .english)")
@@ -1647,14 +1692,12 @@ struct CalcTests {
         check("format [it argument separator]", expected: ";", got: String(italian.argumentSeparator))
         check("format [ch argument separator]", expected: ",", got: String(swiss.argumentSeparator))
 
-        // The issue's own examples
         expectLocalized("2,3 + 1,5", "3,8", italian)
         expectLocalized("1.234,56 + 0,44", "1.235", italian)
         expectLocalized("10/4", "2,5", italian)
         expectLocalizedCopy("1.234,56 + 0,44", "1235", italian)
         expectLocalizedCopy("10/4", "2,5", italian)
 
-        // Decimal comma, dot grouping
         expectLocalized("2^20", "1.048.576", italian)
         expectLocalized("1.000.000 / 3", "333.333,3333", italian)
         expectLocalized("1/3", "0,3333333333", italian)
@@ -1748,7 +1791,6 @@ struct CalcTests {
         expectLocalized("max(2,3)", "3", .english)
         expectLocalizedNil("max(2;3)", .english)
 
-        // Canonical history text, localized for display
         check("history [grouped]", expected: "1.234,5 kg", got: italian.localized("1,234.5 kg"))
         check("history [dotted date]", expected: "19.2.27", got: italian.localized("19.2.27"))
         check("history [clock]", expected: "00:18:00.123", got: italian.localized("00:18:00.123"))
@@ -2008,7 +2050,6 @@ struct CalcTests {
         check(label(query, region), expected: expected, got: result.expression)
     }
 
-    /// `CurrencyFeed` is handed the two payloads exactly as the store receives them.
     static func expectSnapshot(_ name: String, fiat: Data, crypto: Data?, expected: String) {
         guard let result = try? CurrencyFeed.snapshot(fiat: fiat, crypto: crypto, now: clock.now)
         else {

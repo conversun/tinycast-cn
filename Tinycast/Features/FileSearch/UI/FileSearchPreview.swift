@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The pane beside the results: the file itself over what the filesystem says about it.
 struct FileSearchPreview: View {
 
     @Environment(\.metrics) private var metrics
@@ -42,14 +41,14 @@ private struct FileSearchPreviewStage: View {
             .padding(.top, metrics.spacing.xl)
     }
 
-    /// Unmounting is the teardown: an ordered-out panel keeps its tree, and the overlay hides this.
+    /// Unmounting is the teardown: an ordered-out panel keeps its tree.
     @ViewBuilder private var stage: some View {
         if result.isDirectory {
             Image(systemName: "folder")
                 .font(.system(.largeTitle))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.tertiary)
-        } else if palette.isVisible, !palette.fileSearchQuickLook {
+        } else if palette.isVisible {
             FileSearchSurface(url: result.url)
                 .clipShape(card)
                 .overlay(card.strokeBorder(Theme.Colors.cardStroke, lineWidth: 1))
@@ -98,7 +97,7 @@ private struct FileSearchInfoSection: View {
                 ForEach(rows) { row in
                     if row.id != rows.first?.id { Divider() }
                     HStack(spacing: metrics.spacing.sm) {
-                        Text(row.label.localizedUI).foregroundStyle(.secondary)
+                        Text(row.label).foregroundStyle(.secondary)
                         Spacer(minLength: metrics.spacing.lg)
                         Text(row.value).lineLimit(1).truncationMode(.middle)
                     }
@@ -113,22 +112,30 @@ private struct FileSearchInfoSection: View {
 
     private var rows: [InfoRow] {
         var rows = [
-            InfoRow(label: "Name", value: result.name),
-            InfoRow(label: "Where", value: result.parentPath),
+            InfoRow(label: String(localized: "Name"), value: result.name),
+            InfoRow(label: String(localized: "Where"), value: result.parentPath),
             InfoRow(
-                label: "Type",
-                value: details.typeName ?? (result.isDirectory ? "Folder" : "File").localizedUI)
+                label: String(localized: "Type"),
+                value: details.typeName
+                    ?? (result.isDirectory ? String(localized: "Folder") : String(localized: "File")))
         ]
         if let bytes = details.bytes {
             rows.append(
-                InfoRow(label: "Size", value: Int64(bytes).formatted(.byteCount(style: .file))))
+                InfoRow(
+                    label: String(localized: "Size"),
+                    value: Int64(bytes).formatted(.byteCount(style: .file))))
         }
         if let created = details.created {
-            rows.append(InfoRow(label: "Created", value: Self.stampFormatter.string(from: created)))
+            rows.append(
+                InfoRow(
+                    label: String(localized: "Created"),
+                    value: Self.stampFormatter.string(from: created)))
         }
         if let modified = details.modified {
             rows.append(
-                InfoRow(label: "Modified", value: Self.stampFormatter.string(from: modified)))
+                InfoRow(
+                    label: String(localized: "Modified"),
+                    value: Self.stampFormatter.string(from: modified)))
         }
         return rows
     }

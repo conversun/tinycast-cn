@@ -1,7 +1,6 @@
 import Foundation
 
 enum CalcDateTime {
-    /// Which occurrence of a bare, recurring date/time a phrase resolves to.
     private enum MomentBias { case future, past, nearest }
 
     static func evaluate(
@@ -461,8 +460,9 @@ enum CalcDateTime {
             else { return nil }
             let text = String(value)
             return CalcResult(
-                expression: echo, sourceBadge: "Date",
-                targetBadge: scale == 1 ? "Unix Seconds" : "Unix Milliseconds",
+                expression: echo, sourceBadge: String(localized: "Date"),
+                targetBadge: scale == 1
+                    ? String(localized: "Unix Seconds") : String(localized: "Unix Milliseconds"),
                 payload: .value(display: CalcFormatter.grouped(text), copyText: text))
         }
         let source = query.hasSuffix(" to date") ? String(query.dropLast(8)) : query
@@ -570,21 +570,18 @@ enum CalcDateTime {
     private static func parsePair(
         _ a: String, _ b: String, now: Date, calendar: Calendar, bias: MomentBias
     ) -> Moment? {
-        // number + month  /  month + number  →  a day in that month
         if let month = monthByName[b], let day = ordinalDay(a) {
             return monthDayMoment(month: month, day: day, now: now, calendar: calendar, bias: bias)
         }
         if let month = monthByName[a], let day = ordinalDay(b) {
             return monthDayMoment(month: month, day: day, now: now, calendar: calendar, bias: bias)
         }
-        // clock + am/pm  →  a time today (or tomorrow if it has passed)
         if b == "am" || b == "pm", let (hour, minute) = parseClock(a) {
             guard (1...12).contains(hour) else { return nil }
             let adjusted = b == "pm" ? (hour % 12) + 12 : hour % 12
             return clockMoment(
                 hour: adjusted, minute: minute, now: now, calendar: calendar, bias: bias)
         }
-        // next / last  +  weekday or month
         if a == "next" || a == "last" {
             if let weekday = weekdayByName[b] {
                 return nextWeekday(
@@ -709,15 +706,15 @@ enum CalcDateTime {
         guard let last = phrase.split(separator: " ").last.map(String.init) else { return nil }
         switch last {
         case "s", "sec", "secs", "second", "seconds":
-            return DurUnit(seconds: 1, singular: String(localized: "second"), plural: String(localized: "seconds"), kind: .subSecond)
+            return DurUnit(seconds: 1, singular: "second", plural: "seconds", kind: .subSecond)
         case "min", "mins", "minute", "minutes":
-            return DurUnit(seconds: 60, singular: String(localized: "minute"), plural: String(localized: "minutes"), kind: .subSecond)
+            return DurUnit(seconds: 60, singular: "minute", plural: "minutes", kind: .subSecond)
         case "h", "hr", "hrs", "hour", "hours":
-            return DurUnit(seconds: 3600, singular: String(localized: "hour"), plural: String(localized: "hours"), kind: .subSecond)
+            return DurUnit(seconds: 3600, singular: "hour", plural: "hours", kind: .subSecond)
         case "d", "day", "days":
-            return DurUnit(seconds: 86400, singular: String(localized: "day"), plural: String(localized: "days"), kind: .day)
+            return DurUnit(seconds: 86400, singular: "day", plural: "days", kind: .day)
         case "wk", "week", "weeks":
-            return DurUnit(seconds: 604800, singular: String(localized: "week"), plural: String(localized: "weeks"), kind: .week)
+            return DurUnit(seconds: 604800, singular: "week", plural: "weeks", kind: .week)
         default:
             return nil
         }
@@ -779,7 +776,7 @@ enum CalcDateTime {
         -> String
     {
         let day = dateString(date, now: now, calendar: calendar)
-        return hasTime ? "\(day) at \(timeString(date, calendar: calendar))" : day
+        return hasTime ? String(localized: "\(day) at \(timeString(date, calendar: calendar))") : day
     }
 
     /// The weekday moves to the badge, so an answered moment leads with the date itself.
@@ -790,7 +787,7 @@ enum CalcDateTime {
             calendar.component(.year, from: date) == calendar.component(.year, from: now)
         let day = format(
             date, calendar: calendar, pattern: sameYear ? "d MMMM" : "d MMMM, yyyy")
-        return hasTime ? "\(day) at \(timeString(date, calendar: calendar))" : day
+        return hasTime ? String(localized: "\(day) at \(timeString(date, calendar: calendar))") : day
     }
 
     private static func dateString(_ date: Date, now: Date, calendar: Calendar) -> String {
@@ -939,7 +936,6 @@ enum CalcDateTime {
         "weekday", "weekdays"
     ]
 
-    /// Gregorian weekday numbers (Sunday = 1).
     private static let weekdayByName: [String: Int] = [
         "sunday": 1, "sun": 1, "monday": 2, "mon": 2, "tuesday": 3, "tue": 3, "tues": 3,
         "wednesday": 4, "wed": 4, "thursday": 5, "thu": 5, "thurs": 5, "friday": 6, "fri": 6,

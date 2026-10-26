@@ -6,7 +6,8 @@ struct SnippetEditorScreen: PaletteScreen {
 
     var rows: [StoredSnippet] { [] }
     var primaryActionTitle: String {
-        coordinator.editor?.isSaving == true ? String(localized: "Saving…") : String(localized: "Save Snippet")
+        coordinator.editor?.isSaving == true
+            ? String(localized: "Saving…") : String(localized: "Save Snippet")
     }
     let hidesSearchField = true
     let actsWithoutRows = true

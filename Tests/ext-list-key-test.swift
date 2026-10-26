@@ -27,7 +27,7 @@ enum ExtensionListKeyTests {
             "↑ does nothing, so the form keeps it",
             resolve(.upArrow, listOpen: false) == .ignored, nil)
         check(
-            "⎋ does nothing, so the screen keeps it",
+            "esc does nothing, so the screen keeps it",
             resolve(.escape, listOpen: false) == .ignored, nil)
         check(
             "⌫ does nothing, so the palette keeps it",
@@ -41,7 +41,7 @@ enum ExtensionListKeyTests {
         check("↓ moves down", resolve(.downArrow) == .moveDown, nil)
         check("↵ commits", resolve(.return) == .commit, nil)
         check("keypad ⌤ commits", resolve(KeyEquivalent("\u{3}")) == .commit, nil)
-        check("⎋ dismisses", resolve(.escape) == .dismiss, nil)
+        check("esc dismisses", resolve(.escape) == .dismiss, nil)
         check(
             "a letter is typed into the query",
             resolve(KeyEquivalent("a"), characters: "a") == .append("a"), nil)

@@ -1,6 +1,5 @@
 import Foundation
 
-/// Typed arithmetic for measurements and currencies.
 enum CalcQuantity {
     static func evaluate(
         _ tokens: [CalcToken], query: String, rates: CurrencyRates?, region: String? = nil,
@@ -25,15 +24,16 @@ enum CalcQuantity {
                 parser.operationCount > 0 || (!preserveStandaloneUnit && tokens.count > 1)
             else { return nil }
             return CalcResult(
-                expression: CalcFormatter.expression(query), sourceBadge: "Expression",
-                targetBadge: "Result", payload: .number(value.effective))
+                expression: CalcFormatter.expression(query), sourceBadge: String(localized: "Expression"),
+                targetBadge: String(localized: "Result"), payload: .number(value.effective))
         }
         if value.isBoolean {
             guard split.targetName == nil else { return nil }
             let text = value.amount == 0 ? "false" : "true"
             return CalcResult(
-                expression: expressionText(split.expressionTokens), sourceBadge: "Expression",
-                targetBadge: "Boolean", payload: .value(display: text, copyText: text),
+                expression: expressionText(split.expressionTokens),
+                sourceBadge: String(localized: "Expression"), targetBadge: String(localized: "Boolean"),
+                payload: .value(display: text, copyText: text),
                 canChain: false)
         }
 
@@ -42,7 +42,7 @@ enum CalcQuantity {
                 return CalcResult(
                     expression: query,
                     payload: .error(
-                        message: "Exchange rates unavailable — check your connection."))
+                        message: String(localized: "Exchange rates unavailable — check your connection.")))
             }
             if let code = parser.currencyCodes.first(where: { rates.rate(for: $0) == nil }) {
                 return CalcResult(
@@ -59,8 +59,9 @@ enum CalcQuantity {
                 let text = CalcFormatter.timespan(seconds)
                 return CalcResult(
                     expression: expressionText(split.expressionTokens),
-                    sourceBadge: parser.operationCount == 0 ? unit.name : "Expression",
-                    targetBadge: "Timespan", payload: .value(display: text, copyText: text))
+                    sourceBadge: parser.operationCount == 0 ? unit.name : String(localized: "Expression"),
+                    targetBadge: String(localized: "Timespan"),
+                    payload: .value(display: text, copyText: text))
             }
             guard let output = parser.converted(value, to: targetName) else {
                 guard let message = parser.issue else { return nil }
@@ -74,7 +75,7 @@ enum CalcQuantity {
             guard parser.operationCount > 0 else { return nil }
             return CalcResult(
                 expression: expressionText(split.expressionTokens),
-                sourceBadge: "Expression", targetBadge: "Result",
+                sourceBadge: String(localized: "Expression"), targetBadge: String(localized: "Result"),
                 payload: .number(value.effective))
         case .unit(let unit):
             // A bare `50cm` auto-converts below; with an operator the typed units are kept.
@@ -133,7 +134,7 @@ enum CalcQuantity {
     ) -> CalcResult {
         CalcResult(
             expression: expression,
-            sourceBadge: "Expression", targetBadge: unit.name,
+            sourceBadge: String(localized: "Expression"), targetBadge: unit.name,
             payload: .measurement(amount, unit: unit))
     }
 
@@ -147,7 +148,8 @@ enum CalcQuantity {
             sourceBadge: sourceBadge, targetBadge: definition.name,
             payload: .value(
                 display: "\(CalcFormatter.grouped(formatted)) \(definition.code)",
-                copyText: "\(formatted) \(definition.code)"))
+                copyText: "\(formatted) \(definition.code)"),
+            isCurrency: true)
     }
 
     static func convertUnit(_ amount: Double, from: UnitDef, to: UnitDef) -> Double {
@@ -172,19 +174,25 @@ enum CalcQuantity {
             if index + 2 == end, case .ident(let name) = tokens[index + 1] { return (index, name) }
             let target = Array(tokens[(index + 1)..<end])
             guard CalcUnitExpression.parse(target) != nil else { continue }
-            return (
-                index,
-                target.map { token in
-                    switch token {
-                    case .ident(let name): return name
-                    case .op(let op): return String(op.rawValue)
-                    case .number(let value): return CalcFormatter.copyText(value)
-                    default: return ""
-                    }
-                }.joined(separator: " ")
-            )
+            return (index, targetName(tokens[(index + 1)..<end]))
         }
         return nil
+    }
+
+    static func conversionPrefix(_ tokens: [CalcToken], at start: Int) -> (name: String, end: Int)? {
+        guard let target = CalcUnitExpression.prefix(tokens, at: start) else { return nil }
+        return (targetName(tokens[start..<target.end]), target.end)
+    }
+
+    private static func targetName(_ tokens: ArraySlice<CalcToken>) -> String {
+        tokens.map { token in
+            switch token {
+            case .ident(let name): return name
+            case .op(let op): return String(op.rawValue)
+            case .number(let value): return CalcFormatter.copyText(value)
+            default: return ""
+            }
+        }.joined(separator: " ")
     }
 
     private static func isSimpleConversionSource(_ tokens: [CalcToken]) -> Bool {

@@ -41,7 +41,9 @@ enum LauncherFileFormat {
             switch fields["showInLauncher"] {
             case nil: break
             case .bool(let shown)?: record.showInLauncher = shown
-            default: decoded.problems.append(String(localized: "“\(member.key)”: “showInLauncher” needs true or false"))
+            default:
+                decoded.problems.append(
+                    String(localized: "“\(member.key)”: “showInLauncher” needs true or false"))
             }
             decoded.records[member.key] = record
         }
@@ -60,7 +62,8 @@ enum LauncherFileFormat {
         case nil: return
         case .null?: value = nil
         case .string(let text)?: value = text
-        default: decoded.problems.append(String(localized: "“\(name)”: “\(field)” needs quotes, or null"))
+        default:
+            decoded.problems.append(String(localized: "“\(name)”: “\(field)” needs quotes, or null"))
         }
     }
 }

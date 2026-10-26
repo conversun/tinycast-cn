@@ -4,11 +4,13 @@ import SwiftUI
 private struct HeaderMenuSymbol: View {
     let name: String
     let size: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let configuration = NSImage.SymbolConfiguration(pointSize: size, weight: .medium)
         if let image = NSImage(
-            systemSymbolName: SystemSymbolName.resolve(name), accessibilityDescription: nil
+            systemSymbolName: SystemSymbolName.resolve(name, isDark: colorScheme == .dark),
+            accessibilityDescription: nil
         )?
         .withSymbolConfiguration(configuration) {
             Image(nsImage: image)
@@ -58,14 +60,12 @@ struct BarButton<Label: View>: View {
         .onHover { hovered = $0 }
     }
 
-    /// Selection beats hover, the rule every row follows.
     private var fill: Color {
         if isSelected { return Theme.Colors.selection }
         return hovered ? Theme.Colors.rowHover : Color.clear
     }
 }
 
-/// A header control that states the active choice and opens an in-window menu.
 struct HeaderMenuButton: View {
     let title: String
     let icon: PopoverMenuIcon
@@ -120,7 +120,7 @@ struct HeaderMenuButton: View {
                     .font(metrics.typography.bar)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                // One glyph rotates rather than swapping, so opening the menu cannot shift the layout.
+                // One glyph rotates rather than swapping, so opening the menu can't shift layout.
                 Image(systemName: "chevron.down")
                     .font(metrics.typography.disclosure)
                     .rotationEffect(.degrees(isOpen ? 180 : 0))
@@ -128,6 +128,6 @@ struct HeaderMenuButton: View {
             }
             .foregroundStyle(Theme.Colors.textSecondary)
         }
-        .help(help.localizedUI)
+        .help(help)
     }
 }

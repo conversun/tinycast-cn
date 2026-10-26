@@ -102,8 +102,40 @@ struct DictationInferenceTest {
         else {
             fatalError("Audio chunks lost, repeated or cut samples outside a pause")
         }
+        var live = [Float](repeating: 0.5, count: 48_000)
+        for index in 40_000..<43_200 { live[index] = 0 }
+        guard
+            DictationAudioChunks.liveCut(in: live, from: 0, to: live.count) == 41_600,
+            DictationAudioChunks.liveCut(
+                in: [Float](repeating: 0.5, count: 48_000), from: 0, to: 48_000) == 46_400,
+            DictationAudioChunks.liveCut(in: live, from: 46_400, to: live.count) == 46_400,
+            DictationAudioChunks.liveCut(in: [], from: 0, to: 0) == 0
+        else {
+            fatalError("Live insertion cut outside a pause, repeated audio or flushed too little")
+        }
+        var uttered = [Float](repeating: 0.5, count: 32_000) + [Float](repeating: 0, count: 16_000)
+        var steady = [Float](repeating: 0.5, count: 100_000)
+        for index in 80_000..<83_200 { steady[index] = 0 }
+        guard DictationAudioChunks.liveOverlapStart(in: steady, before: 90_000) == 81_520,
+            DictationAudioChunks.liveOverlapStart(
+                in: [Float](repeating: 0.5, count: 100_000), before: 90_000) == 58_000,
+            DictationAudioChunks.liveOverlapStart(in: steady, before: 10_000) == 0
+        else {
+            fatalError("Live insertion re-started mid-word although a pause was behind")
+        }
+        guard
+            DictationAudioChunks.endsInPause(in: uttered, from: 0, to: uttered.count),
+            !DictationAudioChunks.endsInPause(
+                in: [Float](repeating: 0.5, count: 48_000), from: 0, to: 48_000),
+            !DictationAudioChunks.endsInPause(
+                in: [Float](repeating: 0, count: 48_000), from: 0, to: 48_000),
+            !DictationAudioChunks.endsInPause(
+                in: [Float](repeating: 0.5, count: 16_000), from: 0, to: 16_000)
+        else {
+            fatalError("Live insertion flushed speech without a pause, or silence as speech")
+        }
         print(
-            "Dictation scores, tokenizer, Fourier transform, mel features, listening bands and audio chunks passed"
+            "Dictation scores, tokenizer, Fourier transform, mel features, listening bands, audio chunks and live cuts passed"
         )
     }
 

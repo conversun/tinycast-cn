@@ -1,7 +1,6 @@
 import Foundation
 import Security
 
-/// Login-Keychain generic passwords, one item per account inside a caller-named scope.
 struct KeychainSecretStore: Sendable {
     enum StoreError: Error {
         case invalidEncoding
@@ -12,6 +11,7 @@ struct KeychainSecretStore: Sendable {
 
     /// Every scope the app stores under, named here so the whole keychain surface is one list.
     static let aiAPIKeys = KeychainSecretStore(scope: "ai-api-keys")
+    static let aiRequestHeaders = KeychainSecretStore(scope: "ai-request-headers")
     static let mcpSecrets = KeychainSecretStore(scope: "mcp-secrets")
     static let installedAIEnvironment = KeychainSecretStore(scope: "installed-ai-environment")
 
@@ -60,6 +60,20 @@ struct KeychainSecretStore: Sendable {
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw StoreError.keychain(status)
         }
+    }
+
+    /// One JSON item per account; a failed read throws, a garbled item reads as none.
+    func values(for account: UUID) throws -> [String: String] {
+        guard let stored = try secret(for: account) else { return [:] }
+        return (try? JSONDecoder().decode([String: String].self, from: Data(stored.utf8))) ?? [:]
+    }
+
+    func setValues(_ values: [String: String], for account: UUID) throws {
+        guard !values.isEmpty else { return try removeSecret(for: account) }
+        guard let encoded = String(bytes: try JSONEncoder().encode(values), encoding: .utf8) else {
+            throw StoreError.invalidEncoding
+        }
+        try setSecret(encoded, for: account)
     }
 
     private func query(for account: UUID, returningData: Bool) -> [String: Any] {

@@ -62,22 +62,21 @@ gate — it neither runs the harnesses nor builds the app, so the whole bar in
 ### Chinese fork
 
 `conversun/tinycast-cn` publishes through `release-cn.yml`, not the upstream workflow.
-The intended next stable release is `v0.11.19-cn.2`, based on `v0.11.19`.
-Dispatch it with `version=0.11.19-cn.2`, `upstream_tag=v0.11.19`,
+The intended next stable release is `v0.12.1-cn.1`, based on `v0.12.1`.
+Dispatch it with `version=0.12.1-cn.1`, `upstream_tag=v0.12.1`,
 an exact verified source commit, `prerelease=false`, and a Chinese `release_notes` changelog.
-For this release, use a Chinese summary such as “适配 CN 应用内更新：支持 CN 修订号比较，
-并通过签名校验的 Universal ZIP 安装更新。” Supply a fresh changelog for each later release;
-the workflow does not repeat this release's adaptation announcement.
+Supply a fresh Chinese changelog for each release, including any changes pulled from upstream
+after the named stable tag.
 The source may include newer upstream `main` commits; the release tag always points to the
 verified fork commit.
 
 The workflow checks localization and runs the harnesses, builds a signed Universal app,
-checks both architectures in the app and its two helpers, and verifies signatures. From that
+checks both architectures in the app and its three helpers, and verifies signatures. From that
 same signed app it packages both `Tinycast-CN-<version>.dmg` for manual/Homebrew installation
 and `Tinycast-CN-Universal-<version>.zip` for the updater, using
 `ditto -c -k --keepParent --sequesterRsrc`. Before either asset is uploaded or published,
 the ZIP is expanded into scratch storage, its signature is verified again, and both `arm64`
-and `x86_64` slices are checked in all three binaries.
+and `x86_64` slices are checked in all four binaries.
 
 CN versions are `<triple>-cn.N` for stable builds or `<triple>-beta.N-cn.N` for beta builds.
 The final `cn.N` is a fork revision, not a prerelease indicator: `0.11.19-cn.2` is a stable
@@ -115,6 +114,10 @@ needed. Run it from the **Actions** tab (`Release` → **Run workflow**) and pic
   `-beta.N` suffix (`N` = the Actions run number) so re-running never collides; stable ships the
   version as-is.
 - **version** — base semver, e.g. `0.2.0`.
+
+Its first step is `Scripts/check-migrations.sh`: a migration that a stable release already shipped
+stops the run until it is deleted ([migrations.md](migrations.md)). The check reads tags and history,
+so the checkout fetches every commit without blobs.
 
 It builds on a `macos-26` runner with Xcode 26 and publishes a GitHub Release tagged
 `v<full-version>` with a versioned DMG and zip asset, marked prerelease for beta. On success it also

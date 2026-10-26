@@ -10,9 +10,11 @@ const copiedResetMs = 1600;
 // on the always-dark terminal as well as on the themed page.
 export function CopyButton({
   text,
+  subject = "command",
   className,
 }: {
   text: string;
+  subject?: string;
   className?: string;
 }) {
   const [hasCopied, setHasCopied] = useState(false);
@@ -33,7 +35,7 @@ export function CopyButton({
     <button
       type="button"
       onClick={copy}
-      aria-label={hasCopied ? "Copied" : "Copy command"}
+      aria-label={hasCopied ? "Copied" : `Copy ${subject}`}
       className={cn(
         "inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-caption font-medium transition-colors",
         className,

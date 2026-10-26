@@ -3,6 +3,10 @@ description: Suggest an idea
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Check this first.** Many ideas have already been declined on purpose. Read [What Tinycast Won't Do](https://github.com/abue-ammar/tinycast/blob/main/docs/not-planned.md) before you open this.
   - type: textarea
     id: what
     attributes:

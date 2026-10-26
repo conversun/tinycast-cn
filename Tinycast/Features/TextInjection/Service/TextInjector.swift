@@ -118,6 +118,8 @@ final class TextInjector {
     /// A paste is still in flight, or we still hold the pasteboard it borrowed.
     var isDelivering: Bool { !deliveryQueue.isIdle || activePasteboardLease != nil }
 
+    func drain() async { await deliveryQueue.drain() }
+
     func prepareInteractiveExpansion(target: InjectionTarget?) -> Bool {
         if let editor = target?.ownEditor { return editor.isEditable }
         guard targetAcceptsInjection(target?.externalApp), Permissions.ensureAccessibility() else {

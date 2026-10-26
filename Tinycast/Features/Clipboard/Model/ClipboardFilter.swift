@@ -1,6 +1,5 @@
 import Foundation
 
-/// The clipboard list's type filter. See docs/features/clipboard.md#type-filter.
 enum ClipboardFilter: CaseIterable, Sendable {
     case all
     case text
@@ -12,13 +11,13 @@ enum ClipboardFilter: CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .all: return "All Types"
-        case .text: return "Text Only"
-        case .image: return "Images Only"
-        case .file: return "Files Only"
-        case .color: return "Colors Only"
-        case .link: return "Links Only"
-        case .email: return "Emails Only"
+        case .all: return String(localized: "All Types")
+        case .text: return String(localized: "Text Only")
+        case .image: return String(localized: "Images Only")
+        case .file: return String(localized: "Files Only")
+        case .color: return String(localized: "Colors Only")
+        case .link: return String(localized: "Links Only")
+        case .email: return String(localized: "Emails Only")
         }
     }
 
@@ -38,13 +37,13 @@ enum ClipboardFilter: CaseIterable, Sendable {
     /// What an empty list says, so a filter hiding every entry explains itself.
     var emptyMessage: String {
         switch self {
-        case .all: return "Clipboard history is empty"
-        case .text: return "No text in clipboard history"
-        case .image: return "No images in clipboard history"
-        case .file: return "No files in clipboard history"
-        case .color: return "No colors in clipboard history"
-        case .link: return "No links in clipboard history"
-        case .email: return "No email addresses in clipboard history"
+        case .all: return String(localized: "Clipboard history is empty")
+        case .text: return String(localized: "No text in clipboard history")
+        case .image: return String(localized: "No images in clipboard history")
+        case .file: return String(localized: "No files in clipboard history")
+        case .color: return String(localized: "No colors in clipboard history")
+        case .link: return String(localized: "No links in clipboard history")
+        case .email: return String(localized: "No email addresses in clipboard history")
         }
     }
 
@@ -76,7 +75,6 @@ extension ClipboardItem {
         case email
     }
 
-    /// The parsed colour a `.color` entry states, or nil for every other entry.
     var colorValue: ColorValue? {
         guard kind == .text, let text else { return nil }
         return ColorValue.parse(text)
