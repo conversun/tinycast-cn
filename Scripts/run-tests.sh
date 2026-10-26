@@ -32,6 +32,9 @@ if [ "${1:-}" = "--exec" ]; then
     ticks=0
     while kill -0 "$pid" 2>/dev/null; do
         if [ "$ticks" -ge $((TINYCAST_TEST_TIMEOUT * 5)) ]; then
+            for sampled in "$pid" $(pgrep -P "$pid"); do
+                sample "$sampled" 1 1 -file /dev/stdout >> "$BIN/$name.log" 2>&1
+            done
             { pkill -KILL -P "$pid"; kill -KILL "$pid"; wait "$pid"; } 2>/dev/null
             printf '\n[run-tests] killed after %ss without finishing\n' "$TINYCAST_TEST_TIMEOUT" >> "$BIN/$name.log"
             fail "timed out after ${TINYCAST_TEST_TIMEOUT}s"

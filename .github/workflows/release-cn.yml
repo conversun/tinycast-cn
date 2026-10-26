@@ -76,6 +76,9 @@ jobs:
           XCODE_PATH="$(printf '%s\n' "${XCODE_CANDIDATES[@]}" | sort -V | tail -n1)"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
 
+      - name: Run tests
+        run: ./Scripts/run-tests.sh
+
       - name: Check Chinese localization
         run: ./Scripts/check-localization.sh --extract
 
@@ -101,7 +104,6 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
           PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          ./Scripts/run-tests.sh
           BUNDLE_ID="com.conversun.tinycast-cn"
           if [ "$PRERELEASE" = "true" ]; then BUNDLE_ID="${BUNDLE_ID}.beta"; fi
           xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Release \

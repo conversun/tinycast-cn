@@ -54,7 +54,8 @@ runtime fixture suite runs both as well.
 The suite runs four harnesses at a time by default to reduce CPU usage. `TINYCAST_TEST_JOBS` overrides
 that limit; `TINYCAST_TEST_JOBS=1` runs one at a time. Each result is numbered
 against the total and shows its run and compile time, a quiet stretch names the harnesses still running, and a harness that runs longer
-than `TINYCAST_TEST_TIMEOUT` seconds (default 300) is killed and reported as timed out. Parallelism is safe
+than `TINYCAST_TEST_TIMEOUT` seconds (default 300) is sampled, killed and reported as timed out.
+Its failure log includes the process stacks so a CI-only hang leaves diagnostic evidence. Parallelism is safe
 because each harness already roots its scratch state somewhere of its own — a UUID-suffixed
 `temporaryDirectory`, a `UserDefaults(suiteName:)`, or `NSPasteboard.withUniqueName()` — and a new
 harness must keep doing that rather than reach for a fixed path.

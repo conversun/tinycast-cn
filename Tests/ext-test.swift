@@ -1370,10 +1370,24 @@ struct ExtensionTests {
         await runtime.stop(session: "s1")
         let rerunRecorder = Recorder()
         runtime.setDelegate(rerunRecorder)
+        let (timerRendered, rendering) = AsyncStream<Void>.makeStream()
+        rerunRecorder.onRender = { [weak rerunRecorder] in
+            guard let tree = rerunRecorder?.trees.last,
+                ExtensionScreen(tree: tree, query: "").items.first?.node.string("title") == "count=1"
+            else { return }
+            rendering.finish()
+        }
+        let renderTimeout = Task {
+            do { try await Task.sleep(for: .seconds(5)) } catch { return }
+            rendering.finish()
+        }
         await runtime.start(
             session: "s1b", code: command, file: URL(fileURLWithPath: "/tmp/synthetic.js"),
             mode: .view, context: launchContext())
-        await settle()
+        var timerRender = timerRendered.makeAsyncIterator()
+        _ = await timerRender.next()
+        renderTimeout.cancel()
+        rerunRecorder.onRender = nil
         check(
             "a second run in the same runtime renders",
             !rerunRecorder.trees.isEmpty, rerunRecorder.failures.joined(separator: "|"))
