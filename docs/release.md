@@ -70,7 +70,7 @@ after the named stable tag.
 The source may include newer upstream `main` commits; the release tag always points to the
 verified fork commit.
 
-The workflow runs on `macos-26-intel` with Xcode 26, checks localization and runs the harnesses,
+The workflow runs on `macos-26` with Xcode 26, checks localization and runs the harnesses,
 builds a signed Universal app,
 checks both architectures in the app and its three helpers, and verifies signatures. From that
 same signed app it packages both `Tinycast-CN-<version>.dmg` for manual/Homebrew installation
@@ -78,6 +78,9 @@ and `Tinycast-CN-Universal-<version>.zip` for the updater, using
 `ditto -c -k --keepParent --sequesterRsrc`. Before either asset is uploaded or published,
 the ZIP is expanded into scratch storage, its signature is verified again, and both `arm64`
 and `x86_64` slices are checked in all four binaries.
+
+Use the Apple silicon runner even though it also builds Intel slices. The `macos-26-intel`
+hosted image can hang in IconServices while rasterizing system icons; its tests must not be skipped.
 
 CN versions are `<triple>-cn.N` for stable builds or `<triple>-beta.N-cn.N` for beta builds.
 The final `cn.N` is a fork revision, not a prerelease indicator: `0.11.19-cn.2` is a stable

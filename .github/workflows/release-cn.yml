@@ -60,7 +60,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-26-intel
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
         with:
