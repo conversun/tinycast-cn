@@ -66,6 +66,9 @@ struct SettingsBackupTest {
             "the formatting bar rides the settings backup",
             mirrored["notesShowsFormattingBar"] == .notesShowsFormattingBar)
         check(
+            "the Notes menu bar item rides the settings backup",
+            mirrored["notesShowsInMenuBar"] == .notesShowsInMenuBar)
+        check(
             "clipboard enablement rides the settings backup",
             mirrored["clipboardEnabled"] == .clipboardEnabled)
         check(
@@ -75,7 +78,7 @@ struct SettingsBackupTest {
         // Named one by one: a backup now carries content, so it is far likelier to be sent on.
         for key: AppSettingsKey in [
             .snippetsEnabled, .extensionsEnabled, .calendarEnabled, .autoJoinMeetings,
-            .cameraPreview, .quickActionsEnabled
+            .cameraPreview, .quickActionsEnabled, .allowedDeepLinks
         ] {
             check(
                 "\(key.rawValue) stays out of a backup",

@@ -134,7 +134,7 @@ path.win32 = path;
 
 // ─── process ────────────────────────────────────────────────────────
 
-let bootEnvironment = { platform: "darwin", arch: "arm64", env: {}, cwd: "/", homedir: "/", tmpdir: "/tmp", execPath: "" };
+let bootEnvironment = { platform: "darwin", arch: "arm64", env: {}, cwd: "/", homedir: "/", tmpdir: "/tmp", execPath: "", groups: [] };
 
 export function configureNodeShims(info) {
   bootEnvironment = { ...bootEnvironment, ...info };
@@ -179,6 +179,11 @@ const process = {
   stderr: { write: (text) => console.error(String(text).replace(/\n$/, "")), isTTY: false, columns: 80 },
   stdin: { on: () => {}, resume: () => {}, pause: () => {}, isTTY: false },
   cwd: () => bootEnvironment.cwd,
+  getuid: () => bootEnvironment.uid,
+  getgid: () => bootEnvironment.gid,
+  geteuid: () => bootEnvironment.euid,
+  getegid: () => bootEnvironment.egid,
+  getgroups: () => [...bootEnvironment.groups],
   chdir: () => {
     throw new Error("process.chdir is not supported in Tinycast extensions.");
   },
@@ -251,6 +256,15 @@ const process = {
 
 // ─── os ─────────────────────────────────────────────────────────────
 
+/// The host sends a flat list because a JSON object would lose Node's interface order.
+function networkInterfaces() {
+  const interfaces = {};
+  for (const { name, ...address } of hostCallSync("os", "networkInterfaces", [])) {
+    (interfaces[name] ??= []).push(address);
+  }
+  return interfaces;
+}
+
 const os = {
   EOL: "\n",
   platform: () => "darwin",
@@ -264,15 +278,15 @@ const os = {
     username: bootEnvironment.username || "",
     homedir: bootEnvironment.homedir,
     shell: bootEnvironment.shell || "/bin/zsh",
-    uid: 501,
-    gid: 20,
+    uid: bootEnvironment.uid,
+    gid: bootEnvironment.gid,
   }),
   cpus: () => hostCallSync("os", "cpus", []),
   totalmem: () => bootEnvironment.totalmem || 0,
   freemem: () => hostCallSync("os", "freemem", []),
   uptime: () => hostCallSync("os", "uptime", []),
   loadavg: () => hostCallSync("os", "loadavg", []),
-  networkInterfaces: () => ({}),
+  networkInterfaces,
   endianness: () => "LE",
   devNull: "/dev/null",
   constants: { signals: SIGNALS, errno: {} },
@@ -709,7 +723,7 @@ const childProcess = {
       args = [];
     }
     const raw = hostCallSync("proc", "run", [
-      { shell: !!options.shell, command: String(file), args: args.map(String), cwd: options.cwd, env: childEnv(options.env), timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null },
+      { shell: !!options.shell, command: String(file), args: args.map(String), cwd: options.cwd, env: childEnv(options.env), timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null, stdio: stdioDescriptors(options.stdio) },
     ]);
     const result = normalizeExecResult(raw, options);
     return { ...result, pid: 0, output: [null, result.stdout, result.stderr], error: undefined };
@@ -785,11 +799,25 @@ class Hash {
   }
 }
 
+// CryptoKit seals and opens only full 16-byte tags, and takes no nonce shorter than 96 bits.
+const GCM_TAG_LENGTH = 16;
+const GCM_MIN_IV_LENGTH = 12;
+const GCM_AUTHENTICATION_FAILURE = "Unsupported state or unable to authenticate data";
+
+function hasValidIvLength(mode, length) {
+  if (mode === "gcm") return length >= GCM_MIN_IV_LENGTH;
+  return length === (mode === "cbc" ? 16 : 0);
+}
+
+function invalidAuthTagLength(length) {
+  return cryptoError(`Invalid authentication tag length: ${length}`, "ERR_CRYPTO_INVALID_AUTH_TAG", TypeError);
+}
+
 // Buffers until `final`: a block cipher's concatenated output still matches Node's byte for byte.
 class Cipher {
-  constructor(algorithm, key, iv, decrypt) {
+  constructor(algorithm, key, iv, options, decrypt) {
     const name = String(algorithm).toLowerCase().replace(/^aes(128|192|256)$/, "aes-$1-cbc");
-    const match = /^aes-(128|192|256)-(cbc|ecb)$/.exec(name);
+    const match = /^aes-(128|192|256)-(cbc|ecb|gcm)$/.exec(name);
     if (!match) throw cryptoError("Unknown cipher", "ERR_CRYPTO_UNKNOWN_CIPHER");
     this._mode = match[2];
     this._key = cryptoBytes(key);
@@ -797,11 +825,15 @@ class Cipher {
     if (this._key.length !== Number(match[1]) / 8) {
       throw cryptoError("Invalid key length", "ERR_CRYPTO_INVALID_KEYLEN", RangeError);
     }
-    if (this._iv.length !== (this._mode === "cbc" ? 16 : 0)) {
+    if (!hasValidIvLength(this._mode, this._iv.length)) {
       throw cryptoError("Invalid initialization vector", "ERR_CRYPTO_INVALID_IV", TypeError);
     }
+    const tagLength = options?.authTagLength ?? GCM_TAG_LENGTH;
+    if (this._mode === "gcm" && tagLength !== GCM_TAG_LENGTH) throw invalidAuthTagLength(tagLength);
     this._decrypt = decrypt;
     this._padding = true;
+    this._aad = [];
+    this._authTag = null;
     this._chunks = [];
     this._finished = false;
   }
@@ -813,6 +845,10 @@ class Cipher {
   final(outputEncoding) {
     if (this._finished) throw cryptoError("Invalid state", "ERR_CRYPTO_INVALID_STATE");
     this._finished = true;
+    const bytes = this._mode === "gcm" ? this._finalGcm() : this._finalBlock();
+    return outputEncoding ? bytes.toString(outputEncoding) : bytes;
+  }
+  _finalBlock() {
     const base64 = hostCallSync("crypto", "cipher", [
       this._mode,
       this._decrypt,
@@ -821,12 +857,43 @@ class Cipher {
       bytesToBase64(Buffer.concat(this._chunks)),
       this._padding,
     ]);
-    const bytes = Buffer.from(base64ToBytes(base64));
-    return outputEncoding ? bytes.toString(outputEncoding) : bytes;
+    return Buffer.from(base64ToBytes(base64));
+  }
+  _finalGcm() {
+    const parts = [this._key, this._iv, Buffer.concat(this._chunks), Buffer.concat(this._aad)];
+    const args = parts.map((bytes) => bytesToBase64(bytes));
+    if (!this._decrypt) {
+      const sealed = hostCallSync("crypto", "gcmSeal", args);
+      this._authTag = Buffer.from(base64ToBytes(sealed.tag));
+      return Buffer.from(base64ToBytes(sealed.ciphertext));
+    }
+    // Node reports a missing tag the same way as a wrong one, and gives neither a code.
+    if (!this._authTag) throw new Error(GCM_AUTHENTICATION_FAILURE);
+    const opened = hostCallSync("crypto", "gcmOpen", [...args, bytesToBase64(this._authTag)]);
+    if (opened === null) throw new Error(GCM_AUTHENTICATION_FAILURE);
+    return Buffer.from(base64ToBytes(opened));
   }
   setAutoPadding(enabled = true) {
     if (this._finished) throw cryptoError("Invalid state", "ERR_CRYPTO_INVALID_STATE");
     this._padding = Boolean(enabled);
+    return this;
+  }
+  setAAD(buffer) {
+    if (this._mode !== "gcm" || this._finished) throw cryptoError("Invalid state", "ERR_CRYPTO_INVALID_STATE");
+    this._aad.push(cryptoBytes(buffer));
+    return this;
+  }
+  getAuthTag() {
+    if (this._decrypt || !this._authTag) throw cryptoError("Invalid state", "ERR_CRYPTO_INVALID_STATE");
+    return Buffer.from(this._authTag);
+  }
+  setAuthTag(tag, encoding) {
+    if (this._mode !== "gcm" || !this._decrypt || this._finished) {
+      throw cryptoError("Invalid state", "ERR_CRYPTO_INVALID_STATE");
+    }
+    const bytes = cryptoBytes(tag, encoding);
+    if (bytes.length !== GCM_TAG_LENGTH) throw invalidAuthTagLength(bytes.length);
+    this._authTag = bytes;
     return this;
   }
 }
@@ -868,8 +935,8 @@ const cryptoModule = {
   },
   createHash: (algorithm) => new Hash(algorithm),
   createHmac: (algorithm, key) => new Hash(algorithm, bytesToBase64(cryptoBytes(key))),
-  createCipheriv: (algorithm, key, iv) => new Cipher(algorithm, key, iv, false),
-  createDecipheriv: (algorithm, key, iv) => new Cipher(algorithm, key, iv, true),
+  createCipheriv: (algorithm, key, iv, options) => new Cipher(algorithm, key, iv, options, false),
+  createDecipheriv: (algorithm, key, iv, options) => new Cipher(algorithm, key, iv, options, true),
   pbkdf2Sync,
   pbkdf2(password, salt, iterations, keylen, digest, callback) {
     if (typeof callback !== "function") {
@@ -995,6 +1062,7 @@ class ChildProcess extends EventEmitter {
       env: childEnv(options.env),
       timeout: options.timeout,
       input,
+      stdio: stdioDescriptors(options.stdio),
       // `detached` only makes a process group; only an unread child may answer before it exits.
       detached: !!options.detached && (Array.isArray(options.stdio) ? options.stdio[1] : options.stdio) === "ignore",
     }, (pid) => Promise.all([pipeChild(pid, 1, this.stdout), pipeChild(pid, 2, this.stderr)]));
@@ -1066,6 +1134,10 @@ childProcess.execFile[PROMISIFY_CUSTOM] = (file, args, options) =>
       }
     });
   });
+
+function stdioDescriptors(stdio) {
+  return Array.isArray(stdio) ? [0, 1, 2].map((index) => (typeof stdio[index] === "number" ? stdio[index] : null)) : null;
+}
 
 function pickRunOptions(options = {}) {
   return { cwd: options.cwd, env: childEnv(options.env), timeout: options.timeout, input: options.input ? bytesToBase64(Buffer.from(options.input)) : null };
@@ -1866,5 +1938,26 @@ for (const name of Object.keys(nodeModules)) {
 globalThis.process = process;
 globalThis.Buffer = Buffer;
 globalThis.global = globalThis;
+
+// JSContext exposes native Atomics but no shared buffers; extensions have no worker threads.
+if (typeof globalThis.SharedArrayBuffer === "undefined") {
+  globalThis.SharedArrayBuffer = ArrayBuffer;
+  const load = Atomics.load;
+  Atomics.wait = (array, index, value, timeout) => {
+    if (!(array instanceof Int32Array) && !(array instanceof BigInt64Array)) {
+      throw new TypeError("Atomics.wait requires an Int32Array or BigInt64Array");
+    }
+    const offset = Math.trunc(+index) || 0;
+    load(array, offset);
+    const expected = array instanceof BigInt64Array ? BigInt.asIntN(64, value) : value >> 0;
+    const milliseconds = +timeout;
+    if (load(array, offset) !== expected) return "not-equal";
+    if (Number.isNaN(milliseconds) || milliseconds === Infinity) {
+      throw new TypeError("Atomics.wait with an infinite timeout is not supported in Tinycast extensions");
+    }
+    if (milliseconds > 0) hostCallSync("atomics", "wait", [milliseconds]);
+    return "timed-out";
+  };
+}
 
 export { Buffer, process, EventEmitter };

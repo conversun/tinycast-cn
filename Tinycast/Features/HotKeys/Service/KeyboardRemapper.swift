@@ -29,14 +29,23 @@ final class KeyboardRemapper {
 
     private let defaults: UserDefaults
     private let recoveryKey: String
+    private let instanceLock: RemapInstanceLock?
     private let bootSessionID: String?
-    private var savedMappings: [String: SavedMapping]
+    private var savedMappings: [String: SavedMapping] = [:]
     private lazy var system: HIDEventSystem? = makeSystem()
 
-    init(defaults: UserDefaults = .standard, recoveryKey: String = "hyperKeyKeyboardMappings") {
+    init(
+        defaults: UserDefaults = .standard, recoveryKey: String = "hyperKeyKeyboardMappings",
+        instanceLock: RemapInstanceLock? = nil
+    ) {
         self.defaults = defaults
         self.recoveryKey = recoveryKey
+        self.instanceLock = instanceLock
         bootSessionID = Self.currentBootSessionID()
+        reloadRecovery()
+    }
+
+    private func reloadRecovery() {
         let recovery = defaults.data(forKey: recoveryKey).flatMap {
             try? JSONDecoder().decode(Recovery.self, from: $0)
         }
@@ -60,13 +69,11 @@ final class KeyboardRemapper {
     @discardableResult
     func apply(_ mapping: HIDKeyMapping?) -> Bool {
         self.mapping = mapping
-        guard mapping != nil || !savedMappings.isEmpty else { return true }
-        guard bootSessionID != nil else { return false }
         return reconcileAll().succeeded
     }
 
     func clearLeftovers() {
-        guard mapping == nil, !savedMappings.isEmpty else { return }
+        guard mapping == nil else { return }
         reconcileAll()
     }
 
@@ -78,10 +85,13 @@ final class KeyboardRemapper {
     private func makeSystem() -> HIDEventSystem? {
         guard let system = HIDEventSystem() else { return nil }
         system.onKeyboardConnected = { [weak self, weak system] keyboard in
-            guard let self, let system,
-                mapping != nil || savedMappings[String(keyboard.registryID)] != nil
-            else { return }
-            update(keyboard, in: system)
+            guard let self, let system else { return }
+            _ = withOwnership(unavailable: Update.unchanged) {
+                guard mapping != nil || savedMappings[String(keyboard.registryID)] != nil else {
+                    return .unchanged
+                }
+                return update(keyboard, in: system)
+            }
         }
         system.watchConnections()
         return system
@@ -89,21 +99,36 @@ final class KeyboardRemapper {
 
     @discardableResult
     private func reconcileAll() -> (succeeded: Bool, changed: Bool) {
-        guard let system else { return (false, false) }
-        let keyboards = system.keyboards
-        sawKarabinerConflict = false
-        var failed = 0
-        var changed = false
-        for keyboard in keyboards {
-            switch update(keyboard, in: system) {
-            case .unchanged: break
-            case .changed: changed = true
-            case .failed: failed += 1
+        guard mapping != nil || defaults.object(forKey: recoveryKey) != nil else { return (true, false) }
+        return withOwnership(unavailable: (false, false)) {
+            guard mapping != nil || !savedMappings.isEmpty else { return (true, false) }
+            guard bootSessionID != nil, let system else { return (false, false) }
+            let keyboards = system.keyboards
+            sawKarabinerConflict = false
+            var failed = 0
+            var changed = false
+            for keyboard in keyboards {
+                switch update(keyboard, in: system) {
+                case .unchanged: break
+                case .changed: changed = true
+                case .failed: failed += 1
+                }
             }
+            // A keyboard that refuses is skipped, and one connected later is placed by hot plug.
+            let succeeded =
+                mapping == nil ? savedMappings.isEmpty : keyboards.isEmpty || failed < keyboards.count
+            return (succeeded, changed)
         }
-        // A keyboard that refuses is skipped, and one connected later is placed by hot plug.
-        let succeeded = mapping == nil ? savedMappings.isEmpty : keyboards.isEmpty || failed < keyboards.count
-        return (succeeded, changed)
+    }
+
+    private func withOwnership<Result>(unavailable: Result, _ operation: () -> Result) -> Result {
+        guard let instanceLock else { return operation() }
+        let wasHeld = instanceLock.isHeld
+        guard instanceLock.acquire() else { return unavailable }
+        defer { if !wasHeld { instanceLock.release() } }
+        // Another owner may have changed the journal while this process was waiting.
+        reloadRecovery()
+        return operation()
     }
 
     @discardableResult

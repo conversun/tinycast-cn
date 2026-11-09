@@ -9,6 +9,17 @@ struct FileSearchResult: Identifiable, Equatable, Sendable {
     let parentName: String
     let isDirectory: Bool
 
+    var favoriteKey: String {
+        URL(filePath: id, directoryHint: isDirectory ? .isDirectory : .notDirectory).absoluteString
+    }
+
+    init?(favoriteKey: String, homeDirectory: URL) {
+        guard favoriteKey.hasPrefix("file:///"), let url = URL(string: favoriteKey),
+            url.query == nil, url.fragment == nil
+        else { return nil }
+        self.init(url: url, isDirectory: url.hasDirectoryPath, homeDirectory: homeDirectory)
+    }
+
     /// `url` is taken as given: index paths are already real, and standardizing one costs a stat.
     init(url: URL, isDirectory: Bool, homeDirectory: URL) {
         let parent = url.deletingLastPathComponent()

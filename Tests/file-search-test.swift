@@ -46,6 +46,31 @@ struct FileSearchTests {
         expect(!FileSearchQuery.answersLauncher("ab"), "two characters are too few for the launcher")
         expect(FileSearchQuery.answersLauncher("abc"), "three characters reach the launcher")
         expect(!FileSearchQuery.answersLauncher("  ab \n"), "surrounding whitespace does not count")
+        let folder = result("Documents/Résumé", folder: true)
+        let file = result("Documents/Résumé Final.pdf")
+        let indexed = result("Downloads/Resume.txt")
+        expect(
+            FileSearchQuery.launcherResults("", favorites: [folder, file], indexed: [indexed]).isEmpty,
+            "an empty launcher query leaves files to the Favorites section")
+        expect(
+            FileSearchQuery.launcherResults("ré", favorites: [folder, file], indexed: [indexed])
+                == [folder, file],
+            "short queries search explicit favorites without including indexed files")
+        expect(
+            FileSearchQuery.launcherResults("resume", favorites: [folder, file], indexed: [file, indexed])
+                == [folder, file, indexed],
+            "favorite and indexed matches merge without repeating a path")
+        expect(
+            FileSearchQuery.launcherResults("resume final", favorites: [folder, file], indexed: []) == [file],
+            "every query term must match a favorite filename")
+        expect(
+            FileSearchQuery.launcherResults("documents", favorites: [folder, file], indexed: []).isEmpty,
+            "favorite matching follows file search's filename-only rule")
+        let many = (0..<10).map { result("Note \($0).txt") }
+        expect(
+            FileSearchQuery.launcherResults("note", favorites: many, indexed: []).count
+                == FileSearchQuery.launcherLimit,
+            "favorite matches respect the launcher section limit")
     }
 
     static func queryMatching() {
@@ -302,6 +327,21 @@ struct FileSearchTests {
         expect(
             nested.parentName == "Documents" && result("Notes.txt").parentName == "test",
             "the parent's own name is what a folder row prefixes itself with")
+        for original in [nested, result("Documents/Résumé #1? 100%.txt"), result("Projects", folder: true)] {
+            let restored = FileSearchResult(favoriteKey: original.favoriteKey, homeDirectory: home)
+            expect(restored?.id == original.id, "a favorite preserves the exact path and Unicode")
+            expect(restored?.isDirectory == original.isDirectory, "a favorite preserves the directory hint")
+            expect(
+                restored?.favoriteKey == original.favoriteKey,
+                "a favorite key round-trips without disk access")
+            expect(
+                restored?.parentPath == original.parentPath, "a restored favorite abbreviates its location")
+        }
+        for key in ["com.apple.finder", nested.id, "https://example.com/file", "file:///tmp/file?query=1"] {
+            expect(
+                FileSearchResult(favoriteKey: key, homeDirectory: home) == nil,
+                "other favorite identifiers are never interpreted as files")
+        }
     }
 
     static func previewKind() {

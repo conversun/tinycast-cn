@@ -4,9 +4,10 @@ Tinycast connects [Model Context Protocol](https://modelcontextprotocol.io) serv
 tools to the model during a chat. A server is either a remote HTTP endpoint or a command Tinycast
 runs on this Mac; either way it advertises tools, Tinycast namespaces them by the server's handle,
 and the model calls what it wants. On an API route Tinycast is the MCP client; on the Codex and
-Claude routes the vendor CLI is, and Tinycast supplies the servers and answers for them.
-`Features/MCP/` owns servers and knows nothing about chat; [AI](ai.md) owns tool calling and knows
-nothing about MCP. `AIChatCoordinator.send` is the one place the two meet.
+Claude routes the vendor CLI is, and Tinycast supplies the servers and answers for them. OpenCode
+runs its own model loop but calls selected tools through Tinycast's per-turn local MCP bridge.
+`Features/MCP/` owns servers and knows nothing about chat; [AI](ai.md) owns tool calling but does
+not read MCP settings. `AIChatCoordinator.send` is the one place the two meet.
 
 ## Invariants
 
@@ -59,16 +60,19 @@ nothing about MCP. `AIChatCoordinator.send` is the one place the two meet.
   AI → Chat → Tool call rounds, an `AIToolRounds` of 10, 25, 50, 100 or Unlimited, 25 unless changed
   — after which the turn fails saying so: a model that only calls has stopped answering, but a long
   chain of calls is also honest work, which is why it is a choice and not a constant. Unlimited
-  hands the loop no round cap, so the model or Stop ends the turn, even while the palette is hidden,
-  unless what the turn has added — the model's text, call arguments and results — reaches
-  `maxTurnHistoryBytes`, since every round resends all of it. Each result is cut to
+  hands the loop no round cap, so the model or Stop ends the turn, even while the palette is hidden.
+  Every API turn also ends once its added text, call arguments, results and opaque response items
+  reach `maxTurnHistoryBytes`, since every round resends all of it. History-size exhaustion is
+  reported separately from reaching the selected round cap. Each result is cut to
   `maxResultBytes`, and a turn's results together to `maxTurnResultBytes`, because tool output is
   appended inside the turn and so never passes through `ChatSession.boundedContext`. The same
   number bounds a CLI route, in the terms its own client counts in: Claude takes it as
   `--max-turns`, which bounds model requests exactly as the loop's rounds do, and Codex — which
   names no round at all — is interrupted once a turn has spent that many **calls**, which is
-  stricter, never looser. Neither result size is Tinycast's to cut there: the output goes back to
-  the model inside the CLI, and what the transcript keeps is the row. Unlimited reaches a CLI route
+  stricter, never looser. OpenCode also counts calls and uses Tinycast's normal per-result and
+  aggregate result budgets through its bridge. On Codex and Claude neither result size is Tinycast's
+  to cut: the output goes back to the model inside the CLI, and what the transcript keeps is the row.
+  Unlimited reaches a CLI route
   as an `AIToolServerSession.rounds` of `nil`: Claude is given no `--max-turns`, since it has no
   cap without one, and Codex counts nothing, so there too only the model or Stop ends the turn. A
   Claude turn with no server to run is a different case and keeps `--max-turns 1` whatever the
@@ -80,14 +84,18 @@ nothing about MCP. `AIChatCoordinator.send` is the one place the two meet.
   A stdio server is a resident process of someone else's making, and the 100 MB budget is the reason
   this is not "start at launch".
 - **Who runs the loop is the route's own answer, and it is the only thing that differs.**
-  `AIModelCapabilities.tools` is true for `.api`, for Codex and for the Claude command, and false
-  for Apple Intelligence, Grok, OpenCode and Cursor — the three CLIs whose configurations merge
-  with no opt-out, which is why none of them may be handed a server. On an API route Tinycast is
+  `AIModelCapabilities.tools` follows model support for `.api` and OpenCode, is true for Codex
+  and Claude, and is false
+  for Apple Intelligence, Grok and Cursor. On an API route Tinycast is
   the MCP client and `AIToolLoopProvider` runs the loop. On the two subscription routes the vendor
   CLI is the MCP client: `AIModelSelection.runsItsOwnTools` says so, and `AIChatCoordinator` hands
   the route an `AIToolServerSession` instead of wrapping it. The same servers — less an OAuth one
   nobody is signed into, which a CLI could not explain — the same `MCPTrust` and the same
-  `ChatToolUse` rows either way.
+  `ChatToolUse` rows either way. OpenCode receives an `AIToolSession` with the same narrowed catalog
+  and invoke closure the API loop uses. It connects only to that turn's authenticated loopback
+  bridge through exact allow rules after a deny-all rule. Its built-ins and user-configured tools
+  stay denied. `runsItsOwnTools` remains false because Tinycast still owns its server connections
+  and must keep them warm.
 - **A CLI is told what to run, never where to keep it.** Launch arguments, the child's environment
   and files inside Tinycast's own workspace are the whole surface; `~/.codex` and `~/.claude` are
   never written. The secrets Tinycast keeps never reach argv, where `ps` would show them: Codex
@@ -212,10 +220,17 @@ carries only the wire name; the loop consumes it and never forwards it. `.toolCa
 emits in its place, already carrying what a transcript row has to show.
 
 `AIRequestBody` builds each provider's JSON. It is pure and harness-pinned because the shapes are
-unforgiving: OpenAI takes a catalog of `{type: "function", function: {…}}` and results as their own
+unforgiving: OpenAI-compatible routes take `{type: "function", function: {…}}` and results as their own
 `role: "tool"` turns, while Anthropic takes `input_schema` with no wrapper, a `tool_use` content
 block whose `input` is the arguments parsed back into an object, and results as `tool_result` blocks
 that must arrive as **one** user turn however many of them there are.
+
+The direct OpenAI route uses Responses instead of the compatible format above. Functions have
+top-level `name`, `description` and `parameters`, with `strict: false` to preserve each server's
+schema. Results are `function_call_output` items linked by `call_id`. The loop replays the preceding
+response's complete output in order, including encrypted reasoning and assistant phase, before the
+results. This state lives only inside the current turn and shares its history-size budget; it never
+enters saved chat history. Gateways and the other compatible routes keep their existing encoding.
 
 ## The loop somebody else runs
 
@@ -312,7 +327,7 @@ Stopped.
 
 ## Settings
 
-`MCPSettingsSection` is a section inside Settings → AI, the way `AICommandSection` is. Each row leads
+`MCPSettingsSection` is a section inside Settings → AI, the way its commands section is. Each row leads
 with the handle, because that is the half a reader has to type, then the live status and the
 transport. `MCPServerEditor` reaches `MCPCoordinator` through its environment. The editor holds name,
 HTTP or command, Header or OAuth authentication, optional client ID/secret, one Sign In / Cancel / Sign Out button and live
@@ -336,7 +351,9 @@ caught there rather than in the middle of a conversation.
   in the next; Always Allow survives a relaunch; Escape refuses only that call.
 - `@filesystem list my desktop` shows the tools glyph after the text, sends without the prefix, and
   offers only that server's tools. `@nosuch hello` is sent verbatim.
-- On Apple Intelligence, Grok, OpenCode or Cursor, no tool is offered and the reply streams as before.
+- On Apple Intelligence, Grok or Cursor, no tool is offered and the reply streams as before.
+- On OpenCode, selected tools use Tinycast's consent dialog and show the same rows. Its built-ins
+  and user-configured tools remain denied; titles and text rewrites offer no tools.
 - On Codex and on the Claude command the same question answers with the same rows, the same dialog
   and the same `@slug` scoping; `ps` during a turn shows no secret on either command line.
 - With Tool call rounds on Unlimited, `ps` shows no `--max-turns` on an armed Claude turn, and a

@@ -20,6 +20,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>TinycastURLScheme</key>
+	<string>$(TINYCAST_URL_SCHEME)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -28,7 +30,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>raycast</string>
-				<string>tinycast</string>
+				<string>$(TINYCAST_URL_SCHEME)</string>
 				<string>com.raycast</string>
 			</array>
 		</dict>
@@ -77,5 +79,7 @@
 	<string>Tinycast uses Bluetooth access only when you run the Toggle Bluetooth action.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Tinycast</string>
+	<key>TinycastUpdatePublicKey</key>
+	<string>CSzrQKht5GxZW2nVLbWEunvUChqDkeFLP64xSQRWN9E=</string>
 </dict>
 </plist>

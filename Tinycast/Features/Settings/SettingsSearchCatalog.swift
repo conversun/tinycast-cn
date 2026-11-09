@@ -181,7 +181,10 @@ enum SettingsSearchCatalog {
             keywords: ["fuzzy", "strict", "loose", "matching", "typo", "root search"]),
         .init(
             .generalSearch, "Learned ranking",
-            keywords: ["reset", "history", "order", "privacy"])
+            keywords: ["reset", "history", "order", "privacy"]),
+        .init(
+            group: .generalDeepLinks, "Deeplinks",
+            keywords: ["link", "url", "tinycast://", "allow", "karabiner", "shortcuts", "automation"])
     ]
 
     private static let applications: [SettingsSearchEntry] = [
@@ -292,6 +295,7 @@ enum SettingsSearchCatalog {
         .init(.aiDefault, "Reasoning effort", keywords: ["thinking", "effort", "deepseek"]),
         .init(.aiChat, "Web search", keywords: ["browse", "internet"]),
         .init(.aiChat, "Suggested replies", keywords: ["choices", "chips", "follow-up", "buttons"]),
+        .init(.aiChat, "Expand thinking", keywords: ["reasoning", "thoughts", "collapse", "fold", "unfold"]),
         .init(.aiChat, "Tool call rounds", keywords: ["mcp", "tools", "limit", "loop", "agent", "unlimited"]),
         .init(
             .aiConversations, "Opens to",
@@ -305,6 +309,12 @@ enum SettingsSearchCatalog {
         .init(
             .aiSystemPrompt, "Send a system prompt",
             keywords: ["instructions", "persona"]),
+        .init(
+            group: .aiChatPresets, "Chat Presets",
+            keywords: ["persona", "instructions", "system prompt"]),
+        .init(
+            .aiChatPresets, "Add Chat Preset",
+            keywords: ["new", "persona", "instructions", "system prompt"]),
         .init(
             .aiMCPServers, "Enable MCP servers",
             keywords: ["tools", "model context protocol"]),
@@ -389,6 +399,9 @@ enum SettingsSearchCatalog {
             .notesOptions, "Show Formatting Bar",
             keywords: ["toolbar", "format bar", "buttons", "bold", "heading", "markdown"]),
         .init(
+            .notesOptions, "Show in Menu Bar",
+            keywords: ["status bar", "menu bar icon", "status item", "toolbar icon"]),
+        .init(
             .notesOptions, "Notes Folder",
             keywords: ["location", "path", "dotfiles", "files", "markdown"]),
         .init(
@@ -445,6 +458,12 @@ enum SettingsSearchCatalog {
         .init(
             .windowManagementOptions, "Gap between windows",
             keywords: ["padding", "spacing", "margin", "points"]),
+        .init(
+            .windowManagementOptions, "Wrap around displays",
+            keywords: ["next display", "previous display", "monitor", "screens", "loop"]),
+        .init(
+            .windowManagementOptions, "Keep aspect ratio",
+            keywords: ["next display", "previous display", "monitor", "scale", "resize"]),
         .init(
             .windowManagementOptions, "Shortcut preset",
             keywords: ["rectangle", "magnet", "spectacle", "defaults", "import", "shortcuts"]),

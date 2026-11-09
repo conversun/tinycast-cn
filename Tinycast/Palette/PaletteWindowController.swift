@@ -16,6 +16,8 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     private(set) var isPoppedToRoot = false
     /// Resolved once per show; the top edge is the one that must not drift.
     private var anchor: CGPoint?
+    // The laid-out frame's inset, including during synchronous resize callbacks.
+    private var renderingOutset: CGFloat = 0
     /// Live only between mouse-down and mouse-up on a drag handle; nil means a move was ours.
     private var drag: DragSession?
     private let dropGuides = PaletteDropGuideController()
@@ -61,7 +63,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             isPoppedToRoot = false
             core.palette.focusToken = UUID()
             // Summoned over one of our own windows: there is no external paste or focus target.
-            let frontmost = NSWorkspace.shared.frontmostApplication
+            let frontmost = FrontmostApp.current
             let ownPID = NSRunningApplication.current.processIdentifier
             previousApp = frontmost?.processIdentifier == ownPID ? nil : frontmost
             // Recorded even when another app is frontmost: our panels take key without activating.
@@ -81,7 +83,6 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             positionPanel(panel, collapsed: core.paletteCoordinator.paletteIsCollapsed)
             // Flush first-mount layout off-screen, so the safe-area settle isn't visible.
             panel.contentView?.layoutSubtreeIfNeeded()
-            panel.displayIfNeeded()
             core.inputSourceSwitcher.beginSession(
                 preferredInputSourceID: core.settings.autoSwitchInputSourceID)
             // Events go stale while the palette is closed, and the countdown only ticks while up.
@@ -91,8 +92,6 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             // Non-activating, so summoning never raises our own aux windows behind it.
             panel.makeKeyAndOrderFront(nil)
             panel.orderFrontRegardless()
-            // The corner is clipped in SwiftUI, so a stale square shadow rims the first frame.
-            panel.invalidateShadow()
             // A never-activated login item can drop the first key request, so re-assert.
             DispatchQueue.main.async { [weak panel] in
                 guard let panel, panel.isVisible, !panel.isKeyWindow else { return }
@@ -263,13 +262,15 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     /// A drag re-anchors the session, so the next resize grows from where the user left it.
     func windowDidMove(_ notification: Notification) {
         guard let panel else { return }
-        let moved = CGPoint(x: panel.frame.minX, y: panel.frame.maxY)
+        let moved = PalettePlacement.anchor(of: panel.frame, outset: renderingOutset)
         guard moved != anchor else { return }
         guard drag != nil else { anchor = moved; return }
         let snapped = trackDrag(to: moved)
         anchor = snapped
         if snapped != moved {
-            panel.setFrameOrigin(CGPoint(x: snapped.x, y: snapped.y - panel.frame.height))
+            let contentSize = panel.frame.insetBy(dx: renderingOutset, dy: renderingOutset).size
+            panel.setFrameOrigin(
+                PalettePlacement.frame(at: snapped, size: contentSize, outset: renderingOutset).origin)
         }
     }
 
@@ -279,7 +280,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     func beginDrag() {
         guard let panel, let screen = panel.screen ?? targetScreen() else { return }
         let home = defaultAnchor(on: screen)
-        let current = CGPoint(x: panel.frame.minX, y: panel.frame.maxY)
+        let current = PalettePlacement.anchor(of: panel.frame, outset: renderingOutset)
         let candidate = PalettePlacement.snapped(
             current, home: home, visibleFrame: screen.visibleFrame,
             expandedHeight: metrics.size.panelHeight,
@@ -485,10 +486,9 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         guard let anchor = resolveAnchor() else { return }
         let size = metrics.size
         let height = collapsed ? size.compactHeight : size.panelHeight
-        let frame = NSRect(
-            x: anchor.x, y: anchor.y - height, width: size.panelWidth, height: height)
-        // A shadow is cut once from the window's alpha, so compact's moving glass relies on its own.
-        panel.hasShadow = !collapsed
+        renderingOutset = collapsed ? Theme.Size.paletteGlassOutset : 0
+        let frame = PalettePlacement.frame(
+            at: anchor, size: CGSize(width: size.panelWidth, height: height), outset: renderingOutset)
         panel.setFrame(frame, display: true)
     }
 

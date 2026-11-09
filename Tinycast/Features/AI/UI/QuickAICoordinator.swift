@@ -22,6 +22,7 @@ final class QuickAICoordinator {
 
     private var chat: AIChatState { chats.quickAI }
     private var chatCoordinator: AIChatCoordinator { core.aiChatCoordinator }
+    var aiSettings: AISettingsStore { core.aiSettings }
 
     func show() {
         guard settings.aiEnabled else { return }
@@ -32,6 +33,13 @@ final class QuickAICoordinator {
         }
         applyOpenPolicy()
         paletteCoordinator.showPalette(mode: .ai)
+    }
+
+    /// A link's text, typed but never sent: whether to ask is still the reader's call.
+    func show(draft: String) {
+        guard settings.aiEnabled else { return }
+        applyOpenPolicy()
+        paletteCoordinator.showPalette(mode: .ai, seeding: draft)
     }
 
     /// ⇥ and the AI fallback: a fresh chat that carries the question, already asked.

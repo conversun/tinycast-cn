@@ -22,6 +22,7 @@ extension SettingsAnchor {
     static let generalCompactShortcuts = Self(tab: .general, title: "Compact Shortcuts")
     static let generalCalculator = Self(tab: .general, title: "Calculator")
     static let generalGeneral = Self(tab: .general, title: "General")
+    static let generalDeepLinks = Self(tab: .general, title: "Deeplinks")
 
     static let applicationsSearchScopes = Self(tab: .applications, title: "Search Scopes")
     static let applicationsApplications = Self(tab: .applications, title: "Applications")
@@ -51,6 +52,7 @@ extension SettingsAnchor {
     static let aiChat = Self(tab: .ai, title: "Chat")
     static let aiConversations = Self(tab: .ai, title: "Conversations")
     static let aiSystemPrompt = Self(tab: .ai, title: "System prompt")
+    static let aiChatPresets = Self(tab: .ai, title: "Chat Presets")
     static let aiMCPServers = Self(tab: .ai, title: "MCP Servers")
     static let aiCommands = Self(tab: .ai, title: "Commands")
 

@@ -44,8 +44,7 @@ final class PaletteCoordinator {
 
     /// The app an action acts on: the one displaced, else what a hotkey found frontmost.
     var targetApp: NSRunningApplication? {
-        windowController.isVisible
-            ? windowController.previousApp : NSWorkspace.shared.frontmostApplication
+        windowController.isVisible ? windowController.previousApp : FrontmostApp.current
     }
 
     /// The own window the palette covered, for anything acting on it after the palette hides.
@@ -94,6 +93,8 @@ final class PaletteCoordinator {
             navigate(to: mode)
         }
         if let query { palette.query = query }
+        // A restored empty field has nothing to keep open, so compact mode summons the bar again.
+        if !windowController.isVisible, queryIsBlank { palette.forceExpanded = false }
         // Before the show: `targetApp` must still name the app in front, and no row may pop in.
         onScreenOpening?(palette.mode)
         windowController.show()
@@ -137,7 +138,11 @@ final class PaletteCoordinator {
         settings.compactMode
             && !palette.forceExpanded
             && palette.mode == .launcher
-            && palette.query.trimmingCharacters(in: .whitespaces).isEmpty
+            && queryIsBlank
+    }
+
+    private var queryIsBlank: Bool {
+        palette.query.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     func expandFromCompact() {

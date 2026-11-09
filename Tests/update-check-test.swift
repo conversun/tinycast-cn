@@ -11,6 +11,7 @@ struct UpdateCheckTests {
         try await stopsBeforeFirstCheck()
         try await cancelsAndRestarts()
         try await checksCNRevisionAndReopensCache()
+        try await manualCheckAnswersDuringAutomaticOne()
         try reportsInstalledVersionOnce()
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
@@ -23,7 +24,6 @@ struct UpdateCheckTests {
         let store = makeStore(file: file, fixture: fixture)
         store.onUpdateAvailable = { _ in
             fixture.offers += 1
-            return true
         }
 
         store.start(after: .milliseconds(10))
@@ -43,7 +43,6 @@ struct UpdateCheckTests {
         let store = makeStore(file: file, fixture: fixture)
         store.onUpdateAvailable = { _ in
             fixture.offers += 1
-            return true
         }
         defer { store.stop() }
 
@@ -99,7 +98,6 @@ struct UpdateCheckTests {
         let store = makeStore(file: file, fixture: fixture, runningVersion: running)
         store.onUpdateAvailable = { _ in
             fixture.offers += 1
-            return true
         }
         defer { store.stop() }
 
@@ -131,6 +129,25 @@ struct UpdateCheckTests {
         expect(fixture.requests == 1, "reopening the CN cache makes no additional request")
     }
 
+    static func manualCheckAnswersDuringAutomaticOne() async throws {
+        let file = makeFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let fixture = FetchFixture()
+        let store = makeStore(file: file, fixture: fixture)
+        defer { store.stop() }
+
+        store.start(after: .zero)
+        try await StateWait { fixture.requests == 1 }.wait()
+        let manual = Task { await store.check() }
+        try await StateWait { fixture.requests == 2 }.wait()
+        fixture.respond(feed(version: "1.1.0-cn.1"))
+        fixture.respond(feed(version: "1.1.0-cn.1"))
+        let answered = await manual.value
+        expect(answered, "a manual check during an automatic one gets its own answer")
+        try await StateWait { !store.isChecking }.wait()
+        expect(store.update?.version == AppVersion("1.1.0-cn.1"), "both checks leave the release in place")
+    }
+
     static func reportsInstalledVersionOnce() throws {
         let file = makeFile()
         defer { try? FileManager.default.removeItem(at: file) }
@@ -142,16 +159,23 @@ struct UpdateCheckTests {
         let relaunched = makeStore(file: file, fixture: fixture, runningVersion: installed)
         expect(relaunched.latest?.version == installed, "recording an install keeps the cached release")
         expect(
-            relaunched.takeInstalledVersion() == installed, "the installed version's first launch reports it")
-        expect(relaunched.takeInstalledVersion() == nil, "the report is taken once")
+            relaunched.takeInstallReport() == .installed(installed),
+            "the installed version's first launch reports it")
+        expect(relaunched.takeInstallReport() == nil, "the report is taken once")
         let later = makeStore(file: file, fixture: fixture, runningVersion: installed)
-        expect(later.takeInstalledVersion() == nil, "a later launch reports nothing")
+        expect(later.takeInstallReport() == nil, "a later launch reports nothing")
 
         makeStore(file: file, fixture: fixture).recordInstall(of: installed)
         let unchanged = makeStore(file: file, fixture: fixture)
-        expect(unchanged.takeInstalledVersion() == nil, "a launch of another version reports nothing")
+        expect(
+            unchanged.takeInstallReport() == .notInstalled(installed),
+            "an older version still running reports the update that never landed")
         let afterwards = makeStore(file: file, fixture: fixture, runningVersion: installed)
-        expect(afterwards.takeInstalledVersion() == nil, "and clears the record")
+        expect(afterwards.takeInstallReport() == nil, "and clears the record")
+
+        makeStore(file: file, fixture: fixture).recordInstall(of: installed)
+        let newer = makeStore(file: file, fixture: fixture, runningVersion: AppVersion("1.2.0-cn.1"))
+        expect(newer.takeInstallReport() == nil, "a newer version from elsewhere reports nothing")
     }
 
     static func seedCache(at file: URL) throws {
@@ -258,19 +282,18 @@ struct UpdateCheckTests {
         var offers = 0
         var wasCancelled = false
         @ObservationIgnored
-        private var response: CheckedContinuation<Data?, Never>?
+        private var responses: [CheckedContinuation<Data?, Never>] = []
 
         func fetch() async -> Data? {
             requests += 1
-            let data = await withCheckedContinuation { response = $0 }
+            let data = await withCheckedContinuation { responses.append($0) }
             wasCancelled = Task.isCancelled
             return data
         }
 
         func respond(_ data: Data) {
-            let pending = response
-            response = nil
-            pending?.resume(returning: data)
+            guard !responses.isEmpty else { return }
+            responses.removeFirst().resume(returning: data)
         }
     }
 }

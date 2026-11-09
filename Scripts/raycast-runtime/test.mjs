@@ -20,7 +20,7 @@ import {
   randomBytes,
   randomUUID,
 } from "node:crypto";
-import { cpus, freemem, homedir, loadavg, tmpdir, uptime } from "node:os";
+import { cpus, freemem, homedir, loadavg, networkInterfaces, tmpdir, uptime } from "node:os";
 import { lookup } from "node:dns/promises";
 import * as fs from "node:fs";
 import * as zlib from "node:zlib";
@@ -147,6 +147,10 @@ function syncHostCall(api, method, args) {
       return uptime();
     case "os.loadavg":
       return loadavg();
+    case "os.networkInterfaces":
+      return Object.entries(networkInterfaces()).flatMap(([name, addresses]) =>
+        addresses.map((address) => ({ name, ...address, mac: "00:00:00:00:00:00" })),
+      );
     case "fs.open":
       return fs.openSync(args[0], args[1], args[2]);
     case "fs.close":
@@ -184,6 +188,8 @@ function syncHostCall(api, method, args) {
       return {
         size: stat.size,
         mode: stat.mode,
+        uid: stat.uid,
+        gid: stat.gid,
         mtimeMs: stat.mtimeMs,
         atimeMs: stat.atimeMs,
         ctimeMs: stat.ctimeMs,
@@ -239,6 +245,23 @@ function syncHostCall(api, method, args) {
       const cipher = create(algorithm, Buffer.from(key, "base64"), mode === "ecb" ? null : Buffer.from(iv, "base64"));
       cipher.setAutoPadding(padding);
       return Buffer.concat([cipher.update(Buffer.from(data, "base64")), cipher.final()]).toString("base64");
+    }
+    case "crypto.gcmSeal": {
+      const [key, iv, data, aad] = args.map((value) => Buffer.from(value, "base64"));
+      const cipher = createCipheriv(`aes-${key.length * 8}-gcm`, key, iv).setAAD(aad);
+      const ciphertext = Buffer.concat([cipher.update(data), cipher.final()]);
+      return { ciphertext: ciphertext.toString("base64"), tag: cipher.getAuthTag().toString("base64") };
+    }
+    case "crypto.gcmOpen": {
+      const [key, iv, data, aad, tag] = args.map((value) => Buffer.from(value, "base64"));
+      const decipher = createDecipheriv(`aes-${key.length * 8}-gcm`, key, iv).setAAD(aad).setAuthTag(tag);
+      try {
+        return Buffer.concat([decipher.update(data), decipher.final()]).toString("base64");
+      } catch (error) {
+        // Mirrors the Swift host: a tag that does not verify is a result, not a host failure.
+        if (error.message !== "Unsupported state or unable to authenticate data") throw error;
+        return null;
+      }
     }
     case "proc.start": {
       const spec = args[0];
@@ -400,6 +423,11 @@ export function bootConfig(overrides = {}) {
       homedir: homedir(),
       tmpdir: tmpdir(),
       username: "tester",
+      uid: process.getuid(),
+      gid: process.getgid(),
+      euid: process.geteuid(),
+      egid: process.getegid(),
+      groups: process.getgroups(),
     },
     environment: {
       extensionName: "fixture",

@@ -6,6 +6,7 @@ enum ExtensionSessionState: Equatable {
     case launching
     case rendered(RenderTree)
     case failed(String)
+    case needsPreferences(String)
     /// A no-view command that ran to completion.
     case finished
 }
@@ -405,7 +406,8 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
         guard missing.isEmpty else {
             running = ExtensionCommandRef(
                 extensionName: owner.manifest.name, commandName: command.name)
-            state = .failed(ExtensionLaunchError.missingPreferences(missing).localizedDescription)
+            state = .needsPreferences(
+                ExtensionLaunchError.missingPreferences(missing).localizedDescription)
             return
         }
         guard let bundle = owner.bundleURL(for: command) else {
@@ -477,6 +479,7 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
             preferences: storage.resolvedPreferences(
                 extension: owner.manifest.name, schemas: schemas),
             caches: storage.caches(extension: owner.manifest.name),
+            formValues: storage.formValues(extension: owner.manifest.name, command: command.name),
             arguments: command.completeArguments(arguments),
             fallbackText: fallbackText,
             launchType: launchType,
@@ -1007,6 +1010,7 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
         }
         coordinator?.runExtensionCommand(
             entry(for: command, in: owner), arguments: link.arguments,
-            fallbackText: link.fallbackText, launchType: link.launchType)
+            fallbackText: link.fallbackText, launchType: link.launchType,
+            launchContext: link.launchContext)
     }
 }

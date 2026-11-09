@@ -83,6 +83,14 @@ final class ExtensionCoordinator {
         runExtensionCommand(entry)
     }
 
+    /// The link Copy Deeplink gives an extension row; extensions alone know their URL shape.
+    func deepLink(forEntryID entryID: String, arguments: [String: String]) -> URL? {
+        guard let ref = ExtensionCommandRef(entryID: entryID) else { return nil }
+        return ExtensionDeepLink.url(
+            extensionName: ref.extensionName, commandName: ref.commandName, arguments: arguments,
+            scheme: AppURLScheme.current)
+    }
+
     /// A `raycast://extensions/…` link: the same command the launcher would run, by slug.
     func runDeepLink(_ link: ExtensionDeepLink) {
         guard settings.extensionsEnabled else {
@@ -97,7 +105,7 @@ final class ExtensionCoordinator {
         }
         run(
             owner, command: command, arguments: link.arguments, fallbackText: link.fallbackText,
-            launchType: link.launchType)
+            launchType: link.launchType, launchContext: link.launchContext)
     }
 
     // MARK: - Managing one extension from the launcher
@@ -197,6 +205,25 @@ final class ExtensionCoordinator {
         fallbackText: String? = nil, launchType: ExtensionLaunchType = .userInitiated,
         launchContext: [String: RenderValue] = [:]
     ) {
+        let missing = extensions.storage.missingRequiredPreferences(
+            extension: owner.manifest.name,
+            schemas: owner.manifest.preferences + command.preferences)
+        if launchType == .userInitiated, command.mode != .view, !missing.isEmpty {
+            Task {
+                guard
+                    await core.confirm(
+                        title: owner.manifest.title,
+                        message: ExtensionLaunchError.missingPreferences(missing).localizedDescription,
+                        symbol: "puzzlepiece.extension",
+                        confirmTitle: String(localized: "Configure Extension"),
+                        tone: .neutral, confirmRole: .standard),
+                    extensions.isEnabled,
+                    let installed = extensions.extensionNamed(owner.manifest.name)
+                else { return }
+                showExtensionSettings(for: installed)
+            }
+            return
+        }
         switch command.mode {
         case .view:
             // Switch the palette over first, so the launching state is what the user sees.

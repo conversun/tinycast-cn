@@ -77,6 +77,7 @@ enum SettingsFileSchema {
         case .aiEnabled: return bind(settings, \.aiEnabled)
         case .aiWebSearch: return bind(ai, \.webSearchEnabled)
         case .aiChoices: return bind(ai, \.choicesEnabled)
+        case .aiExpandsReasoning: return bind(ai, \.expandsReasoning)
         case .aiSystemPrompt: return bind(ai, \.systemPrompt)
         case .aiSystemPromptEnabled: return bind(ai, \.systemPromptEnabled)
         case .aiRetention: return bind(ai, \.retention)
@@ -96,6 +97,7 @@ enum SettingsFileSchema {
         case .notesEnabled: return bind(settings, \.notesEnabled)
         case .notesRendersMarkdown: return bind(settings, \.notesRendersMarkdown)
         case .notesShowsFormattingBar: return bind(settings, \.notesShowsFormattingBar)
+        case .notesShowsInMenuBar: return bind(settings, \.notesShowsInMenuBar)
         case .notesFolder: return bind(settings, \.notesFolder, accept: folder)
         case .notesCommands: return launcher.commandsBinding(for: key, owner: .notes)
         case .dictationMode: return bind(settings, \.dictationMode)
@@ -128,6 +130,8 @@ enum SettingsFileSchema {
                 WindowPlacementEngine.gapRange.contains($0) ? $0 : nil
             }
         case .windowCycle: return bind(settings, \.windowCycle)
+        case .windowWrapsDisplays: return bind(settings, \.windowWrapsDisplays)
+        case .windowKeepsProportions: return bind(settings, \.windowKeepsProportions)
         case .windowLayoutsShowInLauncher: return bind(settings, \.windowLayoutsShowInLauncher)
         case .windowRoomsShowInLauncher: return bind(settings, \.windowRoomsShowInLauncher)
         case .windowShortcuts: return windowManagement.commandShortcutsBinding(for: key)

@@ -19,6 +19,12 @@ final class AISettingsStore {
     var choicesEnabled: Bool {
         didSet { defaults.set(choicesEnabled, forKey: AppSettingsKey.aiChoices.rawValue) }
     }
+    /// Off by default: a fold keeps the answer in view, and one click opens the thinking.
+    var expandsReasoning: Bool {
+        didSet {
+            defaults.set(expandsReasoning, forKey: AppSettingsKey.aiExpandsReasoning.rawValue)
+        }
+    }
     /// Appended to `AIInstructions.preamble` on every turn, so it is billed on every turn.
     var systemPrompt: String {
         didSet { defaults.set(systemPrompt, forKey: AppSettingsKey.aiSystemPrompt.rawValue) }
@@ -94,6 +100,8 @@ final class AISettingsStore {
             defaults.object(forKey: AppSettingsKey.aiWebSearch.rawValue) as? Bool ?? false
         choicesEnabled =
             defaults.object(forKey: AppSettingsKey.aiChoices.rawValue) as? Bool ?? true
+        expandsReasoning =
+            defaults.object(forKey: AppSettingsKey.aiExpandsReasoning.rawValue) as? Bool ?? false
         systemPrompt = defaults.string(forKey: AppSettingsKey.aiSystemPrompt.rawValue) ?? ""
         systemPromptEnabled =
             defaults.object(forKey: AppSettingsKey.aiSystemPromptEnabled.rawValue) as? Bool ?? true
@@ -343,19 +351,6 @@ final class AISettingsStore {
             environment: values.filter { names.contains($0.key) })
     }
 
-    func disableInstalledModelSelection(for kind: InstalledAIKind) {
-        guard let source = defaultModel?.source else { return }
-        let matches =
-            switch (kind, source) {
-            case (.codex, .codex), (.claude, .claude), (.grok, .grok), (.openCode, .openCode),
-                (.cursor, .cursor):
-                true
-            default: false
-            }
-        guard matches else { return }
-        defaultModel = firstAvailableSelection()
-    }
-
     /// The on-device model leads: free, private, always configured, so never a surprising landing.
     private func firstAvailableSelection() -> AIModelSelection? {
         if isAppleIntelligenceAvailable(), isRouteEnabled(.appleIntelligence) {
@@ -421,6 +416,8 @@ final class AISettingsStore {
             seen.contains($0.key) && !$0.value.efforts.isEmpty
         }
         if connection.reasoningOptions?.isEmpty == true { connection.reasoningOptions = nil }
+        connection.outputLimits = connection.outputLimits?.filter { seen.contains($0.key) }
+        if connection.outputLimits?.isEmpty == true { connection.outputLimits = nil }
         return connection
     }
 

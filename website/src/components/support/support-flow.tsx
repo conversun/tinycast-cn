@@ -9,6 +9,7 @@ import { CryptoPanel } from "./crypto-panel";
 import { ThankYou } from "./thank-you";
 
 const THANKS_PARAM = "thanks";
+const METHOD_PARAM = "method";
 
 const methodIcons: Record<Method, LucideIcon> = {
   crypto: Bitcoin,
@@ -17,6 +18,10 @@ const methodIcons: Record<Method, LucideIcon> = {
 
 function parsePlan(value: string | null): Plan | null {
   return value === "monthly" || value === "one-time" ? value : null;
+}
+
+function parseMethod(value: string | null): Method | null {
+  return methods.find((method) => method.id === value)?.id ?? null;
 }
 
 function MethodTabs({
@@ -87,7 +92,7 @@ type Props = {
 
 export function SupportFlow({ intro }: Props) {
   const [returned, setReturned] = useState<Plan | null>(null);
-  const [method, setMethod] = useState<Method>("crypto");
+  const [method, setMethod] = useState<Method>("card");
 
   // Polar's return adds ?thanks=<plan>; drop it so a reload shows the card again.
   useEffect(() => {
@@ -100,10 +105,18 @@ export function SupportFlow({ intro }: Props) {
     setReturned(plan);
   }, []);
 
+  useEffect(() => {
+    const linked = parseMethod(
+      new URL(window.location.href).searchParams.get(METHOD_PARAM),
+    );
+    // oxlint-disable-next-line react/set-state-in-effect -- URL is only readable after hydration
+    if (linked) setMethod(linked);
+  }, []);
+
   return (
     <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_580px] lg:gap-20">
       {intro}
-      <div className="relative">
+      <div className="rise relative" style={{ animationDelay: "120ms" }}>
         <span
           aria-hidden="true"
           className="mark-bloom pointer-events-none absolute inset-x-0 -top-16 h-72 opacity-60"
@@ -115,11 +128,11 @@ export function SupportFlow({ intro }: Props) {
             <div className="rounded-2xl bg-surface shadow-key">
               <MethodTabs value={method} onChange={setMethod} />
               <div className="grid p-5 sm:p-6">
-                <MethodPanel isActive={method === "crypto"}>
-                  <CryptoPanel />
-                </MethodPanel>
                 <MethodPanel isActive={method === "card"}>
                   <CheckoutPanel />
+                </MethodPanel>
+                <MethodPanel isActive={method === "crypto"}>
+                  <CryptoPanel />
                 </MethodPanel>
               </div>
             </div>

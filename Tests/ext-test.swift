@@ -24,6 +24,7 @@ struct ExtensionTests {
         var calls: [String] = []
         var toasts: [String] = []
         var huds: [String] = []
+        var storedForms: [(command: String, values: [String: String])] = []
         private let fetcher = ExtensionFetcher()
         private let sockets = ExtensionWebSocketBridge()
 
@@ -52,6 +53,13 @@ struct ExtensionTests {
                 return "1"
             case "feedback.showHUD":
                 huds.append(arguments.first?.stringValue ?? "")
+                return ""
+            case "form.store":
+                storedForms.append(
+                    (
+                        arguments.first?.stringValue ?? "",
+                        arguments.dropFirst().first?.objectValue?.compactMapValues(\.stringValue) ?? [:]
+                    ))
                 return ""
             case "storage.get", "clipboard.readText":
                 return #""""#
@@ -118,14 +126,14 @@ struct ExtensionTests {
     static func launchContext(
         extensionName: String = "fixture", command: String = "fixture",
         mode: ExtensionCommandMode = .view, assets: String = "/tmp",
-        preferences: [String: ExtensionPreferenceValue] = [:],
+        preferences: [String: ExtensionPreferenceValue] = [:], formValues: [String: String] = [:],
         arguments: [String: String] = [:], isDarkAppearance: Bool = true
     ) -> ExtensionLaunchContext {
         ExtensionLaunchContext(
             extensionName: extensionName, extensionTitle: extensionName, commandName: command,
             commandMode: mode, assetsPath: assets, supportPath: "/tmp",
-            preferences: preferences, caches: [:], arguments: arguments, fallbackText: nil,
-            isDarkAppearance: isDarkAppearance)
+            preferences: preferences, caches: [:], formValues: formValues, arguments: arguments,
+            fallbackText: nil, isDarkAppearance: isDarkAppearance)
     }
 
     /// `EXT_TEST_ARGS="hours=0,minutes=5"` — stands in for the palette's inline argument fields.
@@ -195,8 +203,10 @@ struct ExtensionTests {
         await bundledModuleChecks()
         await navigationSearchRuntimeChecks()
         await searchAccessoryRuntimeChecks()
+        await formStoreValueRuntimeChecks()
         await nodeContractChecks()
         await bufferEventChecks()
+        await sharedArrayBufferChecks()
         await webAssemblyChecks()
         await asyncComponentChecks()
         await menuBarRuntimeChecks()
@@ -301,6 +311,21 @@ struct ExtensionTests {
             "os.loadavg returns three finite values",
             loadAverages?.count == 3
                 && loadAverages?.allSatisfy { $0.doubleValue.isFinite && $0.doubleValue >= 0 } == true)
+
+        let interfaces = value("networkInterfaces") as? [[String: Any]] ?? []
+        check(
+            "os.networkInterfaces lists the IPv4 loopback as internal",
+            interfaces.contains {
+                $0["address"] as? String == "127.0.0.1" && $0["family"] as? String == "IPv4"
+                    && $0["internal"] as? Bool == true && $0["cidr"] as? String == "127.0.0.1/8"
+            },
+            "\(interfaces)")
+        check(
+            "os.networkInterfaces never exposes a hardware address",
+            !interfaces.isEmpty && interfaces.allSatisfy { $0["mac"] as? String == "00:00:00:00:00:00" })
+        check(
+            "os.networkInterfaces gives a scope ID to IPv6 addresses only",
+            interfaces.allSatisfy { ($0["scopeid"] is NSNumber) == ($0["family"] as? String == "IPv6") })
     }
 
     @MainActor
@@ -893,6 +918,23 @@ struct ExtensionTests {
         let tiny = ExtensionDeepLink.parse(
             url: URL(string: "tinycast://extensions/linear/linear/create-issue")!)
         check("deeplink mirrors raycast:// as tinycast://", tiny == canonical)
+        let copied = ExtensionDeepLink.url(
+            extensionName: "linear/linear", commandName: "create-issue", arguments: [:], scheme: "tinycast")
+        check(
+            "a copied scoped deeplink parses back to its command",
+            copied.flatMap(ExtensionDeepLink.parse) == canonical, String(describing: copied))
+        let copiedBare = ExtensionDeepLink.url(
+            extensionName: "demo", commandName: "search", arguments: [:], scheme: "tinycast-dev")
+        check(
+            "a copied bare deeplink parses back to its command",
+            copiedBare.flatMap(ExtensionDeepLink.parse)?.extensionCandidates == ["demo"],
+            String(describing: copiedBare))
+        let typed = ["query": "a & b = c + d", "tag": "café ✓"]
+        let copiedTyped = ExtensionDeepLink.url(
+            extensionName: "demo", commandName: "search", arguments: typed, scheme: "tinycast")
+        check(
+            "a copied deeplink carries the arguments typed into the row",
+            copiedTyped.flatMap(ExtensionDeepLink.parse)?.arguments == typed, String(describing: copiedTyped))
 
         let bare = ExtensionDeepLink.parse(url: URL(string: "raycast://extensions/demo/search")!)
         check(
@@ -974,6 +1016,24 @@ struct ExtensionTests {
         check(
             "deeplink reads fallback text and background launch",
             full?.fallbackText == "hello" && full?.launchType == .background)
+
+        let expectedContext: [String: RenderValue] = [
+            "id": .string("note-1"), "pinned": .bool(true), "tags": .array([.string("a")])
+        ]
+        let encodedContext =
+            #"{"id":"note-1","pinned":true,"tags":["a"]}"#
+            .addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+        for name in ["context", "launchContext"] {
+            let withContext = ExtensionDeepLink.parse(
+                url: URL(string: "raycast://extensions/demo/search?\(name)=\(encodedContext)")!)
+            check(
+                "deeplink decodes \(name) JSON",
+                withContext?.launchContext == expectedContext,
+                String(describing: withContext?.launchContext))
+        }
+        check(
+            "deeplink treats a context that isn't an object as none",
+            ExtensionDeepLink.parseContext("[1]").isEmpty && ExtensionDeepLink.parseContext("nope").isEmpty)
 
         let legacy = ExtensionDeepLink.parse(
             url: URL(string: "com.raycast:/extensions/demo/search")!)
@@ -1162,6 +1222,9 @@ struct ExtensionTests {
               const errorCode = (callback) => {
                 try { callback(); return "none"; } catch (error) { return error.code; }
               };
+              const errorMessage = (callback) => {
+                try { callback(); return "none"; } catch (error) { return error.message; }
+              };
               const filePaths = [
                 fileURLToPath("file:///Applications/Tinycast%20Beta.app"),
                 fileURLToPath(pathToFileURL("/tmp/a#b.png")),
@@ -1184,6 +1247,22 @@ struct ExtensionTests {
               const encrypted = Buffer.concat([encrypter.update("hello tinycast"), encrypter.final()]);
               const decrypter = crypto.createDecipheriv("aes-256-cbc", "k".repeat(32), Buffer.from("i".repeat(16)));
               const ecb = crypto.createCipheriv("aes-128-ecb", Buffer.alloc(16, 1), null).setAutoPadding(false);
+              const gcmKey = Buffer.alloc(32, 7);
+              const gcmSeal = (iv, aad) => {
+                const cipher = crypto.createCipheriv("aes-256-gcm", gcmKey, iv);
+                if (aad) cipher.setAAD(aad);
+                const ciphertext = Buffer.concat([cipher.update("hello gcm"), cipher.final()]);
+                return { ciphertext, tag: cipher.getAuthTag() };
+              };
+              const gcmOpen = (iv, sealed, aad) => {
+                const decipher = crypto.createDecipheriv("aes-256-gcm", gcmKey, iv);
+                if (aad) decipher.setAAD(aad);
+                decipher.setAuthTag(sealed.tag);
+                return Buffer.concat([decipher.update(sealed.ciphertext), decipher.final()]).toString("utf8");
+              };
+              const shortNonce = gcmSeal(Buffer.from("gcm-nonce-12"));
+              // A 16-byte nonce proves CryptoKit derives a long GCM nonce the way Node does.
+              const longNonce = gcmSeal(Buffer.alloc(16, 9), Buffer.from("header"));
               const cipherShim = [
                 crypto.pbkdf2Sync("password", "salt", 1000, 16, "sha512").toString("hex"),
                 crypto.pbkdf2Sync("", "", 1, 8, "SHA-256").toString("hex"),
@@ -1198,6 +1277,10 @@ struct ExtensionTests {
                 }),
                 errorCode(() => crypto.createCipheriv("aes-256-cbc", "short", "i".repeat(16))),
                 errorCode(() => crypto.pbkdf2Sync("p", "s", 1, 8, "nope")),
+                shortNonce.tag.toString("hex") + ":" + shortNonce.ciphertext.toString("hex"),
+                longNonce.tag.toString("hex") + ":" + longNonce.ciphertext.toString("hex"),
+                gcmOpen(Buffer.alloc(16, 9), longNonce, Buffer.from("header")),
+                errorMessage(() => gcmOpen(Buffer.alloc(16, 9), longNonce)),
                 derived,
               ].join(",");
               return h(List, { navigationTitle: "Synthetic", isLoading: false },
@@ -1270,13 +1353,16 @@ struct ExtensionTests {
                 + "ERR_INVALID_URL_SCHEME",
             String(describing: screen.items.first?.node.array("accessories").dropFirst(2).first))
         check(
-            "crypto shim derives PBKDF2 keys and round-trips AES like Node",
+            "crypto shim derives PBKDF2 keys, round-trips AES and authenticates GCM like Node",
             ExtensionAccessoriesView_labelForTest(
                 screen.items.first?.node.array("accessories").dropFirst(4).first)
                 == "afe6c5530785b6cc6b1c6453384731bd,f7ce0b653d2d72a4,5d11c49af18b4b3e482508362bd2c857,"
                 + "eb7b227687302ff167fef6a04d9f99f3,"
                 + "hello tinycast,17d614f379a9359077e95577fd31c20a,ERR_OSSL_BAD_DECRYPT,"
-                + "ERR_CRYPTO_INVALID_KEYLEN,ERR_CRYPTO_INVALID_DIGEST,6cba6dd1d44f53a3",
+                + "ERR_CRYPTO_INVALID_KEYLEN,ERR_CRYPTO_INVALID_DIGEST,"
+                + "875a7af65e66ba29298577f2c937c48b:589dd2d6d2696c5310,"
+                + "749e7f715a23139cbfa9b3259ab594e1:aaefe159005653143a,hello gcm,"
+                + "Unsupported state or unable to authenticate data,6cba6dd1d44f53a3",
             String(describing: screen.items.first?.node.array("accessories").dropFirst(4).first))
         check(
             "util shim answers debuglog, stripVTControlCharacters, aborted and inspect.custom",
@@ -1438,6 +1524,7 @@ struct ExtensionTests {
 
         await swiftHelperChecks()
         await processKillChecks()
+        await stdioDescriptorChecks()
         zlibChecks()
     }
 
@@ -1522,6 +1609,101 @@ struct ExtensionTests {
                 ExtensionSearchAccessory(node: $0.activeRoot?.node("searchBarAccessory"))?.nodeID
             } == accessory.nodeID)
         await runtime.stop(session: "sAccessory")
+    }
+
+    static let storeValueCommand = """
+        "use strict";
+        const { Form, ActionPanel, Action, showToast } = require("@raycast/api");
+        const React = require("react");
+        const h = React.createElement;
+        module.exports.default = function Command() {
+          return h(Form, {
+            actions: h(ActionPanel, null, h(Action.SubmitForm, {
+              title: "Generate",
+              onSubmit: (values) => showToast({ title: values.format + "|" + values.scratch + "|" + values.remember }),
+            })),
+          },
+            h(Form.TextField, { id: "format", storeValue: true }),
+            h(Form.TextField, { id: "scratch", defaultValue: "blank" }),
+            h(Form.Checkbox, { id: "remember", label: "Remember", storeValue: true }));
+        };
+        """
+
+    @MainActor
+    static func formStoreValueRuntimeChecks() async {
+        func field(_ id: String, in tree: RenderTree?) -> RenderNode? {
+            tree?.activeRoot?.children.first { $0.string("id") == id }
+        }
+
+        let (first, host, recorder) = makeRuntime()
+        try? await first.boot(config: .current(supportDirectory: FileManager.default.temporaryDirectory))
+        await first.start(
+            session: "sStore", code: storeValueCommand, file: URL(fileURLWithPath: "/tmp/store.js"),
+            mode: .view, context: launchContext(command: "generate"))
+        await settle(until: { field("format", in: recorder.trees.last) != nil })
+        check(
+            "a storeValue field without a saved value starts empty",
+            field("format", in: recorder.trees.last)?.string("value") == "")
+
+        for (id, value) in [("format", "{word}-{number:4}" as Any), ("scratch", "typed"), ("remember", true)]
+        {
+            guard let handler = field(id, in: recorder.trees.last)?.handler("onTinycastChange") else {
+                check("form field \(id) exposes a change handler", false)
+                return
+            }
+            await first.dispatch(
+                session: "sStore", handler: handler, payload: ExtensionRuntime.jsonString(from: [value]))
+        }
+        await settle()
+        check("editing a form stores nothing", host.storedForms.isEmpty)
+
+        guard
+            let submit = recorder.trees.last?.activeRoot?.firstDescendant(ofType: "Action")?.handler(
+                "onAction")
+        else {
+            check("the form exposes its submit action", false)
+            return
+        }
+        await first.dispatch(session: "sStore", handler: submit, payload: "[]")
+        await settle(until: { !host.storedForms.isEmpty })
+        let stored = host.storedForms.last
+        check("submitting stores under the running command", stored?.command == "generate")
+        check(
+            "submitting stores only the storeValue fields",
+            stored?.values == ["format": #""{word}-{number:4}""#, "remember": "true"],
+            String(describing: stored?.values))
+        await first.stop(session: "sStore")
+        first.shutdown()
+
+        let (second, secondHost, secondRecorder) = makeRuntime()
+        try? await second.boot(config: .current(supportDirectory: FileManager.default.temporaryDirectory))
+        await second.start(
+            session: "sRestore", code: storeValueCommand, file: URL(fileURLWithPath: "/tmp/store.js"),
+            mode: .view,
+            context: launchContext(
+                command: "generate",
+                formValues: (stored?.values ?? [:]).merging(["scratch": #""leaked""#]) { $1 }))
+        await settle(until: { field("format", in: secondRecorder.trees.last) != nil })
+        let tree = secondRecorder.trees.last
+        check(
+            "a fresh runtime restores the submitted text",
+            field("format", in: tree)?.string("value") == "{word}-{number:4}",
+            field("format", in: tree)?.string("value") ?? "nil")
+        check("a fresh runtime restores the checkbox", field("remember", in: tree)?.bool("value") == true)
+        check(
+            "a field without storeValue ignores a saved value",
+            field("scratch", in: tree)?.string("value") == "blank")
+
+        if let submit = tree?.activeRoot?.firstDescendant(ofType: "Action")?.handler("onAction") {
+            await second.dispatch(session: "sRestore", handler: submit, payload: "[]")
+            await settle(until: { !secondHost.toasts.isEmpty })
+        }
+        check(
+            "a restored value reaches onSubmit",
+            secondHost.toasts == ["{word}-{number:4}|blank|true"],
+            secondHost.toasts.joined(separator: ","))
+        await second.stop(session: "sRestore")
+        second.shutdown()
     }
 
     @MainActor
@@ -1716,6 +1898,56 @@ struct ExtensionTests {
         }
     }
 
+    @MainActor
+    static func sharedArrayBufferChecks() async {
+        let (runtime, host, recorder) = makeRuntime()
+        defer { runtime.shutdown() }
+        do {
+            try await runtime.boot(
+                config: .current(supportDirectory: FileManager.default.temporaryDirectory))
+            let command = #"""
+                const assert = require("assert");
+                const lock = new Int32Array(new SharedArrayBuffer(4));
+                Atomics.store(lock, 0, 5);
+                assert.equal(Atomics.add(lock, 0, "3"), 5);
+                assert.equal(Atomics.compareExchange(lock, 0, "8", 0), 8);
+                assert.equal(Atomics.load(lock, 0), 0);
+                assert.equal(Atomics.wait(lock, 0, 1), "not-equal");
+                assert.equal(Atomics.wait(lock, undefined, 4294967296, 0), "timed-out");
+                assert.equal(Atomics.wait(lock, 0, 0, -1), "timed-out");
+                assert.equal(Atomics.notify(lock, 0), 0);
+                const started = Date.now();
+                assert.equal(Atomics.wait(lock, 0, 0, 40), "timed-out");
+                assert(Date.now() - started >= 40);
+                const big = new BigInt64Array(new SharedArrayBuffer(8));
+                assert.equal(Atomics.wait(big, 0, "0", 0), "timed-out");
+                assert.equal(Atomics.wait(big, 0, 1n), "not-equal");
+                for (const operation of [
+                  () => Atomics.wait(new Uint32Array(1), 0, 0, 0),
+                  () => Atomics.wait(lock, 0, 0n, 0),
+                  () => Atomics.wait(lock, 0, 0),
+                  () => Atomics.wait(lock, 0, 0, Infinity),
+                ]) assert.throws(operation, TypeError);
+                assert.throws(() => Atomics.wait(lock, 1, 0, 0), RangeError);
+                module.exports.default = async () => {
+                  await require("@raycast/api").showHUD("SharedArrayBuffer passed");
+                };
+                """#
+            await runtime.start(
+                session: "shared-buffer", code: command,
+                file: URL(fileURLWithPath: "/tmp/shared-buffer.js"), mode: .noView,
+                context: launchContext(mode: .noView))
+            await settle(until: { recorder.finished || !recorder.failures.isEmpty })
+            check(
+                "SharedArrayBuffer allocation and finite waits work in JavaScriptCore",
+                host.huds == ["SharedArrayBuffer passed"] && recorder.finished,
+                recorder.failures.joined(separator: "|"))
+            await runtime.stop(session: "shared-buffer")
+        } catch {
+            check("SharedArrayBuffer runtime boots", false, String(describing: error))
+        }
+    }
+
     /// sql.js loads through `WebAssembly.instantiate`, whose promise never settled on the JS queue.
     @MainActor
     static func webAssemblyChecks() async {
@@ -1901,6 +2133,61 @@ struct ExtensionTests {
                 == "true,failed,false,EPERM,ESRCH,ERR_UNKNOWN_SIGNAL",
             recorder.trees.last?.activeRoot?.string("markdown") ?? "no tree")
         await runtime.stop(session: "sKill")
+    }
+
+    @MainActor
+    static func stdioDescriptorChecks() async {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tinycast-stdio-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let (runtime, _, recorder) = makeRuntime()
+        try? await runtime.boot(
+            config: .current(supportDirectory: FileManager.default.temporaryDirectory))
+        let command = """
+            "use strict";
+            const { Detail } = require("@raycast/api");
+            const React = require("react");
+            const fs = require("fs");
+            const { spawn, spawnSync } = require("child_process");
+            const run = (file, args, stdio) => new Promise((resolve) => {
+              const child = spawn(file, args, { stdio });
+              let out = "";
+              child.stdout.on("data", (chunk) => (out += chunk));
+              child.on("close", (code) => resolve(code + ":" + out.trim()));
+            });
+            module.exports.default = function Command() {
+              const [state, setState] = React.useState("pending");
+              React.useEffect(() => {
+                (async () => {
+                  const output = fs.openSync("\(file.path)", "wx");
+                  const wrote = await run("/bin/echo", ["hello"], ["ignore", output, "pipe"]);
+                  fs.closeSync(output);
+                  const input = fs.openSync("\(file.path)", "r");
+                  const read = await run("/bin/cat", [], [input, "pipe", "pipe"]);
+                  fs.closeSync(input);
+                  const syncInput = fs.openSync("\(file.path)", "r");
+                  const sync = spawnSync("/bin/cat", [], { stdio: [syncInput, "pipe", "pipe"] });
+                  fs.closeSync(syncInput);
+                  setState([wrote, read, sync.stdout.toString().trim()].join(","));
+                })().catch((error) => setState("threw:" + error.message));
+              }, []);
+              return React.createElement(Detail, { markdown: state });
+            };
+            """
+        await runtime.start(
+            session: "sStdio", code: command, file: URL(fileURLWithPath: "/tmp/stdio-descriptors.js"),
+            mode: .view, context: launchContext())
+        await settle(until: { recorder.trees.last?.activeRoot?.string("markdown") == "0:,0:hello,hello" })
+
+        check(
+            "a stdout descriptor receives the child's output",
+            (try? String(contentsOf: file, encoding: .utf8)) == "hello\n")
+        check(
+            "a stdin descriptor feeds spawn and spawnSync",
+            recorder.trees.last?.activeRoot?.string("markdown") == "0:,0:hello,hello",
+            recorder.trees.last?.activeRoot?.string("markdown") ?? "no tree")
+        await runtime.stop(session: "sStdio")
     }
 
     /// `zlib` is the one node shim with no JS-side implementation to lean on.

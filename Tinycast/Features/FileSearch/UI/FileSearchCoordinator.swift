@@ -49,6 +49,11 @@ final class FileSearchCoordinator {
         settings.fileSearchEnabled && settings.fileSearchShowInLauncher
     }
 
+    var favoriteFiles: [FileSearchResult] {
+        guard settings.fileSearchEnabled else { return [] }
+        return core.favorites.files(homeDirectory: FileManager.default.homeDirectoryForCurrentUser)
+    }
+
     /// Borrows the screen's session, so Search Files then opens on the request already answered.
     func searchFromLauncher(_ query: String) {
         guard showsFilesInLauncher, FileSearchQuery.answersLauncher(query) else {
@@ -60,8 +65,12 @@ final class FileSearchCoordinator {
 
     /// Checks the switch before reading the session, so with it off the launcher observes nothing.
     func launcherFiles(for query: String) -> [FileSearchResult] {
-        guard showsFilesInLauncher, FileSearchQuery.answersLauncher(query) else { return [] }
-        return Array(session.results.prefix(FileSearchQuery.launcherLimit))
+        guard settings.fileSearchEnabled, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return []
+        }
+        let results = showsFilesInLauncher && FileSearchQuery.answersLauncher(query) ? session.results : []
+        return FileSearchQuery.launcherResults(query, favorites: favoriteFiles, indexed: results)
     }
 
     func applyLauncherFiles() {

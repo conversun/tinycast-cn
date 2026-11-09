@@ -26,6 +26,11 @@ struct NotesSettingsView: View {
                     SettingsRowTitle(.notesOptions, "Show Formatting Bar")
                 }
                 .settingsEnabled(settings.notesEnabled && settings.notesRendersMarkdown)
+                Toggle(isOn: $settings.notesShowsInMenuBar) {
+                    SettingsRowTitle(.notesOptions, "Show in Menu Bar")
+                    Text("Right-click the icon to create or search notes.")
+                }
+                .settingsEnabled(settings.notesEnabled)
                 LabeledContent {
                     if settings.notesFolder != nil {
                         Button(

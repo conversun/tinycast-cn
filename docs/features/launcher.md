@@ -329,8 +329,9 @@ can't say what it acts on.
 With File Search on and its **Show in launcher** switch set, a query of three characters or more adds a
 **Files** section of up to five hits between the ranked results and the fallbacks. Like a fallback it is
 query-driven and not an `AppEntry`: `LauncherScreen.Row.file` carries the `FileSearchResult`, and
-`LauncherList.FileSection` draws it. Nothing about a file row is learned, pinned, aliased or hidden, and it
-adds no `Kind` or `VisibilityStore` category; the switch is its only gate. See
+`LauncherList.FileSection` draws it. A file row adds no `Kind` or `VisibilityStore` category and has
+no learned ranking, alias or Hide from Search. It can join the shared Favorites section through ⌘K or ⇧⌘F, and explicit favorites stay
+searchable with shorter queries and with **Show in launcher** off. See
 [file-search.md](file-search.md#in-the-launcher).
 
 ### Fallbacks
@@ -723,31 +724,31 @@ whose icon moved.
 
 ## Favorites
 
-`FavoritesStore.keys` is the order — the array *is* the ranking, and it only shows while the query is
-empty, where `AppIndex.orderedResults` pins it as a prefix of the results and counts it in
-`Results.favoriteCount`. `LauncherScreen` reads that count once in `init`, and the list, the reorder
-rows and the chord guards all read that one number, so the visible section and what a move acts on
-can't disagree.
+`FavoritesStore.keys` is the shared order for launcher entries, files and folders. The existing
+`favoriteApps` preference and settings-backup field hold the whole list. App and command keys keep
+their current spelling; file keys are absolute `file:///` URLs, with a trailing slash identifying a
+folder. Resolving a saved file reads no filesystem metadata and needs no loaded index. Favorites keep
+the saved path: renaming or moving a file requires adding its new location, and an unavailable path
+stays removable and reports the ordinary open failure.
 
-The ⌘K menu carries **Add / Remove from Favorites** (⇧⌘F) plus **Move Favorite Up / Down** (⌥⌘↑ /
-⌥⌘↓). A move row is only built in a direction that exists, so the first favorite has no Up row and
-the last has no Down.
+An empty query pins the section. `AppIndex.orderedResults` resolves the visible launcher entries;
+`LauncherScreen` merges those with saved files in key order through `FavoritesStore.orderedItems`.
+Its `pinnedFavorites` array feeds rendering, reordering and ⌘-digit slots. File favorites are hidden
+while File Search is disabled, with their keys retained. **Show in launcher** controls indexed search
+hits, so turning it off keeps explicit file favorites available.
 
-**Every one of those rows runs the same call its chord does** — the menu is handed an
-`AppActionsMenu.FavoriteActions` built by `LauncherScreen` and never touches `FavoritesStore` itself.
-A row that mutates the store directly looks identical on screen and then behaves differently from its
-chord, because the store knows nothing about where the highlight should land.
+The ⌘K menu carries **Add / Remove from Favorites** (⇧⌘F) on launcher entries and file results in both
+root search and Search Files, plus **Move Favorite Up / Down** (⌥⌘↑ / ⌥⌘↓) in the launcher Favorites
+section. A move row is only built in a direction that exists. `FavoriteActions` builds the shared
+menu rows; the launcher supplies the same calls its chords use so selection and scrolling agree.
 
-`FavoritesStore.exchange` swaps two stored positions rather than removing and re-inserting. `keys`
-retains entries that `VisibilityStore` hides or that aren't currently indexed — `ordered(_:)` drops
-them with `compactMap` and never prunes them, which is how a favorite survives an unmounted volume —
-so exchanging the two *visible* keys leaves every such key on its own slot.
+`FavoritesStore.exchange` swaps two stored positions rather than removing and re-inserting. Hidden
+or unindexed launcher entries keep their keys and slots, so exchanging two visible keys leaves those
+entries untouched.
 
-Both actions re-ask `orderedResults` afterwards and restate `vm.selection` against it; the mutation
-already invalidated the memo, so that call warms the exact key the next render reads. Where the
-highlight lands differs on purpose: a **move** follows the entry, since the point of the action is
-where that entry now sits, while a **toggle** stays with the section rather than chasing an entry
-across the list — the top of Favorites on add, the neighbour above the one that left on remove.
+Both actions resolve the current order after mutation. A move follows its entry; a toggle stays in
+Favorites, selecting the top on add or the neighbour above the removed row. A typed query pins no
+favorites and keeps its selection when one is toggled.
 
 ### ⌘-digit slots
 
@@ -757,7 +758,7 @@ so the same positions work on QWERTY and AZERTY. The same slots address pinned C
 that screen; the eleventh favorite is still listed and reorderable, and simply has no slot.
 
 Both palette sizes serve the chords from the same prefix, because `paletteIsCollapsed` already
-requires an empty query: **compact implies empty implies `favoriteCount` is the pinned prefix**. That
+requires an empty query: **compact implies empty implies `pinnedFavorites` is the visible section**. That
 is why `LauncherScreen.pinnedFavorites` feeds the chords and the numbered rows alike, rather than
 the compact bar re-deriving an empty-query order of its own. The compact bar draws no favorites, yet
 every slot still launches one.

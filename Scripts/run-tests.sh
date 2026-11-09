@@ -51,12 +51,6 @@ if [ "${1:-}" = "--exec" ]; then
     exit 0
 fi
 
-QUEUE="$BIN/queue"
-EXCLUSIVE_QUEUE="$BIN/exclusive-queue"
-: > "$QUEUE"
-: > "$EXCLUSIVE_QUEUE"
-rm -f "$BIN"/*.failed "$BIN"/*.running
-
 failed=()
 ran=0
 only="${1:-}"
@@ -70,13 +64,25 @@ if [ "$only" = "--index" ]; then
     printf '[' > "$DB"
 fi
 
+QUEUE="$BIN/queue"
+# `--index` queues nothing, so it must never reset the state of a suite already running.
+if [ "$emit_db" -eq 0 ]; then
+    # Queue, logs and verdicts are shared by path, so a second suite in this $TMPDIR waits its turn.
+    if [ -z "${TINYCAST_SUITE_LOCKED:-}" ]; then
+        export TINYCAST_SUITE_LOCKED=1
+        lockf -k -t 0 "$BIN/suite.lock" true 2>/dev/null || echo "Waiting for the suite already running…" >&2
+        exec lockf -k "$BIN/suite.lock" "$SELF" "$@"
+    fi
+    : > "$QUEUE"
+    rm -f "$BIN"/*.failed "$BIN"/*.running
+fi
+
 # `slow` dispatches in the first wave; `index` only claims editor flags for a hand-run harness.
 run() {
-    local opt=-Onone pri=1 index_only=0 queue="$QUEUE"
+    local opt=-Onone pri=1 index_only=0
     while :; do
         case "$1" in
             slow)  pri=0; shift;;
-            exclusive) queue="$EXCLUSIVE_QUEUE"; shift;;
             -O)    opt=-O; shift;;
             index) index_only=1; shift;;
             *)     break;;
@@ -106,7 +112,7 @@ run() {
     fi
 
     # xargs splits the queue on whitespace, so no harness source path may contain a space.
-    printf '%s %s %s %s\n' "$pri" "$name" "$opt" "$*" >> "$queue"
+    printf '%s %s %s %s\n' "$pri" "$name" "$opt" "$*" >> "$QUEUE"
 }
 
 L=Tinycast/Features/Launcher/Model
@@ -141,6 +147,7 @@ run app-installation-test  $L/SearchRelevance.swift $L/ScriptRomanization.swift 
                            Tinycast/Features/Launcher/Service/AppLauncher.swift \
                            Tinycast/Features/Launcher/Service/RunningAppsMonitor.swift \
                            Tinycast/Features/Launcher/Service/FavoritesStore.swift \
+                           $FS/Model/FileSearchResult.swift \
                            Tinycast/Features/Launcher/Service/AliasStore.swift \
                            Tinycast/Features/Launcher/Service/VisibilityStore.swift \
                            Tinycast/Features/Launcher/Service/BundleNameCache.swift \
@@ -266,10 +273,6 @@ run appearance-test        Tinycast/Platform/Appearance.swift \
                            Tinycast/Features/Settings/AppAppearance.swift
 run language-test          Tinycast/Features/Settings/AppLanguage.swift
 run localized-resource-test Tinycast/Platform/LocalizedResource.swift
-run exclusive onboarding-test Tinycast/Features/Onboarding/OnboardingCoordinator.swift \
-                           Tinycast/Windows/AppWindowController.swift \
-                           Tinycast/DesignSystem/Interaction/Motion.swift \
-                           Tinycast/Windows/WindowChrome.swift Tinycast/Platform/ActivationPolicy.swift
 run relaunch-test          Tinycast/App/AppDelegate.swift Tinycast/Platform/RelaunchRunner.swift
 run interface-size-test    Tinycast/Platform/Appearance.swift \
                            Tinycast/DesignSystem/Theme.swift \
@@ -481,6 +484,38 @@ run window-layout-test     Tinycast/Features/WindowManagement/Model/WindowComman
                            Tinycast/Features/WindowManagement/Model/CustomWindowSize.swift \
                            Tinycast/Features/WindowManagement/Model/CustomWindowSizeStore.swift \
                            Tinycast/Platform/LocalizedResource.swift
+run deeplink-test          Tinycast/Features/DeepLinks/Model/DeepLink.swift \
+                           Tinycast/Features/DeepLinks/Model/DeepLinkInput.swift \
+                           Tinycast/Features/DeepLinks/Model/DeepLinkConsentPolicy.swift \
+                           Tinycast/Features/DeepLinks/Model/DeepLinkSource.swift \
+                           Tinycast/Features/DeepLinks/Model/CustomWindowSize+DeepLink.swift \
+                           Tinycast/Features/Settings/SettingsTab.swift \
+                           Tinycast/Features/Launcher/Model/CommandID.swift \
+                           Tinycast/Features/HotKeys/Model/HotKeyAction.swift \
+                           Tinycast/Features/HotKeys/Model/HotKeyAction+EntryID.swift \
+                           Tinycast/Features/QuickActions/Model/QuickAction.swift \
+                           Tinycast/Features/QuickActions/Model/BuiltInQuickAction.swift \
+                           Tinycast/Features/QuickActions/Model/CustomQuickAction.swift \
+                           Tinycast/Features/Quicklinks/Model/Quicklink.swift \
+                           Tinycast/Features/Quicklinks/Model/QuicklinkDestination.swift \
+                           Tinycast/Features/SystemActions/Model/SystemAction.swift \
+                           Tinycast/Features/CustomCommands/Model/CustomCommand.swift \
+                           Tinycast/Features/AppleShortcuts/Model/AppleShortcut.swift \
+                           Tinycast/Features/Snippets/Model/Snippet.swift \
+                           Tinycast/Features/WindowManagement/Model/WindowCommand.swift \
+                           Tinycast/Features/WindowManagement/Model/WindowCycle.swift \
+                           Tinycast/Features/WindowManagement/Model/WindowPlacementEngine.swift \
+                           Tinycast/Features/WindowManagement/Model/WindowLayoutAnchor.swift \
+                           Tinycast/Features/WindowManagement/Model/WindowLayoutDisplay.swift \
+                           Tinycast/Features/WindowManagement/Model/WindowLayout.swift \
+                           Tinycast/Features/WindowManagement/Model/WindowLayoutGeometry.swift \
+                           Tinycast/Features/WindowManagement/Model/RoomLayoutKind.swift \
+                           Tinycast/Features/WindowManagement/Model/RoomLayoutEngine.swift \
+                           Tinycast/Features/WindowManagement/Model/RoomGrid.swift \
+                           Tinycast/Features/WindowManagement/Model/RoomWindow.swift \
+                           Tinycast/Features/WindowManagement/Model/Room.swift \
+                           Tinycast/Features/WindowManagement/Model/CustomWindowSize.swift \
+                           Tinycast/Platform/LocalizedResource.swift
 run window-room-test       Tinycast/Features/WindowManagement/Model/WindowCommand.swift \
                            Tinycast/Features/WindowManagement/Model/WindowCycle.swift \
                            Tinycast/Features/WindowManagement/Model/WindowPlacementEngine.swift \
@@ -638,8 +673,17 @@ run hyper-key-engine-test  Tinycast/Features/HotKeys/Model/HyperKeyEngine.swift 
 run hyper-key-test         Tinycast/Features/HotKeys/Model/HIDKeyMapping.swift \
                            Tinycast/Features/HotKeys/Model/HyperKeyConflictPolicy.swift \
                            Tinycast/Features/HotKeys/Service/KeyboardRemapper.swift \
-                           Tinycast/Features/HotKeys/Service/HyperKeyInstanceLock.swift \
+                           Tinycast/Features/HotKeys/Service/RemapInstanceLock.swift \
                            Tests/hyper-key-fixtures.swift
+run dictation-key-test     Tinycast/Features/HotKeys/Model/HIDKeyMapping.swift \
+                           Tinycast/Features/HotKeys/Model/HyperKeyConflictPolicy.swift \
+                           Tinycast/Features/HotKeys/Service/KeyboardRemapper.swift \
+                           Tinycast/Features/HotKeys/Service/RemapInstanceLock.swift \
+                           Tinycast/Features/HotKeys/Service/DictationKeyManager.swift \
+                           Tinycast/Platform/HealthTicker.swift \
+                           Tinycast/Platform/NotificationToken.swift \
+                           Tests/hyper-key-fixtures.swift \
+                           Tests/dictation-key-fixtures.swift
 run hotkey-dispatch-test   Tinycast/Features/HotKeys/Model/DoubleTapModifier.swift \
                            Tinycast/Features/HotKeys/Model/ModifierKey.swift \
                            Tinycast/Features/HotKeys/Model/HotKeyBinding.swift \
@@ -653,9 +697,6 @@ run hotkey-dispatch-test   Tinycast/Features/HotKeys/Model/DoubleTapModifier.swi
 run settings-file-test     Tinycast/Features/Settings/Model/*.swift \
                            Tinycast/Features/Settings/Service/SettingsFileMonitor.swift \
                            Tinycast/Features/Settings/Service/SettingsFileRepository.swift \
-                           Tinycast/Platform/AppPaths.swift
-run compact-favorites-migration-test Tinycast/Migrations/CompactFavoritesMigration.swift \
-                           Tinycast/Features/Settings/Model/*.swift \
                            Tinycast/Platform/AppPaths.swift
 run backup-archive-test   Tinycast/Platform/AppPaths.swift \
                            Tinycast/Features/Backup/Model/BackupArchive.swift \
@@ -694,6 +735,7 @@ run ext-form-test          $E/Model/ExtensionFormMetrics.swift \
                            $E/UI/ExtensionListKey.swift \
                            Tests/ext-list-key-test.swift
 run ext-image-size-test   $E/Model/ExtensionImageSize.swift
+run ext-sign-in-test       $E/Service/ExtensionSignInSession.swift
 run ext-accessory-test     $E/Model/RenderNode.swift \
                            $E/Model/ExtensionPickerItem.swift \
                            $E/Model/ExtensionSearchAccessory.swift \
@@ -750,14 +792,24 @@ run settings-history-test  Tinycast/Features/Settings/SettingsTab.swift \
                            $L/SearchRelevance.swift \
                            Tinycast/Platform/LocalizedResource.swift
 run updates-test           Tinycast/Features/Updates/Model/*.swift \
-                           Tinycast/Features/Updates/Service/BundleSignature.swift
+                           Tinycast/Features/Updates/Service/BundleSignature.swift \
+                           Tinycast/Features/Updates/Service/UpdateSignature.swift
 run update-check-test      Tinycast/Features/Updates/Model/*.swift \
                            Tinycast/Features/Updates/Service/UpdateCheckStore.swift \
                            Tinycast/Platform/AppPaths.swift
 run support-test           Tinycast/Features/Support/Model/*.swift
 run ai-provider-test       Tinycast/Features/Settings/AppSettingsKey.swift \
                            Tinycast/Features/AI/Model/*.swift \
-                           Tinycast/Features/AI/Settings/AISettingsStore.swift
+                           Tinycast/Features/AI/Settings/AISettingsStore.swift \
+                           Tinycast/Features/AI/Service/CodexAppServerClient.swift \
+                           Tinycast/Features/AI/Service/InstalledAIProbe.swift \
+                           Tinycast/Platform/ExecutableLocator.swift Tinycast/Platform/ProcessExit.swift
+run opencode-mcp-test      Tinycast/Features/AI/Model/*.swift \
+                           Tinycast/Platform/ExecutableLocator.swift Tinycast/Platform/ProcessExit.swift \
+                           Tinycast/Features/AI/Service/AIProvider.swift \
+                           Tinycast/Features/AI/Service/AIToolLoopProvider.swift \
+                           Tinycast/Features/AI/Service/InstalledCLIProvider.swift \
+                           Tinycast/Features/AI/Service/OpenCodeMCPBridge.swift
 run ai-chat-test           Tinycast/Features/AI/Model/AIRequest.swift \
                            Tinycast/Features/AI/Model/AIConnection.swift \
                            Tinycast/Features/AI/Model/AIConversationOpenPolicy.swift \
@@ -768,6 +820,7 @@ run ai-chat-test           Tinycast/Features/AI/Model/AIRequest.swift \
                            Tinycast/Features/AI/Model/JSONValue.swift \
                            Tinycast/Features/AI/Model/ChatMessage.swift \
                            Tinycast/Features/AI/Model/ChatSession.swift \
+                           Tinycast/Features/AI/Model/ChatPreset.swift \
                            Tinycast/Features/AI/Model/ChatChoices.swift \
                            Tinycast/Features/AI/Model/ChatReferences.swift \
                            Tinycast/Features/AI/Model/ChatTitle.swift \
@@ -785,6 +838,19 @@ run ai-chat-test           Tinycast/Features/AI/Model/AIRequest.swift \
                            Tinycast/Features/AI/UI/AIChatState.swift \
                            Tinycast/Features/AI/UI/AIChatSurfacesState.swift \
                            Tinycast/Features/AI/UI/ChatFindState.swift
+run ai-responses-test      Tinycast/Features/AI/Model/AIConnection.swift \
+                           Tinycast/Features/AI/Model/AppleIntelligence.swift \
+                           Tinycast/Features/AI/Model/AIModelDiscovery.swift \
+                           Tinycast/Features/AI/Model/AIRequest.swift \
+                           Tinycast/Features/AI/Model/AIRequestBody.swift \
+                           Tinycast/Features/AI/Model/AIStreamDecoder.swift \
+                           Tinycast/Features/AI/Model/AIResponsesDecoder.swift \
+                           Tinycast/Features/AI/Model/AIThinkTagDecoder.swift \
+                           Tinycast/Features/AI/Model/AIProviderFailure.swift \
+                           Tinycast/Features/AI/Model/AITool.swift \
+                           Tinycast/Features/AI/Model/JSONValue.swift \
+                           Tinycast/Features/AI/Service/AIProvider.swift \
+                           Tinycast/Features/AI/Service/AIToolLoopProvider.swift
 run chat-markdown-test     Tinycast/Platform/Appearance.swift \
                            Tinycast/DesignSystem/Theme.swift \
                            Tinycast/DesignSystem/InterfaceMetrics.swift \
@@ -851,6 +917,7 @@ run mcp-oauth-test         Tinycast/Platform/ExecutableLocator.swift \
                            Tinycast/Features/AI/Model/AITool.swift \
                            Tinycast/Features/AI/Model/AIToolServer.swift \
                            Tinycast/Features/AI/Model/AIStreamDecoder.swift \
+                           Tinycast/Features/AI/Model/AIResponsesDecoder.swift \
                            Tinycast/Features/AI/Model/AIProviderFailure.swift \
                            Tinycast/Features/AI/Model/AIThinkTagDecoder.swift \
                            Tinycast/Features/AI/Model/AIRequest.swift \
@@ -866,6 +933,7 @@ run slow mcp-stdio-test    Tinycast/Platform/ExecutableLocator.swift \
                            Tinycast/Features/AI/Model/AITool.swift \
                            Tinycast/Features/AI/Model/AIToolServer.swift \
                            Tinycast/Features/AI/Model/AIStreamDecoder.swift \
+                           Tinycast/Features/AI/Model/AIResponsesDecoder.swift \
                            Tinycast/Features/AI/Model/AIProviderFailure.swift \
                            Tinycast/Features/AI/Model/AIThinkTagDecoder.swift \
                            Tinycast/Features/AI/Model/AIRequest.swift \
@@ -904,7 +972,11 @@ report() {
     while :; do
         asked=$SECONDS
         if IFS= read -r -t 15 line; then
-            case "$line" in "dispatch "*) return "${line#dispatch }";; esac
+            case "$line" in
+                "dispatch "*)
+                    [ "$finished" -eq "$ran" ] || return 1
+                    return "${line#dispatch }";;
+            esac
             finished=$((finished + 1))
             printf '[%*d/%d] %s\n' "${#ran}" "$finished" "$ran" "$line"
             continue
@@ -926,7 +998,7 @@ dispatch() {
 
 # Without this the suite reports "all passed" whenever dispatch itself dies and no harness ran.
 if ! {
-    dispatch "$QUEUE" "$JOBS" && dispatch "$EXCLUSIVE_QUEUE" 1
+    dispatch "$QUEUE" "$JOBS"
     echo "dispatch $?"
 } | report; then
     echo "harness dispatch failed; no result below can be trusted" >&2
@@ -937,7 +1009,7 @@ elapsed=$((SECONDS - started))
 # A compiler diagnostic is far longer than PIPE_BUF, so the workers log it and it is replayed here.
 while read -r _ name _; do
     if [ -f "$BIN/$name.failed" ]; then failed+=("$name"); fi
-done < <(cat "$QUEUE" "$EXCLUSIVE_QUEUE")
+done < "$QUEUE"
 
 if [ ${#failed[@]} -gt 0 ]; then
     for name in "${failed[@]}"; do

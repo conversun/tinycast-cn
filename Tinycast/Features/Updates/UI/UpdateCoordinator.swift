@@ -1,40 +1,31 @@
-import AppKit
-import SwiftUI
+import Foundation
+import os
 
-/// The installer only performs an update the coordinator has decided is safe.
 @MainActor
 @Observable
 final class UpdateCoordinator {
-    /// One surface for prompt, progress and report: a download cannot move into a dialog.
     enum Stage: Equatable {
+        case idle
         case checking
-        case upToDate
-        /// A local build has no release stream to compare against, and says so rather than lying.
-        case localBuild
         case available(AvailableRelease)
-        case blocked(UpdateReadiness.Blocker, AvailableRelease)
         case installing(AvailableRelease, UpdateInstaller.Phase)
         case readyToRelaunch
         case failed(UpdateFailure)
     }
 
-    private(set) var stage: Stage = .checking
+    private(set) var stage: Stage = .idle
 
     private let store: UpdateCheckStore
-    /// Environment injection and activity reads only — never for state this type owns.
+    /// For other features only — never for state this type owns.
     private unowned let core: AppCore
-    @ObservationIgnored private lazy var window = AppWindowController(
-        title: String(localized: "Software Update"), contentSize: UpdateWindowView.initialSize,
-        activation: core.activationPolicy)
     @ObservationIgnored private var installTask: Task<Void, Never>?
+    @ObservationIgnored private var staged: UpdateInstaller.Staged?
+    private static let logger = Logger(subsystem: "com.tinycast", category: "Updates")
 
     init(store: UpdateCheckStore, core: AppCore) {
         self.store = store
         self.core = core
     }
-
-    var channel: ReleaseChannel { store.channel }
-    var runningVersion: String { store.runningVersion?.description ?? String(localized: "unknown") }
 
     /// A local build has no release stream, so it does not advertise the command either.
     func applyEnabled() {
@@ -49,56 +40,35 @@ final class UpdateCoordinator {
         }
     }
 
-    func focusExisting() -> Bool {
-        window.focus()
-    }
-
-    /// The window takes the height its content measured, so no stage pads itself out with space.
-    func fit(height: CGFloat) {
-        window.fitContent(width: UpdateWindowView.width, height: height)
-    }
-
     // MARK: - Entry points
 
-    /// The manual action: always opens the window and always asks GitHub.
+    /// Never re-offers an update under way: that would discard it.
     func checkForUpdates() {
         guard store.channel.updatesItself else {
-            stage = .localBuild
-            present()
+            core.showMessage(
+                String(localized: "This is a local build — rebuild it to move it forward."),
+                tone: .neutral)
             return
         }
-        if case .installing = stage {
-            present()
-            return
-        }
-        stage = .checking
-        present()
-        Task { [weak self] in
-            guard let self else { return }
-            let answered = await store.check()
-            guard case .checking = stage else { return }
-            if let release = store.update {
-                stage = .available(release)
-            } else if answered {
-                stage = .upToDate
-            } else {
-                stage = .failed(.downloadFailed(String(localized: "Tinycast could not reach GitHub.")))
-            }
+        if staged != nil { stage = .readyToRelaunch }
+        switch stage {
+        case .installing, .readyToRelaunch:
+            showPill()
+        case .checking:
+            break
+        case .idle, .available, .failed:
+            check()
         }
     }
 
-    /// The automatic path: `false` answers that it withheld the prompt, so the store re-offers it.
-    func presentIfAvailable(_ release: AvailableRelease) -> Bool {
-        guard core.settings.automaticallyCheckForUpdates else { return false }
+    /// The automatic path: the pill waits for the next palette open and never interrupts.
+    func offer(_ release: AvailableRelease) {
+        guard core.settings.automaticallyCheckForUpdates, staged == nil else { return }
         switch stage {
-        // Already in hand: re-offering would throw away a download or the relaunch it earned.
-        case .installing, .readyToRelaunch:
-            return true
-        case .checking, .upToDate, .localBuild, .available, .blocked, .failed:
-            guard UpdateReadiness.evaluate(core.currentActivity) == nil else { return false }
+        case .checking, .installing, .readyToRelaunch:
+            break
+        case .idle, .available, .failed:
             stage = .available(release)
-            present()
-            return true
         }
     }
 
@@ -106,12 +76,8 @@ final class UpdateCoordinator {
 
     func install() {
         guard let release = pendingRelease else { return }
-        // Re-asked at the moment of the click, never read from a flag that could have gone stale.
-        if let blocker = UpdateReadiness.evaluate(core.currentActivity) {
-            stage = .blocked(blocker, release)
-            return
-        }
         stage = .installing(release, .downloading(received: 0, expected: release.assetSize))
+        staged = nil
         let installer = self.installer
         // Hoisted: nesting the hop inside the task body would re-capture its weak `self`.
         let onProgress: @Sendable (UpdateInstaller.Phase) -> Void = { [weak self] phase in
@@ -119,7 +85,8 @@ final class UpdateCoordinator {
         }
         installTask = Task { [weak self] in
             do {
-                try await installer.install(release, onProgress: onProgress)
+                let staged = try await installer.prepare(release, onProgress: onProgress)
+                self?.staged = staged
                 self?.store.recordInstall(of: release.version)
                 self?.stage = .readyToRelaunch
             } catch is CancellationError {
@@ -132,31 +99,75 @@ final class UpdateCoordinator {
         }
     }
 
-    /// Dismissing a version is what stops it asking again; a later one still will.
-    func skip() {
-        if let release = pendingRelease { store.skip(release) }
-        window.close()
-    }
-
-    func cancelInstall() {
-        installTask?.cancel()
-        installTask = nil
-    }
-
-    func retry() {
-        guard let release = pendingRelease else { return }
-        stage = .available(release)
-    }
-
     func dismiss() {
-        window.close()
+        switch stage {
+        case .installing:
+            installTask?.cancel()
+            installTask = nil
+        case .available, .readyToRelaunch, .failed:
+            stage = .idle
+        case .idle, .checking:
+            break
+        }
+    }
+
+    func showFailure() {
+        guard case .failed(let failure) = stage else { return }
+        let message = [failure.errorDescription, failure.recoverySuggestion]
+            .compactMap(\.self)
+            .joined(separator: " ")
+        Task {
+            let retry = await core.reportFailure(
+                title: String(localized: "Update failed"), message: message,
+                symbol: "arrow.down.circle", recovery: String(localized: "Try Again"))
+            if retry, case .failed = stage { install() }
+        }
     }
 
     func relaunch() {
         core.relaunch()
     }
 
+    func installStagedUpdate() {
+        guard let staged else { return }
+        self.staged = nil
+        do {
+            try installer.install(staged)
+        } catch {
+            Self.logger.error(
+                "Installing the staged update failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     // MARK: - Private
+
+    private func check() {
+        stage = .checking
+        core.showProgress(String(localized: "Checking for updates…"))
+        Task { [weak self] in
+            guard let self else { return }
+            let answered = await store.check()
+            if let release = store.update {
+                core.hideProgress()
+                stage = .available(release)
+                showPill()
+                return
+            }
+            stage = .idle
+            if answered {
+                core.showMessage(
+                    String(localized: "\(Bundle.main.appDisplayName) is up to date"))
+            } else {
+                core.showMessage(
+                    String(localized: "Tinycast could not reach GitHub."), tone: .danger)
+            }
+        }
+    }
+
+    private func showPill() {
+        guard !core.paletteCoordinator.isVisible else { return }
+        core.paletteCoordinator.showPalette(mode: .launcher, restoreAnyMode: true)
+    }
 
     private func report(_ phase: UpdateInstaller.Phase, for release: AvailableRelease) {
         guard case .installing = stage else { return }
@@ -165,9 +176,9 @@ final class UpdateCoordinator {
 
     private var pendingRelease: AvailableRelease? {
         switch stage {
-        case .available(let release), .blocked(_, let release), .installing(let release, _):
+        case .available(let release), .installing(let release, _):
             return release
-        case .checking, .upToDate, .localBuild, .readyToRelaunch, .failed:
+        case .idle, .checking, .readyToRelaunch, .failed:
             return store.update
         }
     }
@@ -176,12 +187,5 @@ final class UpdateCoordinator {
         UpdateInstaller(
             bundleURL: Bundle.main.bundleURL,
             stagingDirectory: AppPaths.caches().appendingPathComponent("Updates", isDirectory: true))
-    }
-
-    private func present() {
-        window.show {
-            UpdateWindowView()
-                .environment(self)
-        }
     }
 }

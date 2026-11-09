@@ -20,6 +20,21 @@ enum FileSearchQuery {
         query.trimmingCharacters(in: .whitespacesAndNewlines).count >= launcherMinimumLength
     }
 
+    static func launcherResults(
+        _ query: String, favorites: [FileSearchResult], indexed: [FileSearchResult]
+    ) -> [FileSearchResult] {
+        guard let prepared = prepare(query) else { return [] }
+        let favorites = favorites.filter { file in
+            var name = fold(file.name)
+            return name.withUTF8 { name in
+                prepared.terms.allSatisfy { find($0, in: name) != nil }
+            }
+        }
+        let favoriteIDs = Set(favorites.map(\.id))
+        let results = answersLauncher(query) ? indexed.filter { !favoriteIDs.contains($0.id) } : []
+        return Array((favorites + results).prefix(launcherLimit))
+    }
+
     static func terms(in query: String) -> [String] {
         query.split(whereSeparator: \Character.isWhitespace).map(String.init)
     }

@@ -13,6 +13,7 @@ struct HyperKeyTest {
         modifierKeysPreferences()
         karabinerConfig()
         remapperLifecycle()
+        recoveryOwnership()
         instanceLock()
         print(failures == 0 ? "All hyper key checks passed" : "\(failures) hyper key check(s) failed")
         if failures > 0 { exit(1) }
@@ -365,11 +366,115 @@ struct HyperKeyTest {
             !HyperKeyConflictPolicy.karabinerRemaps("capsLock", config: Data("{".utf8)))
     }
 
+    static func recoveryOwnership() {
+        let recoveryKey = "hyperKeyKeyboardMappings"
+        func fixture(
+            _ body: (
+                KeyboardRemapper, KeyboardRemapper, RemapInstanceLock, RemapInstanceLock, UserDefaults
+            ) -> Void
+        ) {
+            HIDEventSystem.reset()
+            let domain = "tinycast.hyper-key-ownership-test.\(UUID())"
+            let defaults = UserDefaults(suiteName: domain)!
+            let url = FileManager.default.temporaryDirectory.appending(path: "\(domain).lock")
+            let ownerLock = RemapInstanceLock(url: url)
+            let waitingLock = RemapInstanceLock(url: url)
+            defer {
+                ownerLock.release()
+                waitingLock.release()
+                defaults.removePersistentDomain(forName: domain)
+                try? FileManager.default.removeItem(at: url)
+            }
+            let owner = KeyboardRemapper(defaults: defaults, instanceLock: ownerLock)
+            let waiting = KeyboardRemapper(defaults: defaults, instanceLock: waitingLock)
+            body(owner, waiting, ownerLock, waitingLock, defaults)
+        }
+
+        fixture { owner, _, ownerLock, waitingLock, defaults in
+            check("the live owner acquires its lock", ownerLock.acquire())
+            check("the live owner installs its mapping", owner.apply(toF18))
+            let waiting = KeyboardRemapper(defaults: defaults, instanceLock: waitingLock)
+            let journal = defaults.data(forKey: recoveryKey)
+            let writes = HIDEventSystem.writeCount
+            waiting.clearLeftovers()
+            check(
+                "startup cleanup leaves another owner's mapping alone", HIDEventSystem.mappings[1] == [toF18])
+            check("the waiting process remains blocked", !waitingLock.acquire())
+            check("blocked teardown refuses to clean another owner's mapping", !waiting.apply(nil))
+            check("blocked cleanup never writes HID", HIDEventSystem.writeCount == writes)
+            check(
+                "blocked cleanup preserves the recovery journal",
+                defaults.data(forKey: recoveryKey) == journal)
+            check("cleanup cannot release the live owner's lock", ownerLock.isHeld && !waitingLock.isHeld)
+            owner.apply(nil)
+        }
+
+        fixture { owner, _, ownerLock, waitingLock, defaults in
+            check("crash fixture takes ownership", ownerLock.acquire())
+            let original = HIDKeyMapping(source: HIDKeyMapping.capsLock, destination: 0x7_0000_0029)
+            HIDEventSystem.mappings[1] = [original, otherTool]
+            owner.apply(toF18)
+            let waiting = KeyboardRemapper(defaults: defaults, instanceLock: waitingLock)
+            waiting.clearLeftovers()
+            owner.apply(toRightControl)
+            ownerLock.release()
+            waiting.clearLeftovers()
+            check(
+                "recovery reloads a journal changed since the waiting process started",
+                HIDEventSystem.mappings[1] == [otherTool, original])
+            check("crash recovery clears the completed journal", defaults.data(forKey: recoveryKey) == nil)
+            check(
+                "recovery with Hyper off releases temporary ownership",
+                !waitingLock.isHeld && ownerLock.acquire())
+        }
+
+        fixture { owner, _, ownerLock, waitingLock, defaults in
+            ownerLock.acquire()
+            owner.apply(toF18)
+            HIDEventSystem.devices = []
+            check("disconnected cleanup stays pending", !owner.apply(nil))
+            ownerLock.release()
+            check("another process can own Hyper during pending cleanup", waitingLock.acquire())
+            let journal = defaults.data(forKey: recoveryKey)
+            let writes = HIDEventSystem.writeCount
+            HIDEventSystem.connect(1)
+            check(
+                "reconnect cleanup cannot touch another owner's keyboard", HIDEventSystem.writeCount == writes
+            )
+            check("blocked reconnect preserves recovery", defaults.data(forKey: recoveryKey) == journal)
+            waitingLock.release()
+            HIDEventSystem.devices = []
+            HIDEventSystem.connect(1)
+            check("reconnect cleanup resumes when ownership is free", HIDEventSystem.mappings[1] == [])
+            check("reconnect cleanup clears its completed journal", defaults.data(forKey: recoveryKey) == nil)
+            check(
+                "reconnect cleanup releases temporary ownership", !ownerLock.isHeld && waitingLock.acquire())
+        }
+
+        fixture { owner, waiting, ownerLock, waitingLock, _ in
+            ownerLock.acquire()
+            owner.apply(toF18)
+            waiting.clearLeftovers()
+            owner.apply(nil)
+            ownerLock.release()
+            check("the waiting process acquires ownership after clean teardown", waitingLock.acquire())
+            check("the next owner installs its own route", waiting.apply(toRightControl))
+            check("the next owner's route is active", HIDEventSystem.mappings[1] == [toRightControl])
+            check("active remapping retains its caller's lock", waitingLock.isHeld && !ownerLock.acquire())
+            waiting.apply(nil)
+        }
+
+        fixture { _, idle, ownerLock, waitingLock, _ in
+            ownerLock.acquire()
+            check("idle teardown with no journal skips the lock", idle.apply(nil) && !waitingLock.isHeld)
+        }
+    }
+
     static func instanceLock() {
         let url = FileManager.default.temporaryDirectory.appending(path: "hyper-key-test.\(UUID()).lock")
         defer { try? FileManager.default.removeItem(at: url) }
-        let first = HyperKeyInstanceLock(url: url)
-        let second = HyperKeyInstanceLock(url: url)
+        let first = RemapInstanceLock(url: url)
+        let second = RemapInstanceLock(url: url)
         check("the first process takes the Hyper Key", first.acquire())
         check("taking it again is a no-op", first.acquire())
         check("a second process is refused", !second.acquire())
@@ -377,5 +482,7 @@ struct HyperKeyTest {
         first.release()
         check("release hands the Hyper Key over", second.acquire())
         check("the old holder is refused in turn", !first.acquire())
+        let unavailable = RemapInstanceLock(url: url.appending(path: "missing/lock"))
+        check("an unavailable lock file refuses ownership", !unavailable.acquire() && !unavailable.isHeld)
     }
 }

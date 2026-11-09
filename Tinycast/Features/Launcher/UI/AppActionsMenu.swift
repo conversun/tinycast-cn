@@ -2,16 +2,6 @@ import SwiftUI
 
 @MainActor
 enum AppActionsMenu {
-    /// Resolved by the screen that owns the visible order; every row runs its chord's call.
-    @MainActor
-    struct FavoriteActions {
-        let isFavorite: Bool
-        let canMoveUp: Bool
-        let canMoveDown: Bool
-        let toggle: () -> Void
-        let move: (Int) -> Void
-    }
-
     static func content(
         app: AppEntry, searchQuery: String, core: AppCore, running: Bool,
         favorites: FavoriteActions, onResetRanking: @escaping () -> Void,
@@ -20,31 +10,13 @@ enum AppActionsMenu {
         var items = leadingItems(app: app, searchQuery: searchQuery, core: core)
         // A query-driven row lives only for its query, so no preference could outlive it.
         let isPersistent = !CommandCatalog.isQueryDriven(app)
-        if isPersistent {
+        if isPersistent { items.append(contentsOf: favorites.items) }
+        if let deepLink = core.launcherCoordinator.deepLink(for: app) {
             items.append(
                 PopoverMenuItem(
-                    title: favorites.isFavorite
-                        ? String(localized: "Remove from Favorites")
-                        : String(localized: "Add to Favorites"),
-                    systemImage: favorites.isFavorite ? "star.slash" : "star", startsSection: true,
-                    shortcut: "⇧⌘F", action: favorites.toggle))
-        }
-        if favorites.canMoveUp {
-            items.append(
-                PopoverMenuItem(
-                    title: String(localized: "Move Favorite Up"), systemImage: "arrow.up",
-                    shortcut: "⌥⌘↑"
+                    title: String(localized: "Copy Deeplink"), systemImage: "link", shortcut: "⇧⌘C"
                 ) {
-                    favorites.move(-1)
-                })
-        }
-        if favorites.canMoveDown {
-            items.append(
-                PopoverMenuItem(
-                    title: String(localized: "Move Favorite Down"), systemImage: "arrow.down",
-                    shortcut: "⌥⌘↓"
-                ) {
-                    favorites.move(1)
+                    core.launcherCoordinator.copyDeepLink(deepLink)
                 })
         }
         if core.launcherRanking.hasRanking(for: app.preferenceKey) {

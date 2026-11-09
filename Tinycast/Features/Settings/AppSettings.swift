@@ -400,6 +400,10 @@ final class AppSettings {
         didSet { defaults.set(notesShowsFormattingBar, forKey: Key.notesShowsFormattingBar.rawValue) }
     }
 
+    var notesShowsInMenuBar: Bool {
+        didSet { defaults.set(notesShowsInMenuBar, forKey: Key.notesShowsInMenuBar.rawValue) }
+    }
+
     /// The notes folder as the user wrote it, `~` allowed; nil keeps it in Application Support.
     var notesFolder: String? {
         didSet { defaults.set(notesFolder, forKey: Key.notesFolder.rawValue) }
@@ -612,6 +616,16 @@ final class AppSettings {
         didSet { defaults.set(windowCycle.rawValue, forKey: Key.windowCycle.rawValue) }
     }
 
+    var windowWrapsDisplays: Bool {
+        didSet { defaults.set(windowWrapsDisplays, forKey: Key.windowWrapsDisplays.rawValue) }
+    }
+
+    var windowKeepsProportions: Bool {
+        didSet {
+            defaults.set(windowKeepsProportions, forKey: Key.windowKeepsProportions.rawValue)
+        }
+    }
+
     /// Off means fully off, down to a still-registered shortcut opening nothing.
     var quicklinksEnabled: Bool {
         didSet { defaults.set(quicklinksEnabled, forKey: Key.quicklinksEnabled.rawValue) }
@@ -657,6 +671,11 @@ final class AppSettings {
     /// Whether settings.json mirrors these settings; `AppCore` starts and stops the mirror.
     var settingsFileEnabled: Bool {
         didSet { defaults.set(settingsFileEnabled, forKey: Key.settingsFileEnabled.rawValue) }
+    }
+
+    /// Rows a link from outside may run without asking; only `DeepLinkCoordinator` adds to it.
+    var allowedDeepLinks: [String] {
+        didSet { defaults.set(allowedDeepLinks, forKey: Key.allowedDeepLinks.rawValue) }
     }
 
     /// With no per-app list the bundle follows macOS's languages, so this runs before any lookup.
@@ -729,7 +748,9 @@ final class AppSettings {
         interfaceSize =
             defaults.string(forKey: Key.interfaceSize.rawValue).flatMap(InterfaceSize.init)
             ?? .standard
-        compactMode = defaults.bool(forKey: Key.compactMode.rawValue)
+        compactMode =
+            defaults.object(forKey: Key.compactMode.rawValue) == nil
+            || defaults.bool(forKey: Key.compactMode.rawValue)
         compactBarCommands =
             defaults.stringArray(forKey: Key.compactBarCommands.rawValue)
             .flatMap(CommandID.compactBarCommands(from:)) ?? CommandID.defaultCompactBarCommands
@@ -797,6 +818,7 @@ final class AppSettings {
         notesShowsFormattingBar =
             defaults.object(forKey: Key.notesShowsFormattingBar.rawValue) == nil
             || defaults.bool(forKey: Key.notesShowsFormattingBar.rawValue)
+        notesShowsInMenuBar = defaults.bool(forKey: Key.notesShowsInMenuBar.rawValue)
         notesFolder = defaults.string(forKey: Key.notesFolder.rawValue)
         aiEnabled = defaults.bool(forKey: Key.aiEnabled.rawValue)
         mcpEnabled = defaults.bool(forKey: Key.mcpEnabled.rawValue)
@@ -871,6 +893,12 @@ final class AppSettings {
         windowGap = defaults.integer(forKey: Key.windowGap.rawValue)
         windowCycle =
             defaults.string(forKey: Key.windowCycle.rawValue).flatMap(WindowCycle.init) ?? .off
+        windowWrapsDisplays =
+            defaults.object(forKey: Key.windowWrapsDisplays.rawValue) == nil
+            || defaults.bool(forKey: Key.windowWrapsDisplays.rawValue)
+        windowKeepsProportions =
+            defaults.object(forKey: Key.windowKeepsProportions.rawValue) == nil
+            || defaults.bool(forKey: Key.windowKeepsProportions.rawValue)
         windowLayoutsShowInLauncher =
             defaults.object(forKey: Key.windowLayoutsShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.windowLayoutsShowInLauncher.rawValue)
@@ -892,5 +920,6 @@ final class AppSettings {
             defaults.object(forKey: Key.supportReminders.rawValue) == nil
             || defaults.bool(forKey: Key.supportReminders.rawValue)
         settingsFileEnabled = defaults.bool(forKey: Key.settingsFileEnabled.rawValue)
+        allowedDeepLinks = defaults.stringArray(forKey: Key.allowedDeepLinks.rawValue) ?? []
     }
 }

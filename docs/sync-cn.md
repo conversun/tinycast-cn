@@ -134,7 +134,8 @@ v0.10.2 那次，292 条用户可见字符串里有 200 条只加词条不生效
 ```sh
 gh workflow run release-cn.yml --repo conversun/tinycast-cn \
   -f version=<上游版本>-cn.N -f prerelease=<跟随上游> \
-  -f upstream_tag=vX.Y.Z -f ref=<commit sha>
+  -f upstream_tag=vX.Y.Z -f ref=<commit sha> \
+  -f release_notes='<本次中文更新说明>'
 ```
 
 - 版本规则：同步工作流固定发 `-cn.1`；同一上游版本之上再发汉化跟进，用 `-cn.2` 起手动派发。

@@ -4,6 +4,7 @@
 //   node fixtures.mjs
 
 import { createHarness, bootConfig, describeTree } from "./test.mjs";
+import { statSync } from "node:fs";
 import { transformSync } from "esbuild";
 import { runModuleFixtures } from "./modules-fixtures.mjs";
 import { runOAuthFixtures } from "./oauth-fixtures.mjs";
@@ -225,6 +226,29 @@ export default function Command() {
     }
   };
   const cpu = os.cpus()[0];
+  const errorMessage = (fn) => {
+    try {
+      fn();
+      return "none";
+    } catch (error) {
+      return error.message;
+    }
+  };
+  const gcmKey = Buffer.alloc(32, 7);
+  const gcmSeal = (iv, aad) => {
+    const cipher = crypto.createCipheriv("aes-256-gcm", gcmKey, iv);
+    if (aad) cipher.setAAD(aad);
+    const ciphertext = Buffer.concat([cipher.update("hello gcm"), cipher.final()]);
+    return { ciphertext, tag: cipher.getAuthTag() };
+  };
+  const gcmOpen = (iv, sealed, aad) => {
+    const decipher = crypto.createDecipheriv("aes-256-gcm", gcmKey, iv);
+    if (aad) decipher.setAAD(aad);
+    decipher.setAuthTag(sealed.tag);
+    return Buffer.concat([decipher.update(sealed.ciphertext), decipher.final()]).toString("utf8");
+  };
+  const shortNonce = gcmSeal(Buffer.from("gcm-nonce-12"));
+  const longNonce = gcmSeal(Buffer.alloc(16, 9), Buffer.from("header"));
   const parts = [
     path.join("/a/b", "../c", "d.txt"),
     path.extname("x/y/file.tar.gz"),
@@ -235,9 +259,16 @@ export default function Command() {
     String(os.freemem() > 0),
     String(os.uptime() > 0),
     String(os.loadavg().length === 3 && os.loadavg().every(Number.isFinite)),
+    String(Object.values(os.networkInterfaces()).flat().some((entry) => entry.internal && entry.address === "127.0.0.1")),
+    String(Object.values(os.networkInterfaces()).flat().every((entry) => !Object.hasOwn(entry, "name"))),
     new URL("/next?q=1", "https://example.com/base/page").href,
     new URLSearchParams({ a: "1", b: "two words" }).toString(),
     crypto.createHash("sha256").update("abc").digest("hex").slice(0, 8),
+    shortNonce.tag.toString("hex") + ":" + shortNonce.ciphertext.toString("hex"),
+    longNonce.tag.toString("hex") + ":" + longNonce.ciphertext.toString("hex"),
+    gcmOpen(Buffer.alloc(16, 9), longNonce, Buffer.from("header")),
+    errorMessage(() => gcmOpen(Buffer.alloc(16, 9), longNonce)),
+    errorCode(() => crypto.createCipheriv("aes-256-gcm", gcmKey, Buffer.alloc(11))),
     Buffer.from("hello").toString("base64"),
     Buffer.from("aGVsbG8=", "base64").toString("utf8"),
     new TextDecoder().decode(new TextEncoder().encode("héllo")),
@@ -331,6 +362,44 @@ module.exports.default = () => {
   emitter.emit("ordinary", 1);
   emitter.emit("ordinary", 2);
   globalThis.__once = { calls, chained, emitted, repeated, removedCalls, ordinary };
+};
+`;
+
+// isexe v3's POSIX check, which `which` runs on every PATH candidate.
+const isexeSource = `
+const fs = require("fs");
+
+module.exports.default = () => {
+  const checkMode = (stat) => {
+    const myUid = process.getuid?.();
+    const myGroups = process.getgroups?.() ?? [];
+    const myGid = process.getgid?.() ?? myGroups[0];
+    if (myUid === undefined || myGid === undefined) throw new Error("cannot get uid or gid");
+    const groups = new Set([myGid, ...myGroups]);
+    const mod = stat.mode;
+    return !!(
+      mod & 0o001 ||
+      (mod & 0o010 && groups.has(stat.gid)) ||
+      (mod & 0o100 && stat.uid === myUid) ||
+      (mod & 0o110 && myUid === 0)
+    );
+  };
+  const isexe = (path) => {
+    try {
+      const stat = fs.statSync(path);
+      return stat.isFile() && checkMode(stat);
+    } catch (error) {
+      return error.message;
+    }
+  };
+  const stat = fs.statSync("/etc/hosts");
+  globalThis.__isexe = {
+    ids: [process.getuid(), process.getgid(), process.geteuid(), process.getegid(), process.getgroups()],
+    userInfo: [require("os").userInfo().uid, require("os").userInfo().gid],
+    owner: [stat.uid, stat.gid],
+    executable: isexe("/bin/sh"),
+    plain: isexe("/etc/hosts"),
+  };
 };
 `;
 
@@ -976,6 +1045,17 @@ export async function runFixtures() {
     check("ordinary listeners retain their receiver and repeated delivery", JSON.stringify(result?.ordinary) === "[[true,1],[true,2]]");
   });
 
+  await run("which/isexe sees the user's ids and file owners", isexeSource, "no-view", async (harness) => {
+    const result = harness.call("globalThis.__isexe");
+    const hostIds = [process.getuid(), process.getgid(), process.geteuid(), process.getegid(), process.getgroups()];
+    const hosts = statSync("/etc/hosts");
+    check("process reports the booted ids", JSON.stringify(result?.ids) === JSON.stringify(hostIds), JSON.stringify(result?.ids));
+    check("os.userInfo agrees with process", JSON.stringify(result?.userInfo) === JSON.stringify(hostIds.slice(0, 2)), JSON.stringify(result?.userInfo));
+    check("stat carries the file owner", JSON.stringify(result?.owner) === JSON.stringify([hosts.uid, hosts.gid]), JSON.stringify(result?.owner));
+    check("an executable is found", result?.executable === true, String(result?.executable));
+    check("a plain file is not executable", result?.plain === false, String(result?.plain));
+  });
+
   // A plist's binary <data> must decode without aborting the host read.
   await run("Malformed UTF-8 decodes the way Node does", malformedUtf8Source, "view", async (harness) => {
     const lines = findNode(harness.state.trees.at(-1), "Detail").props.markdown.split("\n");
@@ -1007,9 +1087,16 @@ export async function runFixtures() {
       "true",
       "true",
       "true",
+      "true",
+      "true",
       "https://example.com/next?q=1",
       "a=1&b=two+words",
       "ba7816bf",
+      "875a7af65e66ba29298577f2c937c48b:589dd2d6d2696c5310",
+      "749e7f715a23139cbfa9b3259ab594e1:aaefe159005653143a",
+      "hello gcm",
+      "Unsupported state or unable to authenticate data",
+      "ERR_CRYPTO_INVALID_IV",
       "aGVsbG8=",
       "hello",
       "héllo",

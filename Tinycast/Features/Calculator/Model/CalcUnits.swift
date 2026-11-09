@@ -5,7 +5,8 @@ enum CalcUnits {
         var units: [CalcDimension: UnitDef] = [:]
         for name in [
             "m", "kg", "s", "m2", "m3", "b", "m/s", "pa", "bps", "m/s2", "n", "j", "w", "hz",
-            "a", "v", "ohm", "as", "m3/s", "px", "px2", "ppi"
+            "a", "v", "ohm", "as", "m3/s", "px", "px2", "ppi", "farad", "henry", "siemens", "wb", "tesla",
+            "mol"
         ] {
             if let unit = byName[name], let dimension = unit.category.dimension {
                 units[dimension] = unit
@@ -16,13 +17,29 @@ enum CalcUnits {
 
     static func productUnit(_ lhs: UnitDef, _ rhs: UnitDef) -> UnitDef? {
         let (measure, duration) = lhs.category == .time ? (rhs, lhs) : (lhs, rhs)
-        guard duration.category == .time, duration.factor >= 60 else { return nil }
+        guard duration.category == .time else { return nil }
+        if let accrued = accruedUnit(measure) { return accrued }
+        guard duration.factor >= 60 else { return nil }
         switch measure.category {
         case .power: return byName[measure.factor >= 1000 ? "kwh" : "wh"]
         case .electricCurrent: return byName[measure.factor <= 0.001 ? "mah" : "ah"]
         default: return nil
         }
     }
+
+    /// A rate over time accrues in its own numerator, so `60 mph * 2 h` is miles rather than meters.
+    private static func accruedUnit(_ rate: UnitDef) -> UnitDef? {
+        let symbol = rate.symbol.replacingOccurrences(of: "²", with: "2").replacingOccurrences(
+            of: "³", with: "3")
+        guard let numerator = rateNumerators[symbol] ?? symbol.split(separator: "/").first.map(String.init),
+            numerator != symbol, let unit = byName[numerator] ?? byName[numerator.lowercased()],
+            let rateDimension = rate.dimension, let unitDimension = unit.dimension,
+            unitDimension == rateDimension.adding(CalcDimension(time: 1))
+        else { return nil }
+        return unit
+    }
+
+    private static let rateNumerators = ["mph": "mi", "kn": "nmi"]
 
     enum ConversionParse: Equatable {
         case value(input: Double, from: UnitDef, to: UnitDef, output: Double)
@@ -57,10 +74,35 @@ enum CalcUnits {
             return nil
         }
 
+        if from.category != to.category, reciprocal(from, to) {
+            guard let output = reciprocalValue(input, from: from, to: to) else { return nil }
+            return .value(input: input, from: from, to: to, output: output)
+        }
         guard from.category == to.category else { return .mismatch(from: from, to: to) }
         let output = (input * from.factor + from.offset - to.offset) / to.factor
         guard output.isFinite else { return nil }
         return .value(input: input, from: from, to: to, output: output)
+    }
+
+    private static let speed = CalcDimension(length: 1, time: -1)
+    private static let pace = CalcDimension(length: -1, time: 1)
+
+    /// `30 mpg to l/100km`, `10 km/h to min/km`; area shares fuel's dimension, so fuel goes by name.
+    static func reciprocal(_ from: UnitDef, _ to: UnitDef, fuelRatio: Bool = false) -> Bool {
+        guard let lhs = from.dimension, let rhs = to.dimension else { return false }
+        if isFuel(to), isFuel(from) || fuelRatio { return lhs.adding(rhs) == .scalar }
+        return (lhs == speed && rhs == pace) || (lhs == pace && rhs == speed)
+    }
+
+    private static func isFuel(_ unit: UnitDef) -> Bool {
+        unit.category == .fuelEconomy || unit.category == .fuelConsumption
+    }
+
+    static func reciprocalValue(_ amount: Double, from: UnitDef, to: UnitDef) -> Double? {
+        let base = amount * from.factor
+        guard base != 0 else { return nil }
+        let output = 1 / base / to.factor
+        return output.isFinite ? output : nil
     }
 
     /// `day s` → `1 day` in `s`. Same category only, so two-word searches don't produce a card.
@@ -95,7 +137,7 @@ enum CalcUnits {
 
     static func isConnector(_ token: CalcToken) -> Bool {
         switch token {
-        case .arrow, .ident("to"), .ident("in"): return true
+        case .arrow, .ident("to"), .ident("in"), .ident("as"): return true
         default: return false
         }
     }

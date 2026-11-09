@@ -17,14 +17,12 @@ struct LauncherScreen: PaletteScreen {
     /// Called when an action reorders the list, so the highlight scrolls back into view.
     let scrollToFollow: () -> Void
 
-    /// The one ordered result list; an empty query pins favorites above the ranked matches.
     private let results: [AppEntry]
     private let calc: CalcResult?
     private let color: ColorValue?
     /// Only the empty query pins favorites — a category shows its sections without one of its own.
     private let pinsFavorites: Bool
-    /// How many of `results` are pinned favorites; zero unless the section shows.
-    private let favoriteCount: Int
+    private let pinnedFavorites: [FavoritesStore.Item]
     /// How many follow the favorites as Meetings; zero unless the field is empty.
     private let meetingCount: Int
     /// How many follow the meetings as Suggestions; zero unless the field is empty.
@@ -78,10 +76,14 @@ struct LauncherScreen: PaletteScreen {
         let color = calc == nil && pinned == nil ? ColorValue.parse(vm.query) : nil
         let files = pinned == nil ? core.fileSearchCoordinator.launcherFiles(for: vm.query) : []
         let fallbacks = core.fallbackCoordinator.entries(for: vm.query)
-        let entries =
-            results.map(Row.entry) + files.map(Row.file)
-            + fallbacks.map { Row.fallback($0.fallback, $0.entry) }
         let pinsFavorites = vm.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let pinnedFavorites = favorites.orderedItems(
+            entries: Array(results.prefix(ordered.favoriteCount)),
+            files: pinsFavorites ? core.fileSearchCoordinator.favoriteFiles : [])
+        results.removeFirst(ordered.favoriteCount)
+        let entries =
+            pinnedFavorites.map(Row.init) + results.map(Row.entry) + files.map(Row.file)
+            + fallbacks.map { Row.fallback($0.fallback, $0.entry) }
         // At most one of them leads, so the flat index keeps a single-row offset.
         let meeting = pinsFavorites ? meeting : nil
         self.meeting = meeting
@@ -91,7 +93,7 @@ struct LauncherScreen: PaletteScreen {
         self.fallbacks = fallbacks
         self.color = color
         self.pinsFavorites = pinsFavorites
-        self.favoriteCount = pinsFavorites ? ordered.favoriteCount : 0
+        self.pinnedFavorites = pinnedFavorites
         self.meetingCount = pinsFavorites ? ordered.meetingCount : 0
         self.suggestionCount = pinsFavorites ? ordered.suggestionCount : 0
         self.matchCount = matchCount
@@ -116,6 +118,22 @@ struct LauncherScreen: PaletteScreen {
         case file(FileSearchResult)
         /// Prefixed, because the same command can also be a ranked hit above its own fallback row.
         case fallback(Fallback, AppEntry)
+
+        init(_ favorite: FavoritesStore.Item) {
+            switch favorite {
+            case .entry(let entry): self = .entry(entry)
+            case .file(let file): self = .file(file)
+            }
+        }
+
+        var favoriteKey: String? {
+            switch self {
+            case .entry(let entry):
+                CommandCatalog.isQueryDriven(entry) ? nil : entry.preferenceKey
+            case .file(let file): file.favoriteKey
+            default: nil
+            }
+        }
 
         var id: String {
             switch self {
@@ -186,23 +204,6 @@ struct LauncherScreen: PaletteScreen {
         return Binding(get: { vm.commandArguments[key] ?? "" }, set: { vm.commandArguments[key] = $0 })
     }
 
-    private func argumentValues(for entry: AppEntry) -> [String: String] {
-        if entry.kind == .quicklink {
-            guard let quicklink = quicklink(for: entry) else { return [:] }
-            return QuicklinkArgumentsAccessory.values(for: quicklink, vm: vm)
-        }
-        if entry.kind == .customCommand {
-            guard let command = core.customCommands.command(entryID: entry.id) else { return [:] }
-            return CustomCommandArgumentsAccessory.values(for: command, vm: vm)
-        }
-        var values: [String: String] = [:]
-        for argument in core.extensionCoordinator.commandArguments(for: entry) ?? [] {
-            let typed = vm.commandArguments[PaletteState.argumentKey(entry.id, argument.name)] ?? ""
-            if !typed.isEmpty { values[argument.name] = typed }
-        }
-        return values
-    }
-
     private func quicklink(for entry: AppEntry) -> Quicklink? {
         Quicklink.id(fromEntryID: entry.id).flatMap(core.quicklinks.quicklink)
     }
@@ -247,7 +248,7 @@ struct LauncherScreen: PaletteScreen {
         case .entry(let app):
             return AppActionsMenu.content(
                 app: app, searchQuery: vm.query, core: core, running: running,
-                favorites: favoriteActions(for: app, at: selection),
+                favorites: favoriteActions(for: .entry(app), at: selection),
                 onResetRanking: {
                     core.launcherCoordinator.resetRanking(for: app)
                     // Reset can move the item; keep the highlight on the item whose action ran.
@@ -255,7 +256,9 @@ struct LauncherScreen: PaletteScreen {
                 },
                 onHideFromSearch: { _ = hideFromSearch(at: selection) })
         case .file(let result):
-            return FileSearchActionsMenu.content(result: result, core: core, target: vm.pasteTarget)
+            return FileSearchActionsMenu.content(
+                result: result, core: core, target: vm.pasteTarget,
+                favorites: favoriteActions(for: .file(result), at: selection))
         case .fallback(let fallback, let app):
             return FallbackActionsMenu.content(
                 fallback: fallback, entry: app, query: vm.query, core: core)
@@ -273,7 +276,7 @@ struct LauncherScreen: PaletteScreen {
         case .meeting(let meeting): core.calendarCoordinator.activateMeeting(id: meeting.id)
         case .entry(let app):
             core.launcherCoordinator.launch(
-                app, searchQuery: vm.query, arguments: argumentValues(for: app))
+                app, searchQuery: vm.query, arguments: core.launcherCoordinator.argumentValues(for: app))
         case .file(let result): core.fileSearchCoordinator.open(result)
         case .fallback(let fallback, _):
             core.fallbackCoordinator.run(fallback, query: vm.query)
@@ -316,18 +319,19 @@ struct LauncherScreen: PaletteScreen {
     }
 
     func perform(_ shortcut: PaletteShortcut, at selection: Int) -> Bool {
+        if shortcut == .toggleFavorite { return toggleFavorite(at: selection) }
         if let file = file(at: selection),
             FileSearchActionsMenu.perform(shortcut, result: file, core: core)
         {
             return true
         }
         switch shortcut {
-        case .toggleFavorite: return toggleFavorite(at: selection)
         case .hideFromSearch: return hideFromSearch(at: selection)
         case .quit, .forceQuit: return quit(at: selection, force: shortcut == .forceQuit)
         case .restart: return restart(at: selection)
         case .edit: return editItem(at: selection)
         case .copyPath: return copyQuicklink(at: selection)
+        case .copyFile: return copyDeepLink(at: selection)
         case .favoriteSlot(let index): return launchFavorite(at: index)
         case .copyCalculation: return copyCalculation(at: selection)
         case .openInApp, .showDetails:
@@ -342,6 +346,14 @@ struct LauncherScreen: PaletteScreen {
             let quicklink = quicklink(for: app)
         else { return false }
         core.quicklinkCoordinator.copyQuicklink(id: quicklink.id)
+        return true
+    }
+
+    private func copyDeepLink(at selection: Int) -> Bool {
+        guard let app = entry(at: selection),
+            let deepLink = core.launcherCoordinator.deepLink(for: app)
+        else { return false }
+        core.launcherCoordinator.copyDeepLink(deepLink)
         return true
     }
 
@@ -386,9 +398,13 @@ struct LauncherScreen: PaletteScreen {
 
     /// The highlight stays in Favorites: the top on add, the neighbour above on remove.
     private func toggleFavorite(at selection: Int) -> Bool {
-        guard let app = entry(at: selection), !CommandCatalog.isQueryDriven(app) else { return false }
-        let removed = favoriteIndex(of: app)
-        favorites.toggle(app)
+        guard let row = row(at: selection), row.favoriteKey != nil else { return false }
+        let removed = favoriteIndex(of: row)
+        switch row {
+        case .entry(let entry): favorites.toggle(entry)
+        case .file(let file): favorites.toggle(file)
+        default: return false
+        }
         // A typed query pins no favorites, so nothing moved and the highlight stays.
         guard pinsFavorites else { return true }
         selectFavorite(at: removed.map { $0 - 1 } ?? 0)
@@ -397,48 +413,44 @@ struct LauncherScreen: PaletteScreen {
 
     /// ⌘1–⌘9/⌘0 — launch a favorite by position, in either palette size.
     private func launchFavorite(at index: Int) -> Bool {
-        guard let app = pinnedFavorites.dropFirst(index).first else { return false }
-        core.launcherCoordinator.launch(app)
+        guard pinnedFavorites.indices.contains(index) else { return false }
+        activate(at: index + (leadCard == nil ? 0 : 1))
         return true
     }
 
-    /// Empty while a query is typed, the only state in which the section is off screen.
-    private var pinnedFavorites: ArraySlice<AppEntry> { results.prefix(favoriteCount) }
-
     /// ⌥⌘↑/↓ — swap with the neighbouring favorite; the ends of the section have nowhere to go.
     func moveFavorite(_ delta: Int, at selection: Int) -> Bool {
-        guard let app = entry(at: selection), let index = favoriteIndex(of: app) else { return false }
+        guard let row = row(at: selection), let index = favoriteIndex(of: row) else { return false }
         let target = index + delta
-        guard target >= 0, target < favoriteCount else { return false }
-        favorites.exchange(favorites.key(for: app), with: favorites.key(for: results[target]))
-        follow(app)
+        guard pinnedFavorites.indices.contains(target) else { return false }
+        favorites.exchange(pinnedFavorites[index].key, with: pinnedFavorites[target].key)
+        follow(row)
         return true
     }
 
     /// The ends drop the move they can't run; both rows call back here, never drifting.
     private func favoriteActions(
-        for app: AppEntry, at selection: Int
+        for row: Row, at selection: Int
     )
-        -> AppActionsMenu.FavoriteActions
+        -> FavoriteActions
     {
-        let index = favoriteIndex(of: app)
-        return AppActionsMenu.FavoriteActions(
-            isFavorite: favorites.isFavorite(app),
+        let index = favoriteIndex(of: row)
+        return FavoriteActions(
+            isFavorite: row.favoriteKey.map(favorites.keys.contains) ?? false,
             canMoveUp: index.map { $0 > 0 } ?? false,
-            canMoveDown: index.map { $0 < favoriteCount - 1 } ?? false,
+            canMoveDown: index.map { $0 < pinnedFavorites.count - 1 } ?? false,
             toggle: { _ = toggleFavorite(at: selection) },
             move: { _ = moveFavorite($0, at: selection) })
     }
 
-    private func favoriteIndex(of app: AppEntry) -> Int? {
-        guard let index = results.firstIndex(of: app), index < favoriteCount else { return nil }
-        return index
+    private func favoriteIndex(of row: Row) -> Int? {
+        pinnedFavorites.firstIndex { $0.id == row.id }
     }
 
     /// ⇧⌘H — the row leaves the list for good, so the highlight takes the place it vacated.
     private func hideFromSearch(at selection: Int) -> Bool {
         guard let app = entry(at: selection), !CommandCatalog.isQueryDriven(app),
-            let index = results.firstIndex(of: app)
+            let index = rows.firstIndex(of: .entry(app))
         else { return false }
         // Each editor's Show in root search toggle is the undo, so neither hide is one-way.
         if let id = Quicklink.id(fromEntryID: app.id) {
@@ -450,18 +462,18 @@ struct LauncherScreen: PaletteScreen {
         } else {
             return false
         }
-        select(row: min(index, max(reorderedResults().entries.count - 1, 0)))
+        select(row: min(index - (leadCard == nil ? 0 : 1), max(reorderedEntryRows().count - 1, 0)))
         return true
     }
 
     /// The list reorders under an action; keep the highlight and the scroll on the row that moved.
-    private func follow(_ app: AppEntry) {
-        guard let index = reorderedResults().entries.firstIndex(of: app) else { return }
+    private func follow(_ row: Row) {
+        guard let index = reorderedEntryRows().firstIndex(of: row) else { return }
         select(row: index)
     }
 
     private func selectFavorite(at index: Int) {
-        let count = reorderedResults().favoriteCount
+        let count = reorderedFavorites(in: reorderedResults()).count
         select(row: min(max(index, 0), max(count - 1, 0)))
     }
 
@@ -469,6 +481,18 @@ struct LauncherScreen: PaletteScreen {
     private func reorderedResults() -> AppIndex.Results {
         appIndex.orderedResults(
             query: vm.query, visibility: visibility, favorites: favorites, hotKeys: core.hotKeys)
+    }
+
+    private func reorderedEntryRows() -> [Row] {
+        let ordered = reorderedResults()
+        let pinned = reorderedFavorites(in: ordered)
+        return pinned.map(Row.init) + ordered.entries.dropFirst(ordered.favoriteCount).map(Row.entry)
+    }
+
+    private func reorderedFavorites(in ordered: AppIndex.Results) -> [FavoritesStore.Item] {
+        favorites.orderedItems(
+            entries: Array(ordered.entries.prefix(ordered.favoriteCount)),
+            files: pinsFavorites ? core.fileSearchCoordinator.favoriteFiles : [])
     }
 
     private func select(row index: Int) {
@@ -491,7 +515,7 @@ struct LauncherScreen: PaletteScreen {
         LauncherList(
             results: results,
             selectedRowID: row(at: selection)?.id,
-            favoriteCount: favoriteCount,
+            favorites: pinnedFavorites,
             meetingCount: meetingCount,
             suggestionCount: suggestionCount,
             matchCount: matchCount,
@@ -509,10 +533,15 @@ struct LauncherScreen: PaletteScreen {
             },
             onActivate: {
                 core.launcherCoordinator.launch(
-                    $0, searchQuery: vm.query, arguments: argumentValues(for: $0))
+                    $0, searchQuery: vm.query, arguments: core.launcherCoordinator.argumentValues(for: $0))
             },
             onActions: { app in
                 if let index = rows.firstIndex(of: .entry(app)) { vm.selection = index }
+                openActions()
+            },
+            onActivateFavorite: { _ = launchFavorite(at: $0) },
+            onFavoriteActions: {
+                vm.selection = $0 + (leadCard == nil ? 0 : 1)
                 openActions()
             },
             onDropped: { core.paletteCoordinator.dragLanded() },

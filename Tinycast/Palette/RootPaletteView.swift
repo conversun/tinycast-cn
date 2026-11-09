@@ -47,6 +47,8 @@ struct RootPaletteView: View {
     /// Compact vs. full; the source of truth is on `AppCore`, so the two can't disagree.
     private var isCollapsed: Bool { core.paletteCoordinator.paletteIsCollapsed }
 
+    private var renderingOutset: CGFloat { isCollapsed ? Theme.Size.paletteGlassOutset : 0 }
+
     private var screen: any PaletteScreen {
         switch vm.mode {
         case .launcher:
@@ -202,6 +204,15 @@ struct RootPaletteView: View {
             })
     }
 
+    private var dictionaryScopeContent: PopoverMenuContent {
+        PopoverMenuContent(
+            items: DictionaryScope.allCases.map { scope in
+                PopoverMenuItem(title: scope.title, systemImage: scope.systemImage) {
+                    dictionary.select(scope)
+                }
+            })
+    }
+
     private var appMenuContent: PopoverMenuContent {
         let appName = Bundle.main.appDisplayName
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -262,6 +273,8 @@ struct RootPaletteView: View {
             return headerMenu(fileSearchFilterContent, width: metrics.size.fileSearchFilterMenuWidth)
         case .emojiCategory:
             return headerMenu(emojiCategoryContent, width: metrics.size.emojiCategoryMenuWidth)
+        case .dictionaryScope:
+            return headerMenu(dictionaryScopeContent, width: metrics.size.fileSearchFilterMenuWidth)
         case .aiModel:
             return headerMenu(
                 AIModelMenu.models(coordinator: core.aiChatCoordinator, chat: quickAI),
@@ -340,10 +353,11 @@ struct RootPaletteView: View {
                 )
                 // The window's frame is the size source, so the glass and clip stay matched.
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                // Compact, the bar's own glass shapes are the surface and the window is bare.
                 .background(isCollapsed ? .clear : Theme.Colors.panelScrim)
-                // Hidden rather than unmounted, so expanding never shows a frame without glass.
-                .background(GlassEffectView().opacity(isCollapsed ? 0 : 1))
+                // Square, as rounded glass feathers its edge; the clip alone cuts a crisp corner.
+                .background {
+                    Color.clear.glassEffect(isCollapsed ? .identity : .regular, in: Rectangle())
+                }
                 .overlay {
                     Theme.Colors.dialogDimming
                         .opacity(core.isDimmingPaletteForDialog && !isCollapsed ? 1 : 0)
@@ -355,8 +369,15 @@ struct RootPaletteView: View {
                             ? Theme.Duration.dialogEnter : Theme.Duration.dialogExit),
                     value: core.isDimmingPaletteForDialog
                 )
-                .clipShape(RoundedRectangle(cornerRadius: metrics.radius.panel, style: .continuous))),
-            selection: sel)
+                // Also the window's shape: without it, macOS shadows the default window outline.
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: isCollapsed ? 0 : metrics.radius.panel, style: .continuous
+                    )
+                    .inset(by: -renderingOutset))),
+            selection: sel
+        )
+        .padding(renderingOutset)
     }
 
     /// The emoji grid's observers, split out so `stateObservers` stays within type-checker reach.
@@ -448,6 +469,7 @@ struct RootPaletteView: View {
                     fileSearch.cancel()
                 }
                 if vm.mode == .dictionary {
+                    dictionary.refreshScopes()
                     dictionary.lookUp(vm.query)
                 } else {
                     dictionary.reset()
@@ -520,8 +542,9 @@ struct RootPaletteView: View {
                     moveMenu(1)
                     return .handled
                 }
+                // Marked text owns these keys: an IME drives its candidate window with them.
+                if vm.isComposing { return .ignored }
                 if isCollapsed {
-                    guard !vm.isComposing else { return .ignored }
                     if compactSelection.command != nil {
                         activateCompactSelection()
                         return .handled
@@ -541,17 +564,20 @@ struct RootPaletteView: View {
                     moveMenu(-1)
                     return .handled
                 }
+                if vm.isComposing { return .ignored }
                 return moveVertically(-1)
             }
             .onKeyPress(keys: [.leftArrow], phases: [.down, .repeat]) { press in
                 if vm.isControlListOpen { return .ignored }
                 if menuOpen { return .handled }
+                if vm.isComposing { return .ignored }
                 if moveCompactSelection(-1, modifiers: press.modifiers) { return .handled }
                 return moveHorizontally(-1) ? .handled : .ignored
             }
             .onKeyPress(keys: [.rightArrow], phases: [.down, .repeat]) { press in
                 if vm.isControlListOpen { return .ignored }
                 if menuOpen { return .handled }
+                if vm.isComposing { return .ignored }
                 if moveCompactSelection(1, modifiers: press.modifiers) { return .handled }
                 return moveHorizontally(1) ? .handled : .ignored
             }
@@ -594,6 +620,7 @@ struct RootPaletteView: View {
             .onKeyPress(.escape) {
                 // An open control list owns Escape before the palette beneath it.
                 if vm.isControlListOpen { return .ignored }
+                if vm.isComposing, !menuOpen { return .ignored }
                 switch PaletteEscapeAction.resolve(
                     menuOpen: menuOpen, menuQuery: vm.menuQuery,
                     argumentFocused: argumentFocused != nil, query: vm.query, mode: vm.mode,
@@ -625,8 +652,9 @@ struct RootPaletteView: View {
             }
             .onKeyPress(keys: [.tab], phases: .down) { press in
                 // ⇥ inside an open list belongs to the list, not to the form's field order.
-                if vm.isControlListOpen { return .handled }
-                if !menuOpen { advanceTabFocus(backwards: press.modifiers.contains(.shift)) }
+                if vm.isControlListOpen || menuOpen { return .handled }
+                if vm.isComposing { return .ignored }
+                advanceTabFocus(backwards: press.modifiers.contains(.shift))
                 return .handled
             }
             .modifier(
@@ -810,6 +838,14 @@ struct RootPaletteView: View {
                     help: String(localized: "Filter by category  ⌘P"),
                     action: toggleEmojiCategory)
             }
+            if !isCollapsed, vm.mode == .dictionary, dictionary.hasThesaurus {
+                headerGutter(width: metrics.spacing.md)
+                HeaderMenuButton(
+                    title: dictionary.scope.title, systemImage: dictionary.scope.systemImage,
+                    isOpen: openMenu == .dictionaryScope,
+                    help: String(localized: "Dictionary or thesaurus  ⌘P"),
+                    action: toggleDictionaryScope)
+            }
             if !isCollapsed, vm.mode == .ai {
                 headerGutter(width: metrics.spacing.md)
                 AIModelButton(
@@ -833,7 +869,9 @@ struct RootPaletteView: View {
                     accessory, isOpen: openMenu == .extensionAccessory,
                     action: toggleExtensionSearchAccessory)
             }
-            headerGutter(width: metrics.spacing.md * 2)
+            if isCollapsed { UpdatePill() }
+            // The slack above and below, so the pill stays concentric with the capsule.
+            headerGutter(width: isCollapsed ? metrics.size.headerPadding : metrics.spacing.md * 2)
         }
         // Identical metrics in both states, so typing can't move the search bar.
         .frame(height: metrics.size.headerHeight)
@@ -979,8 +1017,11 @@ struct RootPaletteView: View {
     ) -> some View {
         // Floating controls, no bar; the edge dissolve ghosts the rows passing beneath.
         HStack(spacing: 0) {
-            appMenuButton
-                .modifier(ExtensionToastSlot(extensions: extensions, showing: vm.mode == .extensionCommand))
+            HStack(spacing: 0) {
+                appMenuButton
+                UpdatePill()
+            }
+            .modifier(ExtensionToastSlot(extensions: extensions, showing: vm.mode == .extensionCommand))
             if showActionGroup {
                 actionGroup(
                     pillLabel: pillLabel, formPrimaryShortcut: formPrimaryShortcut,
@@ -1082,6 +1123,7 @@ struct RootPaletteView: View {
         case .clipboardFilter: toggleClipboardFilter()
         case .fileSearchFilter: toggleFileSearchFilter()
         case .emojiCategory: toggleEmojiCategory()
+        case .dictionaryScope: toggleDictionaryScope()
         case .aiModel: toggleAIModel()
         case .ignored: return false
         }
@@ -1095,6 +1137,16 @@ struct RootPaletteView: View {
         }
         let active = EmojiCategoryFilter.allCases.firstIndex(of: vm.emojiCategoryFilter) ?? 0
         open(.emojiCategory, highlighting: active)
+    }
+
+    private func toggleDictionaryScope() {
+        if openMenu == .dictionaryScope {
+            closeMenus()
+            return
+        }
+        guard dictionary.hasThesaurus else { return }
+        let active = DictionaryScope.allCases.firstIndex(of: dictionary.scope) ?? 0
+        open(.dictionaryScope, highlighting: active)
     }
 
     private func toggleExtensionSearchAccessory() {
@@ -1204,11 +1256,9 @@ struct RootPaletteView: View {
         if presenting, let hostWindow {
             menuPanel.show(
                 view, corner: corner, parent: hostWindow, core: core,
-                clipPath: content.clipPath,
                 onKeyDown: handleMenuPanelKey, onDismiss: closeMenus)
         } else {
-            menuPanel.update(
-                view, corner: corner, core: core, clipPath: content.clipPath)
+            menuPanel.update(view, corner: corner, core: core)
         }
     }
 
@@ -1324,7 +1374,8 @@ struct RootPaletteView: View {
         case .actions: .bottomTrailing
         case .argumentOptions: .belowHeaderTrailing
         case .inputOptions(let corner): corner
-        case .clipboardFilter, .fileSearchFilter, .emojiCategory, .aiModel, .aiReasoning,
+        case .clipboardFilter, .fileSearchFilter, .emojiCategory, .dictionaryScope, .aiModel,
+            .aiReasoning,
             .aiAttachments, .extensionAccessory:
             .belowHeaderTrailing
         case nil: nil
@@ -1557,6 +1608,7 @@ private enum OpenMenu: Equatable {
     case clipboardFilter
     case fileSearchFilter
     case emojiCategory
+    case dictionaryScope
     case aiModel
     case aiReasoning
     case aiAttachments

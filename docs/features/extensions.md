@@ -20,6 +20,8 @@ produces, rendered natively into the palette. No Electron, no browser, no Node.j
 - **Bridges share one private HTTP transport, never execution state.** Cookies, credential storage and
   URL caching are disabled. Individual task cancellation leaves other requests running; releasing the
   fetcher invalidates its session so CFNetwork does not retain discarded connections and sessions.
+  Only its session configuration opts out of the AppSSO broker through the private `_preventsAppSSO`
+  property when its setter is available. Other sessions keep their own authentication behavior.
 - **An idle menu item holds no JavaScript.** Once `isLoading` clears, keep only the native button and
   its snapshot. Reload a fresh context when its menu opens; retain it until the menu closes and any
   asynchronous action and host calls finish. Never keep a context alive to preserve handlers.
@@ -110,6 +112,13 @@ Two host-call flavours:
 - **Blocking** (`invokeSync`) for the synchronous Node shims only — `fs.readFileSync`,
   `execSync`, `createHash`, `gunzipSync`. Safe because Swift services these entirely on the JS queue;
   nothing there touches the main actor, so a blocking answer cannot deadlock.
+
+JavaScriptCore exposes native `Atomics` but no `SharedArrayBuffer` constructor. The runtime aliases
+`SharedArrayBuffer` to `ArrayBuffer` so dependencies can allocate their locks at module scope. Native
+atomic reads and writes still apply; `Atomics.wait` sleeps on the JS queue for a finite timeout,
+returns immediately for a mismatched value or nonpositive timeout, and rejects an indefinite wait.
+There are no worker threads to notify a waiter, so this supports synchronous sleep helpers rather
+than shared-memory coordination. If native shared buffers are available, both globals stay native.
 
 ## The Swift host
 
@@ -299,7 +308,10 @@ screens hold (see [palette.md](palette.md)).
   The feature's own fills live in `ExtensionColors` — never in `Theme`.
 - **Form** — label-left/control-right rows. Field values live in the extension (React owns them); every
   edit dispatches `onTinycastChange` and the resulting re-render is what updates the control, so
-  `defaultValue`, a controlled `value`, and `ref.reset()` all behave. **A form takes the whole
+  `defaultValue`, a controlled `value`, and `ref.reset()` all behave. `Action.SubmitForm` saves each
+  `storeValue` field to `ExtensionStorage.formValues`, keyed by command and field id, and the launch
+  context hands them back so the field starts from the saved value on its first render; a controlled
+  `value` always wins. **A form takes the whole
   keyboard**: its fields _are_ the palette's rows, so the search field is hidden and the header left
   empty. `ExtensionFormField` says what each `Form.*` node is —
   which of them focus lands on, which keys the control keeps, and which need a focus ring drawn — and
@@ -528,6 +540,9 @@ exactly the layout `ExtensionCatalog.install` expects: `package.json`, one `<com
 install**: the running child is terminated and the workspace goes with it, so a cancelled build leaves
 nothing behind.
 
+Child output is drained while the command runs, retaining its last 64 KiB for error reports.
+Trimming compacts the buffer's backing storage so verbose builds cannot retain every byte they wrote.
+
 **An extension carrying a Rust package builds `-e dev` instead.** A `rust:` helper is Raycast's
 Windows counterpart to `swift:`, and `dist` cross-compiles it with `cargo xwin` for
 `x86_64-pc-windows-msvc` — a toolchain nobody on macOS has, so Color Picker failed its whole build on
@@ -597,8 +612,10 @@ global Show in launcher switch, or this extension's — because the ranker never
 
 ## Deeplinks
 
-Tinycast registers `raycast`, `com.raycast` and `tinycast` to receive extension links. An installed
-Raycast competes for its schemes, and macOS chooses which app receives a link.
+Tinycast registers `raycast`, `com.raycast` and its own scheme to receive extension links. The own
+scheme is `tinycast`, or `tinycast-dev` in Debug; `ExtensionDeepLink.claims` accepts both, and Copy
+Deeplink builds an extension row's link in the running channel's scheme. An installed Raycast
+competes for its schemes, and macOS chooses which app receives a link.
 
 `raycast://extensions/<owner>/<extension>?source=webstore`, used by the Store website's Install
 buttons, opens Settings → Extensions and looks up that exact listing to offer the existing Install
@@ -608,15 +625,19 @@ opens their Settings pane so they can be enabled through the usual consent flow.
 `raycast://extensions/<owner>/<extension>/<command>` runs an installed command from outside the app —
 a browser link, another app, a Shortcut — and `tinycast://` mirrors it so our own links never depend
 on Raycast winning the scheme. Both accept Raycast's query parameters: `arguments` as URL-encoded
-JSON, `fallbackText`, and `launchType=background`, which only a no-view command receives — a view
+JSON, `fallbackText`, `context` (or `launchContext`) as a URL-encoded JSON object that arrives as
+`props.launchContext`, and `launchType=background`, which only a no-view command receives — a view
 command always takes over the palette, so it launches as `userInitiated`. The owner is a hint: a
 scoped install matches by `owner/extension` first and falls back to the bare slug, so short links
-keep working. Anything else on a claimed scheme just reopens the palette, and an unknown command says
-so rather than failing silently. `ExtensionDeepLink` owns the claimed schemes and the parsing,
+keep working. Anything else on a Raycast scheme just reopens the palette, and an unknown command says
+so rather than failing silently. Every other `tinycast://` link is a built-in's, and never reaches
+`ExtensionDeepLink`. `ExtensionDeepLink` owns the claimed schemes and the parsing,
 covered by `Tests/ext-test.swift`. Two-segment links without `source=webstore` keep running commands
 as `<extension>/<command>`; three-segment command links keep running even with that parameter.
 An extension's own `open("raycast://…")` resolves through the same
-`ExtensionManager.resolve(_:)` instead of launching Raycast.
+`ExtensionManager.resolve(_:)` instead of launching Raycast. Copy Deeplink on a command's launcher
+row, or on its Settings shortcut field, writes the `tinycast://extensions/…` form, with any typed
+arguments as `arguments`; built-in rows have their own links, in [deeplinks.md](deeplinks.md).
 
 For view commands, nonempty `fallbackText` also prefills the search field: lists and grids filter
 locally or receive it through `onSearchTextChange` when their handler mounts. It remains available
@@ -695,13 +716,17 @@ its preferences, keyed by `providerId`. Only a command the user opened can start
 background refresh fails until then. While the browser is up the palette hides, but Pop to Root
 Search holds off, because resetting would stop the command and cancel the sign-in. Summoning the
 palette meanwhile returns to the waiting command, and the palette comes back on its own when the
-redirect lands.
+redirect lands. Leaving the command cancels its browser session and finishes the pending host call
+without waiting for a browser callback, so the sign-in hold cannot outlive the command. A browser
+session that refuses to start fails immediately; duplicate or late callbacks cannot finish it twice.
 
 **Node built-ins** — `path`, `fs` (+ `fs/promises`, `createReadStream`/`createWriteStream`, a snapshot-backed `opendir`, and
-the descriptor calls `tar` unpacks through), `os`,
+the descriptor calls `tar` unpacks through), `os` (`networkInterfaces` reports every MAC as zeros),
 `child_process` (`exec`, `execFile`, `execSync`, `execFileSync`, `spawnSync`, and a streaming `spawn`,
-each async form reporting the child's real `pid` for `process.kill` — Timers pauses that way),
-`crypto` (hashes, HMAC, PBKDF2, AES-CBC/ECB, random, UUID), `zlib` (gzip/zlib/raw deflate, both
+each async form reporting the child's real `pid` for `process.kill` — Timers pauses that way; an
+`fs.openSync` descriptor in `spawn` or `spawnSync`'s `stdio` replaces that stream's pipe),
+`crypto` (hashes, HMAC, PBKDF2, AES-CBC/ECB, AES-GCM with 16-byte tags and nonces of 12 bytes or
+more — CryptoKit's limits, narrower than Node's — random, UUID), `zlib` (gzip/zlib/raw deflate, both
 directions, plus `create*` streams that buffer until `end`), `http`/`https` (`request`, `get` and `Agent`, buffered over the same URLSession bridge
 as `fetch`, with `socketPath` for Unix-socket HTTP), `stream` (`Readable`, `Writable`, `Duplex`, `Transform`, `PassThrough`, `pipeline`,
 `finished`, plus `stream/promises` and `stream/web`), `util`, `events`, `buffer`, `url`, `querystring`, `punycode`, `assert`,

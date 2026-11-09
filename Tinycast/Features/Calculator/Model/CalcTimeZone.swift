@@ -4,8 +4,22 @@ enum CalcTimeZone {
     static func evaluate(_ raw: String, now: Date, calendar: Calendar) -> CalcResult? {
         guard raw.count <= 128, raw.contains(where: \.isWhitespace) else { return nil }
         let inputWords = raw.split(whereSeparator: \.isWhitespace)
-        if let query = currentTimeQuery(inputWords.map { $0.lowercased() }) {
+        let typedWords = inputWords.map { $0.lowercased() }
+        let lowerWords = withoutFillers(typedWords)
+        if lowerWords != typedWords {
+            return evaluate(lowerWords.joined(separator: " "), now: now, calendar: calendar)
+        }
+        if let query = whenQuery(lowerWords) ?? currentTimeQuery(lowerWords) {
             return evaluate(query, now: now, calendar: calendar)
+        }
+        if let date = currentDate(lowerWords, now: now, calendar: calendar) { return date }
+        if raw.utf8.contains(44), let list = worldClock(raw.lowercased(), now: now, calendar: calendar) {
+            return list
+        }
+        if Self.hintsAtClock(raw) {
+            let lowered = raw.lowercased()
+            if let range = clockRange(lowered, now: now, calendar: calendar) { return range }
+            if let dated = datedMoment(lowered, now: now, calendar: calendar) { return dated }
         }
         guard inputWords.count >= 2,
             inputWords.contains(where: { connectors.contains($0.lowercased()) })
@@ -105,8 +119,24 @@ enum CalcTimeZone {
         return "time \(place.joined(separator: " ")) to \(target.joined(separator: " "))"
     }
 
+    /// A written clock has a colon or an am/pm after a digit; anything else skips the dated forms.
+    private static func hintsAtClock(_ text: String) -> Bool {
+        var previous: UInt8 = 0
+        var beforePrevious: UInt8 = 0
+        for byte in text.utf8 {
+            if byte == 58 { return true }
+            if byte | 0x20 == 109, previous | 0x20 == 97 || previous | 0x20 == 112,
+                (48...57).contains(beforePrevious) || beforePrevious == 32
+            {
+                return true
+            }
+            (beforePrevious, previous) = (previous, byte)
+        }
+        return false
+    }
+
     /// Splits a trailing `+ 2h` / `- 30 min` off the zone phrase it shifts.
-    private static func splitOffset(
+    static func splitOffset(
         _ query: String
     ) -> (String, (count: Int, component: Calendar.Component)?) {
         for separator in [" + ", " - "] {
@@ -136,7 +166,7 @@ enum CalcTimeZone {
         }
     }
 
-    private struct SourceMoment {
+    struct SourceMoment {
         let date: Date
         let zone: TimeZone
     }
@@ -171,17 +201,20 @@ enum CalcTimeZone {
 
     private static let connectors: Set<String> = ["in", "to", "at", "diff", "difference"]
 
-    /// `diff paris`, `time diff paris` — how far a zone runs from the Mac's own.
+    /// `diff paris` runs from the Mac's own zone; `diff london and tokyo` from the first place named.
     private static func offsetBetween(
         _ query: String, now: Date, calendar: Calendar
     ) -> CalcResult? {
         var words = query.split(whereSeparator: \.isWhitespace).map(String.init)
         if words.first == "time" { words.removeFirst() }
-        guard words.count >= 2, words[0] == "diff" || words[0] == "difference",
-            let target = zone(named: Array(words.dropFirst()))
-        else { return nil }
+        guard words.count >= 2, words[0] == "diff" || words[0] == "difference" else { return nil }
+        words.removeFirst()
+        if words.first == "between" { words.removeFirst() }
+        guard let (home, target) = zonePair(words) ?? zone(named: words).map({ (calendar.timeZone, $0) })
+        else {
+            return nil
+        }
 
-        let home = calendar.timeZone
         let minutes =
             (target.secondsFromGMT(for: now) - home.secondsFromGMT(for: now)) / 60
         let sign = minutes < 0 ? "-" : "+"
@@ -196,6 +229,75 @@ enum CalcTimeZone {
             payload: .value(
                 display: "\(clockString(now, zone: target, calendar: calendar)) (\(text))",
                 copyText: text))
+    }
+
+    /// Two places, split at `and` / `&` or, failing that, wherever both halves name a zone.
+    private static func zonePair(_ words: [String]) -> (TimeZone, TimeZone)? {
+        if let joiner = words.firstIndex(where: { $0 == "and" || $0 == "&" }) {
+            guard let first = zone(named: Array(words[..<joiner])),
+                let second = zone(named: Array(words[(joiner + 1)...]))
+            else { return nil }
+            return (first, second)
+        }
+        guard words.count >= 2 else { return nil }
+        for split in 1..<words.count {
+            if let first = zone(named: Array(words[..<split])),
+                let second = zone(named: Array(words[split...]))
+            {
+                return (first, second)
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Worded questions
+
+    private static func withoutFillers(_ words: [String]) -> [String] {
+        guard words.count > 2 else { return words }
+        var words = words
+        if words[0] == "local", words[1] == "time" {
+            words.removeFirst()
+        } else if words.suffix(2) == ["local", "time"] {
+            words.remove(at: words.count - 2)
+        }
+        guard words.first == "time", words.count > 2 else { return words }
+        if words[1] == "now" {
+            words.remove(at: 1)
+        } else if words.last == "now" {
+            words.removeLast()
+        }
+        return words
+    }
+
+    /// `time in tokyo when it's 5pm in london` asks what `5pm london in tokyo` answers.
+    private static func whenQuery(_ words: [String]) -> String? {
+        guard let when = words.firstIndex(of: "when") else { return nil }
+        let fillers: Set<String> = ["what", "whats", "is", "it", "its", "it's", "it’s"]
+        var asked = words[..<when].filter { !fillers.contains($0) }
+        guard asked.first == "time" else { return nil }
+        asked.removeFirst()
+        if asked.first == "in" || asked.first == "at" { asked.removeFirst() }
+        let given = words[(when + 1)...].filter { !fillers.contains($0) && $0 != "in" && $0 != "at" }
+        guard !asked.isEmpty, given.count >= 2, zone(named: Array(asked)) != nil else { return nil }
+        return given.joined(separator: " ") + " in " + asked.joined(separator: " ")
+    }
+
+    private static func currentDate(_ words: [String], now: Date, calendar: Calendar) -> CalcResult? {
+        var place = words
+        if place.first == "date" {
+            place.removeFirst()
+            if place.first == "in" || place.first == "at" { place.removeFirst() }
+        } else if place.last == "date" {
+            place.removeLast()
+        } else {
+            return nil
+        }
+        guard !place.isEmpty, let zone = zone(named: place) else { return nil }
+        let text = CalcDateFormatters.string(
+            from: now, calendar: calendar, zone: zone, pattern: "EEEE, d MMMM")
+        return CalcResult(
+            expression: words.joined(separator: " "), sourceBadge: String(localized: "Date"),
+            targetBadge: label(for: zone), payload: .value(display: text, copyText: text))
     }
 
     private static func sourceMoment(
@@ -258,7 +360,7 @@ enum CalcTimeZone {
         return SourceMoment(date: shifted, zone: zone)
     }
 
-    private static func parseClock(_ word: String) -> (hour: Int, minute: Int)? {
+    static func parseClock(_ word: String) -> (hour: Int, minute: Int)? {
         var text = word
         var meridiem: String?
         for suffix in ["am", "pm"] where text.hasSuffix(suffix) {
@@ -282,7 +384,7 @@ enum CalcTimeZone {
         return (meridiem == "pm" ? (hour % 12) + 12 : hour % 12, minute)
     }
 
-    private static func zone(named words: [String]) -> TimeZone? {
+    static func zone(named words: [String]) -> TimeZone? {
         // `são paulo` and `zürich` are how the cities are spelled; the identifiers are not.
         let phrase = words.joined(separator: " ")
             .folding(options: [.diacriticInsensitive], locale: nil)
@@ -291,7 +393,24 @@ enum CalcTimeZone {
 
     /// A curated alias outranks a city, and a city outranks a country sharing its spelling.
     private static func zoneIdentifier(named phrase: String) -> String? {
-        aliases[phrase] ?? cities[phrase] ?? CountryZoneData.zones[phrase]
+        aliases[phrase] ?? cities[phrase] ?? CountryZoneData.zones[phrase] ?? offsetIdentifier(phrase)
+    }
+
+    /// `utc+5`, `gmt-5`, `utc+5:30` — attached, since a spaced `+` is a shift.
+    private static func offsetIdentifier(_ phrase: String) -> String? {
+        guard phrase.hasPrefix("utc") || phrase.hasPrefix("gmt"), phrase.count > 4 else { return nil }
+        let body = phrase.dropFirst(3)
+        guard let sign = body.first, sign == "+" || sign == "-" else { return nil }
+        let parts = body.dropFirst().split(separator: ":", omittingEmptySubsequences: false)
+        guard (1...2).contains(parts.count), (1...2).contains(parts[0].count),
+            let hours = Int(parts[0]), hours <= 14
+        else { return nil }
+        var minutes = 0
+        if parts.count == 2 {
+            guard parts[1].count == 2, let parsed = Int(parts[1]), parsed < 60 else { return nil }
+            minutes = parsed
+        }
+        return "GMT" + String(sign) + String(format: "%02d%02d", hours, minutes)
     }
 
     /// Foundation already carries the IANA database, so nothing here is generated.
@@ -442,15 +561,22 @@ enum CalcTimeZone {
     /// Not `localizedName`, which needs a `Locale` — banned in `Model/`.
     static func label(for zone: TimeZone) -> String {
         if zone.identifier == "GMT" || zone.identifier == "UTC" { return "UTC" }
+        if zone.identifier.hasPrefix("GMT+") || zone.identifier.hasPrefix("GMT-") {
+            let seconds = zone.secondsFromGMT()
+            let minutes = abs(seconds) / 60
+            let tail =
+                minutes % 60 == 0 ? "\(minutes / 60)" : String(format: "%d:%02d", minutes / 60, minutes % 60)
+            return "UTC" + (seconds < 0 ? "-" : "+") + tail
+        }
         guard let city = zone.identifier.split(separator: "/").last else { return zone.identifier }
         return city.replacingOccurrences(of: "_", with: " ")
     }
 
-    private static func clockString(_ date: Date, zone: TimeZone, calendar: Calendar) -> String {
+    static func clockString(_ date: Date, zone: TimeZone, calendar: Calendar) -> String {
         CalcDateFormatters.string(from: date, calendar: calendar, zone: zone, template: "jmm")
     }
 
-    private static func dayOffsetNote(
+    static func dayOffsetNote(
         _ source: SourceMoment, target: TimeZone, calendar: Calendar
     ) -> String? {
         var here = calendar

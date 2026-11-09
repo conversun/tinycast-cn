@@ -1,5 +1,5 @@
 #!/bin/bash
-# Assert a built app will notarize and can still prompt. Usage: verify-signature.sh <path-to-.app>
+# Verify release seals and permission entitlements. Usage: verify-signature.sh <path-to-.app>
 set -uo pipefail
 
 APP="${1:?usage: verify-signature.sh <path-to-.app>}"
@@ -59,6 +59,6 @@ for PAIR in "${RESOURCE_ENTITLEMENTS[@]}"; do
 done
 
 if [ "$STATUS" -eq 0 ]; then
-    echo "✓ $NAME.app is notarizable and its prompts are entitled"
+    echo "✓ $NAME.app has valid seals and permission entitlements"
 fi
 exit "$STATUS"

@@ -63,6 +63,18 @@ enum CalcQuantity {
                     targetBadge: String(localized: "Timespan"),
                     payload: .value(display: text, copyText: text))
             }
+            if let pair = CalcMixedUnits.pair(targetName) {
+                guard case .unit(let unit) = value.kind, unit.category == pair.larger.category,
+                    let text = CalcMixedUnits.format(value.amount, from: unit, into: pair)
+                else { return nil }
+                return CalcResult(
+                    expression: expressionText(split.expressionTokens),
+                    sourceBadge: parser.operationCount == 0 ? unit.name : String(localized: "Expression"),
+                    targetBadge: unit.category == .time
+                        ? String(localized: "Timespan")
+                        : String(localized: "\(pair.larger.name) and \(pair.smaller.name)"),
+                    payload: .value(display: text, copyText: text))
+            }
             guard let output = parser.converted(value, to: targetName) else {
                 guard let message = parser.issue else { return nil }
                 return CalcResult(expression: query, payload: .error(message: message))
@@ -88,6 +100,12 @@ enum CalcQuantity {
             guard parser.operationCount > 0 || parser.dimensionCount > 1 || preserveStandaloneUnit else {
                 return nil
             }
+            if !preserveStandaloneUnit,
+                let rate = regionRate(
+                    split.expressionTokens, unit: unit, value: value, parser: &parser, region: region)
+            {
+                return rate
+            }
             return measurementResult(
                 value.amount, unit: unit, expression: expressionText(split.expressionTokens))
         case .currency(let definition):
@@ -105,6 +123,30 @@ enum CalcQuantity {
             }
             return currencyResult(
                 output, definition: target, expression: expression, sourceBadge: definition.name)
+        }
+    }
+
+    /// `5 usd per gallon` names no target, so its currency becomes the Mac's own and the unit stays.
+    private static func regionRate(
+        _ tokens: [CalcToken], unit: UnitDef, value: CalcValue, parser: inout CalcExpressionParser,
+        region: String?
+    ) -> CalcResult? {
+        guard let source = unit.currency, tokens.count > 3, tokens[2] == .op(.divide),
+            unit.symbol.hasPrefix(source.code + "/"), isAmountOf(tokens[0], tokens[1]),
+            CalcUnitExpression.parse(Array(tokens[3...])) != nil,
+            let target = regionTarget(region, from: source)
+        else { return nil }
+        let rest = unit.symbol.dropFirst(source.code.count + 1)
+        guard let converted = parser.converted(value, to: "\(target.code) / \(rest)") else { return nil }
+        return convertedResult(converted, expression: expressionText(tokens))
+    }
+
+    private static func isAmountOf(_ first: CalcToken, _ second: CalcToken) -> Bool {
+        switch (first, second) {
+        case (.number, .ident(let name)), (.ident(let name), .number):
+            return CalcUnits.byName[name] == nil && CalcCurrency.byName[name] != nil
+        default:
+            return false
         }
     }
 
@@ -142,13 +184,10 @@ enum CalcQuantity {
         _ amount: Double, definition: CurrencyDef, expression: String,
         sourceBadge: String = String(localized: "Expression")
     ) -> CalcResult {
-        let formatted = CalcFormatter.currency(amount)
-        return CalcResult(
+        CalcResult(
             expression: expression,
             sourceBadge: sourceBadge, targetBadge: definition.name,
-            payload: .value(
-                display: "\(CalcFormatter.grouped(formatted)) \(definition.code)",
-                copyText: "\(formatted) \(definition.code)"),
+            payload: .money(amount, code: definition.code),
             isCurrency: true)
     }
 
@@ -172,6 +211,10 @@ enum CalcQuantity {
             if tokens[index] == .op(.close) { depth -= 1 }
             guard depth == 0, index + 1 < end, CalcUnits.isConnector(tokens[index]) else { continue }
             if index + 2 == end, case .ident(let name) = tokens[index + 1] { return (index, name) }
+            if index + 4 == end || index + 3 == end {
+                let pair = targetName(tokens[(index + 1)..<end])
+                if CalcMixedUnits.pair(pair) != nil { return (index, pair) }
+            }
             let target = Array(tokens[(index + 1)..<end])
             guard CalcUnitExpression.parse(target) != nil else { continue }
             return (index, targetName(tokens[(index + 1)..<end]))

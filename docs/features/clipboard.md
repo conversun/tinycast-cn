@@ -27,6 +27,8 @@
   cannot repeat or skip an entry and a deleted one is passed over rather than pasted.
 - **`Model/ClipboardStore.swift` keeps to Foundation plus SQLite3 and no other app source**, so
   `clipboard-test` can compile it standalone. It uses `isolated deinit` for its SQLite teardown.
+- **An image capture keeps the generation from its pasteboard poll.** Clear History and store close
+  retire it across conversion and file writing; a stale capture inserts nothing and leaves no blob.
 - A database that cannot be opened is deleted and recreated. That is sound because a history is
   captured rather than authored, and there is no UI for an unavailable clipboard — `QuicklinkStore`
   deliberately does the opposite. It is **not** a licence to treat the file as disposable: it lives in
@@ -62,6 +64,12 @@ text-first poller records `IMG_1234.png` as prose. The read sits after the `inte
 sensitive-type guards, which stay unconditional — a secret must never be recorded whatever shape it
 arrives in. A bare screenshot carries no file URL and still falls through to the `.png`/`.tiff`
 branch untouched.
+
+**Rich text is the last resort.** A copy with no file URL, plain text or image, such as a web page's
+HTML-only Clipboard API write, is converted through `NSAttributedString`, RTF before HTML, and
+recorded as a plain text entry. It sits after the image branch because a browser's image copy
+carries an `<img>` fragment beside the pixels. The HTML importer runs WebKit on the main actor, so
+fragments over 256 KB are skipped to bound the stall.
 
 `ClipboardManager.fileURLs(on:volatileRoots:)` takes both the pasteboard and the roots as
 parameters, so `pasteboard-test` can drive an `NSPasteboard.withUniqueName()` and its own scratch
@@ -438,7 +446,7 @@ returns false, the coordinator raises a HUD, and the row survives — history is
 happened, and the recorded path is still the answer to "where was it?". The preview says so in
 place, and the Path row keeps showing where the file used to be.
 
-`FilePreviewThumbnailer` is the row tile and the preview still. `QLThumbnailGenerator` is the only
+`FilePreviewThumbnail` is the row tile and the preview still. `QLThumbnailGenerator` is the only
 thing that renders a *content* thumbnail for any type — a video's poster frame, a PDF's first page
 — and with `representationTypes: .all` it falls back to the type icon itself, so every file paints
 something through one path. It copies `ImageThumbnail`'s shape exactly: two byte-bounded caches

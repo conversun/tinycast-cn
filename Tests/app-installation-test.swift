@@ -31,6 +31,7 @@ struct AppInstallationTest {
             try await testLocalizedIndex(root, language: CommandLine.arguments[argument + 1])
         } else {
             try await testIndex(root)
+            testFileFavorites(root)
             try await testLanguageOverride(root)
             if ProcessInfo.processInfo.environment["TINYCAST_TEST_APP_LAUNCH"] == "1"
                 || CommandLine.arguments.contains("--launch")
@@ -83,9 +84,8 @@ struct AppInstallationTest {
         index.start(settings: settings)
         await index.refresh()
         let hotKeys = HotKeyManager()
-        UserDefaults.standard.setVolatileDomain(["favoriteApps": [id]], forName: UserDefaults.argumentDomain)
-        defer { UserDefaults.standard.removeVolatileDomain(forName: UserDefaults.argumentDomain) }
-        let favorites = FavoritesStore()
+        let favorites = FavoritesStore(defaults: defaults)
+        favorites.replace(keys: [id])
         func results(_ query: String) -> AppIndex.Results {
             index.orderedResults(query: query, visibility: visibility, favorites: favorites, hotKeys: hotKeys)
         }
@@ -132,10 +132,10 @@ struct AppInstallationTest {
         check(
             "favoriting the app does not hide its other copies",
             empty.entries.filter { $0.bundleID == id }.count == 4)
-        UserDefaults.standard.setVolatileDomain(["favoriteApps": []], forName: UserDefaults.argumentDomain)
+        favorites.replace(keys: [])
         ranking.visit(itemKey: id, query: nil)
         let unpinned = index.orderedResults(
-            query: "", visibility: visibility, favorites: FavoritesStore(), hotKeys: hotKeys)
+            query: "", visibility: visibility, favorites: favorites, hotKeys: hotKeys)
         check(
             "Suggestions contain one representative per app",
             unpinned.entries.prefix(unpinned.suggestionCount).filter { $0.bundleID == id }.map(\.url) == [
@@ -159,6 +159,59 @@ struct AppInstallationTest {
             "the last installation regains single-app actions",
             index.apps.first { $0.bundleID == id }?.primaryInstallationID == nil)
         await ranking.flush()
+    }
+
+    private static func testFileFavorites(_ root: URL) {
+        let domain = "tinycast.file-favorites-test.\(UUID())"
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let store = FavoritesStore(defaults: defaults)
+        let app = AppEntry(
+            id: root.appending(path: "Fixture.app").path, name: "Fixture",
+            url: root.appending(path: "Fixture.app"), bundleID: "com.example.fixture", kind: .application)
+        let folder = FileSearchResult(
+            url: root.appending(path: "Projects"), isDirectory: true, homeDirectory: root)
+        let file = FileSearchResult(
+            url: root.appending(path: "Résumé #1? 100%.txt"), isDirectory: false, homeDirectory: root)
+        store.toggle(folder)
+        store.toggle(app)
+        store.toggle(file)
+        check("files and folders become favorites", store.isFavorite(folder) && store.isFavorite(file))
+        check("app favorites retain bundle identity", store.keys[1] == app.bundleID)
+        check(
+            "mixed favorites retain insertion order",
+            store.orderedItems(entries: [app], files: [file, folder]).map(\.key)
+                == [folder.favoriteKey, app.preferenceKey, file.favoriteKey])
+        check(
+            "file rows cannot collide with an application's path identity",
+            FavoritesStore.Item.file(folder).id != folder.id)
+        check(
+            "relaunch restores file paths and directory hints without requiring the index",
+            FavoritesStore(defaults: defaults).files(homeDirectory: root).map(\.favoriteKey)
+                == [folder.favoriteKey, file.favoriteKey])
+        store.replace(keys: [folder.favoriteKey, "unavailable-app", app.preferenceKey, file.favoriteKey])
+        store.exchange(folder.favoriteKey, with: app.preferenceKey)
+        check(
+            "reordering mixed favorites preserves hidden slots",
+            store.keys == [app.preferenceKey, "unavailable-app", folder.favoriteKey, file.favoriteKey])
+        check(
+            "hidden apps and disabled file search leave no visible favorite rows",
+            store.orderedItems(entries: [], files: []).isEmpty && store.keys.count == 4)
+        let restored = FavoritesStore(defaults: defaults)
+        restored.replace(keys: store.keys)
+        check(
+            "the existing backup key list restores the mixed order",
+            restored.orderedItems(entries: [app], files: restored.files(homeDirectory: root)).map(\.key)
+                == [app.preferenceKey, folder.favoriteKey, file.favoriteKey])
+        check(
+            "app-only ordering excludes file favorites",
+            restored.ordered([app]).favorites == [app] && restored.ordered([app]).rest.isEmpty)
+        restored.toggle(folder)
+        check(
+            "removing a folder leaves other favorites intact",
+            !restored.isFavorite(folder) && restored.isFavorite(file) && restored.isFavorite(app))
+        restored.remove(keys: [file.favoriteKey])
+        check("file favorites support removal by key", !restored.isFavorite(file))
     }
 
     private static func testLanguageOverride(_ root: URL) async throws {
@@ -502,6 +555,7 @@ enum HotKeyAction: Hashable, Sendable {
     case customCommand(id: UUID), systemAction(id: SystemAction.ID), windowCommand(id: WindowCommand.ID)
     case customWindowSize(id: UUID), windowLayout(id: UUID), windowRoom(id: UUID), quicklink(id: UUID)
     case appleShortcut(id: UUID), snippet(id: UUID), extensionCommand(entryID: String)
+    init?(entryID: String) { nil }
 }
 struct OtherEntry<Tag: Sendable>: Sendable {
     var id = UUID()

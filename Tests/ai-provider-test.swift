@@ -48,6 +48,61 @@ struct AIProviderTests {
             "the preamble stays within its per-turn budget")
     }
 
+    static func presetInstructionsReplaceTheUserPrompt() {
+        let cloud = AIModelSelection.codex(model: "gpt-5", effort: nil)
+        expect(
+            AIInstructions.compose(
+                presetInstructions: " Review for SEO. ", preambleEnabled: true, offersChoices: false,
+                model: cloud)
+                == AIPreamble.text + "\n\nReview for SEO.",
+            "a preset's text follows the preamble in place of the user prompt")
+        expect(
+            AIInstructions.compose(
+                presetInstructions: "Review for SEO.", preambleEnabled: false, offersChoices: true,
+                model: cloud)
+                == "Review for SEO.",
+            "with the system prompt off, the preset's text still rides, alone")
+        expect(
+            AIInstructions.compose(
+                presetInstructions: "Review for SEO.", preambleEnabled: true, offersChoices: true,
+                model: .appleIntelligence)
+                == nil,
+            "the on-device model gets no preset")
+    }
+
+    static func presetsPersistAndNeverOverwriteAnUnreadableFile() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tinycast-presets-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ChatPresetStore(directory: directory)
+        expect(
+            (try? store.add(ChatPreset(name: " ", instructions: "Review."))) == nil,
+            "a blank name is refused")
+        expect(
+            (try? store.add(ChatPreset(name: "SEO", instructions: " \n"))) == nil,
+            "blank instructions are refused")
+        let saved = try? store.add(
+            ChatPreset(name: "  SEO  ", iconSymbol: " ", instructions: " Review. "))
+        expect(
+            saved?.name == "SEO" && saved?.iconSymbol == nil && saved?.instructions == "Review.",
+            "a saved preset is trimmed")
+        let reopened = ChatPresetStore(directory: directory)
+        reopened.load()
+        expect(reopened.presets == store.presets, "presets survive a relaunch")
+        if let saved { _ = try? store.remove(id: saved.id) }
+        let afterDelete = ChatPresetStore(directory: directory)
+        afterDelete.load()
+        expect(afterDelete.presets.isEmpty, "a deleted preset stays deleted")
+
+        try? Data("not json".utf8).write(to: directory.appendingPathComponent("chat-presets.json"))
+        let unreadable = ChatPresetStore(directory: directory)
+        unreadable.load()
+        expect(
+            !unreadable.isAvailable
+                && (try? unreadable.add(ChatPreset(name: "SEO", instructions: "Review."))) == nil,
+            "an unreadable file is reported, never written over")
+    }
+
     /// A wrong document shape must fail here rather than mid-conversation.
     static func requestBodiesCarryDocuments() {
         let pdf = AIDocument(
@@ -82,7 +137,7 @@ struct AIProviderTests {
         let openAI = AIRequestBody.make(
             turn,
             configuration: AIHTTPConfiguration(
-                provider: .openAI, baseURL: URL(string: "https://api.openai.com/v1")!,
+                provider: .openAICompatible, baseURL: URL(string: "https://api.openai.com/v1")!,
                 model: "gpt"))
         let parts =
             (openAI["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]] ?? []
@@ -101,7 +156,7 @@ struct AIProviderTests {
         let documentOnly = AIRequestBody.make(
             AIRequest(messages: [AIMessage(role: .user, text: "", documents: [pdf])]),
             configuration: AIHTTPConfiguration(
-                provider: .openAI, baseURL: URL(string: "https://api.openai.com/v1")!,
+                provider: .openAICompatible, baseURL: URL(string: "https://api.openai.com/v1")!,
                 model: "gpt"))
         expect(
             ((documentOnly["messages"] as? [[String: Any]])?.first?["content"]
@@ -109,8 +164,18 @@ struct AIProviderTests {
             "a document-only turn still sends, as content parts")
     }
 
-    static func main() {
+    static func main() async throws {
+        if CommandLine.arguments.contains("mcp") {
+            print("[]")
+            return
+        }
+        if CommandLine.arguments.last == "app-server" {
+            try codexPeer()
+            return
+        }
         instructionsFollowTheSetting()
+        presetInstructionsReplaceTheUserPrompt()
+        presetsPersistAndNeverOverwriteAnUnreadableFile()
         providerPresetsResolveEndpoints()
         modelCatalogBuildsProviderRequests()
         requestHeadersAreValidated()
@@ -129,6 +194,8 @@ struct AIProviderTests {
         brandsResolveFromModelIDs()
         requestBodiesCarryDocuments()
         codexProtocolFramesRoundTrip()
+        try await codexQueuedWritesRetire()
+        try await codexStopDropsQueuedWrites()
         installedCLIStreamsDecode()
         settingsPersistAndRepairSelections()
         installedModelLoadingPreferencePersists()
@@ -151,7 +218,8 @@ struct AIProviderTests {
         codexElicitationsAreOnlyToolCalls()
         claudeControlFramesAnswerOneTool()
         aGatewayOffersNoneAsItsReasoningEffort()
-        declaredLevelsNeverReachAVendorOrOutliveTheirDeclaration()
+        declaredLevelsNeverOutliveTheirDestination()
+        vendorsTakeTheirOwnDeclaredLevels()
 
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
@@ -317,7 +385,7 @@ struct AIProviderTests {
         let openAI = AIRequestBody.make(
             turn,
             configuration: AIHTTPConfiguration(
-                provider: .openAI, baseURL: URL(string: "https://api.openai.com/v1")!,
+                provider: .openAICompatible, baseURL: URL(string: "https://api.openai.com/v1")!,
                 model: "gpt-5"))
         let catalog = (openAI["tools"] as? [[String: Any]])?.first
         expect(
@@ -399,7 +467,7 @@ struct AIProviderTests {
         expect(
             AIConnection(provider: .anthropic, baseURL: "https://gateway.example", models: ["m"])
                 .reasoningOptions(for: "m") == nil,
-            "the Anthropic shape is out of scope whatever it points at")
+            "the Anthropic shape never takes the gateway's thinking switch")
 
         let catalogued = AIConnection(
             id: UUID(), provider: .openRouter, baseURL: "https://gateway.example", models: ["m"],
@@ -455,7 +523,7 @@ struct AIProviderTests {
         expect(unset["reasoning_effort"] == nil, "Default still sends no field")
     }
 
-    static func declaredLevelsNeverReachAVendorOrOutliveTheirDeclaration() {
+    static func declaredLevelsNeverOutliveTheirDestination() {
         var gateway = AIConnection(
             provider: .openAI, baseURL: "https://gateway.example/v1", models: ["m"])
         gateway.declareLevels(["low", "high"], for: "m")
@@ -469,6 +537,7 @@ struct AIProviderTests {
 
         var vendor = gateway
         vendor.baseURL = AIProviderKind.openAI.defaultBaseURL
+        vendor.dropDeclaredLevels()
         expect(
             vendor.reasoningOptions(for: "m") == nil,
             "levels declared for a gateway are not offered once the URL is the vendor's own")
@@ -499,16 +568,108 @@ struct AIProviderTests {
             "OpenRouter's catalog is no declaration, so a moved URL keeps it")
 
         expect(gateway.takesDeclaredLevels, "a gateway takes declared levels")
-        expect(!vendor.takesDeclaredLevels, "a vendor URL does not")
+        expect(vendor.takesDeclaredLevels, "and so does a vendor's own URL")
         expect(
             !AIConnection(provider: .openRouter, baseURL: "https://proxy.example/v1")
                 .takesDeclaredLevels,
             "OpenRouter at any URL does not, because its catalog names the levels")
     }
 
+    static func vendorsTakeTheirOwnDeclaredLevels() {
+        var openAI = AIConnection(provider: .openAI, models: ["m"])
+        openAI.declareLevels(["max", "none", "low", "xhigh", "bogus"], for: "m")
+        expect(
+            openAI.reasoningOptions(for: "m")?.efforts == ["default", "low", "xhigh", "max", "none"],
+            "OpenAI takes its whole ladder, with None only once declared")
+        var anthropic = AIConnection(provider: .anthropic, models: ["m"])
+        anthropic.declareLevels(["minimal", "none", "low", "max"], for: "m")
+        expect(
+            anthropic.reasoningOptions(for: "m")?.efforts == ["default", "low", "max"],
+            "Anthropic has no minimal effort and no None")
+        var gemini = AIConnection(provider: .gemini, models: ["m"])
+        gemini.declareLevels(["xhigh", "high", "none"], for: "m")
+        expect(
+            gemini.reasoningOptions(for: "m")?.efforts == ["default", "high", "none"],
+            "Gemini stops at high and may declare None")
+        expect(gemini.offeredEffort("none", for: "m") == "none", "a declared None is sent")
+
+        let turn = AIRequest(messages: [AIMessage(role: .user, text: "hi")])
+        func body(_ provider: AIProviderKind, effort: String?) -> [String: Any] {
+            AIRequestBody.make(
+                turn,
+                configuration: AIHTTPConfiguration(
+                    provider: provider, baseURL: URL(string: provider.defaultBaseURL)!,
+                    model: "m", effort: effort))
+        }
+        expect(
+            (body(.openAI, effort: "high")["reasoning"] as? [String: String])?["effort"] == "high",
+            "Responses carries the effort in its reasoning object")
+        expect(
+            (body(.anthropic, effort: "max")["output_config"] as? [String: String])?["effort"]
+                == "max",
+            "Anthropic carries it in output_config")
+        let geminiNone = body(.gemini, effort: "none")
+        expect(
+            geminiNone["reasoning_effort"] as? String == "none" && geminiNone["thinking"] == nil,
+            "a vendor's None is its own reasoning_effort, never the gateway switch")
+        expect(
+            body(.openAI, effort: "default")["reasoning"] == nil
+                && body(.anthropic, effort: "default")["output_config"] == nil
+                && body(.gemini, effort: "default")["reasoning_effort"] == nil,
+            "Default sends no field on any vendor")
+
+        let catalog = Data(
+            """
+            {"data":[
+                {"id":"claude-a","display_name":"Claude A","max_tokens":128000,"capabilities":{
+                    "effort":{"supported":true,"max":{"supported":true},
+                              "low":{"supported":true},"xhigh":{"supported":false}}}},
+                {"id":"claude-b","capabilities":{"effort":{"supported":false}}}
+            ]}
+            """.utf8)
+        let models = try? AIModelDiscovery.decode(catalog, shape: .openAI)
+        expect(
+            models?.first?.reasoningOptions?.efforts == ["low", "max"],
+            "Anthropic's catalog names each model's supported efforts in ladder order")
+        expect(
+            models?.last?.reasoningOptions?.efforts == [],
+            "a model without effort support names none")
+        expect(
+            models?.map(\.maxOutputTokens) == [128_000, nil],
+            "and each model's output ceiling where it states one")
+
+        var saved = AIConnection(provider: .anthropic, models: ["claude-a", "claude-b", "claude-c"])
+        saved.declareLevels(["high"], for: "claude-c")
+        saved.adoptCatalog(
+            (models ?? [])
+                + [
+                    .init(
+                        id: "claude-c", name: "C",
+                        reasoningOptions: .init(efforts: ["low"], defaultEffort: nil))
+                ])
+        expect(
+            saved.declaredLevels(for: "claude-a") == ["low", "max"],
+            "a model saved before its catalog was read takes the catalog's levels")
+        expect(saved.reasoningOptions?["claude-b"] == nil, "a model with no effort support takes none")
+        expect(saved.declaredLevels(for: "claude-c") == ["high"], "a reader's own declaration stays")
+        expect(saved.outputLimits == ["claude-a": 128_000], "only a stated ceiling is stored")
+
+        let url = URL(string: AIProviderKind.anthropic.defaultBaseURL)!
+        let known = AIRequestBody.make(
+            turn,
+            configuration: AIHTTPConfiguration(
+                provider: .anthropic, baseURL: url, model: "claude-a", maxOutputTokens: 128_000))
+        expect(known["max_tokens"] as? Int == 128_000, "a known model may answer up to its ceiling")
+        let unknown = AIRequestBody.make(
+            turn, configuration: AIHTTPConfiguration(provider: .anthropic, baseURL: url, model: "x"))
+        expect(
+            unknown["max_tokens"] as? Int == AIRequest.defaultMaxOutputTokens,
+            "an unknown one keeps the cap every Claude model accepts")
+    }
+
     static func providerPresetsResolveEndpoints() {
         let expected: [(AIProviderKind, String)] = [
-            (.openAI, "https://api.openai.com/v1/chat/completions"),
+            (.openAI, "https://api.openai.com/v1/responses"),
             (.anthropic, "https://api.anthropic.com/v1/messages"),
             (.gemini, "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"),
             (.openRouter, "https://openrouter.ai/api/v1/chat/completions"),
@@ -1400,6 +1561,132 @@ struct AIProviderTests {
             "a compatible endpoint resolves the brand from the model id")
     }
 
+    static func codexQueuedWritesRetire() async throws {
+        let (client, root) = try await pausedCodexClient()
+        defer {
+            client.stop()
+            try? FileManager.default.removeItem(at: root)
+        }
+        var filling = false
+        let bulk = Task {
+            filling = true
+            return try await client.request(
+                method: "bulk", params: ["data": String(repeating: "x", count: 4_000_000)],
+                timeout: .seconds(5))
+        }
+        while !filling { await Task.yield() }
+        var queued = false
+        let cancelled = Task {
+            queued = true
+            return try await client.request(method: "cancelled")
+        }
+        while !queued { await Task.yield() }
+        cancelled.cancel()
+        do {
+            _ = try await cancelled.value
+            expect(false, "cancellation finishes the waiting request")
+        } catch {
+            expect(error is CancellationError, "cancellation preserves CancellationError")
+        }
+        do {
+            _ = try await client.request(method: "expired", timeout: .milliseconds(50))
+            expect(false, "a queued request can time out while stdin is blocked")
+        } catch CodexAppServerClient.ClientError.timedOut {
+        } catch {
+            expect(false, "a queued request reports its timeout: \(error)")
+        }
+        let alreadyCancelled = Task { try await client.request(method: "already-cancelled") }
+        alreadyCancelled.cancel()
+        _ = await alreadyCancelled.result
+        try Data().write(to: root.appendingPathComponent("resume"))
+        _ = try await bulk.value
+        _ = try await client.request(method: "barrier")
+        let received = try String(contentsOf: root.appendingPathComponent("received"), encoding: .utf8)
+        expect(!received.contains("cancelled"), "cancelled writes never reach the peer")
+        expect(!received.contains("expired"), "expired writes never reach the peer")
+        expect(received.contains("bulk\nbarrier"), "an in-flight frame finishes before the next write")
+    }
+
+    static func codexStopDropsQueuedWrites() async throws {
+        let (client, root) = try await pausedCodexClient()
+        defer {
+            client.stop()
+            try? FileManager.default.removeItem(at: root)
+        }
+        var filling = false
+        let bulk = Task {
+            filling = true
+            return try await client.request(
+                method: "bulk", params: ["data": String(repeating: "x", count: 4_000_000)])
+        }
+        while !filling { await Task.yield() }
+        var queued = false
+        let queuedWrite = Task {
+            queued = true
+            return try await client.request(method: "stopped")
+        }
+        while !queued { await Task.yield() }
+        client.stop()
+        _ = await bulk.result
+        _ = await queuedWrite.result
+        try Data().write(to: root.appendingPathComponent("resume"))
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while !FileManager.default.fileExists(atPath: root.appendingPathComponent("exited").path),
+            ContinuousClock.now < deadline
+        {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        expect(
+            FileManager.default.fileExists(atPath: root.appendingPathComponent("exited").path),
+            "Stop closes stdin after the in-flight frame")
+        let received = try String(contentsOf: root.appendingPathComponent("received"), encoding: .utf8)
+        expect(!received.contains("stopped"), "Stop retires writes still waiting on the queue")
+    }
+
+    static func pausedCodexClient() async throws -> (CodexAppServerClient, URL) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ai-provider-codex-\(UUID().uuidString)")
+        let client = CodexAppServerClient(workspace: root)
+        client.launchSettings = {
+            InstalledAILaunch(
+                commandPath: CommandLine.arguments[0], environment: ["TINYCAST_TEST_CODEX_ROOT": root.path])
+        }
+        try await client.start()
+        _ = try await client.request(method: "pause")
+        return (client, root)
+    }
+
+    static func codexPeer() throws {
+        guard let path = ProcessInfo.processInfo.environment["TINYCAST_TEST_CODEX_ROOT"] else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let root = URL(fileURLWithPath: path)
+        let log = root.appendingPathComponent("received")
+        FileManager.default.createFile(atPath: log.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: log)
+        defer {
+            try? handle.close()
+            try? Data().write(to: root.appendingPathComponent("exited"))
+        }
+        while let line = readLine() {
+            guard let data = line.data(using: .utf8),
+                let request = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let method = request["method"] as? String
+            else { continue }
+            try handle.write(contentsOf: Data("\(method)\n".utf8))
+            if let id = request["id"] as? Int {
+                var reply = try JSONSerialization.data(withJSONObject: ["id": id, "result": [:]])
+                reply.append(0x0A)
+                try FileHandle.standardOutput.write(contentsOf: reply)
+            }
+            if method == "pause" {
+                while !FileManager.default.fileExists(atPath: root.appendingPathComponent("resume").path) {
+                    Thread.sleep(forTimeInterval: 0.002)
+                }
+            }
+        }
+    }
+
     static func codexProtocolFramesRoundTrip() {
         let request = try? CodexAppServerProtocol.request(
             id: 7, method: "account/read", params: ["refreshToken": false])
@@ -1472,11 +1759,13 @@ struct AIProviderTests {
         expect(fresh.opensTo == .recent, "chat reopens on the recent conversation by default")
         expect(fresh.newChatAfter == .fiveMinutes, "the idle window defaults to five minutes")
         expect(fresh.toolRounds == .twentyFive, "a reply's tool rounds default to 25")
+        expect(!fresh.expandsReasoning, "thinking starts folded by default")
 
         fresh.retention = .week
         fresh.opensTo = .newConversation
         fresh.newChatAfter = .never
         fresh.toolRounds = .fifty
+        fresh.expandsReasoning = true
         let reopened = AISettingsStore(defaults: defaults)
         expect(reopened.toolRounds == .fifty, "the tool round cap persists")
         reopened.toolRounds = .unlimited
@@ -1496,6 +1785,7 @@ struct AIProviderTests {
         expect(reopened.retention == .week, "retention persists")
         expect(reopened.opensTo == .newConversation, "the open policy persists")
         expect(reopened.newChatAfter == .never, "Never persists rather than reading as the default")
+        expect(reopened.expandsReasoning, "Expand thinking persists")
     }
 
     static func onDeviceSelectionsRoundTripAndLead() {
@@ -1880,6 +2170,16 @@ struct AIProviderTests {
         expect(
             openCodeCatalog.map(\.acceptsImages) == [true, true, false],
             "OpenCode takes images only where the model's input does")
+        expect(
+            openCodeCatalog.allSatisfy(\.supportsTools),
+            "OpenCode retains advertised tool support")
+        let textOnlyModels = #"""
+            {"data":[{"id":"text","providerID":"local","capabilities":{"tools":false}},
+            {"id":"unknown","providerID":"local"}]}
+            """#
+        expect(
+            InstalledAIModel.openCodeCatalog(textOnlyModels).map(\.supportsTools) == [false, false],
+            "OpenCode models without advertised tool support do not offer tools")
         expect(
             InstalledAIModel.openCodeCatalog("Error: server failed to start").isEmpty,
             "an OpenCode answer that is not the model list yields no models")

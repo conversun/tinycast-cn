@@ -17,8 +17,8 @@ struct CompactBarTests {
     static func main() throws {
         let defaults = CommandID.defaultCompactBarCommands
         check(
-            defaults == [.clipboardHistory, .searchFiles, .searchSnippets, .searchQuicklinks],
-            "the existing four commands remain the default")
+            defaults == [.clipboardHistory, .searchEmoji, .searchFiles, .searchQuicklinks],
+            "the always-on commands lead the default")
         check(CommandID.compactBarOptions.count == 8, "eight supported destinations")
         for count in 0...CommandID.compactBarLimit {
             let commands = Array(defaults.prefix(count))

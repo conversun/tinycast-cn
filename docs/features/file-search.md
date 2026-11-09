@@ -33,8 +33,9 @@ design follows [fsearch](https://github.com/noahdunnagan/fsearch).
   so changing `FileSearchIgnoreList.defaults` reaches installs that already ran. Every row can be
   removed, and **Restore Defaults** clears both lists. Scopes are one stored list that `defaultScopes`
   only seeds.
-- **The launcher's Files section is off by default, and off costs nothing.** With it off a keystroke never
-  reaches the index, and `LauncherScreen` reads the switch before the session, so it observes nothing.
+- **Indexed hits in the launcher are off by default.** With **Show in launcher** off, a keystroke
+  never reaches the index or observes the session. Explicit file favorites still answer by filename
+  from their saved paths, while disabling File Search hides them too.
 - **A superseded query never publishes.** The session runs one search at a time, keeps only the newest
   pending request, and checks its revision before publishing.
 - **Share is the one system popover, and the palette stays up under it.** `AGENTS.md` keeps Tinycast's
@@ -239,6 +240,7 @@ its default app. A system `QLPreviewPanel` would take key, and the palette hides
 | Copy Name | ⌥⌘C | through `Paster`, palette stays open |
 | Copy Path | ⌃⌘C | the standardized path, palette stays open |
 | Paste File to … | ⇧⌘V | `Paster.pasteFile` into the app the palette was summoned over, named by `PasteTarget` |
+| Add / Remove from Favorites | ⇧⌘F | saves the file or folder in the launcher’s shared Favorites order |
 | Move to Trash | ⌃X | `FileManager.trashItem` off the main actor, then the row leaves the session |
 
 None of the copies is marked with `ClipboardManager.internalType`, so a copied file enters clipboard
@@ -279,7 +281,12 @@ keystroke and when the launcher becomes the mode, and `applyLauncherFiles` re-ru
 changes. `cancel()` returns early on an idle session, so with the section off a keystroke publishes
 nothing.
 
-A Files row is not an `AppEntry`: no `Kind`, no ranking, favorite, alias or Hide from Search. It is
+A Files row is not an `AppEntry`: no `Kind`, ranking, alias or Hide from Search. Files and folders
+can be favorited through ⌘K or ⇧⌘F in either screen; their saved paths join the launcher’s Favorites
+section, share its reordering and ⌘-digit slots, and survive relaunch and settings backups. Explicit
+favorites remain searchable by filename at any query length with **Show in launcher** off. Matching
+favorites lead indexed file hits in the Files section, with repeated paths removed and the same
+five-row cap. Disabling File Search hides file favorites without deleting them. It is
 `LauncherScreen.Row.file`, id-prefixed `file-` because an application's entry id is its bundle path. It
 draws `FileSearchRow` with its location — name, dimmed parent path, then File or Folder — and answers
 the screen's own row actions: ↵ opens, ⌘↵ reveals, the copy, paste and trash chords run
