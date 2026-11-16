@@ -2,14 +2,14 @@
 
 `Features/Calculator/Model/` is a **Foundation-only** engine (no AppKit / SwiftUI imports) fronted by
 `CalcMemo`, a one-deep memo mirroring `AppIndex`'s. It must stay Foundation-only because the
-`Tests/calc-test.swift` harness compiles the real engine sources — including `CalcDateTime`. It is
+`Tests/CalcTests.swift` harness compiles the real engine sources — including `CalcDateTime`. It is
 also **pure**: the inputs it can't compute — the FX rate table and the Mac's own currency — are passed
 in (see Currency below).
 
 ## Invariants
 
 - **`Model/` (including `CalcDateTime`) stays Foundation-only *and pure*** — no AppKit or SwiftUI, no
-  clock read, no network, **no `Locale`**. `calc-test` compiles the real engine sources. Every
+  clock read, no network, **no `Locale`**. `CalcTests` compiles the real engine sources. Every
   externally-sourced input is injected: the clock via `now`/`calendar`, the FX table via `rates`,
   the Mac's own currency via `region`, which `RegionCurrency` reads and `CalcMemo` passes down, and
   the number format via `format`, which `RegionNumberFormatMonitor` reads from Language & Region.
@@ -468,7 +468,7 @@ destination keeps its meaning: `5pm in SF` still converts from the Mac's zone to
 
 The source is the Mac's own zone unless the query names one, which is what makes `5pm london in sf`
 work without either side being local. That zone comes from the **injected calendar**, so `Model/`
-performs no environment read and `calc-test` pins UTC exactly as it pins the clock. A result that
+performs no environment read and `CalcTests` pins UTC exactly as it pins the clock. A result that
 lands on another date is suffixed `(tomorrow)` / `(yesterday)`, or `(in 2 days)` / `(2 days ago)`
 for a two-date jump across the date line. The difference compares the source and target calendar
 dates; the copyable text stays the bare time.
@@ -509,7 +509,7 @@ one that does not resolve silences the whole list. Two to six places qualify.
 
 The dated, span and list forms live in `CalcZoneSchedule`, an extension of `CalcTimeZone`. Each is
 gated before it allocates — a comma, or a colon or am/pm after a digit — so a query with none of those
-costs nothing on its way past; `calc-performance` shows no change for units, currency or arithmetic.
+costs nothing on its way past; `CalcPerformanceTests` shows no change for units, currency or arithmetic.
 
 `date in tokyo` and `tokyo date` answer today's date there. `local time in tokyo`, `tokyo local time`,
 `time now in tokyo` and `time in tokyo now` drop their filler word and ask `time in tokyo`; the filler is
@@ -899,14 +899,19 @@ typed back reads as local time, and `CalcQuantity` clears it on a boolean.
 ## Number format
 
 General ▸ Calculator ▸ Number format is `System` by default, reading the decimal and grouping
-separators from Language & Region, or `English`, which is the canonical syntax itself. A decimal
-separator other than `.` or `,` (the Arabic `٫`) falls back to English, and so does any grouping
-separator outside `. , ' ’` and the no-break spaces — an ordinary space is never grouping, so
-`1hr 30` and `5 feet 3 inches` keep their meaning. `RegionNumberFormatMonitor` re-reads on
+separators, and the grouping widths, from Language & Region, or `English`, which is the canonical
+syntax itself. A decimal separator other than `.` or `,` (the Arabic `٫`) falls back to English, and
+so does any grouping separator outside `. , ' ’` and the no-break spaces — an ordinary space is
+never grouping, so `1hr 30` and `5 feet 3 inches` keep their meaning. India's widths come with them,
+so a lakh renders `1,00,000` rather than `100,000` — but only with `.` and `,`, the one pair whose
+input reads any grouping back. Any other pair keeps threes, so `2.000.000` still types back in.
+`RegionNumberFormatMonitor` re-reads on
 `NSLocale.currentLocaleDidChangeNotification`, so a change in System Settings applies without a relaunch.
 
 `CalcNumberFormat.canonical` scans each run of digits and the separators between them, and rewrites
-it to canonical spelling or rejects the whole query. Rejection means **no card**, never a guess:
+it to canonical spelling or rejects the whole query. Rejection means **no card**, never a guess. A
+region that writes `.` and `,` — India included — reads input exactly as `English` does, and only
+its answers are re-grouped, so nothing it already answers stops answering:
 
 - **A decimal comma owns every comma between two digits.** `2,3 + 1,5` is `3,8` and `max(2,3)` is
   `max(2.3)`. Function arguments and list items are separated by `;` instead — `max(2,5; 3)`,
@@ -931,8 +936,9 @@ it to canonical spelling or rejects the whole query. Rejection means **no card**
   space) is the canonical decimal, so `1.5 + 1` answers `2,5`.
 
 `CalcNumberFormat.localized` is the reverse, applied to canonical text: a run that is one valid
-canonical number takes the format's separators, and anything else — a dotted date, a version, a
-clock, a date formatter's `Friday, 24 July` — is left as written. Inside a function call every comma
+canonical number is re-grouped in the format's own widths and takes its separators — India reads the
+canonical `2,000,000` back as `20,00,000` — and anything else — a dotted date, a version, a clock, a
+date formatter's `Friday, 24 July` — is left as written. Inside a function call every comma
 is an argument, as `CalcTokenizer` reads it, so a stored `max(1,234)` shows `max(1;234)`, never
 `max(1.234)`. The echoed expression additionally turns its canonical argument commas into `;`. `English` makes both directions the identity, so the
 English path is byte-for-byte what it was.

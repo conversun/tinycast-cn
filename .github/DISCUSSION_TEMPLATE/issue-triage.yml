@@ -1,0 +1,56 @@
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!IMPORTANT]
+        > Read the pinned **[READ ME FIRST]: Discussion Rules** and [What Tinycast Won't Do](https://github.com/abue-ammar/tinycast/blob/main/docs/not-planned.md) first. Some behaviour is a choice, not a bug.
+        >
+        > **Hotkey or Hyper key not working?** Check that no other app grabs the same key before you post.
+  - type: checkboxes
+    id: existing-search
+    attributes:
+      label: Existing discussions
+      options:
+        - label: I searched discussions and issues and didn't find this already reported
+          required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      placeholder: |
+        What you did, what you expected, what you got instead.
+        A short recording beats a paragraph.
+    validations:
+      required: true
+  - type: textarea
+    id: repro-steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or recording
+      description: Drag and drop images or a screen recording here. Optional but speeds up triage a lot.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Tinycast version + channel
+      placeholder: 0.1.0 stable
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "26.0"
+    validations:
+      required: true

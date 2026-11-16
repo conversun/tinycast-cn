@@ -152,7 +152,7 @@ jobs:
           ditto -x -k "$ZIP" "$SCRATCH"
           EXPANDED_APP="$SCRATCH/Tinycast.app"
           ./Scripts/verify-signature.sh "$EXPANDED_APP"
-          "${TMPDIR:-/tmp}/tinycast-harness/updates-test" "$EXPANDED_APP"
+          "${TMPDIR:-/tmp}/tinycast-harness/UpdatesTests" "$EXPANDED_APP"
           for BIN in "$EXPANDED_APP/Contents/MacOS/Tinycast" \
             "$EXPANDED_APP/Contents/Helpers/ClipboardTextHelper" \
             "$EXPANDED_APP/Contents/Helpers/FileIndexHelper" \

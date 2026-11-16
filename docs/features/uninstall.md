@@ -10,7 +10,7 @@ any `.application` entry; it opens the `.uninstall` palette sub-screen scoped to
   the feature; `removeItem` must never appear here. That is what makes display-name attribution
   tolerable — a false positive costs a drag back, not the user's data — so a "delete permanently" option
   would have to drop name matching in the same commit.
-- **The deciding half stays Foundation-only and pure** for `uninstall-test`, with every environment fact
+- **The deciding half stays Foundation-only and pure** for `UninstallTests`, with every environment fact
   injected: the scanner hands the rules directory **names**, never URLs, and hands the classifier a
   `PathFacts`.
 - **`UninstallScanner` detects Full Disk Access and never requests it.** The probe is silent and
@@ -43,7 +43,7 @@ Same split as `WindowManagement`: a pure half that decides, an impure half that 
 | `UI/UninstallScreen.swift`, `UI/UninstallView.swift` | The palette screen, list, row and actions menu |
 | `UI/UninstallCoordinator.swift` | The action surface — confirmation lives here, not in the runner |
 
-The first five compile standalone into `Tests/uninstall-test.swift`, so they stay Foundation-only
+The first five compile standalone into `Tests/UninstallTests.swift`, so they stay Foundation-only
 and take every environment fact as a parameter. The scanner hands the rules **child names**, never
 URLs, which is what makes "no filesystem access in the pure layer" structural rather than a promise.
 
@@ -67,9 +67,9 @@ Two further guards on that rule:
 - **Vendor namespaces don't prefix-match.** A two-component ID like `com.adobe` names a vendor, not a
   product, so `allowsBundleIDPrefixMatch` requires three components. `com.adobe` still matches itself.
 - **An installed sibling owns its own artifacts.** If any _other_ installed app's bundle ID is a
-  longer match for the same component, that app owns it. Without this, uninstalling `com.tinycast.app`
-  would also trash `com.tinycast.app.beta` and `…​.dev` — separate products that merely share a
-  namespace, which is exactly the channel-isolation invariant in reverse.
+  longer match for the same component, that app owns it. Without this, uninstalling
+  `com.abueammar.tinycast` would also trash `com.abueammar.tinycast.beta` and `…​.dev` — separate
+  products that merely share a namespace, which is exactly the channel-isolation invariant in reverse.
 
 **`groupContainer`** — strips a leading `group.` and/or a 10-character Team ID (uppercase
 alphanumerics only, which is what stops an arbitrary `something.com.foo.Bar` being read as a
@@ -256,7 +256,7 @@ what stayed behind.
 ## Tests
 
 ```sh
-./Scripts/run-tests.sh uninstall-test
+./Scripts/run-tests.sh UninstallTests
 ```
 
 No filesystem, no temp directories — every input is a `String` or a `PathFacts`. `testStreamedSizes`

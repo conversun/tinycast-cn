@@ -77,7 +77,9 @@ export function Gallery() {
             className="size-1.5 rounded-full bg-violet"
           />
           Captured in Tinycast
-          <span className="ml-auto hidden sm:inline">Click to view or play</span>
+          <span className="ml-auto hidden sm:inline">
+            Click to view or play
+          </span>
         </div>
         <div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
           {galleryItems.map((item, i) => {
@@ -105,10 +107,12 @@ export function Gallery() {
                   )}
                 </figure>
                 <div>
-                  <h3 className="text-small font-medium text-fg">
+                  <h3 className="font-rounded text-subheading font-semibold text-fg">
                     {item.title}
                   </h3>
-                  <p className="text-small text-fg-muted">{item.caption}</p>
+                  <p className="mt-1 font-rounded text-body text-fg-muted">
+                    {item.caption}
+                  </p>
                 </div>
               </button>
             );

@@ -46,7 +46,7 @@ final class QuicklinkStore {
 
     /// Under Application Support, the same per-channel root snippets use.
     private static var defaultDirectory: URL {
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.tinycast.app"
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.abueammar.tinycast"
         return FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(bundleID, isDirectory: true)
@@ -69,6 +69,12 @@ final class QuicklinkStore {
 
     /// A disabled quicklink is offered nowhere, so every surface lists this, not `quicklinks`.
     var enabled: [Quicklink] { quicklinks.filter(\.isEnabled) }
+
+    func enabled(matching query: String) -> [Quicklink] {
+        let query = query.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return enabled }
+        return enabled.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
 
     func quicklink(id: UUID) -> Quicklink? {
         quicklinks.first { $0.id == id }

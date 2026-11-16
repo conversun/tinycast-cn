@@ -42,6 +42,16 @@ struct SnippetsSettingsView: View {
             }
 
             Group {
+                Section {
+                    Picker(selection: $settings.snippetDefaultAction) {
+                        ForEach(SnippetDefaultAction.allCases) { action in
+                            Text(action.title).tag(action)
+                        }
+                    } label: {
+                        SettingsRowTitle(.snippetsSnippets, "Default action")
+                        Text("↵ does this, and Paste takes its shortcut.")
+                    }
+                }
                 FeatureCommandsSection(owner: .snippets, anchor: .snippetsCommands)
                 library
                 libraryNotices
@@ -55,7 +65,9 @@ struct SnippetsSettingsView: View {
     private var library: some View {
         Section {
             if sortedSnippets.isEmpty {
-                Text(snippetsStore.state == .loading ? "Loading snippets…" : "No snippets yet.")
+                Text(
+                    snippetsStore.state == .loading
+                        ? String(localized: "Loading snippets…") : String(localized: "No snippets yet."))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(sortedSnippets) { record in

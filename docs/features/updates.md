@@ -26,7 +26,7 @@ uninstall` and `brew list` keep working unchanged.
   certificate of the running CN copy. An upstream Developer ID does not grant trust. Replacing the
   CN signing certificate requires a manual upgrade; a new certificate is never silently accepted.
 - **A build only ever updates within its own channel.** The channels are separate bundle ids installed
-  side by side; crossing would mean installing a different app. `com.tinycast.app.dev` never updates
+  side by side; crossing would mean installing a different app. `com.abueammar.tinycast.dev` never updates
   at all, and does not advertise the command.
 - **Nothing is installed unless every check passes.** Bundle id, version and signature are all checked
   on the expanded copy, and the running app survives any failure untouched.
@@ -81,6 +81,9 @@ the header row. It cannot reuse `ExtensionToastPill`, because extension views st
 | `com.conversun.tinycast-cn` | `.stable` | CN releases |
 | `com.conversun.tinycast-cn.beta` | `.beta` | CN prereleases |
 | anything else | `.development` | nothing |
+
+CN bundle identifiers stay unchanged. Upstream's bundle-id migration and `-Handoff` archives do not
+apply to the CN channel; its updater continues to accept only its own bundle identifier and feed.
 
 `AppVersion` parses the upstream triple and optional `-beta.N`, followed by optional `-cn.N`.
 The feed requires the CN suffix: plain upstream tags are not offered. The upstream triple and

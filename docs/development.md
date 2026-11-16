@@ -51,8 +51,8 @@ download on demand; none are app resources.
 
 ### The dev channel
 
-Debug builds are a separate channel: **`Tinycast Dev.app`**, bundle id `com.tinycast.app.dev`. Every
-persisted thing is keyed by bundle id — `~/Library/Preferences/<id>.plist` (settings and hotkey
+Debug builds are a separate channel: **`Tinycast Dev.app`**, bundle id `com.abueammar.tinycast.dev`.
+Every persisted thing is keyed by bundle id — `~/Library/Preferences/<id>.plist` (settings and hotkey
 bindings), `~/Library/Application Support/<id>/` (the onboarding marker, Notes, snippets, quicklinks,
 clipboard history, calculator history, launch ranking and frequent emoji; Notes and snippets unless
 a folder is chosen),
@@ -109,7 +109,7 @@ also mixes Release entries in with Debug and lets them win. `Scripts/sync-lsp.sh
 
 `xcodebuild` never compiles the harnesses — they are not in the Xcode project — so nothing emits a
 compile command for them, and without one an open harness reports every shipped type it uses as *cannot
-find in scope*. Measured on `fuzz-test.swift`: 60 errors with no entry, 0 with one.
+find in scope*. Measured on `FuzzTests.swift`: 60 errors with no entry, 0 with one.
 
 ```sh
 ./Scripts/run-tests.sh --index    # merge the harness compile commands into .compile
