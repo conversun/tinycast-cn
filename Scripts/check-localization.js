@@ -84,6 +84,32 @@ for (const file of [
     requireKey(match[1], file);
   }
 }
+const dynamicBadges = new Set();
+const scienceFile = "Tinycast/Features/Calculator/Model/CalcScience.swift";
+for (const match of read(scienceFile).matchAll(/\("([^"]+)", "[^"]+"\)/g)) {
+  const key = match[1].replace(/(^|\s)([a-z])/g, (_, space, letter) => space + letter.toUpperCase());
+  dynamicBadges.add(key);
+  requireKey(key, scienceFile);
+}
+const newUnitSymbols = new Set([
+  "Å", "µm", "ch", "rod", "league", "ls", "gr", "dwt", "slug", "Da", "cwt",
+  "fortnight", "decade", "century", "millennium", "gill", "cord", "shot", "nibble",
+  "mach", "in/s", "ft/min", "inHg", "gee", "dyn", "kgf", "eV", "keV", "MeV",
+  "GeV", "erg", "thm", "ft·lbf", "TNT", "GW", "PS", "BTU/h", "GHz", "bpm",
+]);
+const unitFile = "Tinycast/Features/Calculator/Model/CalcUnitCatalog.swift";
+for (const match of read(unitFile).matchAll(/^\s+([^|\n]+)\|([^|\n]+)\|/gm)) {
+  if (!newUnitSymbols.has(match[1])) continue;
+  dynamicBadges.add(match[2]);
+  requireKey(match[2], unitFile);
+}
+for (const [key, source] of [
+  ["Satoshi", "Tinycast/Features/Calculator/Model/CalcCurrency.swift"],
+  ["Kilometers per Second", unitFile],
+]) {
+  dynamicBadges.add(key);
+  requireKey(key, source);
+}
 function swiftFiles(folder) {
   return fs.readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
     const file = path.join(folder, entry.name);
@@ -128,5 +154,5 @@ if (problems.length) {
   console.error(problems.map((problem) => `FAIL: ${problem}`).join("\n"));
   process.exit(1);
 }
-console.log(`Localization checks passed: ${Object.keys(table).length} keys, ${catalogs.length + 2} source catalogs, ${checkedProperties} computed Text properties${extractedCount ? `, ${extractedCount} extracted keys` : ""}.`);
+console.log(`Localization checks passed: ${Object.keys(table).length} keys, ${catalogs.length + 2} source catalogs, ${dynamicBadges.size} dynamic calculator badges, ${checkedProperties} computed Text properties${extractedCount ? `, ${extractedCount} extracted keys` : ""}.`);
 console.log("Dynamic user content and unregistered rendering paths still require native UI inspection.");

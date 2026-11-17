@@ -17,7 +17,7 @@ export function DocsSearchButton() {
       title="Search the docs"
       className={iconButtonClass}
     >
-      <Search size={16} />
+      <Search size={18} />
     </button>
   );
 }
@@ -29,12 +29,12 @@ export function DocsSidebarButton() {
     <button
       type="button"
       onClick={() => setOpen((isOpen) => !isOpen)}
-      aria-label={open ? "Close the docs menu" : "Open the docs menu"}
+      aria-label={open ? "Close the menu" : "Open the menu"}
       aria-expanded={open}
       aria-controls="nd-sidebar-mobile"
       className={iconButtonClass}
     >
-      <PanelLeft size={16} />
+      <PanelLeft size={18} />
     </button>
   );
 }

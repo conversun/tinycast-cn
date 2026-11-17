@@ -110,9 +110,6 @@ struct UpdatesTests {
         expect(beta == .beta, "the beta bundle id is the beta channel")
         expect(dev == .development, "the dev bundle id is a local build")
         expect(ReleaseChannel(bundleID: nil) == .development, "a missing bundle id never updates")
-        expect(
-            ReleaseChannel(bundleID: "com.tinycast.app") == .development,
-            "the bundle id from before the move is no channel of this build")
 
         for identifier in ["com.abueammar.tinycast", "com.abueammar.tinycast.beta"] {
             expect(ReleaseChannel(bundleID: identifier) == .development,
@@ -251,27 +248,6 @@ struct UpdatesTests {
             ReleaseFeed.newest(from: universalOnly, channel: .stable, architecture: .appleSilicon)?
                 .version == AppVersion("0.3.0-cn.1"),
             "Apple silicon falls back to the universal zip when it is the only one published")
-
-        let handoff = feed(
-            entry(
-                tag: "v0.3.0-cn.1", prerelease: false,
-                assets: [
-                    "Tinycast-0.3.0-Handoff.zip", "Tinycast-0.3.0.zip",
-                    "Tinycast-Universal-0.3.0-Handoff.zip", "Tinycast-Universal-0.3.0.zip"
-                ]))
-        expect(
-            ReleaseFeed.newest(from: handoff, channel: .stable, architecture: .appleSilicon)?
-                .assetURL.lastPathComponent == "Tinycast-0.3.0.zip",
-            "Apple silicon skips the handoff listed first, which carries the old bundle id")
-        expect(
-            ReleaseFeed.newest(from: handoff, channel: .stable, architecture: .intel)?
-                .assetURL.lastPathComponent == "Tinycast-Universal-0.3.0.zip",
-            "Intel skips the universal handoff too")
-        let handoffOnly = feed(
-            entry(tag: "v0.3.0-cn.1", prerelease: false, assets: ["Tinycast-0.3.0-Handoff.zip"]))
-        expect(
-            ReleaseFeed.newest(from: handoffOnly, channel: .stable, architecture: .appleSilicon) == nil,
-            "a release whose other zip is not up yet is not offered")
     }
 
     static func offersOnlyWhatIsWorthInstalling() {

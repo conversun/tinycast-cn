@@ -47,12 +47,17 @@ struct CalculatorCard: View {
                 HStack(spacing: 0) {
                     LeadCardColumn(
                         text: CalcSyntax.highlighted(result.expression),
-                        badge: result.sourceBadge)
+                        badge: result.sourceBadge.map {
+                            Bundle.main.localizedString(forKey: $0, value: nil, table: nil)
+                        })
                     Image(systemName: "arrow.right")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.tertiary)
                     LeadCardColumn(
-                        text: CalcSyntax.highlighted(display), badge: result.targetBadge,
+                        text: CalcSyntax.highlighted(display),
+                        badge: result.targetBadge.map {
+                            Bundle.main.localizedString(forKey: $0, value: nil, table: nil)
+                        },
                         weight: .semibold)
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -124,6 +129,11 @@ private enum CalcSyntax {
             var piece = AttributedString(String(word))
             if isConnector(word, at: index, of: words) {
                 piece.foregroundColor = Theme.Colors.textTertiary
+            } else {
+                for bracket in piece.characters.indices where "()".contains(piece.characters[bracket]) {
+                    piece[bracket..<piece.characters.index(after: bracket)].foregroundColor =
+                        Theme.Colors.textTertiary
+                }
             }
             attributed.append(piece)
         }
