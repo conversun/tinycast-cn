@@ -73,10 +73,22 @@ struct FileSearchSessionTests {
         await blankScreenOpensOnKeptRecents()
         await recentRefreshLeavesTheOpenListAlone()
         await blankQueryLoadsRecents()
+        await exactRootWorksWithoutASnapshot()
         await filterChangeRerunsTheQuery()
 
         print(failures == 0 ? "File search session tests passed" : "\(failures) tests failed")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    static func exactRootWorksWithoutASnapshot() async {
+        let index = FileIndex()
+        let policy = FileSearchPolicy(
+            scopes: [], ignorePatterns: [], includesHiddenFiles: false,
+            homeDirectory: URL(filePath: "/"))
+        index.replace(with: nil, policy: policy)
+        let session = FileSearchSession(index: index)
+        await waitUntil({ session.state == .ready }) { session.search("/") }
+        expect(session.results.map(\.id) == ["/"], "a root search publishes the folder without a snapshot")
     }
 
     static func coalescesQueuedQueries() async {

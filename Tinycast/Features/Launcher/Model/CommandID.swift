@@ -1,6 +1,6 @@
 import Foundation
 
-enum CommandID: String, CaseIterable, Sendable {
+enum CommandID: String, CaseIterable, Codable, Sendable {
     /// The palette's chat keeps the id it shipped with, so its hotkeys and fallback still reach it.
     case quickAI = "command:ai-chat"
     case aiChat = "command:ai-chat-window"
@@ -34,6 +34,8 @@ enum CommandID: String, CaseIterable, Sendable {
     case captureWindowLayout = "command:capture-window-layout"
     case switchRoom = "command:switch-room"
     case createRoom = "command:create-room"
+    case switchToPreviousRoom = "command:switch-to-previous-room"
+    case tidyCurrentRoom = "command:tidy-current-room"
     case createQuicklink = "command:create-quicklink"
     case searchQuicklinks = "command:search-quicklinks"
     case importQuicklinks = "command:import-quicklinks"
@@ -109,6 +111,8 @@ enum CommandID: String, CaseIterable, Sendable {
         case .captureWindowLayout: return "Create Layout from Current Windows"
         case .switchRoom: return "Switch Room"
         case .createRoom: return "Create Room"
+        case .switchToPreviousRoom: return "Switch to Previous Room"
+        case .tidyCurrentRoom: return "Tidy Current Room"
         case .createQuicklink: return "Create Quicklink"
         case .searchQuicklinks: return "Search Quicklinks"
         case .importQuicklinks: return "Import Quicklinks"
@@ -129,50 +133,76 @@ enum CommandID: String, CaseIterable, Sendable {
     var sfSymbol: String {
         switch self {
         case .quickAI: return "sparkles"
-        case .aiChat: return "bubble.left.and.bubble.right"
+        case .aiChat: return "bubble.left.and.bubble.right.fill"
         case .fixGrammar: return BuiltInQuickAction.fixGrammar.symbol
         case .rewrite: return BuiltInQuickAction.rewrite.symbol
         case .translate: return BuiltInQuickAction.translate.symbol
         case .summarize: return BuiltInQuickAction.summarize.symbol
         case .calculatorHistory: return "plus.forwardslash.minus"
-        case .clipboardHistory: return "doc.on.clipboard"
-        case .pasteSequentially: return "list.bullet.clipboard"
-        case .searchEmoji: return "face.smiling"
+        case .clipboardHistory: return "list.clipboard.fill"
+        case .pasteSequentially: return "arrow.right.doc.on.clipboard"
+        case .searchEmoji: return "face.smiling.inverse"
         case .searchFiles: return "doc.text.magnifyingglass"
         case .searchMenuItems: return "menubar.rectangle"
         case .switchWindows, .switchWindowsBackwards: return "macwindow.on.rectangle"
-        case .openCamera: return "camera"
+        case .openCamera: return "camera.fill"
         case .openInBrowser: return "globe"
-        case .runShellCommand: return "terminal"
-        case .createCustomCommand: return "terminal"
-        case .searchCustomCommands: return "terminal"
-        case .define: return "book.closed"
+        case .runShellCommand, .createCustomCommand, .searchCustomCommands: return "terminal.fill"
+        case .define: return "book.closed.fill"
         case .joinNextMeeting: return "video.fill"
         case .mySchedule: return "calendar"
         case .createEvent: return "calendar.badge.plus"
         case .copyMeetingLink: return "link"
         case .openInCalendar: return "calendar.badge.clock"
-        case .showNotes: return "text.page"
+        case .showNotes: return "text.page.fill"
         case .createNote: return "note.text.badge.plus"
         case .searchNotes: return "text.magnifyingglass"
-        case .createWindowLayout: return "plus.rectangle.on.rectangle"
+        case .createWindowLayout: return "plus.rectangle.on.rectangle.fill"
         case .captureWindowLayout: return "macwindow.badge.plus"
         case .switchRoom: return "door.left.hand.open"
-        case .createRoom: return "rectangle.stack.badge.plus"
+        case .createRoom: return "rectangle.stack.fill.badge.plus"
+        case .switchToPreviousRoom: return "arrowshape.turn.up.backward.fill"
+        case .tidyCurrentRoom: return "rectangle.grid.2x2.fill"
         case .createQuicklink: return "link.badge.plus"
         case .searchQuicklinks: return Quicklink.sfSymbol
-        case .importQuicklinks: return "square.and.arrow.down"
-        case .exportQuicklinks: return "square.and.arrow.up"
+        case .importQuicklinks: return "square.and.arrow.down.fill"
+        case .exportQuicklinks: return "square.and.arrow.up.fill"
         case .searchSnippets: return "curlybraces"
-        case .createSnippet: return "plus.rectangle.on.rectangle"
-        case .exportSettings: return "square.and.arrow.up"
-        case .importSettings: return "square.and.arrow.down"
-        case .importFromRaycast: return "arrow.down.doc"
-        case .checkForUpdates: return "arrow.down.circle"
-        case .settings: return "gearshape"
-        case .about: return "info.circle"
-        case .support: return "heart"
+        case .createSnippet: return "plus.rectangle.on.rectangle.fill"
+        case .exportSettings: return "square.and.arrow.up.fill"
+        case .importSettings: return "square.and.arrow.down.fill"
+        case .importFromRaycast: return "arrow.down.doc.fill"
+        case .checkForUpdates: return "arrow.down.circle.fill"
+        case .settings: return "gearshape.fill"
+        case .about: return "info.circle.fill"
+        case .support: return "heart.fill"
         case .quit: return "power"
+        }
+    }
+
+    var tint: IconTint {
+        switch self {
+        case .quickAI, .aiChat: return .purple
+        case .fixGrammar, .rewrite, .translate, .summarize, .clipboardHistory, .pasteSequentially:
+            return .indigo
+        case .calculatorHistory, .checkForUpdates: return .green
+        case .searchEmoji: return .orange
+        case .searchFiles, .openInBrowser, .createQuicklink, .searchQuicklinks, .importQuicklinks,
+            .exportQuicklinks:
+            return .blue
+        case .searchMenuItems, .switchWindows, .switchWindowsBackwards, .runShellCommand,
+            .createCustomCommand, .searchCustomCommands:
+            return .graphite
+        case .openCamera, .settings, .about: return .gray
+        case .define, .searchSnippets, .createSnippet: return .brown
+        case .joinNextMeeting, .mySchedule, .createEvent, .copyMeetingLink, .openInCalendar, .quit:
+            return .red
+        case .showNotes, .createNote, .searchNotes: return .yellow
+        case .createWindowLayout, .captureWindowLayout, .switchRoom, .createRoom,
+            .switchToPreviousRoom, .tidyCurrentRoom:
+            return .mint
+        case .exportSettings, .importSettings, .importFromRaycast: return .cyan
+        case .support: return .pink
         }
     }
 

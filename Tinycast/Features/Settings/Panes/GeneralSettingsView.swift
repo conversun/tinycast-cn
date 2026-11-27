@@ -2,8 +2,8 @@ import SwiftUI
 
 struct GeneralSettingsView: View {
     @Environment(AppCore.self) private var core
+    @Environment(MainAppLink.self) private var mainApp
     @Environment(AppSettings.self) private var settings
-    private var launcherRanking: LauncherRankingStore { core.launcherRanking }
     @State private var confirmingRankingReset = false
     @State private var inputSources: [InputSourceSwitcher.Option] = []
 
@@ -65,6 +65,12 @@ struct GeneralSettingsView: View {
                         Text("While the launcher is open.")
                     }
                 }
+                LabeledContent {
+                    Button("Show Again") { mainApp.send(.showOnboarding) }
+                } label: {
+                    SettingsRowTitle(.generalGeneral, "Welcome guide")
+                    Text("The steps Tinycast showed on first launch.")
+                }
             } header: {
                 SettingsSectionHeader(.generalGeneral)
             }
@@ -76,6 +82,13 @@ struct GeneralSettingsView: View {
                     }
                 } label: {
                     SettingsRowTitle(.generalAppearance, "Appearance")
+                }
+                Picker(selection: $settings.iconStyle) {
+                    ForEach(IconStyle.allCases) { style in
+                        Text(style.title).tag(style)
+                    }
+                } label: {
+                    SettingsRowTitle(.generalAppearance, "Icon style")
                 }
                 Toggle(isOn: $settings.animationsEnabled) {
                     SettingsRowTitle(.generalAppearance, "Show animations")
@@ -133,7 +146,7 @@ struct GeneralSettingsView: View {
                     Button("Reset…", role: .destructive) {
                         confirmingRankingReset = true
                     }
-                    .disabled(launcherRanking.isEmpty)
+                    .disabled(mainApp.status.launcherRankingIsEmpty)
                 } label: {
                     SettingsRowTitle(.generalSearch, "Learned ranking")
                     Text("Learned privately from the results you pick.")
@@ -152,7 +165,7 @@ struct GeneralSettingsView: View {
             titleVisibility: .visible
         ) {
             Button("Reset Ranking", role: .destructive) {
-                launcherRanking.resetAll()
+                mainApp.send(.resetLauncherRanking)
             }
             Button("Cancel", role: .cancel) {}
         } message: {

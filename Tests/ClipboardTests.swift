@@ -26,6 +26,7 @@ struct ClipboardTests {
         typeFilterSplitsTheHistory()
         typeFilterJoinsTheSearchMemo()
         persistence()
+        deferredOpen()
         exportSeesPastTheMemoryWindow()
         importedImagesArriveOnce()
         imageCopiesLeaveWithTheirBlob()
@@ -38,6 +39,8 @@ struct ClipboardTests {
         fileEntriesAreFoundByNameAndFolder()
         fileKindClassification()
         importedFilesArriveOncePerPath()
+        await syncedEntriesLandByTime()
+        unreadableDatabaseIsRebuilt()
         defaultActionChords()
         plainTextSkipsTheFile()
         offersTextExtraction()
@@ -47,6 +50,18 @@ struct ClipboardTests {
     }
 
     // MARK: - Cases
+
+    static func deferredOpen() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ClipboardStore(directory: directory, opensDatabase: false)
+        expect(
+            !FileManager.default.fileExists(atPath: directory.path),
+            "creating the Settings role's store leaves the database directory untouched")
+        store.open()
+        expect(
+            FileManager.default.fileExists(atPath: store.dbURL.path), "an explicit open creates the database")
+    }
 
     static func retiredImageCapturesStayRetired() async throws {
         let directory = FileManager.default.temporaryDirectory
@@ -661,6 +676,41 @@ struct ClipboardTests {
             afterClear.load()
             expect(texts(afterClear) == ["first"], "and the unpinned rows are gone from disk")
         }
+    }
+
+    /// Another Mac's entries sit among this Mac's by when they were copied, on disk too.
+    static func syncedEntriesLandByTime() async {
+        let dir = scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = ClipboardStore(directory: dir)
+        let now = Date()
+        store.importEntries([entry("old", at: now - 300), entry("new", at: now - 100)])
+        await store.applySynced(
+            [entry("middle", at: now - 200), entry("newest", at: now)], images: [:], removing: [])
+        expect(texts(store) == ["newest", "new", "middle", "old"], "arrivals interleave by time")
+
+        let reopened = ClipboardStore(directory: dir)
+        reopened.load()
+        expect(texts(reopened) == ["newest", "new", "middle", "old"], "and rowid order agrees")
+        reopened.addText("copied", sourceBundleID: nil)
+        expect(texts(reopened).first == "copied", "a later copy still leads")
+
+        let stamp = Date()
+        let middle = item(reopened, "middle")
+        await reopened.applySynced(
+            [middle.with(pinnedAt: stamp)], images: [:], removing: [item(reopened, "old").id])
+        expect(reopened.items.count == 4, "an update reuses its row and a removal takes one")
+        expect(item(reopened, "middle").isPinned, "the update pins the row it names")
+    }
+
+    /// A file it can't read is replaced, and flagged so iCloud Sync merges rather than deletes.
+    static func unreadableDatabaseIsRebuilt() {
+        let dir = scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try? Data("not a database".utf8).write(to: dir.appendingPathComponent("clipboard.sqlite3"))
+        let store = ClipboardStore(directory: dir)
+        expect(store.isOpen && store.wasRebuilt, "an unreadable file is rebuilt and flagged")
+        expect(!ClipboardStore(directory: dir).wasRebuilt, "a readable one is not")
     }
 
     /// A backup reads the whole table, not `items` — which stops at the memory window.

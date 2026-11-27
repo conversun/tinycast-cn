@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   triage:
-    if: github.repository == 'abue-ammar/tinycast'
+    if: ${{ github.repository == 'abue-ammar/tinycast' && !contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) }}
     runs-on: ubuntu-latest
     steps:
       - name: Comment on pull request

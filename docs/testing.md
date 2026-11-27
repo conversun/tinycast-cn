@@ -7,13 +7,13 @@ is a set of standalone harnesses, and the manual half is the sweep at the bottom
 
 The mechanical bar, in one place so it cannot drift. All five pass before a change is finished.
 
-| Check | Command |
-| --- | --- |
-| The harnesses | `./Scripts/run-tests.sh` |
-| Lint, settings search, translations and migrations | `./Scripts/lint.sh` |
-| Pure-layer purity | `grep -rln 'import AppKit\|import SwiftUI\|import Cocoa' Tinycast/Features/*/Model/` |
-| A clean build | `xcodebuild … -configuration Debug CODE_SIGNING_ALLOWED=NO`, zero **new** warnings |
-| Docs still true | any doc your change made wrong, fixed in the same commit |
+| Check                                              | Command                                                                              |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| The harnesses                                      | `./Scripts/run-tests.sh`                                                             |
+| Lint, settings search, translations and migrations | `./Scripts/lint.sh`                                                                  |
+| Pure-layer purity                                  | `grep -rln 'import AppKit\|import SwiftUI\|import Cocoa' Tinycast/Features/*/Model/` |
+| A clean build                                      | `xcodebuild … -configuration Debug CODE_SIGNING_ALLOWED=NO`, zero **new** warnings   |
+| Docs still true                                    | any doc your change made wrong, fixed in the same commit                             |
 
 There is no CI: every item is on you, run locally. Each is expanded below; the manual sweep at the
 end of this file is the sixth, judged by what you touched.
@@ -54,8 +54,8 @@ that limit; `TINYCAST_TEST_JOBS=1` runs one at a time. Each result is numbered
 against the total and shows its run and compile time, a quiet stretch names the harnesses still running, and a harness that runs longer
 than `TINYCAST_TEST_TIMEOUT` seconds (default 300) is sampled, killed and reported as timed out.
 Its failure log includes the process stacks so a CI-only hang leaves diagnostic evidence. Parallelism is safe
-because each harness already roots its scratch state somewhere of its own — a UUID-suffixed
-`temporaryDirectory`, a `UserDefaults(suiteName:)`, or `NSPasteboard.withUniqueName()` — and a new
+because each harness already roots its scratch state somewhere of its own (a UUID-suffixed
+`temporaryDirectory`, a `UserDefaults(suiteName:)`, or `NSPasteboard.withUniqueName()`), and a new
 harness must keep doing that rather than reach for a fixed path. The runner's own queue, logs and
 verdicts do live at a fixed path, so a second suite started in the same `$TMPDIR` waits for the first,
 and a run that reports fewer results than it queued fails rather than passing.
@@ -67,7 +67,7 @@ a compiler diagnostic is far longer than `PIPE_BUF`, so eleven workers streaming
 interleave into nonsense.
 
 A `run` line takes optional markers before the harness name. `-O` compiles that harness optimised,
-which is worth it only where the run dominates the compile — `RaycastTests` spends 47 seconds in
+which is worth it only where the run dominates the compile: `RaycastTests` spends 47 seconds in
 scrypt at `-Onone` and one second at `-O`. `slow` dispatches it in the first wave, so the longest
 harnesses are not still running after everything else has finished.
 
@@ -79,7 +79,7 @@ A harness is `Tests/<Subject>Tests.swift`, and its `@main` type has the same nam
 by harnesses are `<Subject>Fixtures`, and a file that extends another harness is `<Harness>+<Topic>`.
 
 Each harness compiles the **shipped sources** it guards rather than a copy of them, which is what makes
-the pure-layer boundary real: a harness that stops *compiling* means AppKit or SwiftUI has leaked into a
+the pure-layer boundary real: a harness that stops _compiling_ means AppKit or SwiftUI has leaked into a
 `Model/` folder, or an effect has leaked into a decision. That is a more common failure than a broken
 assertion, and it is the more important one.
 
@@ -93,7 +93,7 @@ every run from #232 onward by calling the native `copy:`/`cut:`/`paste:` actions
 second case, and it is why `ClipboardManager.fileURLs(on:volatileRoots:)` and `Paster.write(_:store:to:)`
 each take the thing they act on as a parameter: a seam that exists so the harness never has to reach
 for the shared board. Its scratch tree lives under `temporaryDirectory`, which is itself a volatile
-root, so the cases about *reading* files inject an empty root list and the one case about durability
+root, so the cases about _reading_ files inject an empty root list and the one case about durability
 is the one that runs against the shipped roots. File URL boards also cover the capture cap, exact
 ordering, rejected prefixes, duplicates and symlinks using private fixtures. The reader cases add
 the limit boundaries and the predicate call counts.
@@ -107,99 +107,102 @@ because of exactly this; `run-tests.sh` keeps the two steps separate and records
 
 If a change touches anything in the right column, the harness on the left is mandatory.
 
-| Harness | Guards |
-| --- | --- |
-| `FuzzTests` | `Launcher/Model/LauncherMatch.swift`, `LauncherOrder.swift`, `LauncherSuggestions.swift`, `EntryNaming.swift`, `ScriptRomanization.swift`, `SearchRelevance.swift`, `LauncherRankingStore.swift` — **a new ranking complaint is a new case in its `denseIndex`** |
-| `FileSearchTests` | `FileSearch/Model/`: folding, masks, scoring, ignore rules, priors, scopes |
-| `FileIndexTests` | `FileIndexCrawler`, `FileIndexSnapshot`, `FileIndex`: a real fixture crawled, written, mapped, searched and live-updated |
-| `FileSearchSessionTests` | serialized query execution, coalescing, cancellation and refresh |
-| `MenuSearchTests` | `MenuSearch/Model/` decisions, `MenuSearch/Service/` session filtering, the shared `FuzzyMatch` scorer |
-| `ActionMenuSearchTests` | Action-menu query normalization and shared fuzzy matching |
-| `AppInstallationTests` | Multiple app copies and app-wide preferences; file-favorite persistence, mixed ordering, hidden slots and restoration through the existing favorite key list |
-| `RankingTests` | `Launcher/Model/LauncherRankingStore.swift` |
-| `ScopesTests` | `Launcher/Model/SearchScopes.swift` |
-| `AppNameTests` | `Platform/AppDisplayName.swift` — every path that names a scanned bundle |
-| `LanguageTests` | `AppLanguage` and both string catalogs — compile every language, load privacy prompts, and select plural forms and independent counts at runtime |
-| `LocalizedResourceTests` | `Platform/LocalizedResource.swift` — `resolved()` matches `String(localized:)` in every language, for plain, contextual, interpolated, plural and missing keys |
-| `RelaunchTests` | The shipped app delegate and relaunch helper — asynchronous cleanup, repeated quit requests, and a responsive replacement process |
-| `CalcTests` | all of `Calculator/Model/` |
-| `CalendarTests` | all of `Calendar/Model/` plus `EventEditorSession` — links, join window, day buckets, draft and form focus |
-| `ClipboardSearchTests` | Ordinary and OCR result ordering, opt-in lifecycle, cancellation, pins and type filters |
-| `ClipboardTextTests` | Apple Vision/PDF extraction, scheduling, retry backoff and recovery |
-| `PasteSequenceTests` | `Clipboard/Model/PasteSequence.swift` — the walk's order, its end, and what starts it over |
-| `ClipboardTests` | `Clipboard/Model/ClipboardStore.swift`, `ClipboardFilter.swift`, `ClipboardFileKind.swift`, the colour trio |
-| `ClipboardCoordinatorTests` | Edit Entry selection across query/type changes and pins, failed writes, deletion during editing and cancellation; isolated database and recorded clipboard effects |
-| `ClipboardThumbnailTests` | `Platform/Images/ImageThumbnail.swift` copies against the real store — a remove or clear mid-copy leaves none, same-named JPEG/PNG copies stay apart, a timeout or cancel frees the queue, and a failed or unreadable copy falls back to the original; a stand-in script plays the helper |
-| `PasteboardTests` | `Clipboard/Service/ClipboardManager.swift` capture and `Paster.write` — what a Finder copy reads as, and what a file or image entry writes back |
-| `EmojiTests` | `Emoji/Model/EmojiCatalog.swift`, `EmojiGridGeometry.swift`, the generated data and keyword packs |
-| `EmojiSearchTests` | `Emoji/Service/EmojiIndex.swift`, `FrequentEmojiStore.swift`, `Scripts/gen-emoji.js`'s keyword format, multilingual search |
-| `CommandEscapeTapTests` | `Palette/CommandEscapeTap.swift` — dedicated run-loop dispatch while main is blocked, timeout recovery, stale actions, installation cancellation and teardown; private ports and unposted events only |
-| `PaletteNavigationTests` | `Palette/PaletteState.swift`'s screen motions — `prepare`, `replace`, `push`, `pop` — and hover arming, pointer drift, scroll disarming and highlight tokens |
-| `CompactBarTests` | Compact shortcut order, selection boundaries, zero-to-four slots, identifiers, isolated preferences and invalid settings-file rejection |
-| `PaletteSelectionTests` | `Features/PaletteRowIndex.swift` |
-| `InterfaceSizeTests` | `DesignSystem/InterfaceMetrics.swift`, `Features/Settings/InterfaceSize.swift`, `Extensions/Model/ExtensionFormMetrics.swift` |
-| `FormInputTests` | Native field/textarea sizing, editing alignment, placeholders, Tab, Unicode selection, undo and code fonts |
-| `PalettePlacementTests` | `DesignSystem/Theme.swift`, `Palette/PalettePlacement.swift` |
-| `PaletteMenuClickTests` | `Palette/PalettePanel.swift` — complete click-away presses and subsequent control activation |
-| `HyperKeyEngineTests` | Hyper chord transitions for every physical key, device-bit holds, own-bit and other-Shift residue, released modifiers, the Quick Press rule, repeats and interruption recovery |
-| `HotKeyTests` | `HotKeys/Model/DoubleTapModifier.swift`, `DoubleTapDetector.swift`, `ModifierKey.swift`, `ModifierKeyDetector.swift`, `HotKeyBinding.swift`, `HotKeySpelling.swift`, `HyperKey.swift`, `HIDKeyMapping.swift`, `HotKeyAction.swift`, `Service/KeyShortcut.swift`, and the command→action mapping in `Launcher/Model/CommandID.swift` |
-| `HyperKeyTests` | `HotKeys/Model/HIDKeyMapping.swift`, `HyperKeyConflictPolicy.swift`, `Service/KeyboardRemapper.swift`, `RemapInstanceLock.swift` — mapping ownership, refused writes, crash recovery, device reconnection, Caps Lock and 🎤 remaps sharing a keyboard, conflict severities, Modifier Keys and Karabiner parsing, another app taking over Caps Lock, one process per Hyper Key |
-| `HotKeyDispatchTests` | `HotKeys/Service/HotKeyManager.swift` — Secure Input side isolation, shared Control registrations, press/release routing, recording and cancellation; isolated preferences and simulated Carbon registration |
-| `DeepLinkTests` | `DeepLinks/Model/`, `HotKeys/Model/HotKeyAction+EntryID.swift`, `Settings/SettingsTab.swift` — every bindable command, window command and system action round-trips through its link and its entry ID, stored rows by UUID, snippet paths through percent-encoding, case folding, the channel's scheme, the links that must not resolve (Raycast schemes, the `extensions` host), input decoding, encoding and its refusals (bytes, not characters), batches, field filling, consent classes and keys, the quicklink loop rule, note, chat and window-size links, and every Settings tab slug |
-| `DictationKeyTests` | `HotKeys/Service/DictationKeyManager.swift` — shared and separate preference domains, ownership handoff through the real health ticker, and retry cancellation on unbind or termination; isolated preferences, lock files and simulated keyboards |
-| `DictationTests` | `Dictation/Model/DictationModel.swift`, `DictationTextFormatter.swift` — model paths and text formatting |
-| `DictationFieldTests` | Composer rebinding and teardown, field-scoped dictation cancellation, and queued insertion validity; synthetic capture and real AppKit editors |
-| `DictationCueTests` | System dictation sound paths, stop-before-play ordering and missing resources, without playing audio |
-| `DictationVolumeTests` | Volume recovery across fade steps, user changes, output switching, failed writes and cancellation; injected audio controls only |
-| `DictationInferenceTests` | Dictation byte BPE, Fourier/mel features and non-overlapping audio chunks; no downloaded models |
-| `DictationWorkerTests` | Dictation's framed channel, worker reuse/switching, removal, cancellation and broken pipes with a fixture helper |
-| `FallbackTests` | `Launcher/Model/Fallback.swift`, plus the `CommandID` and `Quicklink` ids it is built from |
-| `DictionaryTests` | `Dictionary/Model/DictionaryEntry.swift`, `DictionaryMarkup.swift` — a real XHTML record and the plain-text fallback, read into page blocks |
-| `CalloutTests` | `DesignSystem/Theme.swift`, `HotKeys/UI/CalloutPlacement.swift` |
-| `SystemActionTests` | `SystemActions/Model/SystemAction.swift` |
-| `MicrophoneMuteTests` | Native input mute, delayed confirmation, device switches and failures; injected CoreAudio calls only |
-| `VolumeTests` | `SystemActions/Model/VolumeLevel.swift` |
-| `WindowCommandTests` | `WindowManagement/WindowCommand.swift`, `WindowPlacementEngine.swift`, `WindowActionMemory.swift` |
-| `WindowLayoutTests` | `WindowManagement/Model/WindowLayout*.swift` and `CustomWindowSize*.swift` — the layout record, its geometry and its inverse, the plan and the store; custom sizes' units, frames and store |
-| `WindowRoomTests` | `WindowManagement/Model/Room*.swift` — every room layout and its minimum sizes, the grid, arrangement reading, window matching, parking, the plan, Tab's choices and the three stores |
-| `CustomCommandTests` | Command storage and execution, editor drafts, argument identities and dynamic keyboard focus |
-| `CustomCommandListTests` | Browser result snapshots, observation, row actions and empty-library messages |
-| `UninstallTests` | all five pure files in `Uninstall/Model/` |
-| `UninstallCoordinatorTests` | Confirmation and the post-confirmation quit gate; recorded quit and Trash effects only |
-| `QuicklinkTests` | all of `Quicklinks/Model/`, plus editor drafts and placeholder selection |
-| `QuicklinkCoordinatorTests` | Opening and requested arguments, launcher editing, current enabled-state preservation, deletion during editing and feature gates; no platform effects or on-screen focus checks |
-| `AppleShortcutTests` | all of `AppleShortcuts/Model/` — the `shortcuts list` parser and entry ids |
-| `SnippetsTests` | all of `Snippets/Model/` and `Snippets/Service/`, plus editor drafts, placeholder selection and `Platform/HealthTicker.swift` |
-| `NotesTests` | all of `Notes/Model/` and `Notes/Service/`, including the Markdown parser, edit plans and reveal policy, plus the real fuzzy matcher and signposts |
-| `NotesEditorTests` | the Notes editor, rendered and literal, with real TextKit 2 and AppKit editing objects: styling, reveal, layout fragments, keys, chords, checkboxes and links |
-| `RaycastTests` | `Backup/Service/RaycastDecoder.swift`, `Scrypt.swift`, `Platform/Compression/Zlib.swift`, `Clipboard/Model/RaycastClipboardImport.swift` and import-time clipboard retention |
-| `SymbolsTests` | `Extensions/Service/SymbolCatalog.swift`, against this machine's CoreGlyphs |
-| `ExtensionStoreTests` | `Extensions/Model/` — GitHub source parsing and URLs, the store and Git tree parsers |
-| `ExtensionRefreshTests` | `Extensions/Model/ExtensionRefreshPolicy.swift` — interval parsing, due dates, backoff, subtitle fallback, indicator state, Refresh Now refusals |
-| `ExtensionVersionTests` | `Extensions/Service/ExtensionVersionStore.swift` — what an update check reports, adopts and forgets |
-| `ExtensionMetadataTests` | `Extensions/Service/ExtensionCommandMetadataStore.swift` — round-trip, failure runs, uninstall |
-| `ExtensionTests` | the extension runtime and native menu-bar lifecycle — boots shipped sources in JavaScriptCore; menu tests cover restoration, refresh serialization, actions and teardown; fetch tests cover HTTP connection cleanup, cancellation and request isolation |
-| `ExtensionIconTests` | `Extensions/Service/ExtensionIconCache.swift` — artwork sizing and its fallback |
-| `ExtensionSignInTests` | `Extensions/Service/ExtensionSignInSession.swift` — browser start failures, completion, cancellation without a callback, and late callbacks after teardown |
-| `IconCacheTests` | `Platform/Images/IconCache.swift` — row sizing at 1×/2×, warm reuse, stamp and style invalidation, bitmap release, fitted geometry across all 256 alpha values, and that a row icon draws identically to the 96px one |
-| `EntryIconTests` | `EntryIcon` — that each case draws, caches and prints apart from the others, and that a moved `FileIconStamp` retires the bitmap decoded before it |
-| `TextDiffTests` | `QuickActions/Model/TextDiffEngine.swift` — exact chunks, coalescing, Unicode, ties, token-cap boundaries and fast paths |
+| Harness                     | Guards                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FuzzTests`                 | `Launcher/Model/LauncherMatch.swift`, `LauncherOrder.swift`, `LauncherSuggestions.swift`, `EntryNaming.swift`, `ScriptRomanization.swift`, `SearchRelevance.swift`, `LauncherRankingStore.swift`: **a new ranking complaint is a new case in its `denseIndex`**                                                                                                                                                                                                                                                                                                                              |
+| `FileSearchTests`           | `FileSearch/Model/`: folding, masks, scoring, ignore rules, priors, scopes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `FileIndexTests`            | `FileIndexCrawler`, `FileIndexSnapshot`, `FileIndex`: a real fixture crawled, written, mapped, searched and live-updated                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `FileSearchSessionTests`    | serialized query execution, coalescing, cancellation and refresh                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `MenuSearchTests`           | `MenuSearch/Model/` decisions, `MenuSearch/Service/` session filtering, the shared `FuzzyMatch` scorer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `ActionMenuSearchTests`     | Action-menu query normalization and shared fuzzy matching                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `AppInstallationTests`      | Multiple app copies and app-wide preferences; file-favorite persistence, mixed ordering, hidden slots and restoration through the existing favorite key list                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `RankingTests`              | `Launcher/Model/LauncherRankingStore.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `ScopesTests`               | `Launcher/Model/SearchScopes.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `AppNameTests`              | `Platform/AppDisplayName.swift`: every path that names a scanned bundle                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `LanguageTests`             | `AppLanguage` and both string catalogs: compile every language, load privacy prompts, and select plural forms and independent counts at runtime                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `LocalizedResourceTests`    | `Platform/LocalizedResource.swift`: `resolved()` matches `String(localized:)` in every language, for plain, contextual, interpolated, plural and missing keys                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `RelaunchTests`             | The shipped app delegate and relaunch helper: asynchronous cleanup, repeated quit requests, and a responsive replacement process                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `CalcTests`                 | all of `Calculator/Model/`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `CalendarTests`             | all of `Calendar/Model/` plus `EventEditorSession`: links, join window, day buckets, draft and form focus                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `ClipboardSearchTests`      | Ordinary and OCR result ordering, opt-in lifecycle, cancellation, pins and type filters                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `ClipboardTextTests`        | Apple Vision/PDF extraction, scheduling, retry backoff and recovery                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `PasteSequenceTests`        | `Clipboard/Model/PasteSequence.swift`: the walk's order, its end, and what starts it over                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `ClipboardTests`            | `Clipboard/Model/ClipboardStore.swift`, `ClipboardFilter.swift`, `ClipboardFileKind.swift`, the colour trio                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `ClipboardSyncTests`        | `Clipboard/Service/ClipboardSyncSource.swift` between two real stores: text keyed by content, owned images with their blob, files kept home, deletions of every duplicate, paused while off or closed                                                                                                                                                                                                                                                                                                                                                                                        |
+| `ClipboardCoordinatorTests` | Edit Entry selection across query/type changes and pins, failed writes, deletion during editing and cancellation; isolated database and recorded clipboard effects                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `ClipboardThumbnailTests`   | `Platform/Images/ImageThumbnail.swift` copies against the real store: a remove or clear mid-copy leaves none, same-named JPEG/PNG copies stay apart, a timeout or cancel frees the queue, and a failed or unreadable copy falls back to the original; a stand-in script plays the helper                                                                                                                                                                                                                                                                                                     |
+| `PasteboardTests`           | `Clipboard/Service/ClipboardManager.swift` capture and `Paster.write`: what a Finder copy reads as, and what a file or image entry writes back                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `EmojiTests`                | `Emoji/Model/EmojiCatalog.swift`, `EmojiGridGeometry.swift`, the generated data and keyword packs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `EmojiSearchTests`          | `Emoji/Service/EmojiIndex.swift`, `FrequentEmojiStore.swift`, `Scripts/gen-emoji.js`'s keyword format, multilingual search                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `CommandEscapeTapTests`     | `Palette/CommandEscapeTap.swift`: dedicated run-loop dispatch while main is blocked, timeout recovery, stale actions, installation cancellation and teardown; private ports and unposted events only                                                                                                                                                                                                                                                                                                                                                                                         |
+| `PaletteNavigationTests`    | `Palette/PaletteState.swift`'s screen motions (`prepare`, `replace`, `push`, `pop`) and hover arming, pointer drift, scroll disarming and highlight tokens                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `CompactBarTests`           | Compact shortcut order, selection boundaries, zero-to-four slots, identifiers, isolated preferences and invalid settings-file rejection                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `PaletteSelectionTests`     | `Features/PaletteRowIndex.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `InterfaceSizeTests`        | `DesignSystem/InterfaceMetrics.swift`, `Features/Settings/InterfaceSize.swift`, `Extensions/Model/ExtensionFormMetrics.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `FormInputTests`            | Native field/textarea sizing, editing alignment, placeholders, Tab, Unicode selection, undo and code fonts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `PalettePlacementTests`     | `DesignSystem/Theme.swift`, `Palette/PalettePlacement.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `PaletteMenuClickTests`     | `Palette/PalettePanel.swift`: complete click-away presses and subsequent control activation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `HyperKeyEngineTests`       | Hyper chord transitions for every physical key, device-bit holds, own-bit and other-Shift residue, released modifiers, the Quick Press rule, repeats and interruption recovery                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `HotKeyTests`               | `HotKeys/Model/DoubleTapModifier.swift`, `DoubleTapDetector.swift`, `ModifierKey.swift`, `ModifierKeyDetector.swift`, `HotKeyBinding.swift`, `HotKeySpelling.swift`, `HyperKey.swift`, `HIDKeyMapping.swift`, `HotKeyAction.swift`, `Service/KeyShortcut.swift`, and the command→action mapping in `Launcher/Model/CommandID.swift`                                                                                                                                                                                                                                                          |
+| `HyperKeyTests`             | `HotKeys/Model/HIDKeyMapping.swift`, `HyperKeyConflictPolicy.swift`, `Service/KeyboardRemapper.swift`, `RemapInstanceLock.swift`: mapping ownership, refused writes, crash recovery, device reconnection, conflict severities, Modifier Keys and Karabiner parsing, another app taking over Caps Lock, one process per Hyper Key                                                                                                                                                                                                                                                             |
+| `HotKeyDispatchTests`       | `HotKeys/Service/HotKeyManager.swift`: Secure Input side isolation, shared Control registrations, press/release routing, recording and cancellation; a loaded manager registers nothing, and a bound reload and a Settings recording reach the main app; isolated preferences and simulated Carbon registration                                                                                                                                                                                                                                                                              |
+| `DeepLinkTests`             | `DeepLinks/Model/`, `HotKeys/Model/HotKeyAction+EntryID.swift`, `Settings/SettingsTab.swift`: every bindable command, window command and system action round-trips through its link and its entry ID, stored rows by UUID, snippet paths through percent-encoding, case folding, the channel's scheme, the links that must not resolve (Raycast schemes, the `extensions` host), input decoding, encoding and its refusals (bytes, not characters), batches, field filling, consent classes and keys, the quicklink loop rule, note, chat and window-size links, and every Settings tab slug |
+| `DictationTests`            | `Dictation/Model/DictationModel.swift`, `DictationTextFormatter.swift`: model paths and text formatting                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `DictationFieldTests`       | Composer rebinding and teardown, field-scoped dictation cancellation, and queued insertion validity; synthetic capture and real AppKit editors                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `DictationCueTests`         | System dictation sound paths, stop-before-play ordering and missing resources, without playing audio                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `DictationVolumeTests`      | Volume recovery across fade steps, user changes, output switching, failed writes and cancellation; injected audio controls only                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `DictationInferenceTests`   | Dictation byte BPE, Fourier/mel features and non-overlapping audio chunks; no downloaded models                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `DictationWorkerTests`      | Dictation's framed channel, worker reuse/switching, removal, cancellation and broken pipes with a fixture helper                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `PipeFramingTests`          | `Platform/PipeFraming.swift`, `ProcessLink.swift`, `LaunchedExecutable.swift`: a frame round-trips, both size bounds hold, a clean end of stream reads nil, a real child link delivers large frames in order and closes once, an oversized message to a stalled peer closes it, and a replaced executable is never spawned                                                                                                                                                                                                                                                                   |
+| `SharedStateMirrorTests`    | `App/SharedStateMirror.swift`: Settings' defaults edits keep pending input, merge dictionary entries, converge in the main app's order and never echo                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `FallbackTests`             | `Launcher/Model/Fallback.swift`, plus the `CommandID` and `Quicklink` ids it is built from                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `DictionaryTests`           | `Dictionary/Model/DictionaryEntry.swift`, `DictionaryMarkup.swift`: a real XHTML record and the plain-text fallback, read into page blocks                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `CalloutTests`              | `DesignSystem/Theme.swift`, `HotKeys/UI/CalloutPlacement.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `SystemActionTests`         | `SystemActions/Model/SystemAction.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `MicrophoneMuteTests`       | Native input mute, delayed confirmation, device switches and failures; injected CoreAudio calls only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `VolumeTests`               | `SystemActions/Model/VolumeLevel.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `WindowCommandTests`        | `WindowManagement/WindowCommand.swift`, `WindowPlacementEngine.swift`, `WindowActionMemory.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `WindowLayoutTests`         | `WindowManagement/Model/WindowLayout*.swift` and `CustomWindowSize*.swift`: the layout record, its geometry and its inverse, the plan and the store, reloads included; custom sizes' units, frames and store                                                                                                                                                                                                                                                                                                                                                                                 |
+| `WindowRoomTests`           | `WindowManagement/Model/Room*.swift`: every room layout and its minimum sizes, the grid, arrangement reading, window matching, parking, the plan, Tab's choices, going back and the three stores                                                                                                                                                                                                                                                                                                                                                                                             |
+| `CustomCommandTests`        | Command storage and execution, a reload of another writer's library, editor drafts, argument identities and dynamic keyboard focus                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `CustomCommandListTests`    | Browser result snapshots, observation, row actions and empty-library messages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `UninstallTests`            | all five pure files in `Uninstall/Model/`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `UninstallCoordinatorTests` | Confirmation and the post-confirmation quit gate; recorded quit and Trash effects only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `QuicklinkTests`            | all of `Quicklinks/Model/`, plus editor drafts and placeholder selection                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `QuicklinkCoordinatorTests` | Opening and requested arguments, launcher editing, current enabled-state preservation, deletion during editing and feature gates; no platform effects or on-screen focus checks                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `AppleShortcutTests`        | all of `AppleShortcuts/Model/`: the `shortcuts list` parser and entry ids                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `SnippetsTests`             | all of `Snippets/Model/` and `Snippets/Service/`, plus editor drafts, placeholder selection and `Platform/HealthTicker.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `NotesTests`                | all of `Notes/Model/` and `Notes/Service/`, including the Markdown parser, edit plans and reveal policy, plus the real fuzzy matcher and signposts                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `NotesEditorTests`          | the Notes editor, rendered and literal, with real TextKit 2 and AppKit editing objects: styling, reveal, layout fragments, keys, chords, clicks beside hidden syntax, checkboxes and links                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `RaycastTests`              | `Backup/Service/RaycastDecoder.swift`, `Scrypt.swift`, `Platform/Compression/Zlib.swift`, `Clipboard/Model/RaycastClipboardImport.swift` and import-time clipboard retention                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `SymbolsTests`              | `Extensions/Service/SymbolCatalog.swift`, against this machine's CoreGlyphs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `ExtensionStoreTests`       | `Extensions/Model/`: GitHub source parsing and URLs, the store and Git tree parsers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `ExtensionRefreshTests`     | `Extensions/Model/ExtensionRefreshPolicy.swift`: interval parsing, due dates, backoff, subtitle fallback, indicator state, Refresh Now refusals                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `ExtensionVersionTests`     | `Extensions/Service/ExtensionVersionStore.swift`: what an update check reports, adopts and forgets                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `ExtensionMetadataTests`    | `Extensions/Service/ExtensionCommandMetadataStore.swift`: round-trip, failure runs, uninstall                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `ExtensionTests`            | the extension runtime and native menu-bar lifecycle: boots shipped sources in JavaScriptCore; menu tests cover restoration, refresh serialization, actions and teardown; fetch tests cover HTTP connection cleanup, cancellation and request isolation                                                                                                                                                                                                                                                                                                                                       |
+| `ExtensionIconTests`        | `Extensions/Service/ExtensionIconCache.swift`: artwork sizing and its fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `ExtensionSignInTests`      | `Extensions/Service/ExtensionSignInSession.swift`: browser start failures, completion, cancellation without a callback, and late callbacks after teardown                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `IconCacheTests`            | `Platform/Images/IconCache.swift`: row sizing at 1×/2×, warm reuse, stamp and style invalidation, bitmap release, fitted geometry across all 256 alpha values, and that a row icon draws identically to the 96px one                                                                                                                                                                                                                                                                                                                                                                         |
+| `EntryIconTests`            | `EntryIcon`: that each case draws, caches and prints apart from the others, and that a moved `FileIconStamp` retires the bitmap decoded before it                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `TextDiffTests`             | `QuickActions/Model/TextDiffEngine.swift`: exact chunks, coalescing, Unicode, ties, token-cap boundaries and fast paths                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `localization-test` | Chinese translations for settings descriptions and labels, including interpolated names and counts |
-| `SettingsBackupTests` | `Settings/AppSettingsKey.swift`, `Backup/Model/SettingsBackupCoverage.swift` |
-| `SettingsFileTests` | `Settings/Model/` and `Settings/Service/` — key paths, value tokens, the printer and parser, and the repository's import, replace, save, reload and symlink handling on a scratch folder |
-| `WindowFileTests` | `WindowManagement/Model/WindowManagementFileFormat.swift` — command shortcuts, custom sizes, layouts and rooms as settings.json spells them, hand edits and bad records |
-| `LauncherSettingsFileTests` | Launcher settings application — invalid records, partial edits, deferred bundles, shortcut moves and records outside search scopes; isolated preferences and in-memory scan/Carbon effects |
-| `BackupArchiveTests` | all of `Backup/Model/`, plus `Backup/Service/BackupStaging.swift` |
-| `UpdatesTests` | `Updates/Model/` — version precedence, channel filtering, install route, readiness |
-| `UpdateCheckTests` | `UpdateCheckStore` — stopping, in-flight cancellation, cached offer suppression, restart and independent manual checking |
-| `SupportTests` | `Support/Model/` — when the support reminder comes due, and a clock moved backwards |
-| `AIProviderTests` | `AI/Model/` and `AISettingsStore` — instruction composition, provider requests and streams, route settings, protocol framing, CLI launch encodings and queued Codex writes across cancellation, timeout and Stop |
-| `OpenCodeMCPTests` | OpenCode's per-turn MCP bridge and installed CLI launch, authentication, scoped catalog, consent dispatch, serial calls, result budgets and cancellation |
-| `AppleIntelligenceTests` | On-device status, snapshot deltas, transcript assembly and error mapping; real generation is opt-in |
-| `SyntaxHighlightTests` | `AI/Model/SyntaxGrammar.swift`, `SyntaxHighlighter.swift`, `SyntaxStructuredLexers.swift` — every grammar's tokens, language aliases, the size limit and streaming prefixes |
-| `MCPTests` | `MCP/Model/` and `MCPSettingsStore` — JSON-RPC framing, handles, tool names, output flattening, trust, `@server` addressing, the shape a vendor CLI is handed, and which servers Tinycast leaves to that CLI |
-| `MCPStdioTests` | `MCP/Service/` against a stub server — handshake, listing, calling, and every way one can go away |
-| `MCPOAuthTests` | OAuth parsing, RFC 7636 PKCE, discovery and resource binding, loopback callback validation/cancellation, dynamic registration, supplied client credentials and their token-endpoint authentication, Keychain token rotation, concurrent refresh, the wider margin for a token lent to a CLI, redirects and one-retry 401 handling |
+| `CloudSyncTests`            | `CloudSync/Model/` and `Settings/Model/SettingsFileKey.swift`: record names, the ledger's diff, last-write-wins, edit-beats-delete, echo-free apply and re-fetch skip, category merge, setting scope (every feature switch, folder and device stays local) and entry-key spelling                                                                                                                                                                                                                                                                                                            |
+| `SettingsBackupTests`       | `Settings/AppSettingsKey.swift`, `Backup/Model/SettingsBackupCoverage.swift`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `SettingsFileTests`         | `Settings/Model/` and `Settings/Service/`: key paths, value tokens, the printer and parser, and the repository's import, replace, save, reload and symlink handling on a scratch folder                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `WindowFileTests`           | `WindowManagement/Model/WindowManagementFileFormat.swift`: command shortcuts, custom sizes, layouts and rooms as settings.json spells them, hand edits and bad records                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `LauncherSettingsFileTests` | Launcher settings application: invalid records, partial edits, deferred bundles, shortcut moves and records outside search scopes; isolated preferences and in-memory scan/Carbon effects                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `BackupArchiveTests`        | all of `Backup/Model/`, plus `Backup/Service/BackupStaging.swift`: the bundle, the archive, and every `SettingsBackup` field in exactly one slice that a crafted file cannot widen                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `UpdatesTests`              | `Updates/Model/`: version precedence, channel filtering, install route, readiness                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `UpdateCheckTests`          | `UpdateCheckStore`: stopping, in-flight cancellation, cached offer suppression, restart and independent manual checking                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `SupportTests`              | `Support/Model/`: when the support reminder comes due, a clock moved backwards, giving week                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `AIProviderTests`           | `AI/Model/` and `AISettingsStore`: instruction composition, provider requests and streams, route settings, protocol framing, CLI launch encodings and queued Codex writes across cancellation, timeout and Stop                                                                                                                                                                                                                                                                                                                                                                              |
+| `OpenCodeMCPTests`          | OpenCode's per-turn MCP bridge and installed CLI launch, authentication, scoped catalog, consent dispatch, serial calls, result budgets and cancellation                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `AppleIntelligenceTests`    | On-device status, snapshot deltas, transcript assembly and error mapping; real generation is opt-in                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `SyntaxHighlightTests`      | `AI/Model/SyntaxGrammar.swift`, `SyntaxHighlighter.swift`, `SyntaxStructuredLexers.swift`: every grammar's tokens, language aliases, the size limit and streaming prefixes                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `MCPTests`                  | `MCP/Model/` and `MCPSettingsStore`: JSON-RPC framing, handles, tool names, output flattening, trust, `@server` addressing, the shape a vendor CLI is handed, and which servers Tinycast leaves to that CLI                                                                                                                                                                                                                                                                                                                                                                                  |
+| `MCPStdioTests`             | `MCP/Service/` against a stub server: handshake, listing, calling, and every way one can go away                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `MCPOAuthTests`             | OAuth parsing, RFC 7636 PKCE, discovery and resource binding, loopback callback validation/cancellation, dynamic registration, supplied client credentials and their token-endpoint authentication, Keychain token rotation, concurrent refresh, the wider margin for a token lent to a CLI, redirects and one-retry 401 handling                                                                                                                                                                                                                                                            |
 
 `MCPStdioTests` copies `Tests/ai-fixtures/mcp-stub.js` into a scratch directory. The stub
 reads fd 0 synchronously and writes replies with `fs.writeSync`, so a reply reaches the pipe before
@@ -261,9 +264,9 @@ find ~/Library/Developer/Xcode/DerivedData -name "Tinycast*.app" -maxdepth 6 -pr
 ./Scripts/lint.sh
 ```
 
-SwiftLint owns the rules that catch defects, including the two checkable comment rules — the
+SwiftLint owns the rules that catch defects, including the two checkable comment rules: the
 100-character cap and the ban on stacked comment lines. Errors block; warnings do not. There is no
-formatter, deliberately — the configuration and the measurements behind that are in
+formatter, deliberately; the configuration and the measurements behind that are in
 [development.md](development.md#formatting).
 
 The script then runs `Scripts/check-settings-search.js`, one check SwiftLint can't: every
@@ -300,7 +303,7 @@ swiftc -O -wmo -swift-version 6 Tinycast/Features/FileSearch/Model/*.swift \
 
 It prints the crawl and write times, the index size, and first and median latency per query.
 
-The calculator benchmark is deterministic — an injected clock, calendar and rate table — so it is a
+The calculator benchmark is deterministic (an injected clock, calendar and rate table), so it is a
 timing harness rather than an assertion one, and stays out of `run-tests.sh` for that reason:
 
 ```sh
@@ -402,19 +405,19 @@ it three times, take the median.
 
 Measured at the end of the 2026 refactor, on `main`. Useful as orders of magnitude, not as contracts.
 
-| | Value |
-| --- | --- |
-| Release binary | 3,655,736 B (from 3,471,592 B at the start of the refactor) |
-| Resident memory | 40–80 MB in normal use; the hard ceiling is 100 MB |
-| `SettingsPaneScanner` warm scan | 0.014 ms (16.5 ms cold), 52 panes |
-| Largest view / owner | `RootPaletteView` 662 lines, `AppCore` 284 lines |
-| Comment density | 1,653 of 27,289 source lines (6.1%) |
-| The harness suite | ~15 s wall clock, 11-way parallel (~98 s serial, ~140 s before either) |
-| `PaletteSelectionTests` | 111,684 assertions — a tripwire: a change in this count means the row-order model moved |
-| `SnippetKeywordPolicy` match | 7 µs/keystroke at 50 keywords, 59 µs at 1,000 — the `lowercased()` is 0.09 µs of it |
-| `ClipboardStore.pinnedItems` | 27–127 µs per uncached search, 1,000-row window — no cache earns its invalidation yet |
+|                                           | Value                                                                                                                                                                |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Release binary                            | 3,655,736 B (from 3,471,592 B at the start of the refactor)                                                                                                          |
+| Resident memory                           | 40–80 MB in normal use; the hard ceiling is 100 MB                                                                                                                   |
+| `SettingsPaneScanner` warm scan           | 0.014 ms (16.5 ms cold), 52 panes                                                                                                                                    |
+| Largest view / owner                      | `RootPaletteView` 662 lines, `AppCore` 284 lines                                                                                                                     |
+| Comment density                           | 1,653 of 27,289 source lines (6.1%)                                                                                                                                  |
+| The harness suite                         | ~15 s wall clock, 11-way parallel (~98 s serial, ~140 s before either)                                                                                               |
+| `PaletteSelectionTests`                   | 111,684 assertions (a tripwire: a change in this count means the row-order model moved)                                                                              |
+| `SnippetKeywordPolicy` match              | 7 µs/keystroke at 50 keywords, 59 µs at 1,000; the `lowercased()` is 0.09 µs of it                                                                                   |
+| `ClipboardStore.pinnedItems`              | 27–127 µs per uncached search, 1,000-row window; no cache earns its invalidation yet                                                                                 |
 | Rendered Notes editor, 100,000 characters | 30 ms install and full restyle; 7.5, 5.9 and 3.3 ms per character typed at the end, middle and start (5.2, 3.1 and 0.6 ms with rendering off); 0.6 ms per caret move |
-| `count items of trash` | 5,000 ms against a cold Finder on an *empty* Trash, 110 ms warm — why AppleScript is detached |
+| `count items of trash`                    | 5,000 ms against a cold Finder on an _empty_ Trash, 110 ms warm: why AppleScript is detached                                                                         |
 
 Launch time, allocation counts and RSS have never been captured as numbers. The signposts are in place,
 so any of them can be taken from `main` whenever a change makes it worth knowing.
@@ -436,7 +439,7 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
   and run it: Escape returns to the launcher **with the query still typed and the row still
   selected**, and the next press clears it. The same screen from its own global hotkey hides the
   palette instead, and shows its own header icon rather than a back chevron
-- ⌘esc from any depth lands on an empty root search with the window still open — **must be checked
+- ⌘esc from any depth lands on an empty root search with the window still open; **must be checked
   on a real keyboard**: macOS claims the chord, so `CommandEscapeTap` is the only thing that
   delivers it and it needs Accessibility granted to the running build. With the palette closed, ⌘esc
   still does whatever macOS does with it. Open a menu or dialog over the palette and verify ⌘esc
@@ -470,13 +473,15 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
 - The expanded header leaves even room above the query and below it, before the first section
 - With a CJK IME: the placeholder clears as soon as composition starts and the composing text never
   overlaps it; cancelling composition brings the placeholder back, and the list filters only once the
-  candidate is committed — check on a second summon too, where first responder never moved
+  candidate is committed; check on a second summon too, where first responder never moved
 - Typing filters instantly; ↑/↓ move the highlight and scroll it into view without yanking the list
 - ⌃N/⌃P move the highlight as ↓/↑ do; ⌃F/⌃B step compact shortcuts or the emoji grid's selection, and the caret elsewhere
+- In the emoji grid, ⇧←, ⌥←, ⌘← and ⌘⇧← edit the query while the selection stays put; with one
+  result or none, bare ←/→ move the caret
 - The highlight always sits on the row the footer pill describes
 - With a calculation typed, the calculator card is first and is selected first
 - ⌘↵ on a number, unit or money card puts the answer in the search bar with the caret after it, so
-  ` * 2` typed straight away extends it — from ⌘K too; a date or time card offers neither
+  ` * 2` typed straight away extends it (from ⌘K too); a date or time card offers neither
 - With macOS set to a decimal-comma region (Italian), `2,3 + 1,5` answers `3,8`, `max(2,5; 3)`
   answers `3`, and ↵ pastes `3,8`; General ▸ Calculator ▸ Number format `English` restores `2.3 + 1.5`
   and re-renders past Calculator History in the chosen format
@@ -487,10 +492,10 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
   the palette query; sections survive filtering, **No Results** is centred, and no dissolve covers the
   last row. The native caret blinks; mouse drag and ⌘A select text; ←/→ move through it; ↑/↓ still
   move the menu highlight. Escape clears a non-empty query, then closes the menu on the next press
-- The bottom-left app menu also searches from its bottom band; every header menu — including Emoji
-  categories, File Search filters and extension dropdowns — searches from its top band
+- The bottom-left app menu also searches from its bottom band; every header menu (including Emoji
+  categories, File Search filters and extension dropdowns) searches from its top band
 - The app menu opens at the ⌘K Actions menu's height with Check for Updates and Changelog, a
-  separator, About and Support, a separator, then Settings partially visible; Settings and Quit
+  separator, About, Support, then Settings partially visible; Settings and, after a separator, Quit
   scroll fully into view with the pointer or arrow keys. Filtering to fewer rows shrinks the menu
 - A long menu opens with unchanged row insets; while scrolling, rows can reach the panel edges
 - A click in the palette but outside its menu closes only the menu; a click outside the palette
@@ -510,7 +515,7 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
 - The type filter searches from its top band, retains its active checkmark when matched, and shows
   centred **No Results** without changing the clipboard query; its native field supports selection
 - ⌘. pins and the highlight follows the row into Pinned; ⌘⌫ deletes; ⌘↵ copies without pasting
-- With enough pins to fill the list, opening it — the first show after launch too — highlights the
+- With enough pins to fill the list, opening it (the first show after launch too) highlights the
   newest clip, centred with pins above; clearing a query or the filter lands there again
 - ⌃X deletes the selected entry and ⌃⇧X clears the history, from the list and from an open ⌘K menu
 - ⌃⇧X asks first, through Tinycast's own dialog; Cancel and Esc both leave every entry in place
@@ -522,7 +527,7 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
   the same Copy Text row
 - The "Reading text…" progress pill appears while the helper runs and is replaced by the outcome:
   **Copied text**, or **No text found** when nothing was recognized
-- Copy Text on a vanished row reports by kind — "That file has moved or been deleted." for a
+- Copy Text on a vanished row reports by kind: "That file has moved or been deleted." for a
   referenced file, "That image is no longer available." for a pruned blob
 - Copy Text works with clipboard text search off: the helper is bundled either way
 - Copying something else while "Reading text…" shows leaves that copy on the pasteboard, and the
@@ -557,7 +562,7 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
 - Recording captures a shortcut, and the old binding does not fire while recording
 - A conflicting binding is rejected and names its current owner
 - A double-tap binding fires; Hyper Key remaps and its status dot is green
-- Each Hyper Key choice — Caps Lock and all eight Left/Right modifiers — sends the chord.
+- Each Hyper Key choice (Caps Lock and all eight Left/Right modifiers) sends the chord.
   Quick Press is offered for Caps Lock only, with original-key and Escape actions. Hyper Key never
   requests Input Monitoring
 - Plug in a second keyboard: Caps Lock is Hyper there too. Change Hyper Key to a modifier while
@@ -584,12 +589,11 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
 - With Secure Input held, record Hyper+J with and without Secure Input Compatibility: both save ✦J,
   never F18 or ⌃J, and a quick Hyper+J leaves Caps Lock off
 - Quit Tinycast: Caps Lock types capitals again on every keyboard, the built-in one included
-- 🎤 records in a recorder and fires its binding; unbound, it starts macOS Dictation again
 - With Karabiner-Elements running and Caps Lock left alone there, Hyper with Caps Lock still works;
   quit Tinycast and Karabiner's own remaps keep working. Remap Caps Lock in Karabiner instead:
   Diagnostics… reports a Karabiner conflict
 - Every binding survives quit and relaunch
-- `Enable Commands` off leaves every pane-owned command listed, searchable and firing — Notes,
+- `Enable Commands` off leaves every pane-owned command listed, searchable and firing: Notes,
   Clipboard, Emoji, File Search, Snippets, Quicklinks, Calendar, AI and the two layout commands
 
 ### Uninstall
@@ -676,15 +680,15 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
 - With Notes **off**: all three commands are absent, their shortcuts no-op, and the Notes directory is
   not created
 - Enabling in Settings projects Show Notes, Create Note, and Search Notes immediately; the pane's
-  visibility checkboxes and recorders are the only ones — Settings > Commands lists none of the three
+  visibility checkboxes and recorders are the only ones; Settings > Commands lists none of the three
 - Show Notes opens the last active note and focuses an already visible window without hiding it
 - Create Note makes one unique Untitled file, including as the first action in an empty channel
 - Command-P and the Browse button focus search, arrows move selection, Return opens, and Command-N
   creates
 - Empty switcher search reads the complete recent list; title and body searches rank correctly and a
   superseded query never publishes
-- An Untitled note titles itself from its first line as it is typed, in the title bar and — after the
-  autosave — in the browse list; naming it replaces that, and clearing the name brings it back
+- An Untitled note titles itself from its first line as it is typed, in the title bar and, after the
+  autosave, in the browse list; naming it replaces that, and clearing the name brings it back
 - Inline rename updates the Markdown filename without changing source, and starts from that filename
   even where the row shows a derived title; collisions receive a suffix
 - Delete confirms through Tinycast, moves the file to Trash, and selecting another note never loses an
@@ -719,12 +723,17 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
 - Typing new lines, wrapping text, and pasting grow the note vertically without changing its width,
   and deleting shrinks it back to the 180pt floor; the top edge stays put until growth reaches the
   screen's bottom, then the window moves up. It stops at 860pt or the screen's usable height and
-  scrolls. A dragged height holds until the next keystroke, which fits the window again. Switching
+  scrolls. A dragged height holds through typing, note switches and a relaunch, and Fit Window to
+  Note in the title bar fits the window again; a width-only drag never stops fitting. Switching
   to a shorter note shrinks it. Repeat with rendering on and off, Find and the formatting bar open,
   and on a secondary display
 - Typing, Return and Delete in a bulleted list, in its last item and in the middle, grow or shrink the
   window by whole rows and never shrink it for a frame, scroll the first line away or flash the
   scrollbar
+- Click just before the first letter of a bullet item, again and again, and type: the text always
+  joins the item, never lands before its `- `. →, ⌘← and ↑ onto the item stop at its first letter,
+  and ← from there moves to the end of the line above. On another line, click right at the edge of
+  bold or code text: the caret sits beside it, never between its hidden `**` or backticks
 - With Render Markdown **off**, the note is fully literal (markers visible, links inert, task syntax
   plain) and Return, Tab, Delete, and formatting-looking shortcuts keep native plain-text behavior;
   flipping it back re-renders without dirtying the note or touching undo
@@ -800,7 +809,7 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
 - A currency query answers from the cached snapshot; with the cache cleared and no network it reports
   rates unavailable rather than guessing
 - A bare amount (`1 usd`) answers in the Mac's region currency, and follows a change to
-  System Settings ▸ General ▸ Language & Region without a relaunch — and nothing prompts for location
+  System Settings ▸ General ▸ Language & Region without a relaunch, and nothing prompts for location
 - A crypto query (`1 btc`, `0.5 sol to eur`) answers, and `1 usd to btc` stays in plain notation
 - `1000 usd in eur/12` converts and then divides; copying preserves the euro amount and code.
   `100km/h in m/s / 2` retains the compound target, and `1000 usd in eur / 0` stays silent
@@ -836,7 +845,7 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
 - Clicking the calendar item opens `Join <title>`, `Open in Calendar...`, `My Schedule` and
   `Calendar Settings...` and nothing else; the second opens that event in Calendar.app, while a bare
   click never joins
-- Camera Preview on: ↵ on the join card opens the panel **already showing live video** — no black
+- Camera Preview on: ↵ on the join card opens the panel **already showing live video**: no black
   frame, no blank mid-preview; ↵ joins, Esc drops the join; the camera light goes out with the
   panel, and the first run prompts once, before any panel appears
 - With Open Camera or the join card up, changing a video effect in Control Center leaves the preview
@@ -844,7 +853,7 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
   panel is clicked
 - A meeting that ends leaves the launcher results and `My Schedule` on the same minute boundary it
   leaves the menu bar, with the palette open or closed over the end
-- Auto Join on: the meeting opens itself at its start, **once** — dismiss it and it does not return.
+- Auto Join on: the meeting opens itself at its start, **once**: dismiss it and it does not return.
   With confirm on and camera preview off, the dialog asks first
 - Arming Auto Join during a meeting already under way joins nothing
 - `Only join known meeting services` on: an event whose only link is a booking page or document
@@ -872,7 +881,8 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
 - Move files and apps across each other with ⌥⌘↑/↓ and the matching menu actions; selection follows
   the moved row. Remove a favorite through either path; selection stays within Favorites.
 - Hold ⌘ and check that each displayed ⌘1–⌘0 opens that favorite, including with the meeting card
-  above Favorites and from the compact palette.
+  above Favorites and from the compact palette. The chords slide in from the trailing edge and
+  vanish at once on release; ⌘, never shows them before Settings opens, even with ⌘ held past the delay.
 - Search for a saved filename, including a short query and accented text: the favorite appears once.
   Turn Show in launcher off: saved files remain available; disable File Search: they disappear.
   Re-enable it: their order returns.
@@ -904,6 +914,10 @@ prefs, caches, TCC grants and login item, so this cannot disturb an installed co
   with the gap, hides other apps and parks their extra windows; quitting, `kill -9` then relaunching, and
   turning Window Management off each bring every window back.
   Repeat on two displays and with Reduce Motion on
+- Rooms by shortcut: entering one shows the room HUD (never with the preview); Switch to Previous
+  Room toggles between the last two, including two presses during the first transition. With a
+  different room previewed, the shortcut fades that preview and shows the destination HUD. Tidy
+  Current Room puts moved windows back
 
 ### Deeplinks
 
@@ -915,7 +929,7 @@ Debug answers `tinycast-dev://`; use that scheme for every link below.
 - Type into a quicklink's and a custom command's argument fields, then ⇧⌘C: the link carries the
   values, and opening it fills the same fields
 - Right-click a shortcut field in Settings (a command, a quicklink, an extension command): Copy
-  Deeplink copies its link. Onboarding's and General's App Launcher field offer no menu
+  Deeplink copies its link. The onboarding shortcut keys and General's App Launcher field offer no menu
 - The note switcher's link button, and Copy Deeplink in the AI Chat sidebar and window menu, copy a
   link that reopens that note or chat; a renamed note's old link reports the missing file
 - `open -g` each copied link with the palette closed: it runs what the row's shortcut runs
@@ -986,8 +1000,28 @@ Debug answers `tinycast-dev://`; use that scheme for every link below.
 - Settings → About shows the update row: "Last checked" with a relative time after a check, "Checking
   for updates…" while Check Now runs, and the local-build line in a Dev build
 - Every pane renders and the sidebar switches without flicker
+- Activity Monitor shows a Tinycast Dev (Settings) row while Settings is open, and it is gone a moment
+  after the window closes; the main app's own footprint stays flat after visiting every pane
+- Settings comes to the front from the menu bar, ⌘, in the palette, the launcher's Settings command,
+  About, `tinycast-dev://settings/<pane>` sent from another app, and the Dock icon's reopen
+- ⌘Q in Settings closes only Settings; quitting or killing the main app closes Settings too
+- Close Settings and immediately open it on another pane. The new process lands on the requested
+  pane. Repeat after saving a shortcut and verify the shortcut is still bound.
+- Rebuild the Debug app while it runs, then open Settings: a relaunch dialog appears instead, and
+  Relaunch brings back a Tinycast whose Settings opens
+- While a shortcut records in Settings, the main app's shortcuts stay silent (⌃Space opens nothing and
+  the recorder reports the conflict); `kill -9` the Settings process mid-recording and they work again
+- A palette editor opened from Settings (custom command, quicklink, snippet, room) saves, and the
+  pane lists the change; a delete in the pane leaves the launcher at once
+- Saving a new quicklink, snippet or custom command shows a "… created" HUD, and saving an edit shows
+  "… saved", whether the editor closes or returns to its browser; a failed save shows none
+- Favorite a launcher item while a Settings deletion confirmation is open for a different favorite.
+  Confirm the deletion and verify the new favorite survives.
+- Mirrored status updates live: File Search indexing, iCloud Sync, a dictation model download,
+  MCP server state, Hyper Key status and diagnostics, extension updates and install progress
 - A feature switch takes effect in the launcher immediately; every setting survives relaunch
-- Export produces a `.tinycast`; import applies it and reports a per-category summary
+- Export produces a `.tinycast`; import applies it and reports a per-category summary, and the
+  launcher shows the imported ranking, frequent emoji, calculator history, pins, notes and clips at once
 - Untick a category on export, and the import picker greys that row out rather than offering it
 - Untick a category on **import** and confirm it did not arrive, while the ticked ones did
 - An image clip round-trips and still renders; the archive can then be deleted without breaking it
@@ -995,6 +1029,28 @@ Debug answers `tinycast-dev://`; use that scheme for every link below.
 - Cancelling the save panel leaves nothing in `~/Library/Caches/com.abueammar.tinycast.dev/backup-staging/`
 - **`snippetsEnabled` is not in the exported file**, and importing does not enable snippets
 - Nothing in the extracted tree names a Keychain item, an extension, or an AI conversation
+- Export only Quicklinks: the file holds `quicklinks.json` with their shortcuts, and importing it
+  restores both without touching settings; every Not Included row shows its reason on hover
+
+### iCloud Sync
+
+Needs a Dev build signed with `Config/Local.xcconfig` ([signing.md](signing.md)). A second macOS user
+signed in to the same Apple ID is a second Mac on one machine.
+
+- A self-signed contributor build shows "iCloud Sync needs a signed release build" and nothing crashes
+- Turning sync on asks first, then shows "Setting up…" and settles on "Up to date"; the counts match
+- On the second Mac: notes, snippets, quicklinks, a hotkey, an alias, a favorite and an appearance
+  change arrive; no note is rewritten or renamed when both Macs already held it
+- Edit the same note on both while offline: the later edit wins; an open note with unsaved typing
+  keeps it and uploads it
+- Delete a note on one Mac: it moves to the Trash on the other
+- Install a store extension on one Mac: it installs on the other only once Extensions is on there;
+  uninstalling removes it from both
+- A clashing hotkey keeps each Mac's own choice and is not bounced back
+- Unchecking a category stops it in both directions; checking it again merges rather than deletes
+- Remove the other Mac: it turns sync off there and says why
+- Delete iCloud Data turns sync off on every Mac and leaves their data
+- Signing out of iCloud shows the reason; signing back in resumes on its own
 
 ### Clean install
 
@@ -1009,10 +1065,43 @@ defaults delete com.abueammar.tinycast.dev 2>/dev/null || true
 tccutil reset Accessibility com.abueammar.tinycast.dev 2>/dev/null || true
 ```
 
-- Launches with every store directory absent — no crash, no hang; onboarding runs
+- Launches with every store directory absent: no crash, no hang; onboarding runs
 - With no saved app language, onboarding uses the primary system language if supported, otherwise
   English; a saved language stays unchanged on relaunch
-- Onboarding has no Dock entry; completing it leaves the palette open and ready for typing.
+- The onboarding intro dims only the display where the wizard opens. The window is revealed from
+  the logo, at the launcher's default position on that display. The soft circular edge is the only
+  part of the window that fades. The logo stays visible throughout. The menu bar and the desktop
+  brighten together, and the native shadow becomes visible as the dimming clears. With Reduce
+  Motion or Tinycast animations disabled, the wizard appears directly with its shadow
+- Welcome leads straight to the pasting step. Without Accessibility there is no Skip: Grant Access is
+  the only way forward, and Return opens System Settings. Once access is granted, the button becomes
+  Next and continues to import. Each short page is centered between the top of the window and the
+  footer. Next and Back slide the pages in opposite directions.
+  Escape leaves the wizard open on every step. Closing the wizard opens the launcher, as Get
+  Started does, and onboarding does not return on relaunch. Quit Tinycast partway, during the intro
+  or on any step: the next launch shows onboarding again from the intro. Settings › General ›
+  Welcome guide › Show Again replays it from the intro, in front of the Settings window.
+- Try both the Raycast file picker and a Finder drop. A recognized export shows its passphrase field.
+  The passphrase field keeps the system focus ring, hidden and visible. Toggling the eye while
+  editing keeps the selection.
+  Before an export is chosen, Skip is violet and Return skips the step.
+  Return activates Import once a passphrase and at least one category are set.
+  Open and close the category row: check the chevron rotation and the scroll in both directions.
+  Click anywhere on a category tile to toggle it. Selected tiles and Select All use Tinycast violet.
+  Click the selected file row to replace the export. Its × clears the passphrase and selection.
+  The export stays on disk.
+  Choosing an invalid file hides the passphrase and categories.
+- On the last step, check Launch at login reflects the current setting after importing or skipping.
+  Without clicking anything, hold modifiers: the keys follow them. Type a shortcut: it is saved at
+  once and survives Back and Next. Type one Tinycast already uses: the card names its owner. A lone
+  modifier tap records nothing; a double tap does. Press the saved shortcut and verify the keys
+  respond before the palette opens, ready for typing. Onboarding has no Dock entry.
+  With no binding, check that ⌘ Space is offered when available. With Spotlight on ⌘ Space, Replace
+  Spotlight binds ⌘ Space and unticks Spotlight in System Settings › Keyboard › Keyboard Shortcuts;
+  it stays off after logging out and back in. Undo ticks it again and clears the binding. With
+  another app using ⌘ Space, Replace Spotlight leaves Spotlight on and shows the warning below the
+  keys; record a different shortcut. Return activates the violet Get Started button even without a
+  binding.
   Settings still adds a Dock entry while open and removes it when the last ordinary window closes
 - Palette opens and lists apps; clipboard, quicklinks, snippets and calculator history are all empty
   and all accept a first entry
@@ -1020,5 +1109,5 @@ tccutil reset Accessibility com.abueammar.tinycast.dev 2>/dev/null || true
 - **Every setting shows its intended default.** Walk the panes: this is what catches a broken
   absence-versus-`false` read
 - Quit and relaunch: everything created above persisted
-- Nothing was written outside `com.abueammar.tinycast.dev/`. Channel isolation is not negotiable — a
+- Nothing was written outside `com.abueammar.tinycast.dev/`. Channel isolation is not negotiable: a
   Dev build writing into the stable app's directory is a defect even though the data is disposable

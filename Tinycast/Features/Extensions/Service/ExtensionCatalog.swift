@@ -9,6 +9,12 @@ struct InstalledExtension: Sendable, Hashable, Identifiable {
     var id: String { manifest.name }
     var title: String { manifest.title }
 
+    var commandEntryIDs: [String] {
+        manifest.commands.map {
+            ExtensionCommandRef(extensionName: manifest.name, commandName: $0.name).entryID
+        }
+    }
+
     /// Assets usually live in `assets/`, but a few manifests point at the extension root.
     var iconPath: String? {
         guard let icon = manifest.icon else { return nil }
@@ -31,7 +37,7 @@ struct InstalledExtension: Sendable, Hashable, Identifiable {
     }
 }
 
-struct ExtensionCommandRef: Sendable, Hashable {
+struct ExtensionCommandRef: Codable, Sendable, Hashable {
     let extensionName: String
     let commandName: String
 

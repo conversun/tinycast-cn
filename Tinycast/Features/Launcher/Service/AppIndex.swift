@@ -193,25 +193,37 @@ struct AppEntry: Identifiable, Hashable, Sendable {
 
     private var defaultIcon: EntryIcon {
         guard kind.descriptor.isSymbolIcon else { return .file(stamp: iconStamp) }
-        return .symbol(symbolName ?? kindSymbol)
-    }
-
-    private var kindSymbol: String {
         switch kind {
-        case .quicklink: return Quicklink.sfSymbol
-        case .snippet: return "text.quote"
-        case .customCommand: return CustomCommand.sfSymbol
-        case .command: return CommandCatalog.command(for: self)?.sfSymbol ?? "questionmark"
+        case .command:
+            guard let command = CommandCatalog.command(for: self) else { return .symbol("questionmark") }
+            return .tile(symbol: command.sfSymbol, tint: command.tint)
         case .quickAction:
-            return CommandCatalog.command(for: self)?.sfSymbol ?? CustomQuickAction.sfSymbol
-        case .systemAction: return SystemActionCatalog.action(forEntryID: id)?.sfSymbol ?? "questionmark"
+            guard let command = CommandCatalog.command(for: self) else {
+                return .tile(
+                    symbol: symbolName ?? CustomQuickAction.sfSymbol, tint: SettingsTab.quickActions.tint)
+            }
+            return .tile(symbol: command.sfSymbol, tint: command.tint)
+        case .systemAction:
+            guard let action = SystemActionCatalog.action(forEntryID: id) else {
+                return .symbol("questionmark")
+            }
+            return .tile(symbol: action.sfSymbol, tint: action.tint)
         case .windowCommand:
-            return WindowCommandCatalog.command(forEntryID: id)?.sfSymbol
-                ?? CustomWindowSize.sfSymbol
-        case .windowLayout: return WindowLayout.sfSymbol
-        case .windowRoom: return Room.sfSymbol
-        case .meeting: return "video.fill"
-        case .application, .systemSettings, .appleShortcut, .extensionCommand: return "questionmark"
+            let symbol =
+                WindowCommandCatalog.command(forEntryID: id)?.sfSymbol ?? CustomWindowSize.sfSymbol
+            return .tile(symbol: symbol, tint: SettingsTab.windowManagement.tint)
+        case .windowLayout:
+            return .tile(
+                symbol: symbolName ?? WindowLayout.sfSymbol, tint: SettingsTab.windowManagement.tint)
+        case .windowRoom: return .tile(symbol: Room.sfSymbol, tint: SettingsTab.windowManagement.tint)
+        case .quicklink:
+            return .tile(symbol: symbolName ?? Quicklink.sfSymbol, tint: SettingsTab.quicklinks.tint)
+        case .snippet: return .tile(symbol: "text.quote", tint: SettingsTab.snippets.tint)
+        case .customCommand:
+            return .tile(symbol: symbolName ?? CustomCommand.sfSymbol, tint: SettingsTab.commands.tint)
+        case .meeting: return .tile(symbol: symbolName ?? "video.fill", tint: SettingsTab.calendar.tint)
+        case .application, .systemSettings, .appleShortcut, .extensionCommand:
+            return .symbol(symbolName ?? "questionmark")
         }
     }
 
@@ -388,9 +400,9 @@ final class AppIndex {
     private var extensionEntries: [AppEntry] = []
     private var meetingEntries: [AppEntry] = []
     /// The catalog's commands a disabled feature hides; the Commands slice is recomputed from it.
-    private var hiddenCommands: Set<CommandID> = []
+    private(set) var hiddenCommands: Set<CommandID> = []
     /// Kept out of launcher search by a "Show in launcher" switch, yet still runnable by shortcut.
-    private var unlistedCommands: Set<CommandID> = []
+    private(set) var unlistedCommands: Set<CommandID> = []
     private var nameCache = BundleNameCache()
     private var paneCache: SettingsPaneScanner.Cache?
     private var isRefreshing = false
@@ -430,6 +442,14 @@ final class AppIndex {
         let updated = visible ? hiddenCommands.subtracting(commands) : hiddenCommands.union(commands)
         guard updated != hiddenCommands else { return }
         hiddenCommands = updated
+        publishEntries()
+    }
+
+    /// Settings' process starts no feature, so it takes the main app's verdicts whole.
+    func adoptCommands(hidden: Set<CommandID>, unlisted: Set<CommandID>) {
+        guard hidden != hiddenCommands || unlisted != unlistedCommands else { return }
+        hiddenCommands = hidden
+        unlistedCommands = unlisted
         publishEntries()
     }
 

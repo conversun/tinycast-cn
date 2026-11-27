@@ -15,21 +15,21 @@ selectable Markdown renderer with AI Chat.
 ## Invariants
 
 - **Off out of the box, and off means the shortcuts do nothing.** `AppSettings.quickActionsEnabled`
-  is the flag and `QuickActionCoordinator` is the only place that reads it: no selection is read, no
-  provider is built, no panel opens. The four commands leave the launcher's Quick Actions slice
+  is the flag and `QuickActionCoordinator` refuses every run while it is off: no selection is read,
+  no provider is built, no panel opens. The four commands leave the launcher's Quick Actions slice
   through `AppIndex.setCommandsVisible`, and the custom ones leave it through
-  `AppIndex.setCustomQuickActions`, the way Notes and AI Chat drop theirs. Carbon bindings stay
-  registered, so re-enabling restores every shortcut without touching the hotkey layer. The flag
-  grants keystroke delivery into other apps, so like `snippetsEnabled` it is excluded from settings
-  backups — an import must never arm it.
+  `AppIndex.setCustomQuickActions`, the way Notes and AI Chat drop theirs.
+  `AppCore.allowsHotKeyAction` also reads the flag, so their shortcuts leave Carbon while it is off
+  and return when it is on. The flag grants keystroke delivery into other apps, so like
+  `snippetsEnabled` it is excluded from settings backups; an import must never arm it.
 - **One funnel, whichever way an action started.** A shortcut and a launcher row both land on
   `QuickActionCoordinator.run(_:)`, which captures the target **before** hiding the palette. An
   external app remains the usual target; a selected passage in the Notes editor is captured directly
   from its text view. Hiding there rather than at each caller keeps the two paths identical.
 - **Enabling is consent, and it is the only place Accessibility is requested.** The toggle confirms
   through `DialogController` first and then calls `Permissions.ensureAccessibility()`, the pattern
-  `SnippetCoordinator.setSnippetsEnabled` established. Everything else — a shortcut press, a
-  delivery — uses `isAccessibilityTrusted()` and degrades to a HUD.
+  `SnippetCoordinator.setSnippetsEnabled` established. Everything else (a shortcut press, a
+  delivery) uses `isAccessibilityTrusted()` and degrades to a HUD.
 - **Tinycast is never an event target.** `QuickActionRunner.selection(in:using:)` refuses our own
   bundle identifier, and `TextInjector.targetAcceptsInjection` refuses it again before every event post,
   along with anything raised while Secure Event Input is up. Notes is the narrow in-process exception:
@@ -38,7 +38,7 @@ selectable Markdown renderer with AI Chat.
 - **One run at a time.** Two overlapping runs would race for one selection, and the second would
   replace text the first had already changed. `QuickActionCoordinator` holds a single task and
   refuses a second while it lives; a generation token stops a task that finishes after being
-  replaced — by a retranslate, say — from clearing the newer handle.
+  replaced (by a retranslate, say) from clearing the newer handle.
 - **`Model/` stays Foundation-only.** `QuickActionTests` compiles that folder standalone, which is
   what keeps `FoundationModels`, `Translation` and `NaturalLanguage` in `Service/` and `UI/`.
 - **Quick Actions route themselves.** `quickActionModel` is a second routing decision, defaulting to
@@ -65,10 +65,10 @@ selectable Markdown renderer with AI Chat.
   whole feature.
 - **Built-in instructions treat the selection as untrusted input.** `QuickActionPrompt` tells the
   model that the text is material to work on and never instructions to follow, and that only the
-  transformed text may come back — no preamble, no fences. Custom instructions replace these rules
+  transformed text may come back: no preamble, no fences. Custom instructions replace these rules
   too. The output is pasted into somebody's document.
 - **A custom prompt cannot drop that boundary.** An override on a shipped action may replace
-  `boundary`, because the sheet shows the whole prompt. A custom action *is* the prompt, so `boundary`
+  `boundary`, because the sheet shows the whole prompt. A custom action _is_ the prompt, so `boundary`
   is prepended and no control removes it.
 - **Each model action owns its instructions and its route.** The pencil on Fix Grammar, Rewrite and
   Summarize opens a sheet prefilled with the exact built-in prompt and the action's model. Saving
@@ -77,27 +77,28 @@ selectable Markdown renderer with AI Chat.
 - **A custom action never travels in a backup.** Neither the record, its shortcut nor its route, for
   the reason `quickActionInstructions` already doesn't: an import must never change what a shortcut
   does to somebody's documents. Its JSON sits outside `UserDefaults`, so no settings key can sweep it
-  up, and `quickActionModelOverrides` is excluded like `quickActionModel`.
+  up, and `quickActionModelOverrides` is excluded like `quickActionModel`. Only the user's own
+  [iCloud Sync](icloud-sync.md) carries the record to their other Macs; its route stays behind.
 
 ## The actions
 
 `QuickAction` is `.builtIn(BuiltInQuickAction)` or `.custom(CustomQuickAction)`. Coordinator, panel,
 runner and prompt all take that one type, and neither half has a code path of its own.
 
-A fifth *shipped* action is one `BuiltInQuickAction` case, its prompt in `QuickActionPrompt`, and one
+A fifth _shipped_ action is one `BuiltInQuickAction` case, its prompt in `QuickActionPrompt`, and one
 `CommandID` case for its launcher row. `CommandID.init(_ action:)` is exhaustive, so it cannot compile
 without one.
 
 The custom case carries the record rather than an id, so a run uses the prompt as it was when it
 started.
 
-| Action | Engine | Default result | Diff |
-| --- | --- | --- | --- |
-| Fix Grammar | provider | replaces directly | yes |
-| Rewrite | provider | panel | yes |
-| Translate | Apple Translation | panel | no |
-| Summarize | provider | panel, always | no |
-| a custom action | provider | panel | no |
+| Action          | Engine            | Default result    | Diff |
+| --------------- | ----------------- | ----------------- | ---- |
+| Fix Grammar     | provider          | replaces directly | yes  |
+| Rewrite         | provider          | panel             | yes  |
+| Translate       | Apple Translation | panel             | no   |
+| Summarize       | provider          | panel, always     | no   |
+| a custom action | provider          | panel             | no   |
 
 A custom action previews by default, switchable to Replace per row: Tinycast cannot know whether an
 arbitrary prompt transforms the text or answers a question about it, and only the second destroys what
@@ -121,7 +122,7 @@ takes the choice with it.
 `VisibilityStore.allowsHotKey` because `quickActionsEnabled` is the master switch. The four keep their
 `CommandID`s, so no shortcut or preference key moved. A custom action binds
 `HotKeyAction.quickAction(id:)` under `hotkey.quickAction.<uuid>`, indexed in `boundQuickActionIDs` so
-`HotKeyManager.start` can prune a binding whose action was deleted while Tinycast was off.
+`HotKeyManager.load` can prune a binding whose action was deleted while Tinycast was off.
 
 **The pane draws its own `AliasField`.** The four are named in `SettingsTab.ownedCommands`, so
 Settings → Commands no longer draws theirs. Without it, `deleteCustomQuickAction` would be clearing an
@@ -132,14 +133,14 @@ that cannot land throws `.storageUnavailable` where the reader sees it. An absen
 install; one that exists but will not decode sets `isAvailable` false and makes every mutation refuse.
 `QuicklinkStore`'s rule: authored data is reported on, never written over.
 
-**Deleting unwinds only once the record is gone.** Confirm, remove, *then* drop the binding, the
+**Deleting unwinds only once the record is gone.** Confirm, remove, _then_ drop the binding, the
 route override, the favorite, the alias, the visibility key and the ranking. `WindowLayoutCoordinator`'s order: a failed
 delete must never leave a kept record stripped of its shortcut.
 
 Only Fix Grammar applies unseen: it changes what was wrong, where a rewrite changes the voice.
-Summarize can never be told to replace text unseen — it answers a question *about* the text, so
+Summarize can never be told to replace text unseen; it answers a question _about_ the text, so
 replacing the text with the answer has to be a choice made in the panel. Every other default is a
-**Replace / Preview** popup in the pane — a popup rather than a second checkbox, because the trailing
+**Replace / Preview** popup in the pane, a popup rather than a second checkbox, because the trailing
 checkbox column means "show in the launcher" in every pane the app has. `QuickActionSettings` stores
 only what the reader actually changed, so a new action arrives with its own default rather than
 whatever a missing key would have meant.
@@ -151,11 +152,22 @@ nothing on every route, and a 3B model is markedly worse at it. `NLLanguageRecog
 source language, because `TranslationSession(installedSource:target:)` needs a concrete one and
 `LanguageAvailability` reports only a status.
 
+**The reader's own languages weigh twenty times more.** The recognizer misreads single words:
+`reproducible` scores 0.92 Spanish and `conundrum` reads as Portuguese, so a Mac with only English and
+the target downloaded was told to download a language the text was never in. Every hypothesis in a
+language from macOS's preferred list (`SystemLanguages`, not Tinycast's own interface language) is
+multiplied by `readerLanguageOdds` before the likeliest wins. A foreign sentence keeps its language,
+because it leaves the reader's languages near zero.
+
 **A download is a locale, not a language.** Apple matches `en-US` and `en-GB` separately, so the bare
-`en` the recognizer reports finds only the first and calls an installed `en-GB` pair missing — which
-read as *Chinese hasn't been downloaded yet* on a Mac that had Chinese. Both sides are retried across
+`en` the recognizer reports finds only the first and calls an installed `en-GB` pair missing, which
+read as _Chinese hasn't been downloaded yet_ on a Mac that had Chinese. Both sides are retried across
 every supported spelling of the same script before the panel names a language, and the language it
 names is the one with no downloaded asset of its own.
+
+**Text already in the target language comes back unchanged**, whatever its region. The recognizer
+reports Arabic as `ar-EG` and English as `en-US`, and the translator calls a pair that differs only by
+region unsupported, so the check compares language and script, never region.
 
 `TranslationError` is annotated `macOS 26.4` while the deployment floor is `26.0`, so failures are
 caught as plain `Error` and reported by what was asked rather than by matching its cases.
@@ -165,31 +177,32 @@ is 47 entries on macOS 26 and is the framework's to change; building the menu fr
 `Locale.preferredLanguages` instead would put a language the translator cannot reach in front of
 someone, where it could only fail at press time. Notably **Bengali is not among the 47**. The list
 loads asynchronously, so the coordinator holds it as observed state rather than a computed property.
-Names come from `minimalIdentifier` — the maximal form carries the script, and `es` would read
+Names come from `minimalIdentifier`; the maximal form carries the script, and `es` would read
 "Spanish (Latin, Spain)" in a menu that should say "Spanish".
 
 A pair that is supported but not downloaded **opens the panel**, whatever the action's usual result,
-so a shortcut never silently does nothing. **The download happens in System Settings.**
+so a shortcut never silently does nothing. It names the language `TextTranslator` found missing, which
+is the source as often as the target. **The download happens in System Settings.**
 `prepareTranslation` never showed its sheet over this non-activating panel, so the prompt says where
-to go — Language & Region → Translation Languages… — and its one button opens that pane and closes
+to go (Language & Region → Translation Languages…) and its one button opens that pane and closes
 the panel. System Settings has no anchor for the sheet itself, so the last click stays the reader's.
 
 ## The panel
 
 `QuickActionPanel` is Tinycast's **fourth borderless surface**, beside the dialog, the notes panel
-and the join preview. It takes the same recipe — `panelScrim`, then `GlassEffectView`, then the
-clip — and sits at `.floating` like the join preview, so a failure report still lands on top of it.
-Its footer speaks the same button language as a dialog's — `ModalActionButtonStyle`, with Replace
-as the `.primary` role — so every borderless surface answers in one voice rather than dropping Aqua
+and the join preview. It takes the same recipe (`panelScrim`, then `GlassEffectView`, then the
+clip) and sits at `.floating` like the join preview, so a failure report still lands on top of it.
+Its footer speaks the same button language as a dialog's (`ModalActionButtonStyle`, with Replace
+as the `.primary` role), so every borderless surface answers in one voice rather than dropping Aqua
 controls onto vibrancy.
 
 It could not have been built on `HUDPresenter`: `HUDPanel` sets `ignoresMouseEvents` and returns
 `false` from `canBecomeKey`, so it is click-through and hosts no buttons. Nor on `DialogAccessory`,
-which is a closed two-case enum measured once at present time — a growing stream would clip.
+which is a closed two-case enum measured once at present time; a growing stream would clip.
 
 Non-activating, so the target app keeps its selection while the panel holds key. Keys go through
 `sendEvent`: `↵` replaces, `⌘C` copies, `esc` dismisses; click-away dismisses like every other
-borderless surface. The panel is anchored by its **top-left** and re-measured as the reply arrives —
+borderless surface. The panel is anchored by its **top-left** and re-measured as the reply arrives;
 centring on every measure would walk it up the screen. Summarize and custom actions use chat's
 `ChatMarkdownText` and `MarkdownBlock.parse`, keeping the whole result selectable across paragraphs
 and headings, with the same math as chat; `midStream` is on while it runs, so an equation still
@@ -202,21 +215,21 @@ Updates windows size themselves.
 
 The scroll view owns the **whole** panel and the bars are overlays on top, so a result dissolves
 beneath them rather than stopping at a line. The mask is clear for each bar's height, ramps over
-`quickActionScrollFade`, and the content is inset by bar + ramp — so the first line starts fully
+`quickActionScrollFade`, and the content is inset by bar + ramp, so the first line starts fully
 opaque and only dissolves once it has scrolled up into the gradient. It is skipped entirely when the
 result already fits, since dimming text that needs no scrolling reads as a defect.
 
 Three things here were settled by rendering them, not by reasoning:
-`scrollEdgeEffectStyle` draws nothing in this panel — it renders a material where a scroll view meets
+`scrollEdgeEffectStyle` draws nothing in this panel: it renders a material where a scroll view meets
 a safe area, and over `panelScrim` + `GlassEffectView` that composites to nothing. `safeAreaBar`
-makes it visible but lays its bars *over* the content instead of insetting it, so text runs through
+makes it visible but lays its bars _over_ the content instead of insetting it, so text runs through
 the buttons and escapes the corner clip. And a ramp starting at the panel edge rather than below the
 bar leaves text about 60% visible behind the title.
 
 `TextDiffEngine` shows what changed when the output is the input, edited. Its traceback is
 quadratic, so past `maxTokens` a side it degrades to whole-text rather than asking for gigabytes.
-It keeps one rolling `UInt16` score row and one insert-or-delete bit per token pair — equality is
-re-checked during traceback — so the cap costs about 2 MB where a full score matrix cost 32 MB.
+It keeps one rolling `UInt16` score row and one insert-or-delete bit per token pair (equality is
+re-checked during traceback), so the cap costs about 2 MB where a full score matrix cost 32 MB.
 
 ## Reading the selection
 
@@ -233,12 +246,12 @@ pasteboard, pause clipboard history, synthesise the chord, wait for `changeCount
 restore, resume. The pause keeps the borrowed copy out of history. Only one borrow runs at a time:
 a second would snapshot the first one's copy and read its restore as a selection, so it returns
 nothing instead. It lives on
-`TextInjector` because the pasteboard has one owner — the same lease, queue and `ClipboardManager`
+`TextInjector` because the pasteboard has one owner: the same lease, queue and `ClipboardManager`
 coordination a paste needs, and a second owner would race it.
 
 **The `changeCount` guard is load-bearing.** With nothing selected, ⌘C is a no-op; returning the
 pasteboard's existing contents there would transform whatever the reader last copied and paste it
-over their selection. Movement is the only proof a copy happened — never comparing content, which
+over their selection. Movement is the only proof a copy happened, never comparing content, which
 false-positives when the same text was already on the clipboard.
 
 Copying is the fallback and never the first try: it synthesises a keystroke into somebody else's app.
@@ -255,16 +268,16 @@ Notes replaces the captured range through its own TextKit edit path, with undo a
 note, source or selection changed while the result was generated, delivery declines and copies the
 result instead of replacing another passage.
 
-For external apps, `TextInjector` — shared with Snippets and Quicklinks, and owned by `AppCore` — does
+For external apps, `TextInjector` (shared with Snippets and Quicklinks, and owned by `AppCore`) does
 the replacement.
 `replaceSelection(with:in:)` takes the interactive path: no keyword to match, no generation to
 cancel, because a shortcut is an explicit gesture rather than an expansion the app decided to
 attempt. Its serial delivery queue is what stops two features fighting over the pasteboard lease.
 
 The Accessibility tier replaces the live selection atomically, under the five-rule delivery contract
-in [snippets.md](snippets.md#text-delivery-and-pasteboard-safety) — Quick Actions simply enter it with
+in [snippets.md](snippets.md#text-delivery-and-pasteboard-safety). Quick Actions simply enter it with
 no keyword, so rule 2 never applies. The event tiers behind it type or paste over the selection, which
-every app treats as replacing it — but that is the target app's behaviour rather than something
+every app treats as replacing it, but that is the target app's behaviour rather than something
 Tinycast asserts, so it is the part worth checking by hand.
 
 **A replacement that never lands says so, and keeps the reply.** Every tier can decline, and a shortcut
@@ -308,6 +321,10 @@ failure handler, so automatic expansion stays silent as before.
   translate rather than call the target language missing.
 - Translate Korean text with Korean not downloaded and the target language installed: the panel names
   Korean, the language that is actually missing.
+- With only English and the target downloaded, translate the single words `reproducible` and
+  `conundrum`: both translate as English rather than asking for Spanish or Portuguese.
+- Translate Arabic text into Arabic (Saudi Arabia), or English text into English (UK): the panel shows
+  the text unchanged rather than calling the pair unsupported.
 - Revoke Accessibility while enabled: a HUD explains instead of failing silently.
 - Harnesses: `QuickActionTests` (action metadata, prompt boundaries, preview choices, routes and
   their repair) and

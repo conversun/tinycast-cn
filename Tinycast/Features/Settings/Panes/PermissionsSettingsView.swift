@@ -4,6 +4,7 @@ import SwiftUI
 
 struct PermissionsSettingsView: View {
     @Environment(AppCore.self) private var core
+    @Environment(MainAppLink.self) private var mainApp
     @State private var accessibilityTrusted = Permissions.isAccessibilityTrusted()
     @State private var fullDiskAccess = Permissions.hasFullDiskAccess()
     @State private var calendarAccess = Permissions.calendarAccess()
@@ -28,10 +29,8 @@ struct PermissionsSettingsView: View {
                     }
                 } label: {
                     HStack(spacing: Theme.Spacing.lg) {
-                        PermissionSettingsIcon(
-                            path:
-                                "/System/Library/ExtensionKit/Extensions/AccessibilitySettingsExtension.appex"
-                        )
+                        SettingsSymbolTile(
+                            symbol: "accessibility.fill", tint: SettingsTab.permissions.tint, scale: .feature)
                         VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                             SettingsRowTitle(.permissionsAccessibility, "Accessibility")
                             Text("Allows pasting and window management.")
@@ -59,10 +58,7 @@ struct PermissionsSettingsView: View {
                     }
                 } label: {
                     HStack(spacing: Theme.Spacing.lg) {
-                        Image(systemName: "internaldrive.fill")
-                            .font(.system(size: SettingsListMetrics.iconSize - Theme.Spacing.xs))
-                            .frame(width: SettingsListMetrics.iconSize)
-                            .accessibilityHidden(true)
+                        SettingsSymbolTile(symbol: "internaldrive.fill", tint: .gray, scale: .feature)
                         VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                             SettingsRowTitle(.permissionsFullDiskAccess, "Full Disk Access")
                             Text("Allows File Search and finding protected app leftovers.")
@@ -86,7 +82,13 @@ struct PermissionsSettingsView: View {
                         Button(calendarNeedsPrompt ? String(localized: "Grant Access…") : String(localized: "Open…")) {
                             // Settings lists no app TCC was never asked about, so asking is the way in.
                             if calendarNeedsPrompt {
-                                core.calendarCoordinator.setCalendarEnabled(true)
+                                Task {
+                                    guard await core.calendarCoordinator.setCalendarEnabled(true) else {
+                                        return
+                                    }
+                                    core.calendarStore.start()
+                                    mainApp.send(.reloadCalendar)
+                                }
                             } else {
                                 Permissions.openCalendarSettings()
                             }
@@ -98,8 +100,8 @@ struct PermissionsSettingsView: View {
                     }
                 } label: {
                     HStack(spacing: Theme.Spacing.lg) {
-                        PermissionSettingsIcon(
-                            path: "/System/Applications/Calendar.app")
+                        SettingsSymbolTile(
+                            symbol: "calendar", tint: SettingsTab.calendar.tint, scale: .feature)
                         VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                             SettingsRowTitle(.permissionsCalendars, "Calendars")
                             Text("Allows joining your next meeting.")
@@ -137,10 +139,8 @@ struct PermissionsSettingsView: View {
                     }
                 } label: {
                     HStack(spacing: Theme.Spacing.lg) {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: SettingsListMetrics.iconSize - Theme.Spacing.xs))
-                            .frame(width: SettingsListMetrics.iconSize)
-                            .accessibilityHidden(true)
+                        SettingsSymbolTile(
+                            symbol: "mic.fill", tint: SettingsTab.dictation.tint, scale: .feature)
                         VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                             SettingsRowTitle(.permissionsMicrophone, "Microphone")
                             Text("Allows dictating text.")
@@ -198,28 +198,11 @@ struct PermissionsSettingsView: View {
         let diskAccess = Permissions.hasFullDiskAccess()
         if diskAccess != fullDiskAccess {
             fullDiskAccess = diskAccess
-            core.fileIndexer.refreshAccess()
+            mainApp.send(.refreshFileAccess)
         }
         let access = Permissions.calendarAccess()
         if access != calendarAccess { calendarAccess = access }
         let microphone = Permissions.microphoneAccess()
         if microphone != microphoneAccess { microphoneAccess = microphone }
-    }
-}
-
-private struct PermissionSettingsIcon: View {
-    let path: String
-
-    var body: some View {
-        Image(nsImage: IconCache.icon(forFile: path))
-            .resizable()
-            .renderingMode(.original)
-            .interpolation(.high)
-            .id(IconCache.style.generation)
-            .frame(
-                width: SettingsListMetrics.iconSize,
-                height: SettingsListMetrics.iconSize
-            )
-            .accessibilityHidden(true)
     }
 }

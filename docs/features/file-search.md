@@ -13,15 +13,17 @@ design follows [fsearch](https://github.com/noahdunnagan/fsearch).
   exits; the app only maps the file, whose clean pages never count toward its footprint.
 - **Full Disk Access is required, and nothing is indexed without it.** `Permissions.hasFullDiskAccess()`
   probes a TCC-guarded file, which never prompts. The pane and the palette both say how to grant it.
-- **Scopes are the crawl roots.** Only what lies under a scope is indexed or searched; a scope inside
+- **Scopes are the crawl roots.** Only what lies under a scope appears in indexed results. A scope inside
   another stays listed but folds into it at crawl time, and a cleared list indexes nothing. The default
-  is home (`~`): dotfiles are user files, the rest of the disk is the system's, and apps are the
-  launcher's.
+  is home (`~`): the rest of the disk is the system's, and apps are the launcher's.
 - **A matching ignore pattern skips a folder and everything in it at crawl time.** Changing either list
-  rebuilds the index, debounced by a second; the old index serves until the new one maps.
-- **Hidden files and bundle contents are indexed.** They rank last instead (see Ranking), and the ignore
-  list is how a user narrows further. Mount points are never entered, which keeps firmlinked files from
-  appearing twice through `/System/Volumes/Data` and keeps other volumes out.
+  rebuilds the index, debounced by a second; the old index serves until the new one maps. Clearing
+  every scope drops the index at once.
+- **Hidden files are indexed only with Include hidden files on, and it is off by default.** The crawl
+  skips a name that starts with a dot in `FileIndexCrawler.append`, the one place a listing is made, so a
+  rebuild, a live diff and the walk of a new folder always agree. Bundle contents are always indexed and
+  rank last (see Searching). Mount points are never entered, which keeps firmlinked files from appearing
+  twice through `/System/Volumes/Data` and keeps other volumes out.
 - **A crawl never downloads.** Every listing runs with `IOPOL_MATERIALIZE_DATALESS_FILES_OFF` on its own
   thread, so dataless iCloud and File Provider items are listed as they are.
 - **A live update is idempotent.** Every FSEvents event relists one folder and diffs it, so a replay, a
@@ -42,7 +44,7 @@ design follows [fsearch](https://github.com/noahdunnagan/fsearch).
   own dialogs because a question or a report is Tinycast's to word. A share sheet is neither: it is
   AirDrop, Mail and Messages, and re-drawing it would mean re-implementing the transports and losing
   whatever the system adds. So this row hands off, and the two rules it does keep are that the palette
-  is never hidden and that the row stays visible beside the sheet — which is what anchoring to
+  is never hidden and that the row stays visible beside the sheet, which is what anchoring to
   `PaletteWindowController.anchorView` buys. The picker is retained on the coordinator, because it
   dies with its last reference, and `NSItemProvider(contentsOf:)` failing (a file that vanished between
   the query and the keystroke) leaves the palette exactly as it was, which is the only failure this row
@@ -91,9 +93,30 @@ One score orders the results: exact name +4000, name starts with the first term 
 word or camel-case boundary +1000, terms typed in order +1500, first term ending a word +500, the prior
 × 1500, minus 4 per name byte. Ties go to the shorter path.
 
+A query of two to eight terms that leaves room under 200 also matches **through folders**, so
+`claude surge skill` finds `~/.claude/skills/surge/SKILL.md`. An entry qualifies when its name holds at
+least one term and the folders between its scope root and itself start a word with every other term.
+These hits list after every name hit, so they never reorder one, and a single term or a list the name
+pass already filled does no extra work. Each term is one bit of a `UInt8`: the pass works out every
+distinct name's held and word-starting terms across the cores, gives each folder its own set in
+parallel, ORs each parent's set into its children in one forward pass (folders are numbered in entry
+order, so a parent always comes first), and then walks only the children of folders whose set is not
+empty. A hit is scored on the first term its name holds, with the bonuses above; the overlay of live
+additions takes its folders from its path.
+
+A `/` separates terms as a space does, since no name holds one, and a leading `~/` or a bare `~` is
+dropped, so `tinycast/Tinycast/App` or `~/.claude/skills` matches through folders like the same words
+with spaces.
+A query that reads as a local path (`/`, `/…`, `~`, `~/…` or a local `file://` URL) is also checked on disk.
+With Full Disk Access this works during the first crawl or with an empty scope list. When the type filter
+admits it, the entry lists first, even if it is hidden, ignored or outside every scope. The filesystem
+resolves parent components and supplies the canonical spelling used to deduplicate indexed hits. A path
+that names a symbolic link directly keeps that link as the target of row actions.
+
 `prior` is set per folder at crawl time and inherited by its files: 2 under home and the cloud drives,
-1 elsewhere in plain sight (`/Applications`, `/Users/Shared`), 0 for hidden paths, system folders,
-`~/Library` and anything inside a bundle.
+1 elsewhere in plain sight (`/Applications`, `/Users/Shared`) and for hidden paths, 0 for system
+folders, `~/Library` and anything inside a bundle. A hidden path at 1 stays out of Recent and out of
+the live diff's date comparison, so a tool that writes under `~/.claude` all day costs nothing.
 
 An empty query lists **Recent**: the 20 newest files with prior 2, by modification date. The session
 keeps those rows across closes and recomputes them in the background whenever the index is swapped in
@@ -109,7 +132,10 @@ reports the failure when opened. Icons and previews are still purged on close.
 The 2026-10-13 benchmark (`Tests/FileSearchPerformanceTests.swift`, `/System /Applications /Library /usr`,
 844,911 entries) crawled in 5.2 s with a 103 MB helper peak and wrote a 16.6 MB index, down from 40 MB
 before names were interned and the per-entry folder and parent columns dropped. With whole-module
-optimization, queries took 0.3–2.7 ms and single letters 3.4 ms.
+optimization, queries took 0.3–2.7 ms and single letters 3.4 ms. On 2026-11-18 (857,059 entries)
+single-term and name-filled queries were unchanged by folder matching, and queries completed through
+folders (`lproj localizable`, `appkit resources`, `xcode plist`) took 2.2–3.5 ms: about 1–1.5 ms for
+the folder pass, the rest for building the rows it adds.
 
 ## Live updates
 
@@ -154,15 +180,17 @@ somewhere on another; `/` is shown as the startup volume's name. The helper reso
 
 `FileSearchIgnoreList` compiles each pattern once into one of three buckets:
 
-| Pattern shape | Matched against | Example |
-| --- | --- | --- |
-| no `/`, no metacharacters | the entry name, case-insensitively | `node_modules` |
-| no `/`, has `*` `?` `[` | the entry name, via `fnmatch` | `*.tmp` |
+| Pattern shape                     | Matched against                        | Example                      |
+| --------------------------------- | -------------------------------------- | ---------------------------- |
+| no `/`, no metacharacters         | the entry name, case-insensitively     | `node_modules`               |
+| no `/`, has `*` `?` `[`           | the entry name, via `fnmatch`          | `*.tmp`                      |
 | contains `/`, or starts with `~/` | the whole absolute path, via `fnmatch` | `~/Movies`, `**/[Cc]ache/**` |
 
 The defaults skip what a search for one's own files never wants: build output and dependency
-folders (`node_modules`, `.git`, `build`, `DerivedData`, `.venv`, …), the Photos library, the Trash,
-the `~/.cache` and `~/.npm` caches, and the noisy parts of `~/Library` — `Application Support`,
+folders (`node_modules`, `.git`, `build`, `DerivedData`, `.venv`, …), the worktrees AI coding agents
+keep (`**/.claude/worktrees`, `**/.codex/worktrees`, `**/conductor/workspaces`, …), each a full copy of
+a repository, the Photos library, the Trash,
+the `~/.cache` and `~/.npm` caches, and the noisy parts of `~/Library`: `Application Support`,
 `Caches`, `Containers`, `Developer`, `Group Containers` and `Mail`. Together they hold most of a home
 folder's entries and most of its churn: one browser's cache alone rewrites tens of thousands of files
 on every page load. `Preferences`, `LaunchAgents` and the cloud drives stay indexed. `/Library/Caches`
@@ -174,8 +202,11 @@ twice, and a default repeated in `fileSearchIgnorePatterns` is ignored, so a shi
 switch.
 
 `fnmatch` runs with `FNM_CASEFOLD` and without `FNM_PATHNAME`, so `*` spans `/`. Name patterns read the
-NUL-terminated name straight out of the `getattrlistbulk` buffer. Literal path patterns first check the
-entry name, so an unrelated entry builds no path; wildcard and escaped paths keep the full-path match.
+NUL-terminated name straight out of the `getattrlistbulk` buffer. A path pattern whose last component
+is literal (no `*` or `?` there, and no `[` or `\` anywhere, so every `/` is a real slash) first
+compares that component with the entry name by length and `strcasecmp`, so an unrelated entry builds no
+path and `**/.claude/worktrees` costs a crawl no more than `~/Movies`. Other wildcard and escaped paths
+keep the full-path match.
 **Add Folder…** stores the chosen folder as a `~`-relative path pattern.
 
 ## Palette and actions
@@ -184,32 +215,32 @@ entry name, so an unrelated entry builds no path; wildcard and escaped paths kee
 290pt column beside a preview pane, split by the same `Theme.Colors.separator` hairline the clipboard
 draws. The list uses the shared Results header, row metrics, edge dissolve, thin scrollbar and scroll
 intent; its header reads **Recent** on the blank screen and **Results** under a query. A row shows
-a fitted native file icon and the full filename — a folder prefixed by its parent's name, dimmed, since
+a fitted native file icon and the full filename: a folder prefixed by its parent's name, dimmed, since
 half the folder hits on a developer machine are some `src` or `Tinycast`. The path itself is the preview's
 `Where` row rather than a second column the narrow list has no width for. A click selects and a double
 click opens, both through `onRowClick`, which answers on the press: `.onTapGesture(count: 2)` makes the
-single tap wait out the system's double-click interval first, and that wait *is* the second a click used
+single tap wait out the system's double-click interval first, and that wait _is_ the second a click used
 to take before the preview moved.
 
 Fitted row icons use a separate 8 MB transient cache. Leaving the list or hiding the palette purges it
 and invalidates in-flight decodes, so scrolling stays warm within one result set without retaining its
 icons after File Search closes. Persistent launcher icons remain in their own cache.
 
-The preview pane is the file itself over an Information block — Name, Where, Type, Size, Created,
+The preview pane is the file itself over an Information block: Name, Where, Type, Size, Created,
 Modified. The stage is **16:9 and sized before the block beneath it**, which then scrolls in whatever is
 left; without that layout priority the aspect ratio shrinks to the leftover height instead of claiming
 it. `FileSearchPreviewKind` picks what draws the file, and `FileSearchSurface` mounts it:
 
-| Kind | Surface | Why not QuickLook |
-| --- | --- | --- |
-| movies, audio | `FileSearchMediaPlayer` | it draws a movie's first frame but never plays one inside a non-activating panel |
-| PDF | `PDFSurface`, PDFKit in process | it draws a PDF in an out-of-process `NSRemoteView` that never scrolls inside the palette |
-| text QuickLook shows as an icon | `PlainTextSurface` | it renders only a declared `public.text` type as text |
-| everything else | `QuickLookSurface` | — |
+| Kind                            | Surface                         | Why not QuickLook                                                                        |
+| ------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------- |
+| movies, audio                   | `FileSearchMediaPlayer`         | it draws a movie's first frame but never plays one inside a non-activating panel         |
+| PDF                             | `PDFSurface`, PDFKit in process | it draws a PDF in an out-of-process `NSRemoteView` that never scrolls inside the palette |
+| text QuickLook shows as an icon | `PlainTextSurface`              | it renders only a declared `public.text` type as text                                    |
+| everything else                 | `QuickLookSurface`              | -                                                                                        |
 
 The extension decides without touching the disk, except where it cannot: an undeclared extension
 (`.jsx`, `.vue`) or `.ts`, which the system declares as MPEG-TS video. Those read their first 256 KB
-off the main actor once per selection — no NUL and valid UTF-8 is text, anything else falls back to
+off the main actor once per selection: no NUL and valid UTF-8 is text, anything else falls back to
 what the extension declares. `PlainTextSurface` copies QuickLook's own text preview (fixed-pitch 11pt,
 3pt inset, unselectable), so a `.jsx` reads like a `.swift`.
 **Nothing autoplays**: arrow-keying a list must not start a movie.
@@ -220,44 +251,44 @@ sizing, and copying forty lines of `AVPlayerView` teardown is the cheaper trade.
 
 **The surface outlives the selection**, and there is no timer in front of it. A move hands the same
 `QLPreviewView` another item rather than closing one and building the next, which is the whole cost:
-measured against the real machinery inside a panel shaped like the palette's — borderless, floating,
-non-activating — a swap paints in about 8 ms, and the first load in a process in about 130 ms. Nothing
+measured against the real machinery inside a panel shaped like the palette's (borderless, floating,
+non-activating), a swap paints in about 8 ms, and the first load in a process in about 130 ms. Nothing
 about that is worth debouncing, and the debounce that was there only made a click feel slow. The surface
 is torn down by not being mounted: when the palette is ordered out, or on
 a folder, whose preview is its icon. Information rows are the compact variant; their disk reads happen once per selection
-in a detached task, never in `body`, and a folder shows no Size — its own record is a few bytes, which is
+in a detached task, never in `body`, and a folder shows no Size: its own record is a few bytes, which is
 never what the row means.
 
 **There is no Quick Look action.** The pane already previews the selection, and ↵ opens the file in
 its default app. A system `QLPreviewPanel` would take key, and the palette hides on `windowDidResignKey`.
 
-| Row | Chord | What it does |
-| --- | --- | --- |
-| Open File / Open Folder | ↵ | `NSWorkspace`'s asynchronous configuration API; hides the palette without restoring focus, and reports a failure through the dialog controller |
-| Show in Finder | ⌘↵ | reveals and dismisses |
-| Share… | — | `NSSharingServicePicker`, anchored to the palette's trailing edge so the row it was opened from stays visible beside it. Escape or a click elsewhere dismisses it, and the palette is never hidden, so the flow returns to the same row. There is no chord: the destinations are the system's, and it is the only place a system popover is right |
-| Copy File | ⇧⌘C | the file itself on the pasteboard through `PasteboardFiles.write`, which declares `.fileURL` and the path as `.string` |
-| Copy Name | ⌥⌘C | through `Paster`, palette stays open |
-| Copy Path | ⌃⌘C | the standardized path, palette stays open |
-| Paste File to … | ⇧⌘V | `Paster.pasteFile` into the app the palette was summoned over, named by `PasteTarget` |
-| Add / Remove from Favorites | ⇧⌘F | saves the file or folder in the launcher’s shared Favorites order |
-| Move to Trash | ⌃X | `FileManager.trashItem` off the main actor, then the row leaves the session |
+| Row                         | Chord | What it does                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open File / Open Folder     | ↵     | `NSWorkspace`'s asynchronous configuration API; hides the palette without restoring focus, and reports a failure through the dialog controller                                                                                                                                                                                                    |
+| Show in Finder              | ⌘↵    | reveals and dismisses                                                                                                                                                                                                                                                                                                                             |
+| Share…                      | None  | `NSSharingServicePicker`, anchored to the palette's trailing edge so the row it was opened from stays visible beside it. Escape or a click elsewhere dismisses it, and the palette is never hidden, so the flow returns to the same row. There is no chord: the destinations are the system's, and it is the only place a system popover is right |
+| Copy File                   | ⇧⌘C   | the file itself on the pasteboard through `PasteboardFiles.write`, which declares `.fileURL` and the path as `.string`                                                                                                                                                                                                                            |
+| Copy Name                   | ⌥⌘C   | through `Paster`, palette stays open                                                                                                                                                                                                                                                                                                              |
+| Copy Path                   | ⌃⌘C   | the standardized path, palette stays open                                                                                                                                                                                                                                                                                                         |
+| Paste File to …             | ⇧⌘V   | `Paster.pasteFile` into the app the palette was summoned over, named by `PasteTarget`                                                                                                                                                                                                                                                             |
+| Add / Remove from Favorites | ⇧⌘F   | saves the file or folder in the launcher’s shared Favorites order                                                                                                                                                                                                                                                                                 |
+| Move to Trash               | ⌃X    | `FileManager.trashItem` off the main actor, then the row leaves the session                                                                                                                                                                                                                                                                       |
 
 None of the copies is marked with `ClipboardManager.internalType`, so a copied file enters clipboard
-history like any other copy. Move to Trash rides the clipboard's own ⌃X, asks nothing first — trashing is
-undoable, as it is for Uninstall and for an extension's `trash` — and has no ⌃⇧X counterpart, since there
+history like any other copy. Move to Trash rides the clipboard's own ⌃X, asks nothing first (trashing is
+undoable, as it is for Uninstall and for an extension's `trash`) and has no ⌃⇧X counterpart, since there
 is no "all" to trash. The three ⌘C chords differ only by their second modifier, which
-`PaletteShortcut` reads in order — ⇧, then ⌥, then ⌃; bare ⌘C stays with the search field.
+`PaletteShortcut` reads in order: ⇧, then ⌥, then ⌃; bare ⌘C stays with the search field.
 
-The first in-flight query says nothing — the rows it is about to replace would only flash a message — an
+The first in-flight query says nothing (the rows it is about to replace would only flash a message); an
 empty completed query says what the active filter admits ("No files found", "No images found"), and a
 blank screen with no recents says "Type to search files and folders". Without Full Disk Access the screen
 says so and ↵ opens the Privacy & Security pane; during the first build it shows the running item count.
 
 ### Dragging out
 
-A row drags its file or folder straight into another app — a Finder window, a browser's upload field,
-a mail being written — through the same `onRowClick(drag:)` the clipboard uses, so the press, the
+A row drags its file or folder straight into another app (a Finder window, a browser's upload field,
+a mail being written) through the same `onRowClick(drag:)` the clipboard uses, so the press, the
 **copy-only** operation and the fly-back are the ones [clipboard.md](clipboard.md#dragging-out)
 explains. Copy matters more here than there: every result is the user's own file, and on the boot
 volume a plain file-URL drag would default to moving it. The image is the row's fitted tile, already
@@ -270,8 +301,9 @@ delay old, since the reset clears its session.
 **Show in launcher** (`fileSearchShowInLauncher`, under the feature switch) adds a **Files** section to
 root search, between the ranked results and the `Use "…" with` fallbacks, so ↵ on a typed app name never
 opens a file. It lists the top five hits (`FileSearchQuery.launcherLimit`) once the trimmed query has
-three characters (`launcherMinimumLength`), the threshold category search uses. Shorter cancels the
-query and releases its rows.
+three characters (`launcherMinimumLength`), the threshold category search uses. Shorter queries
+cancel the search and release its rows, except a path with no words (`/`, `~`, `~/`), which lists only
+its own row.
 
 The launcher borrows this screen's `FileSearchSession` rather than keeping its own. Only one palette
 mode shows at a time, so nothing is held twice. An index swap or a trashed row updates both. And the
@@ -288,7 +320,7 @@ favorites remain searchable by filename at any query length with **Show in launc
 favorites lead indexed file hits in the Files section, with repeated paths removed and the same
 five-row cap. Disabling File Search hides file favorites without deleting them. It is
 `LauncherScreen.Row.file`, id-prefixed `file-` because an application's entry id is its bundle path. It
-draws `FileSearchRow` with its location — name, dimmed parent path, then File or Folder — and answers
+draws `FileSearchRow` with its location (name, dimmed parent path, then File or Folder) and answers
 the screen's own row actions: ↵ opens, ⌘↵ reveals, the copy, paste and trash chords run
 `FileSearchActionsMenu.perform`, and a row drags out as a copy. Row icons come from the same transient
 fitted cache, purged when the palette hides.
@@ -296,8 +328,9 @@ fitted cache, purged when the palette hides.
 ## Invocation
 
 Settings ▸ File Search owns the `fileSearchEnabled` switch, which is off when its preference is absent,
-the **Show in launcher** switch beneath it, along with the Full Disk Access status, the index status and **Rebuild Index**, the scope list, the
-ignore patterns and the Search Files command row. The lists are ordinary settings carried by Tinycast
+the **Show in launcher** switch beneath it, along with the Full Disk Access status, the index status and **Rebuild Index**, the scope list
+with **Include hidden files** (`fileSearchIncludesHiddenFiles`), the ignore patterns and the Search Files
+command row. The lists are ordinary settings carried by Tinycast
 settings backups; importing them grants no permission.
 
 `AppCore` observes the switch and asks `FileSearchCoordinator` to project `CommandID.searchFiles` into
@@ -307,12 +340,12 @@ guards entry into `.fileSearch`, so neither a stale selected command nor the glo
 the screen after the feature is disabled. Disabling cancels the session and returns an open File Search
 screen to the launcher without changing palette visibility.
 
-Search Files is bindable like every other built-in command — `AppEntry.hotKeyAction` answers
+Search Files is bindable like every other built-in command: `AppEntry.hotKeyAction` answers
 `.command(.searchFiles)`, so its launcher row prints a bound chord as a keycap.
 
 This pane is the command's only one: `SettingsTab.ownedCommands` names it, so Settings ▸ Commands
 neither lists it nor gates it behind `Enable Commands`. Launcher visibility is `VisibilityStore`'s,
 keyed on the entry's `preferenceKey`. The entry behind it comes from
 `CommandCatalog.entry(for:)` rather than `AppIndex`, because the index drops the command entirely while
-the feature switch is off — exactly when the pane still has to draw the row. Hiding the command leaves
+the feature switch is off, exactly when the pane still has to draw the row. Hiding the command leaves
 the shortcut working, as it does for every other feature.

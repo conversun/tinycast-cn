@@ -1,7 +1,6 @@
 import AppKit
 import Observation
 
-/// The single funnel for every Quick Action, however it was started.
 @MainActor
 @Observable
 final class QuickActionCoordinator {
@@ -60,7 +59,6 @@ final class QuickActionCoordinator {
         self.core = core
     }
 
-    /// Launcher rows come and go with the switch; the Carbon bindings stay registered.
     func applyEnabled() {
         appIndex.setCommandsVisible(Self.launcherCommands, settings.quickActionsEnabled)
         applyCustomQuickActionsPresence()
@@ -142,6 +140,14 @@ final class QuickActionCoordinator {
                 message: String(localized: "Its instructions, shortcut and learned ranking go with it."),
                 symbol: action.symbol, confirmTitle: String(localized: "Delete"))
         else { return }
+        if let mainApp = core.mainApp {
+            mainApp.send(.deleteCustomQuickAction(id))
+        } else {
+            removeCustomQuickAction(id: id)
+        }
+    }
+
+    func removeCustomQuickAction(id: UUID) {
         // Unwound only once the row is gone, so a kept record never loses its shortcut.
         do {
             guard let removed = try customActions.remove(id: id) else { return }
@@ -274,10 +280,10 @@ final class QuickActionCoordinator {
             deliver(text, to: target, action: state.action)
         } catch let error where error is CancellationError || Task.isCancelled {
             return
-        } catch let error as TextTranslator.Failure where error.needsDownload {
+        } catch TextTranslator.Failure.notInstalled(let language) {
             // A HUD cannot say where the download lives, so this has to become a panel.
             if !previewing { present(state, target: target) }
-            state.requireLanguageDownload()
+            state.requireLanguageDownload(language)
         } catch {
             report(error, state: state, previewing: previewing)
         }
@@ -386,12 +392,5 @@ final class QuickActionCoordinator {
             let languages = await TextTranslator.supportedLanguages()
             self?.offeredLanguages = languages
         }
-    }
-}
-
-extension TextTranslator.Failure {
-    var needsDownload: Bool {
-        if case .notInstalled = self { return true }
-        return false
     }
 }

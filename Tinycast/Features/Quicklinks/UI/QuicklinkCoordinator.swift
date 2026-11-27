@@ -288,6 +288,15 @@ final class QuicklinkCoordinator {
                     confirmTitle: String(localized: "Delete"))
             else { return }
         }
+        if let mainApp = core.mainApp {
+            mainApp.send(.deleteQuicklink(id))
+        } else {
+            await removeQuicklink(id: id)
+        }
+    }
+
+    func removeQuicklink(id: UUID) async {
+        guard let quicklink = store.quicklink(id: id) else { return }
         // Unwound only once the row is gone: a failed delete must not strand its references.
         do {
             try store.remove(id: id)
@@ -358,8 +367,10 @@ final class QuicklinkCoordinator {
         guard settings.quicklinksEnabled, let editor, editor.canSave else { return }
         do {
             var draft = editor.draft(now: Date())
+            let confirmation: String
             if editor.original == nil {
                 try addQuicklink(draft)
+                confirmation = String(localized: "Quicklink created")
             } else {
                 guard let current = store.quicklink(id: draft.id) else {
                     editor.errorMessage = String(
@@ -368,8 +379,10 @@ final class QuicklinkCoordinator {
                 }
                 draft.isEnabled = current.isEnabled
                 try updateQuicklink(draft)
+                confirmation = String(localized: "Quicklink saved")
             }
             cancelQuicklinkEditing()
+            core.showMessage(confirmation)
         } catch {
             editor.errorMessage = error.localizedDescription
         }

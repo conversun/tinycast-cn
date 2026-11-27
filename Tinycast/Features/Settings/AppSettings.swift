@@ -278,6 +278,10 @@ final class AppSettings {
         didSet { defaults.set(animationsEnabled, forKey: Key.animationsEnabled.rawValue) }
     }
 
+    var iconStyle: IconStyle {
+        didSet { defaults.set(iconStyle.rawValue, forKey: Key.iconStyle.rawValue) }
+    }
+
     /// Where a drag left the panel's top-left, per display and relative to it.
     var palettePositions: [String: [Double]] {
         didSet { defaults.set(palettePositions, forKey: Key.palettePosition.rawValue) }
@@ -341,6 +345,13 @@ final class AppSettings {
     var fileSearchShowInLauncher: Bool {
         didSet {
             defaults.set(fileSearchShowInLauncher, forKey: Key.fileSearchShowInLauncher.rawValue)
+        }
+    }
+
+    var fileSearchIncludesHiddenFiles: Bool {
+        didSet {
+            defaults.set(
+                fileSearchIncludesHiddenFiles, forKey: Key.fileSearchIncludesHiddenFiles.rawValue)
         }
     }
 
@@ -581,7 +592,7 @@ final class AppSettings {
         didSet { defaults.set(hideCurrentEvent.rawValue, forKey: Key.hideCurrentEvent.rawValue) }
     }
 
-    /// Off means fully off: no launcher entries, and a still-registered shortcut moves nothing.
+    /// Off means fully off: no launcher entries and no registered shortcut.
     var windowManagementEnabled: Bool {
         didSet {
             defaults.set(windowManagementEnabled, forKey: Key.windowManagementEnabled.rawValue)
@@ -630,7 +641,7 @@ final class AppSettings {
         }
     }
 
-    /// Off means fully off, down to a still-registered shortcut opening nothing.
+    /// Off means fully off: no launcher entries and no registered shortcut.
     var quicklinksEnabled: Bool {
         didSet { defaults.set(quicklinksEnabled, forKey: Key.quicklinksEnabled.rawValue) }
     }
@@ -677,9 +688,167 @@ final class AppSettings {
         didSet { defaults.set(settingsFileEnabled, forKey: Key.settingsFileEnabled.rawValue) }
     }
 
+    /// Sends this Mac's data to iCloud, so only the iCloud Sync pane may turn it on.
+    var iCloudSyncEnabled: Bool {
+        didSet { defaults.set(iCloudSyncEnabled, forKey: Key.iCloudSyncEnabled.rawValue) }
+    }
+
+    /// The categories this Mac leaves out; stored as exclusions, so a new category starts synced.
+    var iCloudSyncDisabledCategories: Set<SyncCategory> {
+        didSet {
+            defaults.set(
+                iCloudSyncDisabledCategories.map(\.rawValue).sorted(),
+                forKey: Key.iCloudSyncDisabledCategories.rawValue)
+        }
+    }
+
+    var iCloudSyncOptedInCategories: Set<SyncCategory> {
+        didSet {
+            defaults.set(
+                iCloudSyncOptedInCategories.map(\.rawValue).sorted(),
+                forKey: Key.iCloudSyncOptedInCategories.rawValue)
+        }
+    }
+
     /// Rows a link from outside may run without asking; only `DeepLinkCoordinator` adds to it.
     var allowedDeepLinks: [String] {
         didSet { defaults.set(allowedDeepLinks, forKey: Key.allowedDeepLinks.rawValue) }
+    }
+
+    /// Adopts what another process stored, through each property, so its observers run here too.
+    func reload() {
+        let stored = AppSettings()
+        for key in Key.allCases { adopt(key, from: stored) }
+    }
+
+    /// Not in defaults: the login item is the system's, so it is read back rather than told.
+    func reloadLaunchAtLogin() {
+        let enabled = LaunchAtLogin.isEnabled
+        if launchAtLogin != enabled { launchAtLogin = enabled }
+    }
+
+    /// Exhaustive, so a new key can't build unadopted; key order moves size before position.
+    private func adopt(_ key: Key, from stored: AppSettings) {
+        switch key {
+        case .clipboardEnabled: adopt(\.clipboardEnabled, from: stored)
+        case .clipboardTextSearchEnabled: adopt(\.clipboardTextSearchEnabled, from: stored)
+        case .clipboardRetention: adopt(\.clipboardRetention, from: stored)
+        case .clipboardDefaultAction: adopt(\.clipboardDefaultAction, from: stored)
+        case .clipboardDisabledApps: adopt(\.clipboardDisabledApps, from: stored)
+        case .hyperKey: adopt(\.hyperKey, from: stored)
+        case .hyperKeyIncludesShift: adopt(\.hyperKeyIncludesShift, from: stored)
+        case .hyperKeyQuickPress: adopt(\.hyperKeyQuickPress, from: stored)
+        case .hyperKeySecureInputCompatibility: adopt(\.hyperKeySecureInputCompatibility, from: stored)
+        case .emojiSkinTone: adopt(\.emojiSkinTone, from: stored)
+        case .emojiGridColumns: adopt(\.emojiGridColumns, from: stored)
+        case .showInMenuBar: adopt(\.showInMenuBar, from: stored)
+        case .automaticallyCheckForUpdates: adopt(\.automaticallyCheckForUpdates, from: stored)
+        case .popToRootTimeout: adopt(\.popToRootTimeout, from: stored)
+        case .escapeKeyBehavior: adopt(\.escapeKeyBehavior, from: stored)
+        case .appearance: adopt(\.appearance, from: stored)
+        case .language: adopt(\.language, from: stored)
+        case .calcNumberStyle: adopt(\.calcNumberStyle, from: stored)
+        case .interfaceSize: adopt(\.interfaceSize, from: stored)
+        case .compactMode: adopt(\.compactMode, from: stored)
+        case .compactBarCommands: adopt(\.compactBarCommands, from: stored)
+        case .searchScopes: adopt(\.searchScopes, from: stored)
+        case .launcherShowsSuggestions: adopt(\.launcherShowsSuggestions, from: stored)
+        case .rootSearchSensitivity: adopt(\.rootSearchSensitivity, from: stored)
+        case .openOnCursorScreen: adopt(\.openOnCursorScreen, from: stored)
+        case .autoSwitchInputSource: adopt(\.autoSwitchInputSourceID, from: stored)
+        case .paletteDraggable: adopt(\.paletteDraggable, from: stored)
+        case .animationsEnabled: adopt(\.animationsEnabled, from: stored)
+        case .iconStyle: adopt(\.iconStyle, from: stored)
+        case .palettePosition: adopt(\.palettePositions, from: stored)
+        case .paletteExpandedCenterDisplays: adopt(\.paletteExpandedCenterDisplays, from: stored)
+        case .fileSearchEnabled: adopt(\.fileSearchEnabled, from: stored)
+        case .fileSearchScopes: adopt(\.fileSearchScopes, from: stored)
+        case .fileSearchIgnorePatterns: adopt(\.fileSearchIgnorePatterns, from: stored)
+        case .fileSearchRemovedDefaultPatterns: adopt(\.fileSearchRemovedDefaultPatterns, from: stored)
+        case .fileSearchShowInLauncher: adopt(\.fileSearchShowInLauncher, from: stored)
+        case .fileSearchIncludesHiddenFiles: adopt(\.fileSearchIncludesHiddenFiles, from: stored)
+        case .notesEnabled: adopt(\.notesEnabled, from: stored)
+        case .notesRendersMarkdown: adopt(\.notesRendersMarkdown, from: stored)
+        case .notesShowsFormattingBar: adopt(\.notesShowsFormattingBar, from: stored)
+        case .notesShowsInMenuBar: adopt(\.notesShowsInMenuBar, from: stored)
+        case .notesFolder: adopt(\.notesFolder, from: stored)
+        case .customCommandsEnabled: adopt(\.customCommandsEnabled, from: stored)
+        case .customCommandsShowInLauncher: adopt(\.customCommandsShowInLauncher, from: stored)
+        case .snippetsEnabled: adopt(\.snippetsEnabled, from: stored)
+        case .snippetsShowInLauncher: adopt(\.snippetsShowInLauncher, from: stored)
+        case .snippetsFolder: adopt(\.snippetsFolder, from: stored)
+        case .snippetDefaultAction: adopt(\.snippetDefaultAction, from: stored)
+        case .navigationEnabled: adopt(\.navigationEnabled, from: stored)
+        case .menuSearchDisabledApps: adopt(\.menuSearchDisabledApps, from: stored)
+        case .menuSearchShowsAppleMenu: adopt(\.menuSearchShowsAppleMenu, from: stored)
+        case .windowManagementEnabled: adopt(\.windowManagementEnabled, from: stored)
+        case .windowManagementShowInLauncher: adopt(\.windowManagementShowInLauncher, from: stored)
+        case .windowGap: adopt(\.windowGap, from: stored)
+        case .windowCycle: adopt(\.windowCycle, from: stored)
+        case .windowWrapsDisplays: adopt(\.windowWrapsDisplays, from: stored)
+        case .windowKeepsProportions: adopt(\.windowKeepsProportions, from: stored)
+        case .windowLayoutsShowInLauncher: adopt(\.windowLayoutsShowInLauncher, from: stored)
+        case .windowRoomsShowInLauncher: adopt(\.windowRoomsShowInLauncher, from: stored)
+        case .quicklinksEnabled: adopt(\.quicklinksEnabled, from: stored)
+        case .quicklinksShowInLauncher: adopt(\.quicklinksShowInLauncher, from: stored)
+        case .quicklinkOpensNewWindow: adopt(\.quicklinkOpensNewWindow, from: stored)
+        case .quicklinkPassesSelectedText: adopt(\.quicklinkPassesSelectedText, from: stored)
+        case .quicklinkConfirmsBeforeDelete: adopt(\.quicklinkConfirmsBeforeDelete, from: stored)
+        case .appleShortcutsEnabled: adopt(\.appleShortcutsEnabled, from: stored)
+        case .extensionsEnabled: adopt(\.extensionsEnabled, from: stored)
+        case .extensionsShowInLauncher: adopt(\.extensionsShowInLauncher, from: stored)
+        case .extensionPackageManager: adopt(\.extensionPackageManager, from: stored)
+        case .extensionCustomSearchPaths: adopt(\.extensionCustomSearchPaths, from: stored)
+        case .calendarEnabled: adopt(\.calendarEnabled, from: stored)
+        case .calendarShowInLauncher: adopt(\.calendarShowInLauncher, from: stored)
+        case .calendarLauncherLimit: adopt(\.calendarLauncherLimit, from: stored)
+        case .calendarSpan: adopt(\.calendarSpan, from: stored)
+        case .joinWindowMinutes: adopt(\.joinWindowMinutes, from: stored)
+        case .autoJoinMeetings: adopt(\.autoJoinMeetings, from: stored)
+        case .autoJoinConfirms: adopt(\.autoJoinConfirms, from: stored)
+        case .autoJoinNamedProvidersOnly: adopt(\.autoJoinNamedProvidersOnly, from: stored)
+        case .cameraPreview: adopt(\.cameraPreview, from: stored)
+        case .meetingBrowser: adopt(\.meetingBrowserBundleID, from: stored)
+        case .menuBarEvents: adopt(\.menuBarEvents, from: stored)
+        case .calendarMenuBarDisplay: adopt(\.calendarMenuBarDisplay, from: stored)
+        case .menuBarLinkedEventsOnly: adopt(\.menuBarLinkedEventsOnly, from: stored)
+        case .calendarMenuBarHidesWhenEmpty: adopt(\.calendarMenuBarHidesWhenEmpty, from: stored)
+        case .hideCurrentEvent: adopt(\.hideCurrentEvent, from: stored)
+        case .aiEnabled: adopt(\.aiEnabled, from: stored)
+        case .mcpEnabled: adopt(\.mcpEnabled, from: stored)
+        case .quickActionsEnabled: adopt(\.quickActionsEnabled, from: stored)
+        case .dictationEnabled: adopt(\.dictationEnabled, from: stored)
+        case .dictationMode: adopt(\.dictationMode, from: stored)
+        case .dictationModel: adopt(\.dictationModel, from: stored)
+        case .dictationMicrophone: adopt(\.dictationMicrophone, from: stored)
+        case .dictationDestination: adopt(\.dictationDestination, from: stored)
+        case .dictationAdaptsCapitalization: adopt(\.dictationAdaptsCapitalization, from: stored)
+        case .dictationLiveInsertion: adopt(\.dictationLiveInsertion, from: stored)
+        case .dictationPlaysSounds: adopt(\.dictationPlaysSounds, from: stored)
+        case .dictationIdleRelease: adopt(\.dictationIdleRelease, from: stored)
+        case .dictationLanguage: adopt(\.dictationLanguage, from: stored)
+        case .supportReminders: adopt(\.supportRemindersEnabled, from: stored)
+        case .settingsFileEnabled: adopt(\.settingsFileEnabled, from: stored)
+        case .iCloudSyncEnabled: adopt(\.iCloudSyncEnabled, from: stored)
+        case .iCloudSyncDisabledCategories: adopt(\.iCloudSyncDisabledCategories, from: stored)
+        case .iCloudSyncOptedInCategories: adopt(\.iCloudSyncOptedInCategories, from: stored)
+        case .allowedDeepLinks: adopt(\.allowedDeepLinks, from: stored)
+        // Read by the AI, Quick Actions and MCP stores, which reload themselves.
+        case .aiInstalledProviders, .aiConnections, .aiDefaultModel, .aiWebSearch, .aiChoices,
+            .aiExpandsReasoning, .aiUsageMenuBar, .aiUsageAlerts, .aiSystemPrompt,
+            .aiSystemPromptEnabled, .aiRetention, .aiOpensTo, .aiNewChatAfter, .aiToolRounds,
+            .aiShownModels, .aiDisabledRoutes, .aiInstalledOverrides,
+            .mcpServers, .quickActionModel, .quickActionModelOverrides, .quickActionPreviews,
+            .quickActionInstructions, .quickActionLanguage:
+            break
+        }
+    }
+
+    private func adopt<Value: Equatable>(
+        _ property: ReferenceWritableKeyPath<AppSettings, Value>, from stored: AppSettings
+    ) {
+        let value = stored[keyPath: property]
+        if self[keyPath: property] != value { self[keyPath: property] = value }
     }
 
     /// With no per-app list the bundle follows macOS's languages, so this runs before any lookup.
@@ -775,6 +944,7 @@ final class AppSettings {
         animationsEnabled =
             defaults.object(forKey: Key.animationsEnabled.rawValue) == nil
             || defaults.bool(forKey: Key.animationsEnabled.rawValue)
+        iconStyle = defaults.string(forKey: Key.iconStyle.rawValue).flatMap(IconStyle.init) ?? .system
         palettePositions =
             defaults.dictionary(forKey: Key.palettePosition.rawValue)
             as? [String: [Double]] ?? [:]
@@ -790,6 +960,8 @@ final class AppSettings {
         fileSearchRemovedDefaultPatterns =
             defaults.stringArray(forKey: Key.fileSearchRemovedDefaultPatterns.rawValue) ?? []
         fileSearchShowInLauncher = defaults.bool(forKey: Key.fileSearchShowInLauncher.rawValue)
+        fileSearchIncludesHiddenFiles = defaults.bool(
+            forKey: Key.fileSearchIncludesHiddenFiles.rawValue)
         notesEnabled = defaults.bool(forKey: Key.notesEnabled.rawValue)
         dictationEnabled = defaults.bool(forKey: Key.dictationEnabled.rawValue)
         dictationMode =
@@ -927,6 +1099,13 @@ final class AppSettings {
             defaults.object(forKey: Key.supportReminders.rawValue) == nil
             || defaults.bool(forKey: Key.supportReminders.rawValue)
         settingsFileEnabled = defaults.bool(forKey: Key.settingsFileEnabled.rawValue)
+        iCloudSyncEnabled = defaults.bool(forKey: Key.iCloudSyncEnabled.rawValue)
+        iCloudSyncDisabledCategories = Set(
+            (defaults.stringArray(forKey: Key.iCloudSyncDisabledCategories.rawValue) ?? [])
+                .compactMap(SyncCategory.init(rawValue:)))
+        iCloudSyncOptedInCategories = Set(
+            (defaults.stringArray(forKey: Key.iCloudSyncOptedInCategories.rawValue) ?? [])
+                .compactMap(SyncCategory.init(rawValue:)))
         allowedDeepLinks = defaults.stringArray(forKey: Key.allowedDeepLinks.rawValue) ?? []
     }
 }

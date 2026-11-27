@@ -70,13 +70,14 @@ private struct WindowLayoutSettingsRow: View {
     let onDelete: () -> Void
 
     @Environment(AppCore.self) private var core
+    @Environment(MainAppLink.self) private var mainApp
     @Environment(VisibilityStore.self) private var visibility
 
     var body: some View {
         let entry = AppEntry(layout)
         let isVisible = visibility.isItemVisible(entry)
         SettingsRow(title: layout.name, subtitle: layout.summary) {
-            SymbolImage(name: layout.symbol, size: 13)
+            SettingsSymbolTile(symbol: layout.symbol, tint: SettingsTab.windowManagement.tint)
         } trailing: {
             AliasField(entry: entry)
                 .settingsEnabled(showsInLauncher && isVisible)
@@ -84,7 +85,7 @@ private struct WindowLayoutSettingsRow: View {
             ShortcutRecorder(action: .windowLayout(id: layout.id))
 
             Button {
-                core.windowLayoutCoordinator.runWindowLayout(id: layout.id)
+                mainApp.send(.runWindowLayout(layout.id))
             } label: {
                 Image(systemName: "play")
             }

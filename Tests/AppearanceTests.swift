@@ -64,7 +64,6 @@ struct AppearanceTests {
 
         print("# tokens that absorbed a literal duplicated across views")
         dark("iconPlaceholder", c.iconPlaceholder, is: Color.white.opacity(0.06))
-        dark("sheen", c.sheen, is: Color.white.opacity(0.04))
         dark("textPrimary", c.textPrimary, is: Color.white)
         // VolumeHUDView draws white 0.85; textPrimary is alpha 1, so opacity must reproduce it.
         dark("textPrimary at 0.85", c.textPrimary.opacity(0.85), is: Color.white.opacity(0.85))
@@ -77,7 +76,7 @@ struct AppearanceTests {
             ("textPrimary", c.textPrimary), ("textSecondary", c.textSecondary),
             ("textTertiary", c.textTertiary), ("noteText", c.noteText), ("cardFill", c.cardFill),
             ("cardStroke", c.cardStroke), ("dropGuide", c.dropGuide),
-            ("iconPlaceholder", c.iconPlaceholder), ("sheen", c.sheen)
+            ("iconPlaceholder", c.iconPlaceholder)
         ] {
             adapts(label, token)
         }
@@ -91,6 +90,37 @@ struct AppearanceTests {
         check("light is aqua", AppAppearance.light.nsAppearance?.isDark == false)
         check("dark is darkAqua", AppAppearance.dark.nsAppearance?.isDark == true)
         check("an unknown stored value is rejected", AppAppearance(rawValue: "sepia") == nil)
+
+        print("# the system icon style reads as macOS stores it")
+        check("unset is Default", SystemIconTheme(stored: nil) == .standard)
+        check("unknown is Default", SystemIconTheme(stored: "Sepia") == .standard)
+        check("a material without a shade is Default", SystemIconTheme(stored: "Clear") == .standard)
+        let clearDark = SystemIconTheme(stored: "ClearDark")
+        check("ClearDark", clearDark.material == .clear && clearDark.shade == .dark)
+        let tinted = SystemIconTheme(stored: "TintedAutomatic")
+        check("TintedAutomatic", tinted.material == .tinted && tinted.shade == .automatic)
+        check("Dark is RegularDark", SystemIconTheme(stored: "RegularDark").shade == .dark)
+        check("automatic follows the surface", tinted.isDark(onDarkSurface: true))
+        check("automatic follows a light surface", !tinted.isDark(onDarkSurface: false))
+        check("a fixed shade ignores the surface", clearDark.isDark(onDarkSurface: false))
+        check("an unset tint uses the accent", tinted.tint == .accent)
+        check(
+            "Clear ignores the saved tint",
+            SystemIconTheme(stored: "ClearDark", storedTint: "Blue") == clearDark)
+        check(
+            "a named tint ignores old custom components",
+            SystemIconTheme(stored: "TintedDark", storedTint: "Graphite", customTint: "0 0.4 1 0.9").tint
+                == .preset(.graphite))
+        check(
+            "a custom tint preserves its RGBA components",
+            SystemIconTheme(stored: "TintedDark", storedTint: "Other", customTint: "0 0.4 1 0.9").tint
+                == .custom(red: 0, green: 0.4, blue: 1, opacity: 0.9))
+        for invalid in ["0 0 1", "0 0 1 1 extra", "nan 0 1 1", "0 0 1 1.5"] {
+            check(
+                "an invalid custom tint uses the accent: \(invalid)",
+                SystemIconTheme(stored: "TintedDark", storedTint: "Other", customTint: invalid).tint
+                    == .accent)
+        }
 
         print("\n\(passes) passed, \(failures) failed")
         exit(failures == 0 ? 0 : 1)

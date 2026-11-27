@@ -10,8 +10,16 @@ the signing identity itself is in [signing.md](signing.md).
 ./Scripts/build-dmg.sh 0.5.7      # -> build/Tinycast-0.5.7.dmg
 ```
 
-It builds a Release `Tinycast.app` signed with `Tinycast Self-Signed` and packs it with an
-`/Applications` symlink. Official per-channel releases are built by CI, below.
+It builds a Release `Tinycast.app` signed with `Tinycast Self-Signed` and packs it with
+`Scripts/make-dmg.sh`, which CI uses too. Official per-channel releases are built by CI, below.
+
+The DMG opens as a styled install window: the Applications folder on the left, the app on the right
+and an arrow between them. `make-dmg.sh` mounts a writable image, and `Scripts/dmg-layout.swift`
+draws the background and writes the volume's `.DS_Store` directly, so packaging never scripts
+Finder and runs the same on a headless runner. Finder picks the label colour from the pixels behind
+each name, so the light pills under the labels make it draw dark text. The `.DS_Store` bookmark to
+the background names the image's own volume, so the layout must happen on the mounted image, not
+on the staging folder.
 
 ## Signing & Gatekeeper
 
@@ -30,7 +38,7 @@ bundle identifiers and fork revisions are described under [Chinese fork](#chines
 Every release publishes three assets from one build: `Tinycast-<version>.dmg`, which people download
 by hand and which the cask installs, `Tinycast-<version>.zip`, which the in-app updater installs, and
 `Tinycast-<version>.zip.sig`, the zip's signature by the release key. The zip is produced with
-`ditto -c -k --keepParent --sequesterRsrc` — the only zip that leaves the code signature verifiable,
+`ditto -c -k --keepParent --sequesterRsrc`, the only zip that leaves the code signature verifiable,
 which matters because the updater refuses any bundle it cannot prove is ours.
 
 A stable release publishes two more from the `universal` job, `Tinycast-Universal-<version>.dmg` and
@@ -62,8 +70,8 @@ There is no CI workflow and no automated reviewer, so the whole bar in
 ### Chinese fork
 
 `conversun/tinycast-cn` publishes through `release-cn.yml`, not the upstream workflow.
-The intended next stable release is `v0.12.15-cn.2`, based on `v0.12.15` and subsequent main changes.
-Dispatch it with `version=0.12.15-cn.2`, `upstream_tag=v0.12.15`,
+The intended next stable release is `v0.17.0-cn.1`, based on `v0.17.0` and subsequent main changes.
+Dispatch it with `version=0.17.0-cn.1`, `upstream_tag=v0.17.0`,
 an exact verified source commit, `prerelease=false`, and a Chinese `release_notes` changelog.
 Supply a fresh Chinese changelog for each release, including any changes pulled from upstream
 after the named stable tag.
@@ -113,11 +121,11 @@ beta users must install the beta DMG initially because the tap tracks only stabl
 `.github/workflows/release.yml` builds and publishes a DMG from GitHub Actions, no local machine
 needed. Run it from the **Actions** tab (`Release` → **Run workflow**) and pick:
 
-- **channel** — `beta` or `stable`. Each builds a distinct app (`Tinycast Beta.app` / `Tinycast.app`)
+- **channel**: `beta` or `stable`. Each builds a distinct app (`Tinycast Beta.app` / `Tinycast.app`)
   with its own bundle id, alongside the local `Tinycast Dev.app`. Beta gets an auto-incrementing
   `-beta.N` suffix (`N` = the Actions run number) so re-running never collides; stable ships the
   version as-is.
-- **version** — base semver, e.g. `0.2.0`.
+- **version**: base semver, e.g. `0.2.0`.
 
 Its first step is `Scripts/check-migrations.sh`: a migration that a stable release already shipped
 stops the run until it is deleted ([migrations.md](migrations.md)). The check reads tags and history,
@@ -133,7 +141,7 @@ A stable run then fans out to a second job, `universal`, which rebuilds the same
 `ARCHS="arm64 x86_64"` and attaches `Tinycast-Universal-<version>.dmg` / `.zip` to the release the
 first job created, then bumps `tinycast-universal`. macOS 26 is the last release that boots on Intel,
 and those Macs need both slices. Both jobs pin `ARCHS` explicitly and assert the slices on _every_
-shipping binary — the app, `ClipboardTextHelper`, `FileIndexHelper` and `Tinycast Dictation`:
+shipping binary (the app, `ClipboardTextHelper`, `FileIndexHelper` and `Tinycast Dictation`):
 trusting `ARCHS_STANDARD` is what shipped a thin arm64 build to Intel users once already, and it
 also keeps the Apple silicon download from silently gaining a slice it never needs. A thin helper
 inside a universal app is the quiet form of the same bug: the app boots on Intel and only clipboard
@@ -148,6 +156,14 @@ Any status but `Accepted` prints Apple's log and stops the run before anything i
 update key. `Scripts/check-update-path.sh` runs just before notarizing, and fails the run unless the
 last release on the channel would install this build ([signing.md](signing.md#update-trust)).
 
+Before building, the job installs the channel's profile from `Config/Profiles/` and runs
+`Scripts/check-cloudkit-schema.sh`, which stops the run unless the channel's container has every
+field of `Config/CloudKit/schema.ckdb` in Production. A Developer ID build reaches only Production,
+where a missing field fails every save. `cktool` can't write Production, so a schema change ships in
+two steps before the release: `./Scripts/deploy-cloudkit-schema.sh iCloud.<bundle id>` imports it
+into Development, then **Deploy Schema Changes** in the CloudKit Console takes it to Production
+([icloud-sync.md](features/icloud-sync.md#cloudkit)).
+
 Channel builds override `TINYCAST_BUNDLE_IDENTIFIER`, not the target-wide `PRODUCT_BUNDLE_IDENTIFIER`.
 The Dictation helper derives its own identifier with a `.dictation` suffix; signature verification
 checks that its bundle and signing identifiers agree and remain distinct from the main app.
@@ -156,21 +172,21 @@ checks that its bundle and signing identifiers agree and remain distinct from th
 
 For upstream releases, `Scripts/release-notes.sh` composes the release body, and CI runs it just
 before `gh release create`.
-It is safe to run by hand against any tag — it only reads:
+It is safe to run by hand against any tag; it only reads:
 
 ```sh
 CHANNEL=beta TAG=v0.9.13-beta.61 ./Scripts/release-notes.sh /tmp/body.md /tmp/discord.md
 ```
 
 The changelog itself comes from GitHub's own release-notes API, which lists every merged PR with its
-author and number — so contributors are credited without anyone maintaining a `CHANGELOG.md`, and
+author and number, so contributors are credited without anyone maintaining a `CHANGELOG.md`, and
 without Conventional Commits. **Nothing is ever committed to this repo**: the tag is created
 server-side by `gh release create`, and no release, bot or version-bump commit exists.
 
 Two details the script exists for:
 
-- **The previous tag is picked per channel.** Beta and stable tags interleave on `main` — the same
-  commit can carry both — so "the previous release" is only ever right within one channel. A stable
+- **The previous tag is picked per channel.** Beta and stable tags interleave on `main` (the same
+  commit can carry both), so "the previous release" is only ever right within one channel. A stable
   release therefore spans every beta since the last stable.
 - **The body is split by `<!-- tinycast:install -->`.** Everything above it is the changelog;
   everything below is the install text, which only a download page needs. The website's changelog
@@ -191,7 +207,7 @@ is the only job that touches it: its last step rewrites the cask's `version` + `
 The tap's `tap_migrations.json` hands anyone who installed `tinycast` or `tinycast@beta` from the tap
 to homebrew/cask on `brew update`.
 
-The step needs a `HOMEBREW_TAP_TOKEN` repo secret — a fine-grained PAT with **Contents: read/write**
+The step needs a `HOMEBREW_TAP_TOKEN` repo secret: a fine-grained PAT with **Contents: read/write**
 on the tap repo. Without the secret the step logs a warning and skips; the release still publishes.
 The `sed` is anchored to `^  version` / `^  sha256`, so a cask's two-space indent on those lines is
 load-bearing.

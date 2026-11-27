@@ -3,6 +3,7 @@ import SwiftUI
 struct CommandsSettingsView: View {
     @Environment(CustomCommandStore.self) private var store
     @Environment(CustomCommandCoordinator.self) private var coordinator
+    @Environment(MainAppLink.self) private var mainApp
     @Environment(AppSettings.self) private var settings
 
     var body: some View {
@@ -45,12 +46,12 @@ struct CommandsSettingsView: View {
                                     coordinator.setCustomCommandEnabled(
                                         $0, id: command.id)
                                 }),
-                            onEdit: { coordinator.editCustomCommand(command) },
+                            onEdit: { mainApp.send(.editCustomCommand(command.id)) },
                             onDelete: { Task { await coordinator.deleteCustomCommand(id: command.id) } })
                     }
                 }
                 Button {
-                    coordinator.editCustomCommand(nil)
+                    mainApp.send(.editCustomCommand(nil))
                 } label: {
                     SettingsRowTitle(.commandsCustomCommands, "Add Custom Command")
                 }
@@ -86,8 +87,8 @@ private struct CustomCommandSettingsRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        SettingsRow(title: command.name, subtitle: command.command) {
-            Image(systemName: command.symbol)
+        SettingsRow(title: command.name) {
+            SettingsSymbolTile(symbol: command.symbol, tint: SettingsTab.commands.tint)
         } trailing: {
             if !command.showsInRootSearch {
                 Image(systemName: "eye.slash")

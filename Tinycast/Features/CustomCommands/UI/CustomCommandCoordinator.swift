@@ -91,8 +91,10 @@ final class CustomCommandCoordinator {
         guard settings.customCommandsEnabled, let editor, editor.canSave else { return }
         do {
             var draft = editor.draft()
+            let confirmation: String
             if editor.original == nil {
                 try addCustomCommand(draft)
+                confirmation = String(localized: "Command created")
             } else {
                 guard let current = store.command(id: editor.id) else {
                     editor.errorMessage = String(
@@ -101,8 +103,10 @@ final class CustomCommandCoordinator {
                 }
                 draft.isEnabled = current.isEnabled
                 try updateCustomCommand(draft)
+                confirmation = String(localized: "Command saved")
             }
             cancelCustomCommandEditing()
+            core.showMessage(confirmation)
         } catch {
             editor.errorMessage = error.localizedDescription
         }
@@ -165,6 +169,15 @@ final class CustomCommandCoordinator {
                 symbol: command.iconSymbol ?? CustomCommand.sfSymbol,
                 confirmTitle: String(localized: "Delete"))
         else { return }
+        if let mainApp = core.mainApp {
+            mainApp.send(.deleteCustomCommand(id))
+        } else {
+            removeCustomCommand(id: id)
+        }
+    }
+
+    func removeCustomCommand(id: UUID) {
+        guard let command = store.command(id: id) else { return }
         removeCustomCommandReferences(ids: [id], entryIDs: [command.entryID])
         store.remove(id: id)
     }
@@ -249,7 +262,6 @@ final class CustomCommandCoordinator {
 
     /// The one funnel, so no entry point skips a required value or the confirmation.
     func runCustomCommand(id: UUID, values: [String: String] = [:]) {
-        // Also the feature switch: with it off a registered hotkey must run nothing.
         guard settings.customCommandsEnabled else { return }
         guard let command = store.command(id: id), command.isEnabled else { return }
         guard let arguments = command.positionalValues(from: values) else {

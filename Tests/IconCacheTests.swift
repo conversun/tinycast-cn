@@ -1,5 +1,7 @@
 import AppKit
 import Foundation
+import Observation
+import Synchronization
 
 @main
 @MainActor
@@ -13,34 +15,14 @@ struct IconCacheTests {
         }
     }
 
-    /// The cache key carries the colour, or a re-skin serves whatever was drawn first.
-    static func tintedTiles() {
-        let plain = bitmap(IconCache.symbolIcon(named: "star"))
-        let red = bitmap(
-            IconCache.symbolIcon(named: "star", tint: SymbolTint(key: "red", color: .systemRed)))
-        let blue = bitmap(
-            IconCache.symbolIcon(named: "star", tint: SymbolTint(key: "blue", color: .systemBlue)))
-
-        expect(plain != nil && red != nil && blue != nil, "every tile rasterizes")
-        expect(plain != red, "a tinted tile differs from the plain one")
-        expect(red != blue, "two tints do not share a cache entry")
-        // Same key twice must hit the cache and give back the identical bitmap.
-        expect(
-            red
-                == bitmap(
-                    IconCache.symbolIcon(
-                        named: "star", tint: SymbolTint(key: "red", color: .systemRed))),
-            "the same tint is stable")
-    }
-
-    static func bitmap(_ image: NSImage) -> Data? { image.tiffRepresentation }
-
     static func semanticSymbolNames() {
         for (isDark, appearance) in [(false, NSAppearance.Name.aqua), (true, .darkAqua)] {
             let smile = SystemSymbolName.resolve("face.smiling", isDark: isDark)
             let other = smile == "face.smiling" ? "face.smiling.inverse" : "face.smiling"
             NSAppearance(named: appearance)?.performAsCurrentDrawingAppearance {
                 expect(ink(smile) < ink(other), "the smiley resolves to its outline, dark: \(isDark)")
+                let filled = SystemSymbolName.resolve("face.smiling.inverse", isDark: isDark)
+                expect(ink(filled) > ink(smile), "the inverse smiley stays filled, dark: \(isDark)")
             }
         }
         expect(SystemSymbolName.resolve("star", isDark: true) == "star", "other symbols stay unchanged")
@@ -89,6 +71,47 @@ struct IconCacheTests {
         let first = IconCache.styleFingerprint()
         expect(first != nil, "the style probe renders")
         expect(first == IconCache.styleFingerprint(), "an unchanged style renders identically")
+    }
+
+    static func tileTintChanges() {
+        let defaults = UserDefaults.standard
+        let domain = UserDefaults.argumentDomain
+        let saved = defaults.volatileDomain(forName: domain)
+        let followedSystem = IconCache.style.tilesFollowSystem
+        defer {
+            defaults.removeVolatileDomain(forName: domain)
+            defaults.setVolatileDomain(saved, forName: domain)
+            IconCache.style.tilesFollowSystem = followedSystem
+            IconCache.invalidateStyled()
+        }
+
+        func pickTint(_ tint: String) {
+            defaults.removeVolatileDomain(forName: domain)
+            defaults.setVolatileDomain(
+                ["AppleIconAppearanceTheme": "TintedDark", "AppleIconAppearanceTintColor": tint],
+                forName: domain)
+            IconCache.invalidateStyled()
+        }
+
+        pickTint("Blue")
+        let blue = IconCache.style.tileTheme
+        expect(blue.tint == .preset(.blue), "tiles read the selected system tint")
+        let didChange = Mutex(false)
+        withObservationTracking {
+            _ = IconCache.style.tileTheme
+        } onChange: {
+            didChange.withLock { $0 = true }
+        }
+
+        pickTint("Red")
+        let red = IconCache.style.tileTheme
+        expect(
+            red.tint == .preset(.red) && red.material == blue.material && red.shade == blue.shade,
+            "the tint changes while the material and shade stay the same")
+        expect(didChange.withLock { $0 }, "a tint-only change invalidates the tile's observation")
+
+        IconCache.style.tilesFollowSystem = false
+        expect(IconCache.style.tileTheme == .standard, "Colorful skips the system tint")
     }
 
     static let finder = "/System/Library/CoreServices/Finder.app"
@@ -243,8 +266,8 @@ struct IconCacheTests {
         fittedAlphaThreshold()
         await asynchronousRows()
         semanticSymbolNames()
-        tintedTiles()
         restyling()
+        tileTintChanges()
         styleFingerprint()
 
         print(failures == 0 ? "Icon cache tests passed" : "\(failures) tests failed")

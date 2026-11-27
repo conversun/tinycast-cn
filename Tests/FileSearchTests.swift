@@ -28,6 +28,8 @@ struct FileSearchTests {
 
     static func main() {
         queryMatching()
+        pathQuery()
+        termHits()
         launcherQuery()
         ranking()
         typeFilter()
@@ -46,9 +48,17 @@ struct FileSearchTests {
         expect(!FileSearchQuery.answersLauncher("ab"), "two characters are too few for the launcher")
         expect(FileSearchQuery.answersLauncher("abc"), "three characters reach the launcher")
         expect(!FileSearchQuery.answersLauncher("  ab \n"), "surrounding whitespace does not count")
+        for path in ["/", "~", "~/"] {
+            expect(FileSearchQuery.answersLauncher(path), "a short path with no words reaches the launcher")
+        }
+        expect(!FileSearchQuery.answersLauncher("/a"), "a short path with a word is still too short")
         let folder = result("Documents/Résumé", folder: true)
         let file = result("Documents/Résumé Final.pdf")
         let indexed = result("Downloads/Resume.txt")
+        let root = FileSearchResult(url: URL(filePath: "/"), isDirectory: true, homeDirectory: home)
+        expect(
+            FileSearchQuery.launcherResults("/", favorites: [file], indexed: [root]) == [root],
+            "a path with no terms lists the exact row without matching every favorite")
         expect(
             FileSearchQuery.launcherResults("", favorites: [folder, file], indexed: [indexed]).isEmpty,
             "an empty launcher query leaves files to the Favorites section")
@@ -99,6 +109,90 @@ struct FileSearchTests {
         expect(
             haystack.withUTF8 { FileSearchQuery.find(Array("abc".utf8), in: $0) } == 2,
             "find returns the first case-insensitive occurrence")
+    }
+
+    static func pathQuery() {
+        expect(
+            FileSearchQuery.terms(in: "Dev/tinycast/App") == ["Dev", "tinycast", "App"],
+            "a slash separates terms")
+        expect(
+            FileSearchQuery.terms(in: "~/.claude/skills") == [".claude", "skills"],
+            "a leading tilde is home, not a term")
+        expect(FileSearchQuery.terms(in: "~").isEmpty, "a bare tilde is home, not a term")
+
+        func location(_ query: String) -> String? { FileSearchQuery.prepare(query)?.location }
+        expect(location("Dev/tinycast") == nil, "a relative path names no place")
+        expect(location("~report") == nil, "a tilde starting a name names no place")
+        expect(location("https://example.com/a") == nil, "a web link names no place")
+        expect(location(" ~/.claude \n") == "~/.claude", "a pasted path is trimmed")
+        expect(location("~") == "~", "a bare tilde names home")
+        expect(
+            location("/Users/test/My Notes") == "/Users/test/My Notes",
+            "a path keeps its spaces")
+        expect(
+            location("file:///Users/test/My%20Notes/") == "/Users/test/My Notes/",
+            "a file link keeps its decoded path and trailing slash")
+        expect(
+            location("FILE://LOCALHOST/Users/test") == "/Users/test",
+            "localhost names the local filesystem")
+        expect(location("file://other-mac.example/Users/test") == nil, "remote URLs name no local file")
+        expect(location("file://%FF/Users/test") == nil, "an undecodable host does not become local")
+        expect(location("file:////other-mac/path") == nil, "a network share is not a local path")
+        expect(location("file:///Users/test%2Ffoo") == nil, "a URL cannot encode a slash into a name")
+        expect(location("file:///Users/test#other") == nil, "a fragment is not part of a filename")
+        expect(location("file:///Users/test?%FF") == nil, "an undecodable query is still present")
+        expect(location("/private/tmp/../tmp/x") == "/private/tmp/../tmp/x", "dot segments reach disk")
+        expect(
+            FileSearchQuery.prepare("/")?.terms.isEmpty == true && location("/") == "/",
+            "the root prepares a path with no terms")
+        expect(
+            FileSearchQuery.prepare("~/")?.terms.isEmpty == true && location("~/") == "~/",
+            "home with a trailing slash prepares a path with no terms")
+    }
+
+    static func hits(_ query: String, _ name: String) -> FileSearchQuery.TermHits {
+        let prepared = FileSearchQuery.prepare(query)!
+        var name = name
+        return name.withUTF8 { FileSearchQuery.hits(prepared, name: $0, mask: FileSearchQuery.nameMask($0)) }
+    }
+
+    static func termHits() {
+        let prepared = FileSearchQuery.prepare("claude surge skill")!
+        expect(prepared.reachesFolders && prepared.everyTerm == 0b111, "each term owns one bit")
+        expect(!FileSearchQuery.prepare("skill")!.reachesFolders, "one term never reaches folders")
+        expect(
+            !FileSearchQuery.prepare("a b c d e f g h i")!.reachesFolders,
+            "more terms than bits stay with names")
+
+        let claude = hits("claude surge skill", ".claude")
+        expect(claude.held == 0b001 && claude.startingWords == 0b001, "a dot starts a word")
+        let skills = hits("claude surge skill", "skills")
+        expect(skills.held == 0b100 && skills.startingWords == 0b100, "a word may run on")
+        let inner = hits("laude skill", ".claude")
+        expect(inner.held == 0b01 && inner.startingWords == 0, "a term inside a word starts none")
+        let later = hits("map", "bitmap-map")
+        expect(later.startingWords == 0b1, "a later occurrence can start a word")
+        expect(hits("projects resume", "Résumé").held == 0b10, "a folded name holds its plain term")
+
+        func score(_ query: String, _ name: String, holding held: UInt8) -> Int? {
+            let prepared = FileSearchQuery.prepare(query)!
+            var name = name
+            return name.withUTF8 { bytes in
+                FileSearchQuery.score(
+                    prepared, name: bytes, mask: FileSearchQuery.nameMask(bytes), holding: held,
+                    prior: 2)
+            }
+        }
+        expect(
+            score("claude skills", "skills", holding: 0b10)!
+                > score("claude skill", "SKILL.md", holding: 0b10)!,
+            "a name equal to its held term ranks first")
+        expect(
+            score("claude skill", "SKILL.md", holding: 0b10)!
+                > score("claude skill", "skillful.md", holding: 0b10)!,
+            "a held term that ends a word beats one that runs on")
+        expect(
+            score("claude skill", "notes.md", holding: 0b10) == nil, "a term the name lacks scores nothing")
     }
 
     static func ranking() {
@@ -200,6 +294,10 @@ struct FileSearchTests {
         expect(
             !shipped.excludes(name: "Preferences", path: "/Users/test/Library/Preferences"),
             "only the noisy parts of the user's Library are skipped")
+        expect(
+            shipped.excludes(name: "worktrees", path: "/Users/test/Developer/app/.claude/worktrees")
+                && shipped.excludes(name: "workspaces", path: "/Users/test/conductor/workspaces"),
+            "agent worktrees are skipped wherever they live")
 
         let edited = FileSearchIgnoreList.patterns(
             added: ["*.log", "node_modules", "*.log"], removedDefaults: [".git", "*.log"])
@@ -249,6 +347,15 @@ struct FileSearchTests {
         check(
             ["**/Cache/*.bin"], name: "blob.bin", path: "/x/Cache/nested/blob.bin",
             excluded: true, builds: 1)
+        check(
+            ["**/.claude/worktrees"], name: "WorkTrees", path: "/x/repo/.claude/WorkTrees",
+            excluded: true, builds: 1)
+        check(
+            ["**/.claude/worktrees"], name: "worktrees", path: "/x/repo/worktrees",
+            excluded: false, builds: 1)
+        check(
+            ["**/.claude/worktrees"], name: "notes.txt", path: "/x/repo/notes.txt",
+            excluded: false, builds: 0)
         check(["/x/[a/b]"], name: "a", path: "/x/a", excluded: true, builds: 1)
         check(["/x/cache\\?"], name: "cache?", path: "/x/cache?", excluded: true, builds: 1)
         check(["/x/\\*/cache"], name: "cache", path: "/x/*/cache", excluded: true, builds: 1)
@@ -258,16 +365,20 @@ struct FileSearchTests {
     static func policy() {
         let policy = FileSearchPolicy(
             scopes: ["~/Developer", "~", "/Volumes/Work", "~/Developer"],
-            ignorePatterns: ["*.log"], homeDirectory: home)
+            ignorePatterns: ["*.log"], includesHiddenFiles: false, homeDirectory: home)
         expect(
             policy.roots == ["/Users/test", "/Volumes/Work"],
             "roots are deduplicated, and a scope inside another folds into it")
         expect(
-            FileSearchPolicy(scopes: ["/", "~"], ignorePatterns: [], homeDirectory: home).roots
+            FileSearchPolicy(
+                scopes: ["/", "~"], ignorePatterns: [], includesHiddenFiles: false, homeDirectory: home
+            ).roots
                 == ["/"],
             "the whole disk covers home")
         expect(
-            FileSearchPolicy(scopes: [], ignorePatterns: [], homeDirectory: home).roots.isEmpty,
+            FileSearchPolicy(
+                scopes: [], ignorePatterns: [], includesHiddenFiles: false, homeDirectory: home
+            ).roots.isEmpty,
             "a cleared list resolves to no roots at all")
         expect(
             policy.ignore.excludes(name: "run.log", path: "/Volumes/Work/run.log")
@@ -276,16 +387,24 @@ struct FileSearchTests {
 
         let same = FileSearchPolicy(
             scopes: ["~/Developer", "~", "/Volumes/Work", "~/Developer"],
-            ignorePatterns: ["*.log"], homeDirectory: home)
+            ignorePatterns: ["*.log"], includesHiddenFiles: false, homeDirectory: home)
         expect(policy == same && policy.fingerprint == same.fingerprint, "the fingerprint is stable")
         let other = FileSearchPolicy(
-            scopes: ["~"], ignorePatterns: ["*.txt"], homeDirectory: home)
+            scopes: ["~"], ignorePatterns: ["*.txt"], includesHiddenFiles: false, homeDirectory: home)
         expect(policy.fingerprint != other.fingerprint, "changing the settings changes the fingerprint")
+        let hidden = FileSearchPolicy(
+            scopes: ["~/Developer", "~", "/Volumes/Work", "~/Developer"],
+            ignorePatterns: ["*.log"], includesHiddenFiles: true, homeDirectory: home)
+        expect(
+            policy != hidden && policy.fingerprint != hidden.fingerprint,
+            "including hidden files rebuilds the index")
 
         let priors: [(String, Int8)] = [
             ("/Users/test", 2),
             ("/Users/test/Documents/Work", 2),
-            ("/Users/test/.config", 0),
+            ("/Users/test/.config", 1),
+            ("/Users/test/.config/Tool.app/Contents", 0),
+            ("/Users/test/Library/CloudStorage/Dropbox/.cache", 1),
             ("/Users/test/Library/Caches", 0),
             ("/Users/test/Library/CloudStorage/Dropbox/Team", 2),
             ("/Users/test/Library/Mobile Documents/com~apple~CloudDocs/Notes", 2),
@@ -327,6 +446,13 @@ struct FileSearchTests {
         expect(
             nested.parentName == "Documents" && result("Notes.txt").parentName == "test",
             "the parent's own name is what a folder row prefixes itself with")
+        let top = FileSearchResult(
+            url: URL(filePath: "/Applications", directoryHint: .isDirectory), isDirectory: true,
+            homeDirectory: home)
+        let root = FileSearchResult(url: URL(filePath: "/"), isDirectory: true, homeDirectory: home)
+        expect(
+            top.parentName.isEmpty && root.parentName.isEmpty,
+            "a folder at the root has no parent name to prefix, so it never reads as //")
         for original in [nested, result("Documents/Résumé #1? 100%.txt"), result("Projects", folder: true)] {
             let restored = FileSearchResult(favoriteKey: original.favoriteKey, homeDirectory: home)
             expect(restored?.id == original.id, "a favorite preserves the exact path and Unicode")

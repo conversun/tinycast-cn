@@ -3,6 +3,7 @@ import SwiftUI
 struct QuicklinksSettingsView: View {
     @Environment(QuicklinkStore.self) private var store
     @Environment(QuicklinkCoordinator.self) private var coordinator
+    @Environment(MainAppLink.self) private var mainApp
     @Environment(AppSettings.self) private var settings
     @State private var query = ""
 
@@ -65,14 +66,14 @@ struct QuicklinksSettingsView: View {
                             set: {
                                 coordinator.setQuicklinkEnabled($0, id: quicklink.id)
                             }),
-                        onEdit: { coordinator.editQuicklink(quicklink) },
+                        onEdit: { mainApp.send(.editQuicklink(quicklink.id)) },
                         onDelete: {
                             Task { await coordinator.deleteQuicklink(id: quicklink.id, alwaysConfirm: true) }
                         })
                 }
             }
             Button {
-                coordinator.editQuicklink(nil)
+                mainApp.send(.editQuicklink(nil))
             } label: {
                 SettingsRowTitle(.quicklinksQuicklinks, "Add Quicklink")
             }
@@ -137,12 +138,8 @@ private struct QuicklinkSettingsRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        SettingsRow(title: quicklink.name, subtitle: quicklink.link) {
-            SymbolImage(
-                name: quicklink.symbol,
-                size: Theme.Size.settingsRowIcon - Theme.Spacing.xs
-            )
-            .frame(width: SettingsListMetrics.iconSize, height: SettingsListMetrics.iconSize)
+        SettingsRow(title: quicklink.name) {
+            SettingsSymbolTile(symbol: quicklink.symbol, tint: SettingsTab.quicklinks.tint)
         } trailing: {
             if quicklink.isPinned {
                 Image(systemName: "pin.fill")

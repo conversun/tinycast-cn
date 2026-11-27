@@ -29,11 +29,13 @@ enum SettingsBackupCoverage {
         "openOnCursorScreen": .openOnCursorScreen,
         "paletteDraggable": .paletteDraggable,
         "animationsEnabled": .animationsEnabled,
+        "iconStyle": .iconStyle,
         "fileSearchEnabled": .fileSearchEnabled,
         "fileSearchScopes": .fileSearchScopes,
         "fileSearchIgnorePatterns": .fileSearchIgnorePatterns,
         "fileSearchRemovedDefaultPatterns": .fileSearchRemovedDefaultPatterns,
         "fileSearchShowInLauncher": .fileSearchShowInLauncher,
+        "fileSearchIncludesHiddenFiles": .fileSearchIncludesHiddenFiles,
         "notesEnabled": .notesEnabled,
         "notesRendersMarkdown": .notesRendersMarkdown,
         "notesShowsFormattingBar": .notesShowsFormattingBar,
@@ -142,6 +144,10 @@ enum SettingsBackupCoverage {
         AppSettingsKey.aiExpandsReasoning.rawValue:
             "How much of a reply a reader sees unasked is this Mac's own choice, and no other AI "
             + "setting travels.",
+        AppSettingsKey.aiUsageMenuBar.rawValue:
+            "Reads the limits of commands signed in on this Mac, and no other AI setting travels.",
+        AppSettingsKey.aiUsageAlerts.rawValue:
+            "Accompanies the menu bar switch it serves, which stays on the Mac that set it.",
         AppSettingsKey.aiSystemPrompt.rawValue:
             "Standing instructions to a model are the one AI setting that changes every answer; an "
             + "import must not carry them onto another Mac unseen.",
@@ -195,6 +201,12 @@ enum SettingsBackupCoverage {
         AppSettingsKey.notesFolder.rawValue:
             "Names a folder on this Mac; the one a backup lands on may not have it.",
         AppSettingsKey.settingsFileEnabled.rawValue:
-            "Lets a file on this Mac change its settings; an import must not hand that to another."
+            "Lets a file on this Mac change its settings; an import must not hand that to another.",
+        AppSettingsKey.iCloudSyncEnabled.rawValue:
+            "Sends this Mac's data to iCloud; only the iCloud Sync pane may turn that on.",
+        AppSettingsKey.iCloudSyncDisabledCategories.rawValue:
+            "Which categories sync is each Mac's own choice, made in its iCloud Sync pane.",
+        AppSettingsKey.iCloudSyncOptedInCategories.rawValue:
+            "Which categories sync is each Mac's own choice, made in its iCloud Sync pane."
     ]
 }

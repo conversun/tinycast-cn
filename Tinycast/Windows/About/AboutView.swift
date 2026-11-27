@@ -2,24 +2,13 @@ import AppKit
 import SwiftUI
 
 struct AboutView: View {
-    @Environment(AppCore.self) private var core
+    @Environment(MainAppLink.self) private var mainApp
 
     private static var version: String {
         let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
         return String(localized: "Version \(short) (\(build))")
     }
-
-    // Cached, and read from the bundle: the app icon is generic until LaunchServices registers.
-    @MainActor private static let appIcon: NSImage = {
-        if let name = Bundle.main.infoDictionary?["CFBundleIconFile"] as? String,
-            let url = Bundle.main.url(forResource: name, withExtension: "icns"),
-            let image = NSImage(contentsOf: url)
-        {
-            return image
-        }
-        return NSApp.applicationIconImage
-    }()
 
     private static let iconSize: CGFloat = 88
     private static let tileSize: CGFloat = 30
@@ -48,7 +37,7 @@ struct AboutView: View {
 
     private var hero: some View {
         VStack(spacing: Theme.Spacing.xl) {
-            Image(nsImage: Self.appIcon)
+            Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
                 .interpolation(.high)
                 .frame(width: Self.iconSize, height: Self.iconSize)
@@ -71,7 +60,7 @@ struct AboutView: View {
                     )
             }
 
-            Text("A native macOS launcher for everyday productivity. Lightweight and open source.")
+            Text("A native macOS launcher built for productivity. Fast, lightweight, and open source.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -79,7 +68,7 @@ struct AboutView: View {
     }
 
     private var updates: some View {
-        let updates = core.updateCoordinator
+        let updates = mainApp.status.updates
         return Section {
             HStack(spacing: Theme.Spacing.xl) {
                 tile("arrow.down.circle.fill", tint: Theme.Colors.progress)
@@ -92,14 +81,14 @@ struct AboutView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Theme.Spacing.lg)
-                Button("Check Now") { updates.checkForUpdates() }
+                Button("Check Now") { mainApp.send(.checkForUpdates) }
                     .disabled(updates.isChecking)
             }
             .padding(.vertical, Theme.Spacing.xs)
         }
     }
 
-    private func updateStatus(_ updates: UpdateCoordinator) -> Text {
+    private func updateStatus(_ updates: MainAppStatus.Updates) -> Text {
         guard updates.updatesItself else {
             return Text("This is a local build — rebuild it to move it forward.")
         }
@@ -107,7 +96,7 @@ struct AboutView: View {
             return Text("Checking for updates…")
         }
         if let version = updates.availableVersion {
-            return Text("Version \(version.description) is available")
+            return Text("Version \(version) is available")
         }
         guard let lastCheckedAt = updates.lastCheckedAt else {
             return Text("Not checked yet")
@@ -137,13 +126,13 @@ struct AboutView: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                     SettingsRowTitle(.aboutLinks, "Support")
                         .font(.body.weight(.medium))
-                    Text("Free and open source. Your support sustains its development.")
+                    Text("If it earns a place on your Mac, consider supporting its development.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Theme.Spacing.lg)
-                Button("Support…") { core.supportCoordinator.showSupport() }
+                Button("Support…") { mainApp.send(.showSupport) }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.Colors.brand)
             }

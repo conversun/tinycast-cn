@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct ClipboardSettingsView: View {
     @Environment(AppCore.self) private var core
+    @Environment(MainAppLink.self) private var mainApp
     @Environment(AppSettings.self) private var settings
     @State private var confirmingClear = false
 
@@ -70,11 +71,15 @@ struct ClipboardSettingsView: View {
             titleVisibility: .visible
         ) {
             Button("Clear History", role: .destructive) {
-                core.clipboardCoordinator.clearHistory()
+                mainApp.send(.clearClipboardHistory)
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This can't be undone.")
+            if core.cloudSyncCoordinator.syncsClipboard {
+                Text("This also clears your other Macs and can't be undone.")
+            } else {
+                Text("This can't be undone.")
+            }
         }
     }
 }

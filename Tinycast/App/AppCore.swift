@@ -17,7 +17,7 @@ final class AppCore {
     let roomParking = RoomParkingLedger(
         fileURL: AppPaths.applicationSupport().appendingPathComponent("room-parking.json"))
     let roomSession = RoomSession()
-    let clipboardStore = ClipboardStore()
+    let clipboardStore = ClipboardStore(opensDatabase: ProcessRole.current == .main)
     @ObservationIgnored private var clipboardTextIndexer: ClipboardTextIndexer?
     let clipboardManager: ClipboardManager
     let snippetsStore: SnippetsStore
@@ -30,15 +30,13 @@ final class AppCore {
         DictationModelStore(idleRelease: settings.dictationIdleRelease)
     @ObservationIgnored private(set) lazy var hyperKey = HyperKeyManager(
         settings: settings, hotKeys: hotKeys)
-    @ObservationIgnored private lazy var dictationKey = DictationKeyManager(hotKeys: hotKeys)
     let windowMover = WindowMover()
     let spaceSwitcher = SpaceSwitcher()
     let inputSourceSwitcher = InputSourceSwitcher()
     let settings: AppSettings
     /// Mirrors settings into settings.json; nil while the Backup pane's switch is off.
     @ObservationIgnored private var settingsFile: SettingsFileRepository?
-    /// The file's launcher items, kept to apply a waiting record once its app is installed.
-    @ObservationIgnored private var launcherSettingsFile: LauncherSettingsFile?
+    @ObservationIgnored private(set) lazy var settingsBindings = makeSettingsBindings()
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
     /// The last verdict `trackChatRoute` acted on; nil until it has read one.
     @ObservationIgnored private var chatsRunTheirOwnTools: Bool?
@@ -67,21 +65,26 @@ final class AppCore {
     let activationPolicy = ActivationPolicy()
     let uninstall = UninstallSession()
     let notesStore: NotesStore
-    let extensions: ExtensionManager
+    /// Lazy, so Settings' own process never builds the extension runtime.
+    @ObservationIgnored private(set) lazy var extensions = ExtensionManager(clipboardStore: clipboardStore)
     let chatHistory: ChatHistoryStore
     let aiChats: AIChatSurfacesState
     let aiSettings = AISettingsStore(
         environmentStore: .keychain,
         isAppleIntelligenceAvailable: { AppleIntelligenceProvider.status().isAvailable })
     let mcpSettings = MCPSettingsStore()
-    let mcpOAuth = MCPOAuthManager()
+    @ObservationIgnored private(set) lazy var mcpOAuth = MCPOAuthManager()
     @ObservationIgnored private(set) lazy var mcp = MCPServerManager(oauth: mcpOAuth)
     let quickActionSettings = QuickActionSettingsStore()
     let customQuickActions = CustomQuickActionStore()
     let chatPresets = ChatPresetStore()
     let chatGPTSubscription = ChatGPTSubscriptionManager()
     let installedAI = InstalledAIManager()
+    let planUsage = PlanUsageMonitor()
     @ObservationIgnored private var appliedLaunchRevisions: [InstalledAIKind: Int] = [:]
+
+    /// Settings' own process only: its line to the main app, which panes read and ask through.
+    @ObservationIgnored private(set) var mainApp: MainAppLink?
 
     /// Set when a layout editor should open with Settings; the pane consumes it.
     var pendingWindowLayoutEdit: WindowLayoutEditRequest?
@@ -153,7 +156,8 @@ final class AppCore {
         store: rooms, minimums: roomMinimums, ledger: roomParking, session: roomSession,
         settings: settings, appIndex: appIndex, hotKeys: hotKeys, favorites: favorites,
         visibility: visibility, ranking: launcherRanking, aliases: aliases, palette: palette,
-        paletteCoordinator: paletteCoordinator, core: self)
+        paletteCoordinator: paletteCoordinator,
+        hud: RoomHUDController(settings: settings, presenter: pillPresenter), core: self)
     @ObservationIgnored private(set) lazy var customCommandCoordinator = CustomCommandCoordinator(
         store: customCommands, settings: settings, appIndex: appIndex,
         paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
@@ -163,8 +167,9 @@ final class AppCore {
         settings: settings, appIndex: appIndex, hotKeys: hotKeys, favorites: favorites,
         visibility: visibility, ranking: launcherRanking, aliases: aliases,
         paletteCoordinator: paletteCoordinator, core: self)
-    /// Window state, not a preference: it rides `UserDefaults` like the active note's filename.
+    /// Window state, not preferences: they ride `UserDefaults` like the active note's filename.
     private nonisolated static let noteFormattingBarKey = "notesFormattingBarExpanded"
+    private nonisolated static let noteWindowFitsKey = "notesWindowFitsNote"
     @ObservationIgnored private(set) lazy var notesCoordinator = NotesCoordinator(
         store: notesStore,
         settings: settings,
@@ -173,7 +178,9 @@ final class AppCore {
         isFormattingBarExpanded: UserDefaults.standard.bool(forKey: Self.noteFormattingBarKey),
         saveFormattingBarExpanded: {
             UserDefaults.standard.set($0, forKey: Self.noteFormattingBarKey)
-        })
+        },
+        fitsWindowToNote: UserDefaults.standard.object(forKey: Self.noteWindowFitsKey) as? Bool ?? true,
+        saveFitsWindowToNote: { UserDefaults.standard.set($0, forKey: Self.noteWindowFitsKey) })
 
     @ObservationIgnored private(set) lazy var launcherCoordinator = LauncherCoordinator(
         ranking: launcherRanking, windowController: windowController,
@@ -227,6 +234,7 @@ final class AppCore {
         injector: textInjector, appIndex: appIndex, hotKeys: hotKeys, favorites: favorites,
         visibility: visibility, ranking: launcherRanking, aliases: aliases,
         paletteCoordinator: paletteCoordinator, core: self)
+    @ObservationIgnored private(set) lazy var cloudSyncCoordinator = CloudSyncCoordinator(core: self)
     @ObservationIgnored private(set) lazy var mcpCoordinator = MCPCoordinator(
         settings: settings, store: mcpSettings, manager: mcp, core: self)
     /// Its own window and lifecycle, like Settings; Quick AI is the palette's half of the feature.
@@ -234,6 +242,9 @@ final class AppCore {
         chats: aiChats, settings: settings, appIndex: appIndex,
         paletteCoordinator: paletteCoordinator, settingsCoordinator: settingsCoordinator,
         core: self)
+    @ObservationIgnored private(set) lazy var planUsageCoordinator = PlanUsageCoordinator(
+        monitor: planUsage, settings: settings, aiSettings: aiSettings, installedAI: installedAI,
+        subscription: chatGPTSubscription, core: self)
     @ObservationIgnored private(set) lazy var quickAICoordinator = QuickAICoordinator(
         chats: aiChats, settings: settings, palette: palette,
         paletteCoordinator: paletteCoordinator, core: self)
@@ -243,7 +254,12 @@ final class AppCore {
         core: self)
 
     @ObservationIgnored private lazy var windowController = PaletteWindowController(core: self)
-    @ObservationIgnored private lazy var messageHUD = MessageHUDController(settings: settings)
+    /// Every pill shares this panel, so a later one replaces the earlier rather than stacking.
+    @ObservationIgnored private lazy var pillPresenter = HUDPresenter(
+        anchor: .edgeInset(Theme.Size.hudEdgeOffset), dwell: Theme.Duration.messageHUD,
+        screen: { [settings] in settings.openOnCursorScreen ? .underCursor : .primary })
+    @ObservationIgnored private lazy var messageHUD = MessageHUDController(
+        settings: settings, presenter: pillPresenter)
     private(set) var isShowingDialog = false
     /// A link that launched the app can arrive before `start` wires anything; it waits, then runs.
     @ObservationIgnored private var pendingURLs: [URL]? = []
@@ -271,7 +287,6 @@ final class AppCore {
         appIndex = AppIndex(ranking: launcherRanking, aliases: aliases)
         let clipboardManager = ClipboardManager(store: clipboardStore, settings: settings)
         self.clipboardManager = clipboardManager
-        extensions = ExtensionManager(clipboardStore: clipboardStore)
         snippetsStore = SnippetsStore(repository: Self.snippetsRepository(for: settings))
         textInjector = TextInjector(
             clipboardManager: clipboardManager,
@@ -287,18 +302,14 @@ final class AppCore {
 
     func start(launchedByUser: Bool) {
         Signposts.interval("AppCore.start") {
-            // Shorten AppKit's ~2–3s tooltip delay; registration domain, so a user default wins.
-            UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
             NSApp.setActivationPolicy(.accessory)
             dictationAudioDucker.recover()
-            applyAppearance()
-            applyMotion()
-            observeEffectiveAppearance()
+            load()
+            loadHotKeys()
             pinnedEmoji.onPersistenceFailure = { [weak self] in
                 self?.showMessage(String(localized: "Couldn't save Emoji & Symbols pins"), tone: .danger)
             }
 
-            appIndex.start(settings: settings)
             clipboardCoordinator.applyEnabled()
             extensions.start(appIndex: appIndex, coordinator: extensionCoordinator)
             extensionCoordinator.applyEnabled()
@@ -307,15 +318,12 @@ final class AppCore {
             menuSearchCoordinator.applyEnabled()
             fileSearchCoordinator.applyPolicy()
             notesCoordinator.applyEnabled()
-            installedAI.launchSettings = { [aiSettings] in aiSettings.launch(for: $0) }
-            chatGPTSubscription.launchSettings = { [aiSettings] in aiSettings.launch(for: .codex) }
             aiChatCoordinator.applyEnabled()
+            planUsageCoordinator.applyEnabled()
             mcpCoordinator.applyEnabled()
             customQuickActions.onChange = { [weak self] _ in
                 self?.quickActionCoordinator.applyCustomQuickActionsPresence()
             }
-            // Before `hotKeys.start` even when off: the prune reads it.
-            customQuickActions.load()
             quickActionCoordinator.applyEnabled()
             customCommands.onChange = { [weak self] _ in
                 self?.customCommandCoordinator.applyCustomCommandsPresence()
@@ -337,8 +345,6 @@ final class AppCore {
             quicklinks.onChange = { [weak self] _ in
                 self?.quicklinkCoordinator.applyQuicklinksPresence()
             }
-            // Before `hotKeys.start` even when off: the prune reads it. docs/features/quicklinks.md
-            quicklinks.load()
             quicklinkCoordinator.applyQuicklinksPresence()
             appleShortcutCoordinator.applyPresence()
             paletteCoordinator.onLauncherShown = { [weak self] in
@@ -354,7 +360,6 @@ final class AppCore {
             }
             updateCoordinator.applyEnabled()
             calendarCoordinator.applyEnabled()
-            Task { await appIndex.refresh() }
             Task { await emojiIndex.load(languages: SystemLanguages.preferred) }
             currencyRates.start()
             updateChecker.onUpdateAvailable = { [weak self] in self?.updateCoordinator.offer($0) }
@@ -363,13 +368,10 @@ final class AppCore {
             supportReminders.start()
 
             hyperKey.healthTicker = healthTicker
-            dictationKey.healthTicker = healthTicker
             hotKeys.modifierTapMonitor.healthTicker = healthTicker
             snippetListener.healthTicker = healthTicker
 
             hotKeys.onTogglePalette = { [weak self] in self?.paletteCoordinator.togglePalette() }
-            hotKeys.dictationEnabled = settings.dictationEnabled
-            hotKeys.dictationHoldToTalk = settings.dictationMode == .pushToTalk
             hotKeys.onDictationPressed = { [weak self] in self?.dictationCoordinator.pressed() }
             hotKeys.onDictationReleased = { [weak self] in self?.dictationCoordinator.released() }
             hotKeys.onDictationCancelled = { [weak self] in self?.dictationCoordinator.cancel() }
@@ -414,31 +416,21 @@ final class AppCore {
                 // After the first scan, so the file's apps and panes have entries to match.
                 if settings.settingsFileEnabled, settingsFile == nil {
                     startSettingsFile(importing: true)
-                } else if let launcherSettingsFile {
-                    reportSettingsFileIssues(launcherSettingsFile.applyInstalled())
+                } else {
+                    let issues = settingsBindings.launcher.applyInstalled()
+                    if settingsFile != nil { reportSettingsFileIssues(issues) }
                 }
+                cloudSyncCoordinator.appIndexDidScan()
             }
-            hotKeys.displayName = { [weak self] action in self?.hotKeyDisplayName(for: action) }
             hotKeys.allowsAction = { [weak self] in self?.allowsHotKeyAction($0) ?? false }
-            KeyShortcut.displayedHyperChord = { [settings] in
-                guard settings.hyperKey != .none else { return nil }
-                return KeyShortcut.hyperChord(includesShift: settings.hyperKeyIncludesShift)
-            }
             SystemActionRunner.onAsyncFailure = { [weak self] id, failure in
                 self?.systemActionCoordinator.presentSystemActionFailure(id: id, failure: failure)
             }
-            hotKeys.start(
-                customCommandIDs: Set(customCommands.commands.map(\.id)),
-                quicklinkIDs: Set(quicklinks.quicklinks.map(\.id)),
-                windowLayoutIDs: Set(windowLayouts.layouts.map(\.id)),
-                windowRoomIDs: Set(rooms.rooms.map(\.id)),
-                customWindowSizeIDs: Set(customWindowSizes.sizes.map(\.id)),
-                quickActionIDs: Set(customQuickActions.actions.map(\.id)))
+            hotKeys.activate()
+            trackHotKeyAllowance()
             // After `hotKeys.start`: Secure Input equivalents are built from the loaded bindings.
             hyperKey.onProblem = { [weak self] in self?.showMessage($0, tone: .danger) }
             hyperKey.start()
-            dictationKey.onProblem = { [weak self] in self?.showMessage($0, tone: .danger) }
-            dictationKey.start()
 
             snippetsStore.onSnapshot = { [weak self] snapshot in
                 guard let self else { return }
@@ -447,18 +439,13 @@ final class AppCore {
                 self.hotKeys.removeSnippetBindings(keeping: snapshot.fileIDs)
             }
             // Off out of the box, so an unused feature costs no load, watcher or tap.
-            if settings.snippetsEnabled {
-                Task { await snippetsStore.start() }
-                snippetCoordinator.startSnippetKeywordListener()
-            }
+            if settings.snippetsEnabled { snippetCoordinator.startSnippetKeywordListener() }
             // Unconditional: a disabled feature has to take its command rows down with it.
             snippetCoordinator.applySnippetsLauncherPresence()
 
             observeFeatureSwitches()
 
-            // First launch binds no hotkey, so guide once; the marker is written at show-time.
             if !OnboardingState.hasOnboarded {
-                OnboardingState.markShown()
                 onboardingCoordinator.showOnboarding()
             } else if launchedByUser {
                 paletteCoordinator.showPalette(mode: .launcher)
@@ -466,6 +453,66 @@ final class AppCore {
             reportInstall(updateChecker.takeInstallReport())
         }
         openPendingURLs()
+    }
+
+    /// Settings' own process: the main app's state, loaded and kept in step, no engine started.
+    func startSettings() {
+        guard let link = ProcessLink<SettingsWire.ToMainApp, SettingsWire.ToSettings>.standardIO()
+        else { return terminate() }
+        load()
+        chatPresets.load()
+        if settings.calendarEnabled { calendarStore.start() }
+        track({ _ = $0.snippetsEnabled }, reproject: { $0.applySnippetsStoreEnabled() })
+        let mainApp = MainAppLink(link: link, mirror: makeSharedStateMirror, core: self)
+        self.mainApp = mainApp
+        hotKeys.onBindingEdit = { [weak mainApp] action, binding in
+            mainApp?.send(.setShortcut(action, binding))
+        }
+        hotKeys.reloadBindings()
+        mainApp.start()
+    }
+
+    /// Stops only what Settings' process started for its panes; the main app's engines are its own.
+    func prepareSettingsForTermination() {
+        snippetsStore.stop()
+        chatGPTSubscription.stop()
+        installedAI.stop()
+    }
+
+    /// Both roles: preferences applied and stores loaded; nothing here registers, taps or polls.
+    private func load() {
+        // Shorten AppKit's ~2–3s tooltip delay; registration domain, so a user default wins.
+        UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
+        applyAppearance()
+        applyMotion()
+        applyIconStyle()
+        observeEffectiveAppearance()
+        appIndex.start(settings: settings)
+        Task { await appIndex.refresh() }
+        installedAI.launchSettings = { [aiSettings] in aiSettings.launch(for: $0) }
+        chatGPTSubscription.launchSettings = { [aiSettings] in aiSettings.launch(for: .codex) }
+        // Before `hotKeys.load` even when off: the prune reads both. docs/features/quicklinks.md
+        customQuickActions.load()
+        quicklinks.load()
+        hotKeys.displayName = { [weak self] action in self?.hotKeyDisplayName(for: action) }
+        hotKeys.dictationEnabled = settings.dictationEnabled
+        hotKeys.dictationHoldToTalk = settings.dictationMode == .pushToTalk
+        KeyShortcut.displayedHyperChord = { [settings] in
+            guard settings.hyperKey != .none else { return nil }
+            return KeyShortcut.hyperChord(includesShift: settings.hyperKeyIncludesShift)
+        }
+        if settings.snippetsEnabled { Task { await snippetsStore.start() } }
+        observeSharedSettings()
+    }
+
+    private func loadHotKeys() {
+        hotKeys.load(
+            customCommandIDs: Set(customCommands.commands.map(\.id)),
+            quicklinkIDs: Set(quicklinks.quicklinks.map(\.id)),
+            windowLayoutIDs: Set(windowLayouts.layouts.map(\.id)),
+            windowRoomIDs: Set(rooms.rooms.map(\.id)),
+            customWindowSizeIDs: Set(customWindowSizes.sizes.map(\.id)),
+            quickActionIDs: Set(customQuickActions.actions.map(\.id)))
     }
 
     private func reportInstall(_ report: UpdateCheckStore.InstallReport?) {
@@ -524,10 +571,24 @@ final class AppCore {
 
     func allowsHotKeyAction(_ action: HotKeyAction) -> Bool {
         guard visibility.allowsHotKey(action) else { return false }
-        if action == .dictation { return settings.dictationEnabled }
         // A disabled feature drops its commands from the launcher; their shortcuts go too.
-        guard case .command(let id) = action else { return true }
-        return appIndex.isCommandEnabled(id)
+        switch action {
+        case .dictation: return settings.dictationEnabled
+        case .command(let id): return appIndex.isCommandEnabled(id)
+        case .windowCommand, .customWindowSize, .windowLayout, .windowRoom:
+            return settings.windowManagementEnabled
+        case .customCommand(let id):
+            return settings.customCommandsEnabled && customCommands.command(id: id)?.isEnabled == true
+        // Snippets load after `start()`; observing `snippets` re-registers them once they arrive.
+        case .snippet(let id):
+            return settings.snippetsEnabled && snippetsStore.record(id: id)?.snippet.isEnabled == true
+        case .quickAction: return settings.quickActionsEnabled
+        case .quicklink(let id):
+            return settings.quicklinksEnabled && quicklinks.quicklink(id: id)?.isEnabled == true
+        case .appleShortcut: return settings.appleShortcutsEnabled
+        case .extensionCommand: return settings.extensionsEnabled
+        case .togglePalette, .app, .settingsPane, .systemAction: return true
+        }
     }
 
     /// The store-backed half of the conflict message; `HotKeyManager` names the catalogs itself.
@@ -603,7 +664,11 @@ final class AppCore {
     func relaunch() {
         guard !relaunchRequested else { return }
         relaunchRequested = true
-        // AppKit's termination loop must start outside a Swift task or dispatch callback.
+        terminate()
+    }
+
+    /// AppKit's termination loop must start outside a Swift task or dispatch callback.
+    func terminate() {
         RunLoop.main.perform(inModes: [.common]) {
             MainActor.assumeIsolated { NSApp.terminate(nil) }
         }
@@ -612,10 +677,10 @@ final class AppCore {
     func prepareForTermination() {
         if settings.dictationEnabled { dictationCoordinator.prepareForTermination() }
         settingsFile?.flush()
+        cloudSyncCoordinator.flush()
         clipboardTextIndexer?.stop()
-        // HID remaps first: they outlive the process.
+        // Caps Lock first: its remap is the one teardown that outlives the process.
         hyperKey.prepareForTermination()
-        dictationKey.prepareForTermination()
         windowLayoutCoordinator.prepareForTermination()
         roomCoordinator.prepareForTermination()
         inputSourceSwitcher.endSession()
@@ -684,10 +749,28 @@ final class AppCore {
 
     // MARK: - Feature switches
 
+    /// Both roles: what a shown surface or a recorder's conflict check reads.
+    private func observeSharedSettings() {
+        track({ _ = $0.appearance }, reproject: { $0.applyAppearance() })
+        track({ _ = $0.animationsEnabled }, reproject: { $0.applyMotion() })
+        track({ _ = $0.iconStyle }, reproject: { $0.applyIconStyle() })
+        track(
+            {
+                _ = $0.dictationEnabled
+                _ = $0.dictationMode
+            },
+            reproject: {
+                $0.hotKeys.dictationHoldToTalk = $0.settings.dictationMode == .pushToTalk
+                $0.hotKeys.dictationEnabled = $0.settings.dictationEnabled
+            })
+        track({ _ = $0.snippetsFolder }, reproject: { $0.applySnippetsFolder() })
+    }
+
     private func observeFeatureSwitches() {
         track(
             { _ = $0.automaticallyCheckForUpdates },
             reproject: { $0.updateCoordinator.applyAutomaticChecking() })
+        track({ _ = $0.iCloudSyncEnabled }, reproject: { $0.cloudSyncCoordinator.applyEnabled() })
         track(
             {
                 _ = $0.windowManagementEnabled
@@ -739,19 +822,14 @@ final class AppCore {
         track(
             { _ = $0.notesShowsInMenuBar }, reproject: { $0.notesCoordinator.applyMenuBarItem() })
         track({ _ = $0.aiEnabled }, reproject: { $0.aiChatCoordinator.applyEnabled() })
+        track({ _ = $0.aiEnabled }, reproject: { $0.planUsageCoordinator.applyEnabled() })
+        track(
+            aiSettings, { _ = $0.usageMenuBarEnabled },
+            reproject: { $0.planUsageCoordinator.applyEnabled() })
         track(
             { _ = $0.dictationIdleRelease },
             reproject: {
                 $0.dictationModels.setIdleRelease($0.settings.dictationIdleRelease)
-            })
-        track(
-            {
-                _ = $0.dictationEnabled
-                _ = $0.dictationMode
-            },
-            reproject: {
-                $0.hotKeys.dictationHoldToTalk = $0.settings.dictationMode == .pushToTalk
-                $0.hotKeys.dictationEnabled = $0.settings.dictationEnabled
             })
         track(
             {
@@ -781,6 +859,7 @@ final class AppCore {
         track(
             {
                 _ = $0.fileSearchScopes
+                _ = $0.fileSearchIncludesHiddenFiles
                 _ = $0.fileSearchIgnorePatterns
                 _ = $0.fileSearchRemovedDefaultPatterns
             }, reproject: { $0.fileSearchCoordinator.applyPolicy() })
@@ -790,8 +869,6 @@ final class AppCore {
         track(
             { _ = $0.snippetsShowInLauncher },
             reproject: { $0.snippetCoordinator.applySnippetsLauncherPresence() })
-        track({ _ = $0.appearance }, reproject: { $0.applyAppearance() })
-        track({ _ = $0.animationsEnabled }, reproject: { $0.applyMotion() })
         track({ _ = $0.language }, reproject: { $0.offerLanguageRelaunch() })
         track({ _ = $0.interfaceSize }, reproject: { $0.windowController.applyInterfaceSize() })
         // Settings panes did these on change; settings.json can change them with no pane open.
@@ -800,10 +877,19 @@ final class AppCore {
             reproject: { $0.clipboardCoordinator.applyRetention($0.settings.clipboardRetention) })
         track(aiSettings, { _ = $0.retention }, reproject: { $0.aiChatCoordinator.applyRetention() })
         track(aiSettings, { _ = $0.launchRevisions }, reproject: { $0.applyInstalledLaunches() })
+        // Settings' process flips these, so the tools they start must follow here, not in a pane.
+        track(
+            {
+                _ = $0.aiEnabled
+                _ = $0.quickActionsEnabled
+            }, reproject: { _ = $0.applyInstalledAILifecycle() })
+        track(
+            aiSettings, { _ = $0.enabledInstalledProviders },
+            reproject: { _ = $0.applyInstalledAILifecycle() })
+        track({ _ = $0.extensionsEnabled }, reproject: { $0.extensionCoordinator.applyEnabled() })
         track(
             { _ = $0.extensionsShowInLauncher },
             reproject: { $0.extensionCoordinator.applyExtensionsLauncherPresence() })
-        track({ _ = $0.snippetsFolder }, reproject: { $0.applySnippetsFolder() })
         track({ _ = $0.notesFolder }, reproject: { $0.applyNotesFolder() })
         trackChatRoute()
     }
@@ -819,6 +905,10 @@ final class AppCore {
         for case let panel as any AnimatedPanel in NSApp.windows {
             panel.followMotion()
         }
+    }
+
+    private func applyIconStyle() {
+        IconCache.style.tilesFollowSystem = settings.iconStyle == .system
     }
 
     private var isLanguagePending: Bool { settings.language.rawValue != launchLocalization }
@@ -870,6 +960,15 @@ final class AppCore {
         }
     }
 
+    /// Re-arms on whatever `allowsHotKeyAction` read: feature switches, visibility, dictation.
+    private func trackHotKeyAllowance() {
+        withObservationTracking {
+            hotKeys.applyAllowance()
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.trackHotKeyAllowance() }
+        }
+    }
+
     /// A chat route that runs its own MCP client decides which servers Tinycast runs itself.
     private func trackChatRoute() {
         let runsOwnTools = withObservationTracking {
@@ -887,6 +986,15 @@ final class AppCore {
     private func applyHyperChord() {
         guard settings.hyperKey != .none else { return }
         hotKeys.retargetHyperBindings(includesShift: settings.hyperKeyIncludesShift)
+    }
+
+    /// Settings lists snippets but never expands them, so it runs the store without the listener.
+    private func applySnippetsStoreEnabled() {
+        if settings.snippetsEnabled {
+            Task { await snippetsStore.start() }
+        } else {
+            snippetsStore.stop()
+        }
     }
 
     private func applySnippetsFolder() {
@@ -918,21 +1026,11 @@ final class AppCore {
     /// Mirrors settings into settings.json from now on; `importing` applies the file's own first.
     func startSettingsFile(importing: Bool) {
         guard settingsFile == nil else { return }
-        let shortcuts = HotKeySettingsFile(hotKeys: hotKeys)
-        let launcher = LauncherSettingsFile(
-            appIndex: appIndex, aliases: aliases, visibility: visibility, shortcuts: shortcuts)
         let file = SettingsFileRepository(
-            fileURL: AppPaths.settingsFile(),
-            bindings: SettingsFileSchema.bindings(
-                settings: settings, ai: aiSettings, quickActions: quickActionSettings,
-                shortcuts: shortcuts, launcher: launcher,
-                windowManagement: WindowManagementSettingsFile(
-                    sizes: customWindowSizes, layouts: windowLayouts, rooms: rooms, aliases: aliases,
-                    shortcuts: shortcuts)),
-            commit: shortcuts.commit)
+            fileURL: AppPaths.settingsFile(), bindings: settingsBindings.bindings,
+            commit: settingsBindings.commit)
         file.onIssues = { [weak self] issues in self?.reportSettingsFileIssues(issues) }
         settingsFile = file
-        launcherSettingsFile = launcher
         settings.settingsFileEnabled = true
         file.start(importing: importing)
     }
@@ -941,8 +1039,20 @@ final class AppCore {
     func stopSettingsFile() {
         settingsFile?.flush()
         settingsFile = nil
-        launcherSettingsFile = nil
         settings.settingsFileEnabled = false
+    }
+
+    private func makeSettingsBindings() -> SettingsBindingSet {
+        let shortcuts = HotKeySettingsFile(hotKeys: hotKeys)
+        let launcher = LauncherSettingsFile(
+            appIndex: appIndex, aliases: aliases, visibility: visibility, shortcuts: shortcuts)
+        let bindings = SettingsFileSchema.bindings(
+            settings: settings, ai: aiSettings, quickActions: quickActionSettings,
+            shortcuts: shortcuts, launcher: launcher,
+            windowManagement: WindowManagementSettingsFile(
+                sizes: customWindowSizes, layouts: windowLayouts, rooms: rooms, aliases: aliases,
+                shortcuts: shortcuts))
+        return SettingsBindingSet(bindings: bindings, commit: shortcuts.commit, launcher: launcher)
     }
 
     private func reportSettingsFileIssues(_ issues: [SettingsFileIssue]) {

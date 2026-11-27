@@ -67,6 +67,12 @@ struct Room: Codable, Hashable, Identifiable, Sendable {
         return left != right ? left > right : precedes(lhs, rhs)
     }
 
+    /// The room to go back to: the one entered last, other than `current`.
+    static func previous(to current: UUID?, in rooms: [Room]) -> Room? {
+        rooms.filter { $0.id != current && $0.lastEnteredAt != nil }
+            .sorted(by: enteredMoreRecently).first
+    }
+
     // Hand-written, so an added field keeps stored rooms and older backups readable.
     private enum CodingKeys: String, CodingKey {
         case id, name, windows, layout, layoutsByDisplay, lastEnteredAt

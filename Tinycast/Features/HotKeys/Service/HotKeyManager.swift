@@ -37,32 +37,50 @@ final class HotKeyManager {
     var onRunExtensionCommand: ((String) -> Void)?
     /// Names what only the stores know; the fixed catalogs resolve here. Set in `AppCore.start()`.
     var displayName: ((HotKeyAction) -> String?)?
-    /// Whether the action's launcher category is switched on. Set in `AppCore.start()`.
+    /// Whether the action's category, feature and item are switched on. Set in `AppCore.start()`.
     var allowsAction: ((HotKeyAction) -> Bool)?
+    var onBindingEdit: ((HotKeyAction, HotKeyBinding?) -> Void)?
+
+    private struct Recording: Equatable {
+        let action: HotKeyAction
+        let mode: ShortcutCaptureSession.Mode
+    }
 
     /// The recorder currently capturing, which also pauses both engines.
     var recordingAction: HotKeyAction? {
+        get { recording?.action }
+        set { recording = newValue.map { Recording(action: $0, mode: .field) } }
+    }
+
+    private var recording: Recording? {
         didSet {
-            guard recordingAction != oldValue else { return }
-            let recording = recordingAction != nil
-            if recording, dictationEnabled, dictationHoldToTalk { onDictationCancelled?() }
-            if recording { secureInputPressedActions.removeAll(keepingCapacity: true) }
-            center.isPaused = recording
-            modifierTapMonitor.isPaused = recording
-            if secureInputEquivalentsIncludeShift != nil { syncSecureInputEquivalents() }
-            if let recordingAction {
-                capture.start(action: recordingAction, hotKeys: self)
+            guard recording != oldValue else { return }
+            applyPause()
+            if let recording {
+                capture.start(action: recording.action, mode: recording.mode, hotKeys: self)
             } else {
                 capture.stop()
             }
         }
     }
 
+    /// Settings records in its own process, where nothing is registered to pause.
+    var isRecordingInSettings = false {
+        didSet {
+            guard isRecordingInSettings != oldValue else { return }
+            applyPause()
+        }
+    }
+
+    var isRecording: Bool { recordingAction != nil || isRecordingInSettings }
+
     let modifierTapMonitor = ModifierTapMonitor()
     let capture = ShortcutCaptureSession()
 
     private let defaults: UserDefaults
     private let center = HotKeyCenter()
+    /// False until `activate()`: a role that only edits bindings never registers one.
+    private var isActive = false
     private var modifierTaps: [HotKeyBinding: HotKeyAction] = [:]
     /// Include Shift for the chord whose combos also answer to ⌃+key; nil when none should.
     private var secureInputEquivalentsIncludeShift: Bool?
@@ -74,8 +92,9 @@ final class HotKeyManager {
     private var bindings: [HotKeyAction: HotKeyBinding] = [:]
     /// Part of `AppIndex`'s cache key: a bound entry leaves the launcher's Suggestions.
     private(set) var revision = 0
-    var bindsDictationKey: Bool { bindings.values.contains { $0.shortcut?.isDictationKey == true } }
     @ObservationIgnored private var candidateActionsCache: [HotKeyAction]?
+    /// Bound combos left unregistered because `allowsAction` refuses them.
+    @ObservationIgnored private var suppressedActions: Set<HotKeyAction> = []
     // Reused: the startup load decodes once per candidate action.
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
@@ -95,7 +114,7 @@ final class HotKeyManager {
         self.defaults = defaults
     }
 
-    func start(
+    func load(
         customCommandIDs: Set<UUID>, quicklinkIDs: Set<UUID>, windowLayoutIDs: Set<UUID>,
         windowRoomIDs: Set<UUID>, customWindowSizeIDs: Set<UUID>, quickActionIDs: Set<UUID>
     ) {
@@ -110,7 +129,11 @@ final class HotKeyManager {
         // After the prunes, so a dropped record can't survive in memory this session.
         for action in candidateActions { bindings[action] = storedBinding(for: action) }
         revision &+= 1
+    }
 
+    func activate() {
+        guard !isActive else { return }
+        isActive = true
         // `register` no-ops on an unbound item, so the fixed catalogs need no index of their own.
         for action in candidateActions { register(action) }
 
@@ -181,6 +204,36 @@ final class HotKeyManager {
 
     func binding(for action: HotKeyAction) -> HotKeyBinding? { bindings[action] }
 
+    /// Onboarding's listener: it stays open across commits until `recordingAction` is cleared.
+    func startListening(for action: HotKeyAction) {
+        recording = Recording(action: action, mode: .live)
+    }
+
+    /// Adopts bindings another process stored, re-registering only the ones that moved.
+    func reloadBindings() {
+        candidateActionsCache = nil
+        let changed = Set(candidateActions).union(bindings.keys).filter {
+            storedBinding(for: $0) != bindings[$0]
+        }
+        guard !changed.isEmpty else { return }
+        clearSecureInputEquivalents()
+        var touchesModifierTaps = false
+        for action in changed {
+            let binding = storedBinding(for: action)
+            if action == .dictation { onDictationCancelled?() }
+            if recordingAction == action { recordingAction = nil }
+            touchesModifierTaps =
+                touchesModifierTaps || bindings[action]?.usesModifierTapMonitor == true
+                || binding?.usesModifierTapMonitor == true
+            bindings[action] = binding
+            center.unregister(id: action.defaultsKey)
+            register(action)
+        }
+        revision &+= 1
+        if touchesModifierTaps { syncModifierTaps() }
+        if secureInputEquivalentsIncludeShift != nil { syncSecureInputEquivalents() }
+    }
+
     private func storedBinding(for action: HotKeyAction) -> HotKeyBinding? {
         guard
             let json = defaults.string(forKey: action.defaultsKey),
@@ -190,6 +243,10 @@ final class HotKeyManager {
     }
 
     func setBinding(_ binding: HotKeyBinding?, for action: HotKeyAction) {
+        if let onBindingEdit {
+            onBindingEdit(action, binding)
+            return
+        }
         if action == .dictation, binding != self.binding(for: action) { onDictationCancelled?() }
         let previous = bindings[action]
         clearSecureInputEquivalents()
@@ -259,16 +316,33 @@ final class HotKeyManager {
         center.register(id: Self.secureInputHintID, shortcut: shortcut, onKeyDown: { _ in onPress() })
     }
 
+    /// A refused combo must leave Carbon, which otherwise swallows the key in every other app.
+    func applyAllowance() {
+        var changed = false
+        for action in candidateActions where binding(for: action)?.shortcut != nil {
+            let allowed = allowsAction?(action) ?? true
+            guard allowed == suppressedActions.contains(action) else { continue }
+            changed = true
+            if allowed {
+                register(action)
+            } else {
+                center.unregister(id: action.defaultsKey)
+                suppressedActions.insert(action)
+            }
+        }
+        if changed, secureInputEquivalentsIncludeShift != nil { syncSecureInputEquivalents() }
+    }
+
     /// Rebuilt wholesale, like the modifier-tap map, so an equivalent cannot outlive its binding.
     private func syncSecureInputEquivalents() {
         clearSecureInputEquivalents()
-        guard let includesShift = secureInputEquivalentsIncludeShift else { return }
+        guard isActive, let includesShift = secureInputEquivalentsIncludeShift else { return }
         let chord = KeyShortcut.hyperChord(includesShift: includesShift)
         let actions = candidateActions
         let originalActions = actions.reduce(into: [KeyShortcut: HotKeyAction]()) { result, action in
             if let shortcut = binding(for: action)?.shortcut { result[shortcut] = action }
         }
-        for action in actions {
+        for action in actions where allowsAction?(action) ?? true {
             guard let equivalent = binding(for: action)?.shortcut?.secureInputEquivalent(of: chord)
             else { continue }
             let original = originalActions[equivalent]
@@ -322,7 +396,9 @@ final class HotKeyManager {
     }
 
     /// A hold reserves its physical modifier across both tap gestures.
-    func conflictOwner(of binding: HotKeyBinding, excluding action: HotKeyAction) -> String? {
+    func conflictOwner(
+        of binding: HotKeyBinding, excluding action: HotKeyAction, includingExternal: Bool = false
+    ) -> String? {
         for candidate in candidateActions where candidate != action {
             guard let other = self.binding(for: candidate) else { continue }
             let holdsModifier =
@@ -332,6 +408,9 @@ final class HotKeyManager {
             if binding.conflicts(with: other, holdsModifier: holdsModifier) {
                 return displayName(of: candidate)
             }
+        }
+        if includingExternal, let shortcut = binding.shortcut, center.isReservedOutsideApp(shortcut) {
+            return String(localized: "macOS or another app")
         }
         return nil
     }
@@ -394,7 +473,12 @@ final class HotKeyManager {
 
     /// Hands a combo to Carbon; a modifier-only binding has no per-action registration.
     private func register(_ action: HotKeyAction) {
-        guard let shortcut = binding(for: action)?.shortcut else { return }
+        guard isActive, let shortcut = binding(for: action)?.shortcut else { return }
+        guard allowsAction?(action) ?? true else {
+            suppressedActions.insert(action)
+            return
+        }
+        suppressedActions.remove(action)
         center.register(
             id: action.defaultsKey, shortcut: shortcut,
             onKeyDown: { [weak self] _ in self?.perform(action) },
@@ -403,6 +487,7 @@ final class HotKeyManager {
 
     /// Rebuilt wholesale, so the map can't drift from what is on disk.
     private func syncModifierTaps() {
+        guard isActive else { return }
         modifierTaps = [:]
         let dictationBinding = binding(for: .dictation)
         let holdKey = dictationHoldToTalk ? dictationBinding?.holdKey : nil
@@ -442,6 +527,16 @@ final class HotKeyManager {
         case .snippet(let id): onExpandSnippet?(id)
         case .extensionCommand(let entryID): onRunExtensionCommand?(entryID)
         }
+    }
+
+    private func applyPause() {
+        let paused = isRecording
+        guard paused != center.isPaused else { return }
+        if paused, dictationEnabled, dictationHoldToTalk { onDictationCancelled?() }
+        if paused { secureInputPressedActions.removeAll(keepingCapacity: true) }
+        center.isPaused = paused
+        modifierTapMonitor.isPaused = paused
+        if secureInputEquivalentsIncludeShift != nil { syncSecureInputEquivalents() }
     }
 
     // MARK: - UUID-keyed indexes

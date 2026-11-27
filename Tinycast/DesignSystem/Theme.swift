@@ -31,6 +31,8 @@ enum Theme {
         static let sectionSpacing: CGFloat = 12
         /// Emoji tiles need a little more separation so adjacent category grids stay distinct.
         static let emojiSectionSpacing: CGFloat = 14
+        static let planUsageRow: CGFloat = 16
+        static let planUsageSectionBottom: CGFloat = 16
     }
 
     enum Radius {
@@ -197,8 +199,8 @@ enum Theme {
         static let previewAspectRatio: CGFloat = 16 / 9
         /// Opening size and resize floor: the Quick Actions row's width, the sidebar's full height.
         static let settingsWindow = CGSize(width: 900, height: 700)
-        /// Settings sidebar: a fixed column, wide enough for "Window Management".
-        static let settingsSidebar: CGFloat = 215
+        /// Settings sidebar: a fixed column, as wide as System Settings' own.
+        static let settingsSidebar: CGFloat = 232
         /// The narrowest the pane column may get before a grouped row's control starts colliding.
         static let settingsDetailMinimum: CGFloat = 420
         static let settingsRowIcon: CGFloat = 20
@@ -256,6 +258,13 @@ enum Theme {
         static let aiVariableName: CGFloat = 170
         /// A Codex usage window's meter, beside its "72% left" readout.
         static let aiUsageBar: CGFloat = 110
+        static let planUsageMenuWidth: CGFloat = 320
+        static let planUsageMenuInset: CGFloat = 16
+        static let planUsageMeter: CGFloat = 4
+        static let planUsagePaceMark = CGSize(width: 2, height: 8)
+        static let planUsageGauge: CGFloat = 18
+        static let planUsageGaugeLine: CGFloat = 2
+        static let planUsageGaugeGlyph: CGFloat = 10
         /// Settings editor modals (Custom Commands, Snippets): fixed width, intrinsic height.
         static let editorSheetWidth: CGFloat = 480
         /// The multi-line box inside those modals; it scrolls rather than grows the panel.
@@ -369,6 +378,10 @@ enum Theme {
             0.16, 1, 0.3, 1, duration: Theme.Duration.menuChevron)
     }
 
+    enum SlotChordMotion {
+        static let reveal = Animation.easeOut(duration: 0.15)
+    }
+
     enum Typography {
         /// One size, two frameworks: `TextTrailingDragHandle` measures what the field renders.
         static let searchFieldSize: CGFloat = 20
@@ -408,6 +421,181 @@ enum Theme {
         static let composerSymbol = Font.system(size: 13, weight: .medium)
         static let composerSend = Font.system(size: 13, weight: .bold)
         static let composerStop = Font.system(size: 10, weight: .bold)
+    }
+
+    enum Onboarding {
+        static let inset: CGFloat = 36
+        static let setupWidth: CGFloat = 460
+        static let importOptionsWidth: CGFloat = 552
+        static let passphraseWidth: CGFloat = 196
+        static let fileCardInset: CGFloat = 16
+        static let fileGlyphSize: CGFloat = 24
+        static let compactSetupHeight: CGFloat = 340
+        static let setupIconSize: CGFloat = 60
+        static let importItemPadding: CGFloat = 5
+        static let titleSize: CGFloat = 42
+        static let stepTitleSize: CGFloat = 34
+        static let markSize: CGFloat = 84
+        static let carouselWidth: CGFloat = 576
+        static let featureIconSize: CGFloat = 37
+        static let featureSymbolSize: CGFloat = 14
+        static let featureIconEdgeRadius: CGFloat = 14
+        static let carouselFade: Gradient = {
+            let leading = (0...6).map { index in
+                let progress = Double(index) / 6
+                return Gradient.Stop(
+                    color: .black.opacity(progress * progress * (3 - 2 * progress)),
+                    location: progress * 0.22)
+            }
+            let trailing = leading.reversed().map {
+                Gradient.Stop(color: $0.color, location: 1 - $0.location)
+            }
+            return Gradient(stops: leading + trailing)
+        }()
+        static let carouselSpeed: CGFloat = 13
+        static let revealDuration = 1.2
+        static let revealBackdropDelay = revealDuration * 0.50
+        static let revealShadowDelay = 0.64
+        static let revealFeather: CGFloat = 480
+        static let shortcutConfirmationDuration = 0.44
+        static let pageTravel: CGFloat = 48
+        static let pageMotion = Animation.smooth(duration: 0.28, extraBounce: 0)
+
+        static let night = Color(red: 0.038, green: 0.025, blue: 0.072)
+        static let importItemSelectedFill = Colors.brand.opacity(0.28)
+        static let featureIconFill = Colors.brand.opacity(0.14)
+        static let emblemInk = Colors.brand.mix(with: .primary, by: 0.40)
+        static let featureIconTopEdge = RadialGradient(
+            colors: [emblemInk.opacity(0.34), .clear],
+            center: .top, startRadius: 0, endRadius: featureIconEdgeRadius)
+        static let featureIconBottomEdge = RadialGradient(
+            colors: [emblemInk.opacity(0.20), .clear],
+            center: .bottom, startRadius: 0, endRadius: featureIconEdgeRadius)
+        static let fileCardFill = Colors.cardFill.opacity(0.74)
+        static let returnKeyBorder = Color.white.opacity(0.45)
+        /// "↵" falls back to a face that seats high, so it drops as it does in `KeyCapChip`.
+        static let returnGlyphDrop: CGFloat = 1.1
+
+        /// The shortcut step's keys, in fractions of one key's height so every fitted size matches.
+        enum Keycap {
+            static let size: CGFloat = 92
+            static let compactScale: CGFloat = 0.72
+            static let smallestScale: CGFloat = 0.52
+            static let gap: CGFloat = 0.15
+            static let cornerRadius: CGFloat = 0.14
+            static let labelledWidth: CGFloat = 1.22
+            static let spaceWidth: CGFloat = 3
+            static let horizontalInset: CGFloat = 0.15
+            static let verticalInset: CGFloat = 0.14
+            static let symbolSize: CGFloat = 0.21
+            static let legendSize: CGFloat = 0.17
+            static let glyphSize: CGFloat = 0.26
+            static let nameSize: CGFloat = 0.2
+            static let glyphMinimumScale: CGFloat = 0.65
+            static let plusSize: CGFloat = 0.16
+            static let unboundOpacity = 0.55
+            static let glowReach: CGFloat = 0.6
+            static let edgeWidth: CGFloat = 0.5
+            static let pressDepth: CGFloat = 1
+            static let pressedRimOpacity = 0.5
+            static let contactShadow = Shadow(radius: 1, offset: 1)
+            static let pressedContactShadow = Shadow(radius: 0.5, offset: 0.5)
+            static let ambientShadow = Shadow(radius: 7, offset: 4)
+            static let pressedAmbientShadow = Shadow(radius: 2, offset: 1)
+            static let press = Animation.easeOut(duration: 0.06)
+            static let release = Animation.spring(duration: 0.2, bounce: 0.2)
+
+            struct Shadow {
+                let radius: CGFloat
+                let offset: CGFloat
+            }
+
+            static let face = Colors.adaptive(
+                dark: .srgbInk(0.125, alpha: 0.78), light: .srgbInk(1, alpha: 1))
+            static let pressedFace = Colors.adaptive(
+                dark: .srgbInk(0.09, alpha: 0.78), light: .srgbInk(0.955, alpha: 1))
+            static let pressedTint = Colors.adaptive(
+                dark: NSColor(Colors.brand).withAlphaComponent(0.16),
+                light: NSColor(Colors.brand).withAlphaComponent(0.07))
+            static let sheen = LinearGradient(
+                colors: [
+                    Colors.adaptive(dark: .srgbInk(1, alpha: 0.045), light: .srgbInk(1, alpha: 0)),
+                    Colors.adaptive(dark: .srgbInk(1, alpha: 0), light: .srgbInk(0, alpha: 0.025))
+                ], startPoint: .top, endPoint: .bottom)
+            static let glow = Colors.adaptive(dark: .srgbInk(1, alpha: 0.055), light: .srgbInk(1, alpha: 0))
+            static let rim = LinearGradient(
+                stops: [
+                    .init(
+                        color: Colors.adaptive(dark: .srgbInk(1, alpha: 0.2), light: .srgbInk(1, alpha: 1)),
+                        location: 0),
+                    .init(
+                        color: Colors.adaptive(
+                            dark: .srgbInk(1, alpha: 0.05), light: .srgbInk(1, alpha: 0.6)),
+                        location: 0.18),
+                    .init(
+                        color: Colors.adaptive(dark: .srgbInk(1, alpha: 0.015), light: .srgbInk(1, alpha: 0)),
+                        location: 0.6),
+                    .init(
+                        color: Colors.adaptive(dark: .srgbInk(1, alpha: 0.03), light: .srgbInk(1, alpha: 0)),
+                        location: 1)
+                ], startPoint: .top, endPoint: .bottom)
+            static let edge = Colors.adaptive(dark: .srgbInk(0, alpha: 0.85), light: .srgbInk(0, alpha: 0.11))
+            static let contactShadowColor = Colors.adaptive(
+                dark: .srgbInk(0, alpha: 0.5), light: .srgbInk(0, alpha: 0.12))
+            static let ambientShadowColor = Colors.adaptive(
+                dark: .srgbInk(0, alpha: 0.35), light: .srgbInk(0, alpha: 0.08))
+            static let ink = Colors.adaptive(dark: .srgbInk(0.88, alpha: 1), light: .srgbInk(0.26, alpha: 1))
+            static let pressedInk = Colors.adaptive(
+                dark: .srgbInk(1, alpha: 1), light: .srgbInk(0.1, alpha: 1))
+        }
+
+        enum Notice {
+            static let width: CGFloat = 480
+            /// Held even while no card shows, so the keys never move when one appears.
+            static let reservedHeight: CGFloat = 72
+            static let cornerRadius: CGFloat = 12
+            static let horizontalInset: CGFloat = 16
+            static let verticalInset: CGFloat = 14
+            static let fill = Colors.adaptive(dark: .srgbInk(1, alpha: 0.05), light: .srgbInk(0, alpha: 0.04))
+            static let stroke = Colors.adaptive(
+                dark: .srgbInk(1, alpha: 0.06), light: .srgbInk(0, alpha: 0.06))
+            static let strokeWidth: CGFloat = 0.5
+            static let disabledOpacity = 0.5
+            static let buttonHeight: CGFloat = 28
+            static let buttonInset: CGFloat = 14
+            static let buttonFill = Colors.adaptive(
+                dark: .srgbInk(1, alpha: 0.12), light: .srgbInk(0, alpha: 0.07))
+            static let buttonHover = Colors.adaptive(
+                dark: .srgbInk(1, alpha: 0.16), light: .srgbInk(0, alpha: 0.1))
+            static let buttonPressed = Colors.adaptive(
+                dark: .srgbInk(1, alpha: 0.2), light: .srgbInk(0, alpha: 0.13))
+        }
+
+        enum Intro {
+            static let duration = 3.16
+            static let markSize: CGFloat = 96
+            static let frameInterval = 1.0 / 60
+            static let dimDuration = 1.30
+            static let dimOpacity = 0.94
+            static let violetDelay = 0.14
+            static let violetDuration = 1.32
+            static let violetCurve = UnitCurve.bezier(
+                startControlPoint: .init(x: 0.16, y: 0), endControlPoint: .init(x: 0.35, y: 1))
+            /// In screen diagonals, so the glow reaches every corner of any display.
+            static let violetRadius: CGFloat = 0.57
+            static let violetCenterOpacity = 0.40
+            static let violetMidOpacity = 0.18
+            static let grainOpacity = 0.055
+            static let zoomDelay = 0.99
+            static let zoomDuration = 1.41
+            /// The mark starts this many screen diagonals tall, so the zoom opens inside it.
+            static let zoomReach: CGFloat = 4.4
+            static let markFadeStart = 0.48
+            static let markFadeLength = 0.44
+            static let liftDelay = 0.09
+            static let liftCurve = UnitCurve.bezier(
+                startControlPoint: .init(x: 0.72, y: 0), endControlPoint: .init(x: 0.28, y: 1))
+        }
     }
 
     enum Colors {
@@ -465,7 +653,6 @@ enum Theme {
         static let menuSymbol = ramp(dark: 0.70, light: 0.70)
         static let noteText = ramp(dark: 0.90, light: 0.85)
         static let iconPlaceholder = ramp(dark: 0.06, light: 0.06)
-        static let sheen = ramp(dark: 0.04, light: 0.04)
         /// The Settings card: a faint surface whose border doubles as the row divider.
         static let cardFill = ramp(dark: 0.05, light: 0.04)
         static let cardStroke = ramp(dark: 0.10, light: 0.10)
@@ -491,8 +678,11 @@ enum Theme {
         static let searchFlash = Color.accentColor.opacity(0.35)
         static let checkerLight = Color(nsColor: .srgbInk(1, alpha: 0.22))
         static let checkerDark = Color(nsColor: .srgbInk(0, alpha: 0.22))
-        /// The violet of the app mark, used only to tint the About support callout.
         static let brand = Color(red: 0.525, green: 0.231, blue: 1.0)
+        static let brandHighlight = Color(red: 0.87, green: 0.79, blue: 1)
+        static let brandCanvas = adaptive(
+            dark: NSColor(srgbRed: 0.051, green: 0.044, blue: 0.073, alpha: 1),
+            light: .windowBackgroundColor)
         /// The palette's drop guides while dragging, and once a release would snap it home.
         static let dropGuide = ramp(dark: 0.35, light: 0.35)
         static let dropGuideArmed = Color.blue
@@ -528,13 +718,88 @@ enum Theme {
             private static func pair(dark: UInt32, light: UInt32) -> Color {
                 adaptive(dark: rgb(dark), light: rgb(light))
             }
+        }
+    }
 
-            private static func rgb(_ hex: UInt32) -> NSColor {
-                NSColor(
-                    srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
-                    blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+    enum IconTile {
+        static let glyphRatio: CGFloat = 0.6
+        static let edgeLightRatio: CGFloat = 0.02
+        static let edgeLight = LinearGradient(
+            stops: [
+                .init(color: .white.opacity(0.26), location: 0),
+                .init(color: .white.opacity(0.03), location: 0.6)
+            ], startPoint: .top, endPoint: .bottom)
+
+        static let whiteInk = vertical(.white, .white)
+        static let darkGround = ramp(0x2E2E31, 0x0F0F10)
+        /// Measured off the system's Clear icons, which `NSWorkspace` flattens onto an opaque ground.
+        static let clearDarkGround = ramp(0x2B2B2B, 0x2B2B2B)
+        static let clearDarkInk = ramp(0xF7F7F7, 0xC8C8C8)
+        static let clearLightGround = ramp(0x7D7D7D, 0x7D7D7D)
+        static let clearLightInk = ramp(0xFCFCFC, 0xDCDCDC)
+        static func tinted(_ tint: SystemIconTheme.Tint, isDark: Bool) -> LinearGradient {
+            let color: Color
+            switch tint {
+            case .accent:
+                color = .accentColor
+            case .preset(let preset):
+                color = Color(nsColor: rgb(tintSwatch(preset, isDark: isDark)))
+            case .custom(let red, let green, let blue, let opacity):
+                color = Color(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
+            }
+            return vertical(color.mix(with: .white, by: 0.2), color)
+        }
+
+        private static func tintSwatch(_ preset: SystemIconTheme.Tint.Preset, isDark: Bool) -> UInt32 {
+            switch preset {
+            case .red: isDark ? 0xFF5257 : 0xE0383E
+            case .orange: 0xF7821B
+            case .yellow: isDark ? 0xFFC600 : 0xFFC726
+            case .green: 0x62BA46
+            case .blue: 0x007AFF
+            case .purple: isDark ? 0xA550A7 : 0x953D96
+            case .pink: 0xF74F9E
+            case .graphite: isDark ? 0x8C8C8C : 0x989898
             }
         }
+
+        /// Fixed in both appearances: a saturated tile carries its own contrast against white ink.
+        static func fill(_ tint: IconTint) -> LinearGradient {
+            switch tint {
+            case .gray: ramp(0xA9A9AF, 0x77777D)
+            case .graphite: ramp(0x55555B, 0x1F1F22)
+            case .blue: ramp(0x4AA3FF, 0x0B6BF5)
+            case .cyan: ramp(0x5CC8F7, 0x1B9BE0)
+            case .mint: ramp(0x56D6C4, 0x12B2A0)
+            case .green: ramp(0x5FDD70, 0x2DBB49)
+            case .yellow: ramp(0xFFD43B, 0xF5AB00)
+            case .orange: ramp(0xFFAD42, 0xFF8600)
+            case .red: ramp(0xFF6A60, 0xEE3B31)
+            case .pink: ramp(0xFF6B87, 0xF52E57)
+            case .purple: ramp(0xC96BF7, 0xA235DB)
+            case .indigo: ramp(0x8583FF, 0x5451E0)
+            case .brown: ramp(0xC2A07A, 0x96744F)
+            }
+        }
+
+        /// Graphite's ramp is the dark ground's own, so there its glyph lifts to gray.
+        static func darkInk(_ tint: IconTint) -> LinearGradient {
+            fill(tint == .graphite ? .gray : tint)
+        }
+
+        private static func ramp(_ top: UInt32, _ bottom: UInt32) -> LinearGradient {
+            vertical(Color(nsColor: rgb(top)), Color(nsColor: rgb(bottom)))
+        }
+
+        private static func vertical(_ top: Color, _ bottom: Color) -> LinearGradient {
+            LinearGradient(colors: [top, bottom], startPoint: .top, endPoint: .bottom)
+        }
+    }
+
+    private static func rgb(_ hex: UInt32) -> NSColor {
+        NSColor(
+            srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
     }
 }
 

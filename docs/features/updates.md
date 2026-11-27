@@ -8,7 +8,7 @@ There is no Sparkle or appcast.
 
 - **Tinycast installs its own updates, and Homebrew stays out of the way.** The CN cask declares
   `auto_updates true`, which is Homebrew's own flag for an app that manages its own version. `brew
-update && brew upgrade` therefore skips Tinycast entirely — it is never reported outdated, never
+update && brew upgrade` therefore skips Tinycast entirely: it is never reported outdated, never
   re-downloaded, and a self-updated copy is never trashed or rolled back. `brew install`, `brew
 uninstall` and `brew list` keep working unchanged.
 - **The archive is a zip, never the DMG.** A zip expands with `ditto`; a DMG would have to be mounted,
@@ -17,7 +17,7 @@ uninstall` and `brew list` keep working unchanged.
 - **The zip is chosen by architecture.** CN publishes one `-Universal-` zip for both architectures.
   Intel takes the universal zip and is offered nothing if it is missing. Apple silicon can prefer a
   thin zip when one exists, and otherwise uses universal.
-- **Nobody ever runs `xattr`.** An archive Tinycast fetched itself is not quarantined — macOS sets
+- **Nobody ever runs `xattr`.** An archive Tinycast fetched itself is not quarantined: macOS sets
   that flag for sandboxed downloaders and for apps that opt in with `LSFileQuarantineEnabled`, and
   Tinycast is neither. `Quarantine` checks anyway through `getxattr`/`removexattr` rather than the
   `xattr` tool, and an app that still carries the flag is refused rather than installed.
@@ -148,7 +148,7 @@ One route, whatever the install came from:
    it in. The staging folder is on the same volume as `/Applications`, which is what lets this be
    atomic. A copy Tinycast cannot write is reported before the download starts, not worked around;
    there is no privileged helper.
-6. Relaunch spawns a detached waiter that reopens the app once this process exits — `open` on a
+6. Relaunch spawns a detached waiter that reopens the app once this process exits; `open` on a
    bundle id that is still running would only re-activate the instance on its way out.
 
 A successful install records its version as `installedVersion`. The first launch running that
@@ -172,12 +172,12 @@ The zip is made with
 ditto -c -k --keepParent --sequesterRsrc "$APP" "dist/$ZIP_FILE"
 ```
 
-which is the only zip that leaves the code signature verifiable — plain `zip` drops symlinks and
+which is the only zip that leaves the code signature verifiable: plain `zip` drops symlinks and
 breaks the seal, and the signature check above would then reject every update.
 
 The CN workflow combines the supplied Chinese changelog with GitHub's generated merge records,
 then `<!-- tinycast:install -->`, then the install text. The app opens this CN release page for its
-changelog; changes belong above that marker — see [release.md](../release.md#release-notes).
+changelog; changes belong above that marker; see [release.md](../release.md#release-notes).
 
 **The cask declares `auto_updates true`** in `conversun/homebrew-tinycast-cn`. Without it Homebrew
 compares its Caskroom receipt against the cask version, sees a self-updated app as outdated forever,

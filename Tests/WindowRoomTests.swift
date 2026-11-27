@@ -783,6 +783,15 @@ struct WindowRoomTests {
         expect(
             [older, never, newer].sorted(by: Room.enteredMoreRecently).map(\.name) == ["A", "B", "0"],
             "most recent first")
+        expect(
+            Room.previous(to: newer.id, in: [older, never, newer])?.name == "B",
+            "going back skips the current room")
+        expect(
+            Room.previous(to: nil, in: [older, never, newer])?.name == "A",
+            "with no current room, going back enters the last one entered")
+        expect(
+            Room.previous(to: newer.id, in: [never, newer]) == nil,
+            "a room never entered is nowhere to go back to")
 
         let learned = Room(
             name: "Design", windows: [window("figma", id: 12), window("notes", id: 13)],

@@ -4,9 +4,17 @@
 // The page title and meta description, shared by the layout and /llms.txt. Google truncates a
 // description near 160 characters, so `summary` is written to land under it rather than be cut.
 export const pageTitle =
-  "Tinycast: a native macOS launcher for everyday productivity";
+  "Tinycast: a native macOS launcher built for productivity";
 export const summary =
   "A lightweight, open source macOS launcher with app search, clipboard history, snippets, window management, your own AI keys and Raycast extensions.";
+
+// A page that sets its own `openGraph` replaces the layout's whole object, so it names this too.
+export const ogImage = {
+  url: "/og.jpg",
+  width: 1200,
+  height: 630,
+  alt: "The Tinycast logo and tagline beside its command palette, showing fuzzy app search.",
+};
 
 export const site = {
   name: "Tinycast",
@@ -38,7 +46,7 @@ export const hero = {
     rest: "on your Mac.",
     second: "One keystroke away",
   },
-  sub: "A native macOS launcher for everyday productivity. Lightweight and open source, with no account and no telemetry.",
+  sub: "A native macOS launcher built for productivity. Fast, lightweight, and open source, with no account and no telemetry.",
   // The mono line under the buttons. Each fact is stated in the docs.
   facts: ["Under 100 MB of memory", "Zero dependencies", "Free & open source"],
 } as const;
